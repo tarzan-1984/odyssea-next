@@ -1,0 +1,7 @@
+{
+	"*.{js,jsx,ts,tsx}": ["bash -c 'if [[ \"$1\" != \"jest.config.js\" && \"$1\" != \"jest.setup.js\" ]]; then eslint --fix \"$1\"; fi' _", "prettier --write"],
+	"*.{json,md,yml,yaml,css,scss}": ["prettier --write"],
+	"*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+	"jest.config.js": ["prettier --write"],
+	"jest.setup.js": ["prettier --write"]
+}

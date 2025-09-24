@@ -1,0 +1,365 @@
+"use client";
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import ChatBoxHeader from "./ChatBoxHeader";
+import ChatBoxSendForm from "./ChatBoxSendForm";
+import Image from "next/image";
+import { Message, ChatRoom } from "@/app-api/chatApi";
+import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+// WebSocket functionality is now passed via props
+import { useCurrentUser } from "@/stores/userStore";
+import { useChatStore } from "@/stores/chatStore";
+
+interface ChatBoxProps {
+	selectedChatRoom?: ChatRoom;
+	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+}
+
+export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBoxProps) {
+	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+	// Get current user for message display
+	const currentUser = useCurrentUser();
+
+	// Use WebSocket chat sync for real-time functionality from props
+	const {
+		messages,
+		isLoadingMessages: loading,
+		isSendingMessage: sending,
+		loadMessages,
+		sendMessage,
+		webSocketMessages: { sendTyping, isTyping },
+	} = webSocketChatSync;
+
+	// Get error from chat store
+	const error = useChatStore(state => state.error);
+
+	// WebSocket message handling is already provided by useWebSocketChatSync
+	// No need to duplicate useWebSocketMessages here
+
+	// Function to scroll to bottom of messages
+	const scrollToBottom = () => {
+		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	};
+
+	// Check if user is scrolled up
+	const handleScroll = () => {
+		if (messagesContainerRef.current) {
+			const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+			const isAtBottom = scrollHeight - scrollTop - clientHeight < 100; // 100px threshold
+			setIsUserScrolledUp(!isAtBottom);
+		}
+	};
+
+	// Load messages when chat room changes
+	const loadMessagesForRoom = useCallback(
+		async (chatRoomId: string) => {
+			try {
+				await loadMessages(chatRoomId);
+				// Scroll to bottom after messages are loaded
+				setTimeout(() => {
+					scrollToBottom();
+				}, 100);
+			} catch (err) {
+				console.error("Failed to load messages:", err);
+			}
+		},
+		[loadMessages]
+	);
+
+	useEffect(() => {
+		if (selectedChatRoom) {
+			loadMessagesForRoom(selectedChatRoom.id);
+		}
+	}, [selectedChatRoom, loadMessagesForRoom]);
+
+	// Scroll to bottom when messages change (for new messages)
+	useEffect(() => {
+		if (messages.length > 0 && !isUserScrolledUp) {
+			scrollToBottom();
+		}
+	}, [messages.length, isUserScrolledUp]);
+
+	const handleSendMessage = async (messageData: {
+		content: string;
+		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+	}) => {
+		if (!selectedChatRoom) return;
+
+		try {
+			// Use WebSocket-enabled send message
+			await sendMessage(messageData);
+
+			// Always scroll to the new message when user sends it
+			setTimeout(() => {
+				scrollToBottom();
+			}, 100);
+		} catch (err) {
+			console.error("Failed to send message:", err);
+		}
+	};
+
+	const getMessageTime = (createdAt: string): string => {
+		const messageTime = new Date(createdAt);
+		const now = new Date();
+		const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
+
+		if (diffInMinutes < 1) return "Just now";
+		if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+		if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+		return `${Math.floor(diffInMinutes / 1440)}d ago`;
+	};
+
+	const isImageFile = (fileName?: string): boolean => {
+		if (!fileName) return false;
+		const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+		return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+	};
+
+	if (!selectedChatRoom) {
+		return (
+			<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4">
+				<div className="flex items-center justify-center h-full">
+					<div className="text-center text-gray-500 dark:text-gray-400">
+						<svg
+							width="64"
+							height="64"
+							viewBox="0 0 24 24"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+							className="mx-auto mb-4"
+						>
+							<path
+								d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							/>
+						</svg>
+						<p className="text-lg font-medium">Select a chat to start messaging</p>
+						<p className="text-sm">Choose a conversation from the list to begin</p>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4">
+			{/* Header */}
+			<ChatBoxHeader chatRoom={selectedChatRoom} />
+
+			{/* Messages */}
+			<div
+				ref={messagesContainerRef}
+				onScroll={handleScroll}
+				className="flex-1 max-h-full p-5 space-y-6 overflow-auto custom-scrollbar xl:space-y-8 xl:p-6"
+			>
+				{loading ? (
+					<div className="flex items-center justify-center h-full">
+						<div className="text-gray-500">Loading messages...</div>
+					</div>
+				) : error ? (
+					<div className="flex items-center justify-center h-full">
+						<div className="text-red-500">{error}</div>
+					</div>
+				) : messages.length === 0 ? (
+					<div className="flex items-center justify-center h-full">
+						<div className="text-center text-gray-500 dark:text-gray-400">
+							<p>No messages yet</p>
+							<p className="text-sm">Start the conversation!</p>
+						</div>
+					</div>
+				) : (
+					messages.map(message => {
+						const isSender = message.senderId === currentUser?.id;
+
+						return (
+							<div
+								key={message.id}
+								className={`flex ${isSender ? "justify-end" : "items-start gap-4"}`}
+							>
+								{!isSender && (
+									<div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+										{message.sender.profilePhoto ? (
+											<Image
+												width={40}
+												height={40}
+												src={message.sender.profilePhoto}
+												alt={`${message.sender.firstName} profile`}
+												className="object-cover object-center w-full h-full"
+												onError={e => {
+													// Hide image and show fallback
+													const target = e.target as HTMLImageElement;
+													target.style.display = "none";
+													const parent = target.parentElement;
+													if (parent) {
+														parent.innerHTML = `
+															<div class="w-full h-full flex items-center justify-center bg-brand-500 text-white text-sm font-medium">
+																${message.sender.firstName?.charAt(0) || "U"}
+															</div>
+														`;
+													}
+												}}
+											/>
+										) : (
+											<div className="w-full h-full flex items-center justify-center bg-brand-500 text-white text-sm font-medium">
+												{message.sender.firstName?.charAt(0) || "U"}
+											</div>
+										)}
+									</div>
+								)}
+
+								<div className={`${isSender ? "text-right" : ""}`}>
+									{/* Image preview */}
+									{message.fileUrl && isImageFile(message.fileName) && (
+										<div className="mb-2 w-full max-w-[270px] overflow-hidden rounded-lg">
+											<img
+												src={message.fileUrl}
+												alt="chat image"
+												className="object-cover w-full h-auto max-h-48"
+												onError={e => {
+													// Hide image if it fails to load
+													const target = e.target as HTMLImageElement;
+													target.style.display = "none";
+												}}
+											/>
+										</div>
+									)}
+
+									{/* File attachment */}
+									{message.fileUrl && !isImageFile(message.fileName) && (
+										<div className="mb-2 w-full max-w-[270px]">
+											<a
+												href={message.fileUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+											>
+												<svg
+													width="20"
+													height="20"
+													viewBox="0 0 24 24"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+												>
+													<path
+														d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+													<polyline
+														points="14,2 14,8 20,8"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+												</svg>
+												<div className="flex-1 min-w-0">
+													<p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+														{message.fileName || "Download file"}
+													</p>
+													{message.fileSize && (
+														<p className="text-xs text-gray-500 dark:text-gray-400">
+															{Math.round(message.fileSize / 1024)}KB
+														</p>
+													)}
+												</div>
+												<svg
+													width="16"
+													height="16"
+													viewBox="0 0 24 24"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+												>
+													<path
+														d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+													<polyline
+														points="7,10 12,15 17,10"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+													<line
+														x1="12"
+														y1="15"
+														x2="12"
+														y2="3"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+												</svg>
+											</a>
+										</div>
+									)}
+
+									{/* Message content */}
+									{message.content && (
+										<div
+											className={`px-3 py-2 rounded-lg ${
+												isSender
+													? "bg-brand-500 text-white dark:bg-brand-500"
+													: "bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90"
+											} ${isSender ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+										>
+											<p className="text-sm">{message.content}</p>
+										</div>
+									)}
+
+									{/* Timestamp */}
+									<p className="mt-2 text-gray-500 text-theme-xs dark:text-gray-400">
+										{isSender
+											? getMessageTime(message.createdAt)
+											: `${message.sender.firstName}, ${getMessageTime(message.createdAt)}`}
+									</p>
+								</div>
+							</div>
+						);
+					})
+				)}
+				{/* Typing indicator */}
+				{Object.keys(isTyping).length > 0 && (
+					<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+						<div className="flex space-x-1">
+							<div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+							<div
+								className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+								style={{ animationDelay: "0.1s" }}
+							></div>
+							<div
+								className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+								style={{ animationDelay: "0.2s" }}
+							></div>
+						</div>
+						<span className="text-sm">Someone is typing...</span>
+					</div>
+				)}
+
+				{/* Invisible div to scroll to */}
+				<div ref={messagesEndRef} />
+			</div>
+
+			{/* Send Form */}
+			<ChatBoxSendForm
+				onSendMessage={handleSendMessage}
+				onTyping={sendTyping}
+				isLoading={sending}
+				disabled={sending}
+			/>
+		</div>
+	);
+}
