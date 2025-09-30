@@ -15,12 +15,12 @@ import { twMerge } from "tailwind-merge";
 export function renderAvatar(item?: UserData | UserListItem | null, className?: string) {
 	if (!item) return <div className="w-10 h-10 bg-gray-300 rounded-full" />;
 
-	if ("avatar" in item && item.avatar) {
+	if ("profilePhoto" in item && item.profilePhoto) {
 		return (
 			<Image
 				width={40}
 				height={40}
-				src={item.avatar}
+				src={item.profilePhoto}
 				alt="user"
 				className={twMerge("rounded-full", className)}
 			/>
@@ -28,9 +28,18 @@ export function renderAvatar(item?: UserData | UserListItem | null, className?: 
 	}
 
 	// Get the username depending on the object type
-	const name =
-		("organized_data" in item ? item.organized_data?.contact?.driver_name : item.driver_name) ??
-		"";
+	const name = (() => {
+		if ("organized_data" in item) {
+			return item.organized_data?.contact?.driver_name ?? "";
+		}
+		if ("firstName" in item && "lastName" in item) {
+			return `${item.firstName} ${item.lastName}`.trim();
+		}
+		if ("driver_name" in item) {
+			return item.driver_name ?? "";
+		}
+		return "";
+	})();
 
 	const initials = name
 		.replace(/\(.*?\)/g, "")

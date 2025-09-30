@@ -11,11 +11,11 @@ export async function POST(request: NextRequest) {
 
 		const body = await request.json();
 
+		console.log("body++++++", body);
+
 		// Extract parameters from request body
 		const page = body.page || 1;
 		const limit = body.limit || 10;
-		const role = body.role;
-		const status = body.status;
 		const search = body.search;
 		const sort = body.sort;
 
@@ -23,20 +23,17 @@ export async function POST(request: NextRequest) {
 		const queryParams = new URLSearchParams();
 		if (page) queryParams.append("page", page.toString());
 		if (limit) queryParams.append("limit", limit.toString());
-		if (role) queryParams.append("role", role);
-		if (status) queryParams.append("status", status);
 		if (search) queryParams.append("search", search);
 		if (sort) queryParams.append("sort", JSON.stringify(sort));
 
 		// Send request to backend for user list
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL_TWO}/v1/drivers?${queryParams.toString()}`,
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users?${queryParams.toString()}`,
 			{
 				method: "GET",
 				headers: {
 					"Content-Type": "application/json",
-					// Authorization: `Bearer ${accessToken}`,
-					"X-API-Key": `${process.env.TMS_API_KEY}`,
+					Authorization: `Bearer ${accessToken}`,
 				},
 			}
 		);

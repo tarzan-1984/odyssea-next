@@ -12,25 +12,29 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import { renderAvatar } from "@/helpers";
 
 export default function UserListTable() {
+	// State for pagination
 	const [currentPage, setCurrentPage] = useState(1);
-	const [itemsPerPage, setItemsPerPage] = useState(0);
+	const [itemsPerPage, setItemsPerPage] = useState(10);
+
+	// State for search functionality
 	const [searchTerm, setSearchTerm] = useState("");
+
+	// State for data management
 	const [totalItems, setTotalItems] = useState(0);
 	const [userList, setUserList] = useState<UserListItem[]>([]);
+
+	// State for sorting functionality
 	const [sortState, setSortState] = useState<{ [key: string]: "asc" | "desc" }>({ role: "asc" });
+
+	// State for loading indicator
 	const [loading, setLoading] = useState(false);
 
-	// Map frontend column keys to database column names
-	const columnMapping: Record<"role" | "location" | "vehicleBrand", string> = {
-		role: "role",
-		location: "location",
-		vehicleBrand: "vehicleBrand",
-	};
-
+	// Fetch users data when dependencies change
 	useEffect(() => {
 		const fetchUsers = async () => {
 			setLoading(true);
 			try {
+				// Call API to get users with current filters
 				const result = await users.getAllUsers({
 					page: currentPage,
 					limit: itemsPerPage,
@@ -38,16 +42,17 @@ export default function UserListTable() {
 					sort: sortState,
 				});
 
+				// Process successful response
 				if (result.success && result.data) {
-					const newUsers = result.data.data || [];
+					const newUsers = result.data.data?.users || [];
 
 					setUserList(newUsers);
-					setItemsPerPage(result.data.pagination.per_page || 0);
-					setTotalItems(result.data.pagination.total_count || 0);
+					setTotalItems(result.data.data?.pagination?.total_count || 0);
 				} else {
 					setUserList([]);
 				}
 			} catch {
+				// Handle errors by clearing user list
 				setUserList([]);
 			} finally {
 				setLoading(false);
@@ -57,35 +62,38 @@ export default function UserListTable() {
 		fetchUsers();
 	}, [currentPage, itemsPerPage, searchTerm, sortState]);
 
+	// Calculate total pages for pagination
 	const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+	// Handle page change in pagination
 	const handlePageChange = (page: number) => {
 		setCurrentPage(page);
 		// Clear current data to show the loading state
 		setUserList([]);
 	};
 
+	// Handle column sorting
 	const handleSort = (key: "role" | "location" | "vehicleBrand") => {
-		const dbColumn = columnMapping[key];
-
 		// Determine new sort order
 		let newSortOrder: "asc" | "desc";
 
-		if (sortState[dbColumn]) {
+		if (sortState[key]) {
 			// Toggle sort order if same column
-			newSortOrder = sortState[dbColumn] === "asc" ? "desc" : "asc";
+			newSortOrder = sortState[key] === "asc" ? "desc" : "asc";
 		} else {
 			// Set new column with ascending order
 			newSortOrder = "asc";
 		}
 
 		// Update sort state
-		setSortState({ [dbColumn]: newSortOrder });
+		setSortState({ [key]: newSortOrder });
 	};
 
 	return (
 		<div className="overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
+			{/* Header section with pagination controls and search */}
 			<div className="flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+				{/* Items per page selector */}
 				<div className="flex items-center gap-3">
 					<span className="text-gray-500 dark:text-gray-400"> Show </span>
 
@@ -105,6 +113,7 @@ export default function UserListTable() {
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
 
+				{/* Search input */}
 				<div className="relative">
 					<button className="absolute text-gray-500 -translate-y-1/2 left-4 top-1/2 dark:text-gray-400">
 						<svg
@@ -134,9 +143,11 @@ export default function UserListTable() {
 				</div>
 			</div>
 
+			{/* Table section */}
 			<div className="overflow-x-auto custom-scrollbar">
 				<div className="min-w-max">
 					<Table>
+						{/* Table header with sortable columns */}
 						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
 							<TableRow>
 								{[
@@ -170,6 +181,7 @@ export default function UserListTable() {
 											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
 												{label}
 											</p>
+											{/* Sort indicators */}
 											{sortable && (
 												<button className="flex flex-col gap-0.5">
 													<AngleUpIcon
@@ -209,16 +221,20 @@ export default function UserListTable() {
 								))}
 							</TableRow>
 						</TableHeader>
+						{/* Table body with user data */}
 						<TableBody>
 							{loading ? (
+								// Loading spinner
 								<tr>
 									<td colSpan={7} className="p-2">
 										<SpinnerOne />
 									</td>
 								</tr>
 							) : (
+								// User rows
 								userList.map((item, i) => (
 									<TableRow key={i + 1}>
+										{/* User name with avatar */}
 										<TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
 											<Link
 												href={`users/${item?.id}`}
@@ -227,28 +243,38 @@ export default function UserListTable() {
 												{item && renderAvatar(item)}
 												<div>
 													<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
-														{item?.driver_name ? item.driver_name : "-"}
+														{item?.firstName && item?.lastName
+															? `${item.firstName} ${item.lastName}`
+															: item?.firstName ||
+																item?.lastName ||
+																"-"}
 													</span>
 												</div>
 											</Link>
 										</TableCell>
+										{/* User role */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
 											{item?.role ? item.role : "-"}
 										</TableCell>
+										{/* User email */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											{item?.driver_email ? item.driver_email : "-"}
+											{item?.email ? item.email : "-"}
 										</TableCell>
+										{/* User phone */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											{item?.driver_phone ? item.driver_phone : "-"}
+											{item?.phone ? item.phone : "-"}
 										</TableCell>
+										{/* User location */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											{item?.home_location ? item.home_location : "-"}
+											{item?.location ? item.location : "-"}
 										</TableCell>
+										{/* Vehicle type */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
 											<span className="block">
 												{item?.type ? item.type : "-"}
 											</span>
 										</TableCell>
+										{/* Vehicle VIN */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
 											{item?.vin ? item.vin : "-"}
 										</TableCell>
@@ -260,14 +286,12 @@ export default function UserListTable() {
 				</div>
 			</div>
 
+			{/* Footer section with pagination info and controls */}
 			<div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
 				<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-					{/* Left side: Showing entries */}
+					{/* Pagination info */}
 					<div className="pb-3 xl:pb-0">
 						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-							{/*Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}*/}
-							{/*{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}{" "}*/}
-							{/*entries*/}
 							{totalItems === 0
 								? "Showing 0 entries"
 								: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
@@ -277,6 +301,7 @@ export default function UserListTable() {
 						</p>
 					</div>
 
+					{/* Pagination controls */}
 					{totalPages > 1 && (
 						<PaginationWithIcon
 							totalPages={totalPages}

@@ -36,9 +36,9 @@ const authentication = {
 	 * @param loginData - User credentials (email and password)
 	 * @returns Promise with login result including access and refresh tokens
 	 */
-	async login(loginData: LoginData): Promise<LoginResponse> {
+	async login_password(loginData: LoginData): Promise<LoginResponse> {
 		try {
-			const response = await fetch("/api/authentication/login", {
+			const response = await fetch("/api/authentication/login/password", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -57,8 +57,47 @@ const authentication = {
 
 			return {
 				success: true,
-				message: "Login successful",
+				message: data.message || "OTP code sent to your email",
 				data: data,
+			};
+		} catch {
+			return {
+				success: false,
+				error: "Network error occurred",
+			};
+		}
+	},
+
+	/**
+	 * Authenticates user with email only - checks user status and sends temporary password if inactive
+	 * @param email - User email address
+	 * @returns Promise with login result including redirect URL
+	 */
+	async login_email(
+		email: string
+	): Promise<{ success: boolean; message?: string; redirectUrl?: string; error?: string }> {
+		try {
+			const response = await fetch("/api/authentication/login/email", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email }),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				return {
+					success: false,
+					error: data.error || "Failed to verify email",
+				};
+			}
+
+			return {
+				success: true,
+				message: data.message,
+				redirectUrl: data.redirectUrl,
 			};
 		} catch {
 			return {
