@@ -26,17 +26,12 @@ function AuthSuccessContent() {
 					// Transform UserData from API format to client format
 					const clientUserData = {
 						id: data.user.id,
-						email: data.user.organized_data?.contact?.driver_email || "",
-						firstName:
-							data.user.organized_data?.contact?.driver_name?.split(" ")[0] || "",
-						lastName:
-							data.user.organized_data?.contact?.driver_name
-								?.split(" ")
-								.slice(1)
-								.join(" ") || "",
+						email: data.user.email || "",
+						firstName: data.user.firstName || "",
+						lastName: data.user.lastName,
 						role: data.user.role,
 						status: data.user.status,
-						avatar: "", // Default empty avatar, can be updated later if needed
+						avatar: data.user.avatar || "",
 					};
 
 					// Save tokens and user data to cookies

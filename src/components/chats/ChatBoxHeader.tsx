@@ -58,8 +58,8 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== "current-user-id"
 			);
-			if (otherParticipant?.user.profilePhoto) {
-				return otherParticipant.user.profilePhoto;
+			if (otherParticipant?.user.avatar) {
+				return otherParticipant.user.avatar;
 			}
 		}
 
@@ -67,7 +67,7 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 		return "/images/avatars/avatar-default.jpg";
 	};
 
-	const getChatUserData = (): { firstName: string; lastName: string; profilePhoto?: string } => {
+	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
 
 		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
@@ -78,7 +78,7 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 				return {
 					firstName: otherParticipant.user.firstName,
 					lastName: otherParticipant.user.lastName,
-					profilePhoto: otherParticipant.user.profilePhoto,
+					avatar: otherParticipant.user.avatar,
 				};
 			}
 		}
@@ -89,7 +89,7 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 			return {
 				firstName: firstParticipant.user.firstName,
 				lastName: firstParticipant.user.lastName,
-				profilePhoto: firstParticipant.user.profilePhoto,
+				avatar: firstParticipant.user.avatar,
 			};
 		}
 
@@ -104,7 +104,7 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 						const userData = getChatUserData();
 						return (
 							<UserAvatar
-								src={userData.profilePhoto}
+								src={userData.avatar}
 								alt={`${userData.firstName} profile`}
 								firstName={userData.firstName}
 								lastName={userData.lastName}

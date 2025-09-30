@@ -67,7 +67,6 @@ export const clientAuth = {
 		if (encryptedUserData) {
 			try {
 				const decryptedData = tokenEncoder.decode(encryptedUserData);
-				console.log("JSON.parse(decryptedData)", JSON.parse(decryptedData));
 				return JSON.parse(decryptedData);
 			} catch (error) {
 				console.error("Failed to decrypt user data:", error);

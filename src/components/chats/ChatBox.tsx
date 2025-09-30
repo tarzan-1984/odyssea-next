@@ -184,11 +184,11 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 							>
 								{!isSender && (
 									<div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-										{message.sender.profilePhoto ? (
+										{message.sender.avatar ? (
 											<Image
 												width={40}
 												height={40}
-												src={message.sender.profilePhoto}
+												src={message.sender.avatar}
 												alt={`${message.sender.firstName} profile`}
 												className="object-cover object-center w-full h-full"
 												onError={e => {

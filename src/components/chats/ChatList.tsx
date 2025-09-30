@@ -96,8 +96,8 @@ export default function ChatList({
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== "current-user-id"
 			);
-			if (otherParticipant?.user.profilePhoto) {
-				return otherParticipant.user.profilePhoto;
+			if (otherParticipant?.user.avatar) {
+				return otherParticipant.user.avatar;
 			}
 		}
 
@@ -107,7 +107,7 @@ export default function ChatList({
 
 	const getChatUserData = (
 		chatRoom: ChatRoom
-	): { firstName: string; lastName: string; profilePhoto?: string } => {
+	): { firstName: string; lastName: string; avatar?: string } => {
 		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== "current-user-id"
@@ -116,7 +116,7 @@ export default function ChatList({
 				return {
 					firstName: otherParticipant.user.firstName,
 					lastName: otherParticipant.user.lastName,
-					profilePhoto: otherParticipant.user.profilePhoto,
+					avatar: otherParticipant.user.avatar,
 				};
 			}
 		}
@@ -127,7 +127,7 @@ export default function ChatList({
 			return {
 				firstName: firstParticipant.user.firstName,
 				lastName: firstParticipant.user.lastName,
-				profilePhoto: firstParticipant.user.profilePhoto,
+				avatar: firstParticipant.user.avatar,
 			};
 		}
 
@@ -267,7 +267,7 @@ export default function ChatList({
 											const userData = getChatUserData(chatRoom);
 											return (
 												<UserAvatar
-													src={userData.profilePhoto}
+													src={userData.avatar}
 													alt={getChatDisplayName(chatRoom)}
 													firstName={userData.firstName}
 													lastName={userData.lastName}

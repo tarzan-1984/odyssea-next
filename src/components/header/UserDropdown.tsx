@@ -6,24 +6,11 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { clientAuth } from "@/utils/auth";
 import authentication from "@/app-api/authentication";
+import { useCurrentUser } from "@/stores/userStore";
 
 export default function UserDropdown() {
 	const [isOpen, setIsOpen] = useState(false);
-	const [user, setUser] = useState<{
-		id: string;
-		email: string;
-		firstName: string;
-		lastName: string;
-		role: string;
-		status: string;
-		avatar: string;
-	} | null>(null);
-
-	// Get user data from cookies on the component mount
-	useEffect(() => {
-		const userData = clientAuth.getUserData();
-		setUser(userData);
-	}, []);
+	const currentUser = useCurrentUser();
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -54,7 +41,7 @@ export default function UserDropdown() {
 			}
 
 			// Clear user data from the state
-			setUser(null);
+			// setUser(null); // No longer needed with Zustand
 
 			// Force page reload to clear any cached state
 			window.location.href = "/signin";
@@ -68,18 +55,24 @@ export default function UserDropdown() {
 				className="flex items-center dropdown-toggle text-gray-700 dark:text-gray-400 dropdown-toggle"
 			>
 				<span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-					{user?.avatar ? (
-						<Image width={44} height={44} src={user.avatar} alt="User" />
+					{currentUser?.avatar ? (
+						<Image
+							width={44}
+							height={44}
+							src={currentUser.avatar}
+							alt="User"
+							className="object-cover w-full h-full"
+						/>
 					) : (
 						<div className="flex items-center justify-center w-full h-full bg-[#465fff] text-white font-semibold text-lg">
-							{user?.firstName?.charAt(0)}
-							{user?.lastName?.charAt(0)}
+							{currentUser?.firstName?.charAt(0)}
+							{currentUser?.lastName?.charAt(0)}
 						</div>
 					)}
 				</span>
 
 				<span className="block mr-1 font-medium text-theme-sm">
-					{user?.firstName || "User"}
+					{currentUser?.firstName || "User"}
 				</span>
 
 				<svg
@@ -109,10 +102,10 @@ export default function UserDropdown() {
 			>
 				<div>
 					<span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-						{user?.firstName} {user?.lastName}
+						{currentUser?.firstName} {currentUser?.lastName}
 					</span>
 					<span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
-						{user?.email}
+						{currentUser?.email}
 					</span>
 				</div>
 

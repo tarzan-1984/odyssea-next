@@ -10,7 +10,10 @@ export interface UserData {
 	role: string;
 	status: string;
 	avatar?: string;
-	organized_data: {
+	email: string;
+	firstName: string;
+	lastName: string;
+	organized_data?: {
 		contact: {
 			driver_name: string;
 			driver_email: string;

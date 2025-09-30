@@ -133,17 +133,12 @@ export default function OtpForm() {
 					// Transform UserData from API format to client format
 					const clientUserData = {
 						id: userData.id,
-						email: userData.organized_data?.contact?.driver_email || "",
-						firstName:
-							userData.organized_data?.contact?.driver_name?.split(" ")[0] || "",
-						lastName:
-							userData.organized_data?.contact?.driver_name
-								?.split(" ")
-								.slice(1)
-								.join(" ") || "",
+						email: userData.email || "",
+						firstName: userData.firstName || "",
+						lastName: userData.lastName || "",
 						role: userData.role,
 						status: userData.status,
-						avatar: "", // Default empty avatar, can be updated later if needed
+						avatar: userData.avatar || "",
 					};
 
 					// Save tokens and user data to cookies
