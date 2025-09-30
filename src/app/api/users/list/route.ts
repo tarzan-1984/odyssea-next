@@ -11,13 +11,12 @@ export async function POST(request: NextRequest) {
 
 		const body = await request.json();
 
-		console.log("body++++++", body);
-
 		// Extract parameters from request body
 		const page = body.page || 1;
 		const limit = body.limit || 10;
 		const search = body.search;
 		const sort = body.sort;
+		const role = body.role || "DRIVER"; // Default to DRIVER role
 
 		// Build query string for backend
 		const queryParams = new URLSearchParams();
@@ -25,6 +24,7 @@ export async function POST(request: NextRequest) {
 		if (limit) queryParams.append("limit", limit.toString());
 		if (search) queryParams.append("search", search);
 		if (sort) queryParams.append("sort", JSON.stringify(sort));
+		if (role) queryParams.append("role", role);
 
 		// Send request to backend for user list
 		const response = await fetch(

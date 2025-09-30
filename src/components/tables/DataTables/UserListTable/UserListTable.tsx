@@ -40,6 +40,7 @@ export default function UserListTable() {
 					limit: itemsPerPage,
 					search: searchTerm,
 					sort: sortState,
+					role: "DRIVER", // Filter for drivers only
 				});
 
 				// Process successful response
@@ -237,7 +238,7 @@ export default function UserListTable() {
 										{/* User name with avatar */}
 										<TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
 											<Link
-												href={`users/${item?.id}`}
+												href={`users/${item?.externalId}`}
 												className="flex items-center gap-3"
 											>
 												{item && renderAvatar(item)}
