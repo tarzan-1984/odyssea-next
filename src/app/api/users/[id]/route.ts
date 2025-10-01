@@ -13,12 +13,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		const { id } = await params;
 
 		if (!id) {
-			return NextResponse.json({ error: "User External ID is required" }, { status: 400 });
+			return NextResponse.json({ error: "User ID is required" }, { status: 400 });
 		}
 
-		// Send request to backend for user by externalId
+		// Send request to backend for user by ID
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/external/${id}`,
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/${id}`,
 			{
 				method: "GET",
 				headers: {

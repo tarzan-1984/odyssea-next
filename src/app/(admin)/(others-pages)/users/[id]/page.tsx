@@ -5,60 +5,60 @@ import UserContactCard from "@/components/user-profile/UserContactCard";
 import UserVehicleCard from "@/components/user-profile/UserVehicleCard";
 import UserMetaCard from "@/components/user-profile/UserMetaCard";
 import users from "@/app-api/users";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
-import {
-	useCurrentUser,
-	useIsLoadingUser,
-	useUserError,
-	useSetCurrentUser,
-	useSetLoadingUser,
-	useSetError,
-} from "@/stores/userStore";
 import UserDocumentsCard from "@/components/user-profile/UserDocumentsCard";
 import UserStatisticsCard from "@/components/user-profile/UserStatistics";
+import {UserData, UserOrganizedData} from "@/app-api/api-types";
 import UserCurrentLocationCard from "@/components/user-profile/UserCurrentLocation";
 
 export default function SingleUserProfile() {
-	// Get data from Zustand store
-	const currentUser = useCurrentUser();
-	const isLoading = useIsLoadingUser();
-	const error = useUserError();
-	const setCurrentUser = useSetCurrentUser();
-	const setLoadingUser = useSetLoadingUser();
-	const setError = useSetError();
-
 	const params = useParams();
 	const userID = params.id as string;
+	const [isLoading, setIsLoading] = useState(true);
+	const [user, setUser] = useState<UserData | null>(null);
+	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!userID) return;
 
 		const fetchUser = async () => {
-			setLoadingUser(true);
+			setIsLoading(true);
 			setError(null);
 
 			try {
 				const result = await users.getUserByID(userID);
 
-				// TODO: Need to add redirect for non allowed users to visit the page
 				if (result.success && result.data) {
-					setCurrentUser(result.data);
+
+					const fetchUser = {...result.data.data};
+
+					// If user is a driver, fetch additional data from TMS
+					if (result.data.data.role === 'DRIVER' && result.data.data.externalId) {
+						const driverResult = await users.getDriverById(result.data.data.externalId);
+
+						if(driverResult.success && driverResult?.data) {
+							fetchUser['organized_data'] = driverResult?.data.organized_data as UserOrganizedData;
+						}
+					}
+
+					setUser(fetchUser);
+
 				} else {
-					setCurrentUser(null);
+					setUser(null);
 					setError(result.error || "Failed to load user data");
 				}
 			} catch (error) {
 				console.log("error", error);
-				setCurrentUser(null);
+				setUser(null);
 				setError("Network error occurred");
 			} finally {
-				setLoadingUser(false);
+				setIsLoading(false);
 			}
 		};
 
 		fetchUser();
-	}, [userID, setCurrentUser, setLoadingUser, setError]);
+	}, [userID]);
 
 	if (isLoading) {
 		return (
@@ -71,7 +71,7 @@ export default function SingleUserProfile() {
 		);
 	}
 
-	if (!currentUser && !isLoading) {
+	if (!user && !isLoading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
 				<div className="text-center">
@@ -84,17 +84,30 @@ export default function SingleUserProfile() {
 	return (
 		<div>
 			<div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-				{/*<h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90 lg:mb-7">*/}
-				{/*	Profile - {currentUser?.firstName} {currentUser?.lastName}*/}
-				{/*</h3>*/}
 
 				<div className="space-y-6">
-					<UserMetaCard />
-					<UserContactCard />
-					<UserCurrentLocationCard />
-					<UserVehicleCard />
-					<UserDocumentsCard />
-					<UserStatisticsCard />
+					<UserMetaCard user={user} />
+
+					{user?.organized_data?.contact && user.role === 'DRIVER' &&
+						<UserContactCard user={user} />
+					}
+
+					{user?.organized_data?.contact && user.role === 'DRIVER' &&
+						<UserVehicleCard user={user} />
+					}
+
+
+					{user?.organized_data?.contact && user.role === 'DRIVER' &&
+						<UserDocumentsCard user={user} />
+					}
+
+					{user?.organized_data?.contact && user.role === 'DRIVER' &&
+						<UserStatisticsCard user={user} />
+					}
+
+					{user?.organized_data?.contact && user.role === 'DRIVER' &&
+						<UserCurrentLocationCard user={user} />
+					}
 				</div>
 			</div>
 		</div>

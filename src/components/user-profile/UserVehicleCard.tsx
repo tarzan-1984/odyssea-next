@@ -5,12 +5,17 @@ import { useModal } from "@/hooks/useModal";
 import { Modal } from "../ui/modal";
 import { useForm, Path } from "react-hook-form";
 import users from "@/app-api/users";
-import { UserUpdateFormData } from "@/app-api/api-types";
+import { UserData, UserUpdateFormData } from "@/app-api/api-types";
 import Label from "../form/Label";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import Button from "../ui/button/Button";
 
-export default function UserVehicleCard() {
+
+interface IUserVehicleCardProp {
+	user: UserData;
+}
+
+export default function UserVehicleCard({user}: IUserVehicleCardProp) {
 	// Get user data from Zustand store
 	const currentUser = useCurrentUser();
 
@@ -95,24 +100,24 @@ export default function UserVehicleCard() {
 	};
 
 	const vehicleFields = [
-		{ label: "Type", value: currentUser?.organized_data?.vehicle.type.label, key: "type" },
-		{ label: "Make", value: currentUser?.organized_data?.vehicle.make, key: "make" },
-		{ label: "Model", value: currentUser?.organized_data?.vehicle.model, key: "model" },
-		{ label: "Vehicle Year", value: currentUser?.organized_data?.vehicle.year, key: "year" },
-		{ label: "Payload", value: currentUser?.organized_data?.vehicle.payload, key: "payload" },
+		{ label: "Type", value: user?.organized_data?.vehicle.type.label, key: "type" },
+		{ label: "Make", value: user?.organized_data?.vehicle.make, key: "make" },
+		{ label: "Model", value: user?.organized_data?.vehicle.model, key: "model" },
+		{ label: "Vehicle Year", value: user?.organized_data?.vehicle.year, key: "year" },
+		{ label: "Payload", value: user?.organized_data?.vehicle.payload, key: "payload" },
 		{
 			label: "Cargo space dimensions",
-			value: currentUser?.organized_data?.vehicle.cargo_space_dimensions,
+			value: user?.organized_data?.vehicle.cargo_space_dimensions,
 			key: "cargo_space_dimensions",
 		},
 		{
 			label: "Overall dimensions",
-			value: currentUser?.organized_data?.vehicle.overall_dimensions,
+			value: user?.organized_data?.vehicle.overall_dimensions,
 			key: "overall_dimensions",
 		},
 		{
 			label: "Vin",
-			value: currentUser?.organized_data?.vehicle?.vin,
+			value: user?.organized_data?.vehicle?.vin,
 			key: "vin",
 		},
 	];
@@ -121,28 +126,28 @@ export default function UserVehicleCard() {
 		{
 			label: "Side door",
 			key: "side_door",
-			value: currentUser?.organized_data?.vehicle?.equipment?.side_door,
+			value: user?.organized_data?.vehicle?.equipment?.side_door,
 		},
 		{
 			label: "Load bars",
 			key: "load_bars",
-			value: currentUser?.organized_data?.vehicle?.equipment?.load_bars,
+			value: user?.organized_data?.vehicle?.equipment?.load_bars,
 		},
 		{
 			label: "Printer",
 			key: "printer",
-			value: currentUser?.organized_data?.vehicle?.equipment?.printer,
+			value: user?.organized_data?.vehicle?.equipment?.printer,
 		},
 		{
 			label: "Sleeper",
 			key: "sleeper",
-			value: currentUser?.organized_data?.vehicle?.equipment?.sleeper,
+			value: user?.organized_data?.vehicle?.equipment?.sleeper,
 		},
 		{ label: "PPE", key: "ppe", value: currentUser?.organized_data?.vehicle?.equipment?.ppe },
 		{
 			label: "E-tracks",
 			key: "e_tracks",
-			value: currentUser?.organized_data?.vehicle?.equipment?.e_tracks,
+			value: user?.organized_data?.vehicle?.equipment?.e_tracks,
 		},
 		{
 			label: "Pallet Jack",
@@ -152,17 +157,17 @@ export default function UserVehicleCard() {
 		{
 			label: "Lift Gate",
 			key: "lift_gate",
-			value: currentUser?.organized_data?.vehicle?.equipment?.lift_gate,
+			value: user?.organized_data?.vehicle?.equipment?.lift_gate,
 		},
 		{
 			label: "Dolly",
 			key: "dolly",
-			value: currentUser?.organized_data?.vehicle?.equipment?.dolly,
+			value: user?.organized_data?.vehicle?.equipment?.dolly,
 		},
 		{
 			label: "Ramp",
 			key: "ramp",
-			value: currentUser?.organized_data?.vehicle?.equipment?.ramp,
+			value: user?.organized_data?.vehicle?.equipment?.ramp,
 		},
 	];
 

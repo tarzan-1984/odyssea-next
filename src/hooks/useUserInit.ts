@@ -23,6 +23,9 @@ export const useUserInit = () => {
 					firstName: userData.firstName,
 					lastName: userData.lastName,
 					email: userData.email,
+					externalId: userData.externalId,
+					phone: userData.phone,
+					location: userData.location,
 				};
 
 				setCurrentUser(userDataForStore);

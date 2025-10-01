@@ -3,15 +3,17 @@ import React, { useEffect, useState } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
-// import Input from "../form/input/InputField";
 import Label from "../form/Label";
 import { useCurrentUser, useUpdateUserField } from "@/stores/userStore";
 import { useForm } from "react-hook-form";
-import { UserUpdateFormData } from "@/app-api/api-types";
+import { UserData, UserUpdateFormData } from "@/app-api/api-types";
 import users from "@/app-api/users";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
-export default function UserCurrentLocationCard() {
+interface IUserCurrentLocationCardProp {
+	user: UserData | null;
+}
+export default function UserCurrentLocationCard({user}: IUserCurrentLocationCardProp) {
 	const { isOpen, openModal, closeModal } = useModal();
 	const [loading, setLoading] = useState(false);
 	const [resultMessage, setResultMessage] = useState<{
@@ -31,30 +33,29 @@ export default function UserCurrentLocationCard() {
 	} = useForm<Partial<UserUpdateFormData>>({});
 
 	useEffect(() => {
-		if (currentUser) {
+		if (user) {
 			reset({
 				current_location: {
-					zipcode: currentUser?.organized_data?.current_location.zipcode || "",
-					city: currentUser?.organized_data?.current_location.city || "",
-					state: currentUser?.organized_data?.current_location.state || "",
+					zipcode: user?.organized_data?.current_location.zipcode || "",
+					city: user?.organized_data?.current_location.city || "",
+					state: user?.organized_data?.current_location.state || "",
 					coordinates: {
-						lat: currentUser?.organized_data?.current_location.coordinates.lat || "",
-						lng: currentUser?.organized_data?.current_location.coordinates.lng || "",
-					},
-					last_updated: currentUser?.organized_data?.current_location.last_updated || "",
+						lat: user?.organized_data?.current_location.coordinates.lat || "",
+						lng: user?.organized_data?.current_location.coordinates.lng || "",
+					}
 				},
 			});
 		}
-	}, [currentUser, reset]);
+	}, [user, reset]);
 
 	const onSubmit = async (data: Partial<UserUpdateFormData>) => {
-		if (!currentUser?.id) return;
+		if (!user?.id) return;
 
 		setLoading(true);
 		setResultMessage(null);
 
 		try {
-			const result = await users.updateUser(currentUser.id, data);
+			const result = await users.updateUser(user.id, data);
 
 			if (result.success) {
 				setResultMessage({
@@ -75,29 +76,24 @@ export default function UserCurrentLocationCard() {
 	const currentLocationFields = [
 		{
 			label: "City",
-			value: currentUser?.organized_data?.current_location?.city,
+			value: user?.organized_data?.current_location?.city,
 			key: "city",
 		},
 		{
 			label: "Coordinates (lat / lng)",
-			value: currentUser?.organized_data?.current_location?.coordinates,
+			value: user?.organized_data?.current_location?.coordinates,
 			key: "coordinates",
-			lat: currentUser?.organized_data?.current_location?.coordinates.lat,
-			lng: currentUser?.organized_data?.current_location?.coordinates.lng,
-		},
-		{
-			label: "Last updated",
-			value: currentUser?.organized_data?.current_location?.last_updated,
-			key: "last_updated",
+			lat: user?.organized_data?.current_location?.coordinates.lat,
+			lng: user?.organized_data?.current_location?.coordinates.lng,
 		},
 		{
 			label: "State",
-			value: currentUser?.organized_data?.current_location?.state,
+			value: user?.organized_data?.current_location?.state,
 			key: "state",
 		},
 		{
 			label: "Zipcode",
-			value: currentUser?.organized_data?.current_location?.zipcode,
+			value: user?.organized_data?.current_location?.zipcode,
 			key: "zipcode",
 		},
 	];
@@ -110,27 +106,29 @@ export default function UserCurrentLocationCard() {
 						Current location
 					</h4>
 
-					<button
-						onClick={openModal}
-						className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 lg:inline-flex lg:w-auto order-3 lg:order-2"
-					>
-						<svg
-							className="fill-current"
-							width="18"
-							height="18"
-							viewBox="0 0 18 18"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
+					{ currentUser?.role === 'ADMINISTRATOR' &&
+						<button
+							onClick={openModal}
+							className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 lg:inline-flex lg:w-auto order-3 lg:order-2"
 						>
-							<path
-								fillRule="evenodd"
-								clipRule="evenodd"
-								d="M15.0911 2.78206C14.2125 1.90338 12.7878 1.90338 11.9092 2.78206L4.57524 10.116C4.26682 10.4244 4.0547 10.8158 3.96468 11.2426L3.31231 14.3352C3.25997 14.5833 3.33653 14.841 3.51583 15.0203C3.69512 15.1996 3.95286 15.2761 4.20096 15.2238L7.29355 14.5714C7.72031 14.4814 8.11172 14.2693 8.42013 13.9609L15.7541 6.62695C16.6327 5.74827 16.6327 4.32365 15.7541 3.44497L15.0911 2.78206ZM12.9698 3.84272C13.2627 3.54982 13.7376 3.54982 14.0305 3.84272L14.6934 4.50563C14.9863 4.79852 14.9863 5.2734 14.6934 5.56629L14.044 6.21573L12.3204 4.49215L12.9698 3.84272ZM11.2597 5.55281L5.6359 11.1766C5.53309 11.2794 5.46238 11.4099 5.43238 11.5522L5.01758 13.5185L6.98394 13.1037C7.1262 13.0737 7.25666 13.003 7.35947 12.9002L12.9833 7.27639L11.2597 5.55281Z"
-								fill=""
-							/>
-						</svg>
-						Edit
-					</button>
+							<svg
+								className="fill-current"
+								width="18"
+								height="18"
+								viewBox="0 0 18 18"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M15.0911 2.78206C14.2125 1.90338 12.7878 1.90338 11.9092 2.78206L4.57524 10.116C4.26682 10.4244 4.0547 10.8158 3.96468 11.2426L3.31231 14.3352C3.25997 14.5833 3.33653 14.841 3.51583 15.0203C3.69512 15.1996 3.95286 15.2761 4.20096 15.2238L7.29355 14.5714C7.72031 14.4814 8.11172 14.2693 8.42013 13.9609L15.7541 6.62695C16.6327 5.74827 16.6327 4.32365 15.7541 3.44497L15.0911 2.78206ZM12.9698 3.84272C13.2627 3.54982 13.7376 3.54982 14.0305 3.84272L14.6934 4.50563C14.9863 4.79852 14.9863 5.2734 14.6934 5.56629L14.044 6.21573L12.3204 4.49215L12.9698 3.84272ZM11.2597 5.55281L5.6359 11.1766C5.53309 11.2794 5.46238 11.4099 5.43238 11.5522L5.01758 13.5185L6.98394 13.1037C7.1262 13.0737 7.25666 13.003 7.35947 12.9002L12.9833 7.27639L11.2597 5.55281Z"
+									fill=""
+								/>
+							</svg>
+							Edit
+						</button>
+					}
 
 					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-7 2xl:gap-x-32 basis-full order-2 lg:order-3">
 						{currentLocationFields.map(field => (

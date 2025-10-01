@@ -3,10 +3,12 @@ import React from "react";
 import { useCurrentUser } from "@/stores/userStore";
 import IconPdf from "@/components/ui/icons/IconPdf";
 import IconTxt from "@/components/ui/icons/IconTxt";
-// import users from "@/app-api/users";
-// import { UserData } from "@/app-api/api-types";
+import { UserData } from "@/app-api/api-types";
 
-export default function UserDocumentsCard() {
+interface IUserDocumentsCardProp {
+	user: UserData;
+}
+export default function UserDocumentsCard({user}: IUserDocumentsCardProp) {
 	// Get user data from Zustand store
 	const currentUser = useCurrentUser();
 
@@ -15,42 +17,42 @@ export default function UserDocumentsCard() {
 			label: "Real ID",
 			key: "real_id",
 			type: "boolean",
-			value: currentUser?.organized_data?.documents.real_id,
+			value: user?.organized_data?.documents.real_id,
 		},
 		{
 			label: "Hazmat certificate",
 			key: "hazmat_certificate",
 			type: "object",
-			value: currentUser?.organized_data?.documents.hazmat_certificate.has_certificate,
-			file_url: currentUser?.organized_data?.documents.hazmat_certificate.file_url,
+			value: user?.organized_data?.documents.hazmat_certificate.has_certificate,
+			file_url: user?.organized_data?.documents.hazmat_certificate.file_url,
 		},
 		{
 			label: "TWIC",
 			key: "twic",
 			type: "object",
-			value: currentUser?.organized_data?.documents.twic.has_certificate,
-			file_url: currentUser?.organized_data?.documents.twic.file_url,
+			value: user?.organized_data?.documents.twic.has_certificate,
+			file_url: user?.organized_data?.documents.twic.file_url,
 		},
 		{
 			label: "TSA Approved",
 			key: "tsa_approved",
 			type: "object",
-			value: currentUser?.organized_data?.documents.tsa_approved.has_certificate,
-			file_url: currentUser?.organized_data?.documents.tsa_approved.file_url,
+			value: user?.organized_data?.documents.tsa_approved.has_certificate,
+			file_url: user?.organized_data?.documents.tsa_approved.file_url,
 		},
 		{
 			label: "Background check",
 			key: "background_check",
 			type: "object",
-			value: currentUser?.organized_data?.documents.background_check.has_certificate,
-			file_url: currentUser?.organized_data?.documents.background_check.file_url,
+			value: user?.organized_data?.documents.background_check.has_certificate,
+			file_url: user?.organized_data?.documents.background_check.file_url,
 		},
 		{
 			label: "Change 9 training",
 			key: "change_9_training",
 			type: "object",
-			value: currentUser?.organized_data?.documents.change_9_training.has_certificate,
-			file_url: currentUser?.organized_data?.documents.change_9_training.file_url,
+			value: user?.organized_data?.documents.change_9_training.has_certificate,
+			file_url: user?.organized_data?.documents.change_9_training.file_url,
 		},
 	];
 

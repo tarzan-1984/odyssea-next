@@ -1,27 +1,32 @@
 "use client";
 import React from "react";
 import { useCurrentUser } from "@/stores/userStore";
+import { UserData } from "@/app-api/api-types";
 
-export default function UserStatisticsCard() {
+interface IUserStatisticsCardProp {
+	user: UserData;
+}
+
+export default function UserStatisticsCard({user}: IUserStatisticsCardProp) {
 	// Get user data from Zustand store
 	const currentUser = useCurrentUser();
 
 	const notificationsFields = [
 		{
 			label: "All notifications",
-			value: currentUser?.organized_data?.statistics?.notifications?.all_notifications,
+			value: user?.organized_data?.statistics?.notifications?.all_notifications,
 		},
 		{
 			label: "Total notifications",
-			value: currentUser?.organized_data?.statistics?.notifications?.total_count,
+			value: user?.organized_data?.statistics?.notifications?.total_count,
 		},
 		{
 			label: "Average rating",
-			value: currentUser?.organized_data?.statistics?.rating?.average_rating,
+			value: user?.organized_data?.statistics?.rating?.average_rating,
 		},
 		{
 			label: "Total ratings",
-			value: currentUser?.organized_data?.statistics?.rating?.total_ratings,
+			value: user?.organized_data?.statistics?.rating?.total_ratings,
 		},
 	];
 

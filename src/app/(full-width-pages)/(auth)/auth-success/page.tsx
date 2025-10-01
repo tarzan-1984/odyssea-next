@@ -32,6 +32,9 @@ function AuthSuccessContent() {
 						role: data.user.role,
 						status: data.user.status,
 						avatar: data.user.avatar || "",
+						externalId: data.user.externalId || "",
+						phone: data.user.phone || "",
+						location: data.user.location || "",
 					};
 
 					// Save tokens and user data to cookies

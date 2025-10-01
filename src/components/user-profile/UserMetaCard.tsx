@@ -1,25 +1,26 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useModal } from "../../hooks/useModal";
-// import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
-// import Input from "../form/input/InputField";
-// import Label from "../form/Label";
 import Image from "next/image";
 import { Camera } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import UploadFile from "@/components/upload-file/UploadFile";
-import { useCurrentUser, useUpdateUserField, useUserStore } from "@/stores/userStore";
+import { useCurrentUser, useUpdateUserField } from "@/stores/userStore";
 import { renderAvatar } from "@/helpers";
 import { clientAuth } from "@/utils/auth";
+import {UserData} from "@/app-api/api-types";
 
 interface IFormDataImportTable {
 	upload: File | null;
 }
 
-export default function UserMetaCard() {
-	// Get user data from Zustand store
+interface IUserMetaCardProp {
+	user: UserData | null;
+}
+
+export default function UserMetaCard({user}: IUserMetaCardProp) {
 	const currentUser = useCurrentUser();
+	// Get user data from Zustand store
 	const updateUserField = useUpdateUserField();
 
 	// State for upload handling
@@ -27,9 +28,6 @@ export default function UserMetaCard() {
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-	// const { isOpen, openModal, closeModal } = useModal();
-	const { isOpen, closeModal } = useModal();
 
 	// Cleanup preview URL on component unmount
 	useEffect(() => {
@@ -39,12 +37,6 @@ export default function UserMetaCard() {
 			}
 		};
 	}, [previewUrl]);
-
-	const handleSave = () => {
-		// Handle save logic here
-		console.log("Saving changes...");
-		closeModal();
-	};
 
 	// Handle file selection
 	const handleFileSelect = (file: File | null) => {
@@ -66,7 +58,7 @@ export default function UserMetaCard() {
 
 	// Handle avatar upload
 	const handleAvatarUpload = async (file: File) => {
-		if (!file || !currentUser?.id) return;
+		if (!file || !user?.id) return;
 
 		setIsUploading(true);
 		setUploadError(null);
@@ -75,7 +67,7 @@ export default function UserMetaCard() {
 			// Step 1: Upload file to server
 			const formData = new FormData();
 			formData.append("file", file);
-			formData.append("userId", currentUser.id);
+			formData.append("userId", user.id);
 
 			const uploadResponse = await fetch("/api/upload/avatar", {
 				method: "POST",
@@ -105,21 +97,26 @@ export default function UserMetaCard() {
 				throw new Error(updateData.error || "Failed to update avatar");
 			}
 
-			// Step 3: Update local state (Zustand)
-			updateUserField("avatar", uploadData.avatarUrl);
+			if(user.id === currentUser?.id) {
+				// Step 3: Update local state (Zustand)
+				updateUserField("avatar", uploadData.avatarUrl);
 
-			// Step 4: Update cookies with new avatar URL
-			if (currentUser) {
-				const updatedUserData = {
-					id: currentUser.id,
-					email: currentUser.email,
-					firstName: currentUser.firstName,
-					lastName: currentUser.lastName,
-					role: currentUser.role,
-					status: currentUser.status,
-					avatar: uploadData.avatarUrl, // Update avatar in cookies
-				};
-				clientAuth.setUserData(updatedUserData);
+				// Step 4: Update cookies with new avatar URL
+				if (user) {
+					const updatedUserData = {
+						id: user.id,
+						email: user.email,
+						firstName: user.firstName,
+						lastName: user.lastName,
+						role: user.role,
+						status: user.status,
+						avatar: uploadData.avatarUrl, // Update avatar in cookies
+						externalId: user.externalId || "",
+						phone: user.phone || "",
+						location: user.location || "",
+					};
+					clientAuth.setUserData(updatedUserData);
+				}
 			}
 
 			// Step 5: Clear preview and selected file
@@ -156,6 +153,10 @@ export default function UserMetaCard() {
 		}
 	};
 
+	if(!user) {
+		return (<></>);
+	}
+
 	return (
 		<>
 			<div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -177,7 +178,7 @@ export default function UserMetaCard() {
 											className="w-20 h-20 rounded-full object-cover"
 										/>
 									) : (
-										currentUser && renderAvatar(currentUser, "w-20 h-20")
+										user && renderAvatar(user, "w-20 h-20")
 									)}
 
 									<Controller
@@ -252,138 +253,32 @@ export default function UserMetaCard() {
 
 							<div>
 								<h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-									{(currentUser?.firstName || currentUser?.lastName) &&
-										`${currentUser.firstName} ${currentUser.lastName}`}
+									{(user?.firstName || user?.lastName) &&
+										`${user.firstName} ${user.lastName}`}
 								</h4>
 								<div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
 									<p className="text-sm text-gray-500 dark:text-gray-400">
-										{currentUser?.role || "-"}
+										{user?.role || "-"}
 									</p>
 									<div className="hidden h-3.5 w-px bg-gray-300 dark:bg-gray-700 xl:block"></div>
 									<p className="text-sm text-gray-500 dark:text-gray-400">
-										{currentUser?.status || "-"}
+										{user?.status || "-"}
 									</p>
 								</div>
 							</div>
 						</div>
 
-						<div className="shrink-0">
-							<h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-								Recruiter Manager
-							</h4>
-							<p className="text-sm text-gray-500 dark:text-gray-400">Alex Baker</p>
-						</div>
+						{user.role === 'DRIVER' &&
+							<div className="shrink-0">
+								<h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
+									Recruiter Manager
+								</h4>
+								<p className="text-sm text-gray-500 dark:text-gray-400">Alex Baker</p>
+							</div>
+						}
 					</div>
 				</div>
 			</div>
-			{/*<Modal isOpen={isOpen} onClose={closeModal} className="max-w-[700px] m-4">*/}
-			{/*	<div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">*/}
-			{/*		<div className="px-2 pr-14">*/}
-			{/*			<h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">*/}
-			{/*				Edit Personal Information*/}
-			{/*			</h4>*/}
-			{/*			<p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">*/}
-			{/*				Update your details to keep your profile up-to-date.*/}
-			{/*			</p>*/}
-			{/*		</div>*/}
-			{/*		<form className="flex flex-col">*/}
-			{/*			<div className="custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3">*/}
-			{/*				<div>*/}
-			{/*					<h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">*/}
-			{/*						Social Links*/}
-			{/*					</h5>*/}
-
-			{/*					<div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">*/}
-			{/*						<div>*/}
-			{/*							<Label>Facebook</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue="https://www.facebook.com/PimjoHQ"*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-
-			{/*						<div>*/}
-			{/*							<Label>X.com</Label>*/}
-			{/*							<Input type="text" defaultValue="https://x.com/PimjoHQ" />*/}
-			{/*						</div>*/}
-
-			{/*						<div>*/}
-			{/*							<Label>Linkedin</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue="https://www.linkedin.com/company/pimjo"*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-
-			{/*						<div>*/}
-			{/*							<Label>Instagram</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue="https://instagram.com/PimjoHQ"*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-			{/*					</div>*/}
-			{/*				</div>*/}
-			{/*				<div className="mt-7">*/}
-			{/*					<h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">*/}
-			{/*						Personal Information*/}
-			{/*					</h5>*/}
-
-			{/*					<div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">*/}
-			{/*						<div className="col-span-2 lg:col-span-1">*/}
-			{/*							<Label>First Name</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue={currentUser?.firstName || ""}*/}
-			{/*								onChange={e =>*/}
-			{/*									updateUserField("firstName", e.target.value)*/}
-			{/*								}*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-
-			{/*						<div className="col-span-2 lg:col-span-1">*/}
-			{/*							<Label>Last Name</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue={currentUser?.lastName || ""}*/}
-			{/*								onChange={e =>*/}
-			{/*									updateUserField("lastName", e.target.value)*/}
-			{/*								}*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-
-			{/*						<div className="col-span-2 lg:col-span-1">*/}
-			{/*							<Label>Email Address</Label>*/}
-			{/*							<Input*/}
-			{/*								type="text"*/}
-			{/*								defaultValue={currentUser?.email || ""}*/}
-			{/*								onChange={e => updateUserField("email", e.target.value)}*/}
-			{/*							/>*/}
-			{/*						</div>*/}
-
-			{/*						<div className="col-span-2 lg:col-span-1">*/}
-			{/*							<Label>Phone</Label>*/}
-			{/*							<Input type="text" defaultValue="+09 363 398 46" />*/}
-			{/*						</div>*/}
-
-			{/*						<div className="col-span-2">*/}
-			{/*							<Label>Bio</Label>*/}
-			{/*							<Input type="text" defaultValue="Team Manager" />*/}
-			{/*						</div>*/}
-			{/*					</div>*/}
-			{/*				</div>*/}
-			{/*			</div>*/}
-			{/*			<div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">*/}
-			{/*				<Button size="sm" variant="outline" onClick={closeModal}>*/}
-			{/*					Close*/}
-			{/*				</Button>*/}
-			{/*				<Button size="sm" onClick={handleSave}>*/}
-			{/*					Save Changes*/}
-			{/*				</Button>*/}
-			{/*			</div>*/}
-			{/*		</form>*/}
-			{/*	</div>*/}
-			{/*</Modal>*/}
 		</>
 	);
 }

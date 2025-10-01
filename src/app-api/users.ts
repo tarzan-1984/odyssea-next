@@ -3,9 +3,7 @@ import {
 	CreateUserResponse,
 	GetAllUsersParams,
 	GetAllUsersResponse,
-	GetUserProfileResponse,
 	GetUserByIdResponse,
-	UpdateUserProfileResponse,
 	UpdateUserResponse,
 	DeleteUserResponse,
 	ChangeUserStatusResponse,
@@ -13,6 +11,7 @@ import {
 	DeleteUserInput,
 	ChangeUserStatusInput,
 	UserUpdateFormData,
+	TMSDriverResponse,
 } from "./api-types";
 
 /**
@@ -98,42 +97,6 @@ const users = {
 	},
 
 	/**
-	 * Retrieves current authenticated user's profile
-	 * @returns Promise with current user profile data
-	 */
-	async getCurrentUserProfile(): Promise<GetUserProfileResponse> {
-		try {
-			const response = await fetch("/api/users/profile", {
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include", // Include cookies for authentication
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				return {
-					success: false,
-					error: data.error || "Failed to fetch user profile",
-				};
-			}
-
-			return {
-				success: true,
-				data: data,
-			};
-		} catch (error) {
-			console.error("Error in getCurrentUserProfile:", error);
-			return {
-				success: false,
-				error: "Network error occurred",
-			};
-		}
-	},
-
-	/**
 	 * Retrieves user profile by user ID
 	 * @param id - User ID
 	 * @returns Promise with user profile data
@@ -150,9 +113,6 @@ const users = {
 
 			const data = await response.json();
 
-			console.log("getUserById response = ", response);
-			console.log("getUserById data = ", data);
-
 			if (!response.ok) {
 				return {
 					success: false,
@@ -166,44 +126,6 @@ const users = {
 			};
 		} catch (error) {
 			console.error("Error in getUserById:", error);
-			return {
-				success: false,
-				error: "Network error occurred",
-			};
-		}
-	},
-
-	/**
-	 * Updates current authenticated user's profile
-	 * @param userData - Partial user data to update (only fields that need to be changed)
-	 * @returns Promise with profile update result
-	 */
-	async updateUserProfile(userData: Partial<CreateUserData>): Promise<UpdateUserProfileResponse> {
-		try {
-			const response = await fetch("/api/users/profile", {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include", // Include cookies for authentication
-				body: JSON.stringify(userData),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				return {
-					success: false,
-					error: data.error || "Failed to update user profile",
-				};
-			}
-
-			return {
-				success: true,
-				data: data,
-			};
-		} catch (error) {
-			console.error("Error in updateUserProfile:", error);
 			return {
 				success: false,
 				error: "Network error occurred",
@@ -327,6 +249,43 @@ const users = {
 			};
 		} catch (error) {
 			console.error("Error in changeUserStatus:", error);
+			return {
+				success: false,
+				error: "Network error occurred",
+			};
+		}
+	},
+
+	/**
+	 * Retrieves driver data from TMS by driver ID
+	 * @param id - Driver ID from TMS system
+	 * @returns Promise with driver data from TMS
+	 */
+	async getDriverById(id: string): Promise<TMSDriverResponse> {
+		try {
+			const response = await fetch(`/api/users/driver/${id}`, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				credentials: "include", // Include cookies for authentication
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				return {
+					success: false,
+					error: data.error || "Failed to fetch driver from TMS",
+				};
+			}
+
+			return {
+				success: true,
+				data: data,
+			};
+		} catch (error) {
+			console.error("Error in getDriver:", error);
 			return {
 				success: false,
 				error: "Network error occurred",

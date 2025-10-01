@@ -44,6 +44,9 @@ export const clientAuth = {
 		role: string;
 		status: string;
 		avatar: string;
+		externalId: string;
+		phone: string;
+		location: string;
 	}) => {
 		const encryptedUserData = tokenEncoder.encode(JSON.stringify(userData));
 		Cookies.set(USER_DATA_COOKIE, encryptedUserData, {
@@ -62,6 +65,9 @@ export const clientAuth = {
 		role: string;
 		status: string;
 		avatar: string;
+		externalId: string;
+		phone: string;
+		location: string;
 	} | null => {
 		const encryptedUserData = Cookies.get(USER_DATA_COOKIE);
 		if (encryptedUserData) {
@@ -192,6 +198,9 @@ export const serverAuth = {
 		role: string;
 		status: string;
 		avatar: string;
+		externalId: string;
+		phone: string;
+		location: string;
 	} | null => {
 		const encryptedUserData = request.cookies.get(USER_DATA_COOKIE)?.value;
 		if (encryptedUserData) {

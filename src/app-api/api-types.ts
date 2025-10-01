@@ -5,116 +5,125 @@ export interface LoginData {
 	password: string;
 }
 
+export interface DriverContact {
+	driver_name: string;
+	driver_email: string;
+	driver_phone: string;
+	date_of_birth: string;
+	city: string;
+	languages: string;
+	team_driver: {
+		enabled: boolean;
+		name: string | null;
+		phone: string | null;
+		email: string | null;
+		date_of_birth: string | null;
+	};
+	preferred_distance: string | null;
+	emergency_contact: {
+		name: string;
+		phone: string;
+		relation: string;
+	};
+	home_location: string;
+	city_state_zip: string;
+}
+
+export interface DriverVehicle {
+	type: {
+		label: string;
+		value: string;
+	};
+	make: string;
+	model: string;
+	year: string;
+	payload: string;
+	cargo_space_dimensions: string;
+	overall_dimensions: string | null;
+	vin: string;
+	equipment: {
+		side_door: boolean;
+		load_bars: boolean;
+		printer: boolean;
+		sleeper: boolean;
+		ppe: boolean;
+		e_tracks: boolean;
+		pallet_jack: boolean;
+		lift_gate: boolean;
+		dolly: boolean;
+		ramp: boolean;
+	};
+}
+
+export interface DriverDocuments {
+	driver_licence_type: string | null;
+	real_id: boolean;
+	hazmat_certificate: {
+		has_certificate: boolean;
+		file_url: string | null;
+	};
+	twic: {
+		has_certificate: boolean;
+		file_url: string | null;
+	};
+	tsa_approved: {
+		has_certificate: boolean;
+		file_url: string | null;
+	};
+	background_check: {
+		has_certificate: boolean;
+		file_url: string | null;
+	};
+	change_9_training: {
+		has_certificate: boolean;
+		file_url: string | null;
+	};
+}
+
+export interface DriverStatistics {
+	rating: {
+		average_rating: number;
+		total_ratings: number;
+		all_ratings: any[];
+	};
+	notifications: {
+		total_count: number;
+		all_notifications: any[];
+	};
+}
+
+export interface DriverLocation {
+	status: string | null;
+	available_date: string | null;
+	zipcode: string | null;
+	city: string | null;
+	state: string | null;
+	coordinates: {
+		lat: string | null;
+		lng: string | null;
+	};
+}
+
+export interface UserOrganizedData {
+	current_location: DriverLocation;
+	contact: DriverContact;
+	vehicle: DriverVehicle;
+	documents: DriverDocuments;
+	statistics: DriverStatistics;
+}
+
 export interface UserData {
 	id: string;
 	role: string;
 	status: string;
+	externalId: string;
 	avatar?: string;
 	email: string;
 	firstName: string;
 	lastName: string;
-	organized_data?: {
-		contact: {
-			driver_name: string;
-			driver_email: string;
-			driver_phone: string;
-			date_of_birth: string;
-			city: string;
-			languages: string;
-			team_driver: {
-				name: string;
-			};
-			preferred_distance: string;
-			emergency_contact: {
-				name: string;
-				phone: string;
-				relation: string;
-			},
-			home_location: string;
-			city_state_zip: string;
-		},
-
-		vehicle: {
-			type: {
-				label: string;
-				value: string;
-			};
-			make: string;
-			model: string;
-			year: string;
-			payload: string;
-			cargo_space_dimensions: string;
-			overall_dimensions: string;
-			vin: string;
-
-			equipment: {
-				side_door: boolean;
-				load_bars: boolean;
-				printer: boolean;
-				sleeper: boolean;
-				ppe: boolean;
-				e_tracks: boolean;
-				pallet_jack: boolean;
-				lift_gate: boolean;
-				dolly: boolean;
-				ramp: boolean;
-			}
-		}
-
-		statistics: {
-			notifications: {
-				all_notifications: [];
-				total_count: number;
-			},
-			rating: {
-				average_rating: number,
-				total_ratings: number,
-				all_ratings: {
-					id: string,
-					name: string;
-					order_number: string;
-					message: string;
-					reit: string;
-				}[]
-			},
-		},
-
-		documents: {
-			driver_licence_type: string,
-			real_id: boolean,
-			hazmat_certificate: {
-				has_certificate: boolean,
-				file_url: string
-			},
-			twic: {
-				has_certificate: boolean,
-				file_url: string,
-			},
-			tsa_approved: {
-				has_certificate: boolean,
-				file_url: string,
-			},
-			background_check: {
-				has_certificate: boolean,
-				file_url: string,
-			},
-			change_9_training: {
-				has_certificate: boolean,
-				file_url: string,
-			}
-		},
-
-		current_location: {
-			zipcode: string,
-			city: string,
-			state: string,
-			coordinates: {
-				lat: string,
-				lng: string
-			},
-			last_updated: string
-		},
-	}
+	phone: string;
+	location: string;
+	organized_data?: UserOrganizedData;
 }
 
 export interface UserUpdateFormData {
@@ -369,21 +378,11 @@ export interface GetAllUsersResponse {
     error?: string;
 }
 
-export interface GetUserProfileResponse {
-    success: boolean;
-    data?: UserData;
-    error?: string;
-}
-
 export interface GetUserByIdResponse {
     success: boolean;
-    data?: UserData;
-    error?: string;
-}
-
-export interface UpdateUserProfileResponse {
-    success: boolean;
-    data?: UserData;
+    data?: {
+        data: UserData;
+    };
     error?: string;
 }
 
@@ -462,3 +461,116 @@ export interface GetUsersResponse {
     };
     error?: string;
 }
+
+// TMS Driver API types
+export interface TMSDriverResponse {
+    success: boolean;
+    data?: {
+        id: string;
+        date_created: string;
+        date_updated: string;
+        user_id_added: string;
+        updated_zipcode: string | null;
+        status_post: string;
+        organized_data: {
+            current_location: {
+                status: string | null;
+                available_date: string | null;
+                zipcode: string | null;
+                city: string | null;
+                state: string | null;
+                coordinates: {
+                    lat: number | null;
+                    lng: number | null;
+                };
+            };
+            contact: {
+                driver_name: string;
+                driver_phone: string;
+                driver_email: string;
+                home_location: string;
+                city: string;
+                city_state_zip: string;
+                date_of_birth: string;
+                languages: string;
+                team_driver: {
+                    enabled: boolean;
+                    name: string | null;
+                    phone: string | null;
+                    email: string | null;
+                    date_of_birth: string | null;
+                };
+                preferred_distance: string | null;
+                emergency_contact: {
+                    name: string;
+                    phone: string;
+                    relation: string;
+                };
+            };
+            vehicle: {
+                type: {
+                    value: string;
+                    label: string;
+                };
+                make: string;
+                model: string;
+                year: string;
+                payload: string;
+                cargo_space_dimensions: string;
+                overall_dimensions: string;
+                vin: string;
+                equipment: {
+                    side_door: boolean;
+                    load_bars: boolean;
+                    printer: boolean;
+                    sleeper: boolean;
+                    ppe: boolean;
+                    e_tracks: boolean;
+                    pallet_jack: boolean;
+                    lift_gate: boolean;
+                    dolly: boolean;
+                    ramp: boolean;
+                };
+            };
+            documents: {
+                driver_licence_type: string | null;
+                real_id: boolean;
+                hazmat_certificate: {
+                    has_certificate: boolean;
+                    file_url: string | null;
+                };
+                twic: {
+                    has_certificate: boolean;
+                    file_url: string | null;
+                };
+                tsa_approved: {
+                    has_certificate: boolean;
+                    file_url: string | null;
+                };
+                background_check: {
+                    has_certificate: boolean;
+                    file_url: string | null;
+                };
+                change_9_training: {
+                    has_certificate: boolean;
+                    file_url: string | null;
+                };
+            };
+            statistics: {
+                rating: {
+                    average_rating: number;
+                    total_ratings: number;
+                    all_ratings: any[];
+                };
+                notifications: {
+                    total_count: number;
+                    all_notifications: any[];
+                };
+            };
+        };
+        ratings: any[];
+        notices: any[];
+    };
+    error?: string;
+}
+

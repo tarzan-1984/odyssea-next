@@ -238,7 +238,7 @@ export default function UserListTable() {
 										{/* User name with avatar */}
 										<TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
 											<Link
-												href={`users/${item?.externalId}`}
+												href={`users/${item?.id}`}
 												className="flex items-center gap-3"
 											>
 												{item && renderAvatar(item)}

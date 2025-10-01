@@ -139,6 +139,9 @@ export default function OtpForm() {
 						role: userData.role,
 						status: userData.status,
 						avatar: userData.avatar || "",
+						externalId: userData.externalId || "",
+						phone: userData.phone || "",
+						location: userData.location || "",
 					};
 
 					// Save tokens and user data to cookies
