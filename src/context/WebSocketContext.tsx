@@ -118,7 +118,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const currentUser = useUserStore(state => state.currentUser);
 
 	// WebSocket URL from environment variables
-	const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3000/chat";
+	const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
 
 	// Debug logging for URL (only once on mount)
 	const [urlLogged, setUrlLogged] = useState(false);
