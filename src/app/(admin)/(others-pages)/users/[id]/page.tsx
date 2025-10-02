@@ -88,9 +88,7 @@ export default function SingleUserProfile() {
 				<div className="space-y-6">
 					<UserMetaCard user={user} />
 
-					{user?.organized_data?.contact && user.role === 'DRIVER' &&
-						<UserContactCard user={user} />
-					}
+					<UserContactCard user={user} />
 
 					{user?.organized_data?.contact && user.role === 'DRIVER' &&
 						<UserVehicleCard user={user} />

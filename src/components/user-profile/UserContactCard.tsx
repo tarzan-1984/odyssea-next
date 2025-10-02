@@ -131,7 +131,7 @@ export default function UserContactCard({user}: IUserContactCardProp) {
 						Contact
 					</h4>
 
-					{currentUser?.id !== user?.id && currentUser?.role === 'ADMINISTRATOR' &&
+					{/*{currentUser?.id !== user?.id && currentUser?.role === 'ADMINISTRATOR' &&
 						<button
 							onClick={openModal}
 							className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 lg:inline-flex lg:w-auto order-5 lg:order-2"
@@ -153,7 +153,7 @@ export default function UserContactCard({user}: IUserContactCardProp) {
 							</svg>
 							Edit
 						</button>
-					}
+					}*/}
 
 					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-7 2xl:gap-x-32 basis-full order-2 lg:order-3">
 						{contactFields.map(field => (

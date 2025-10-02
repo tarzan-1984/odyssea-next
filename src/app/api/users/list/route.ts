@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 		const limit = body.limit || 10;
 		const search = body.search;
 		const sort = body.sort;
-		const role = body.role || "DRIVER"; // Default to DRIVER role
+		const role = body.role; // Role filter - empty string means "show all"
 
 		// Build query string for backend
 		const queryParams = new URLSearchParams();
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 		if (limit) queryParams.append("limit", limit.toString());
 		if (search) queryParams.append("search", search);
 		if (sort) queryParams.append("sort", JSON.stringify(sort));
-		if (role) queryParams.append("role", role);
+		if (role && role !== "") queryParams.append("role", role); // Only add role if it's not empty
 
 		// Send request to backend for user list
 		const response = await fetch(

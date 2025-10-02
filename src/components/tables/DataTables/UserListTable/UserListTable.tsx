@@ -19,6 +19,9 @@ export default function UserListTable() {
 	// State for search functionality
 	const [searchTerm, setSearchTerm] = useState("");
 
+	// State for role filtering
+	const [selectedRole, setSelectedRole] = useState<string>(""); // Empty means "Show all"
+
 	// State for data management
 	const [totalItems, setTotalItems] = useState(0);
 	const [userList, setUserList] = useState<UserListItem[]>([]);
@@ -40,7 +43,7 @@ export default function UserListTable() {
 					limit: itemsPerPage,
 					search: searchTerm,
 					sort: sortState,
-					role: "DRIVER", // Filter for drivers only
+					role: selectedRole || undefined, // Pass role filter or undefined for "show all"
 				});
 
 				// Process successful response
@@ -61,7 +64,7 @@ export default function UserListTable() {
 		};
 
 		fetchUsers();
-	}, [currentPage, itemsPerPage, searchTerm, sortState]);
+	}, [currentPage, itemsPerPage, searchTerm, sortState, selectedRole]);
 
 	// Calculate total pages for pagination
 	const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -74,7 +77,7 @@ export default function UserListTable() {
 	};
 
 	// Handle column sorting
-	const handleSort = (key: "role" | "location" | "vehicleBrand") => {
+	const handleSort = (key: "role" | "location" | "type") => {
 		// Determine new sort order
 		let newSortOrder: "asc" | "desc";
 
@@ -89,6 +92,33 @@ export default function UserListTable() {
 		// Update sort state
 		setSortState({ [key]: newSortOrder });
 	};
+
+	// Handle role filter change
+	const handleRoleChange = (role: string) => {
+		setSelectedRole(role);
+		setCurrentPage(1); // Reset to first page when filtering
+	};
+
+	// Define all available roles
+	const roleOptions = [
+		{ value: "", label: "Show all" },
+		{ value: "DRIVER_UPDATES", label: "Driver Updates" },
+		{ value: "MODERATOR", label: "Moderator" },
+		{ value: "RECRUITER", label: "Recruiter" },
+		{ value: "ADMINISTRATOR", label: "Administrator" },
+		{ value: "NIGHTSHIFT_TRACKING", label: "Nightshift Tracking" },
+		{ value: "DISPATCHER", label: "Dispatcher" },
+		{ value: "BILLING", label: "Billing" },
+		{ value: "SUBSCRIBER", label: "Subscriber" },
+		{ value: "ACCOUNTING", label: "Accounting" },
+		{ value: "RECRUITER_TL", label: "Recruiter TL" },
+		{ value: "TRACKING", label: "Tracking" },
+		{ value: "DISPATCHER_TL", label: "Dispatcher TL" },
+		{ value: "TRACKING_TL", label: "Tracking TL" },
+		{ value: "MORNING_TRACKING", label: "Morning Tracking" },
+		{ value: "EXPEDITE_MANAGER", label: "Expedite Manager" },
+		{ value: "DRIVER", label: "Driver" },
+	];
 
 	return (
 		<div className="overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
@@ -112,6 +142,16 @@ export default function UserListTable() {
 						}}
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
+				</div>
+
+				{/* Role filter */}
+				<div className="flex items-center gap-3">
+					<span className="text-gray-500 dark:text-gray-400">Filter by role:</span>
+					<CustomStaticSelect
+						options={roleOptions}
+						value={selectedRole}
+						onChangeAction={handleRoleChange}
+					/>
 				</div>
 
 				{/* Search input */}
@@ -157,7 +197,7 @@ export default function UserListTable() {
 									{ key: "email", label: "Email", sortable: false },
 									{ key: "phone", label: "Phone", sortable: false },
 									{ key: "location", label: "Home location", sortable: true },
-									{ key: "vehicleBrand", label: "Vehicle", sortable: true },
+									{ key: "type", label: "Vehicle", sortable: true },
 									{ key: "vin", label: "VIN", sortable: false },
 								].map(({ key, label, sortable }) => (
 									<TableCell
@@ -174,7 +214,7 @@ export default function UserListTable() {
 																key as
 																	| "role"
 																	| "location"
-																	| "vehicleBrand"
+																	| "type"
 															)
 													: undefined
 											}
@@ -193,8 +233,8 @@ export default function UserListTable() {
 																: key === "location" &&
 																	  sortState.location === "asc"
 																	? "text-brand-500"
-																	: key === "vehicleBrand" &&
-																		  sortState.vehicleBrand ===
+																	: key === "type" &&
+																		  sortState.type ===
 																				"asc"
 																		? "text-brand-500"
 																		: "text-gray-300 dark:text-gray-700"
@@ -208,8 +248,8 @@ export default function UserListTable() {
 																: key === "location" &&
 																	  sortState.location === "desc"
 																	? "text-brand-500"
-																	: key === "vehicleBrand" &&
-																		  sortState.vehicleBrand ===
+																	: key === "type" &&
+																		  sortState.type ===
 																				"desc"
 																		? "text-brand-500"
 																		: "text-gray-300 dark:text-gray-700"
