@@ -8,6 +8,7 @@ import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import chatRooms from "@/app-api/chatRooms";
 import { useChatStore } from "@/stores/chatStore";
+import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 
 interface ContactsModalProps {
 	isOpen: boolean;
@@ -27,9 +28,12 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 
 	// Get current user and chat store
 	const currentUser = useCurrentUser();
-	const { addChatRoom } = useChatStore();
+	const { addChatRoom, chatRooms } = useChatStore();
+	
+	// Get online status functionality
+	const { isUserOnline } = useWebSocketChatSync();
 
-	// Create direct chat with selected contact
+	// Create direct chat with selected contact or open existing one
 	const handleCreateDirectChat = async (contact: UserListItem) => {
 		if (!currentUser?.id) {
 			setError("User not authenticated");
@@ -37,6 +41,21 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 		}
 
 		try {
+			// Check if there's already a DIRECT chat with this user
+			const existingChat = chatRooms.find(chat => 
+				chat.type === "DIRECT" && 
+				chat.participants.length === 2 &&
+				chat.participants.some(p => p.user.id === contact.id) &&
+				chat.participants.some(p => p.user.id === currentUser.id)
+			);
+
+			if (existingChat) {
+				// Chat already exists, just close the modal
+				// The user can select this chat from the chat list
+				onClose();
+				return;
+			}
+
 			// Ensure firstName and lastName are strings
 			const firstName = contact?.firstName? String(contact.firstName || '').trim() : '';
 			const lastName = contact?.lastName? String(contact.lastName || '').trim() : '';
@@ -109,10 +128,12 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 				const newUsers = response.data.data?.users || [];
 				const pagination = response.data.data?.pagination;
 
+				// Exclude current user from the list
+				const filtered = newUsers.filter((u: UserListItem) => u.id !== currentUser?.id);
 				if (append) {
-					setUsers(prev => [...prev, ...newUsers]);
+					setUsers(prev => [...prev, ...filtered]);
 				} else {
-					setUsers(newUsers);
+					setUsers(filtered);
 				}
 
 				// Check if there are more pages using pagination data
@@ -236,26 +257,49 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 							{searchQuery ? "No contacts found" : "No contacts available"}
 						</div>
 					) : (
-						users.map((user) => (
-							<div
-								key={user.id}
-								className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
-								onClick={() => handleCreateDirectChat(user)}
-							>
-								{/* Avatar */}
-								{renderAvatar(user, "flex-shrink-0 w-[50px] h-[50px]")}
+						users.map((user) => {
+							// Check if there's already a DIRECT chat with this user
+							const existingChat = chatRooms.find(chat => 
+								chat.type === "DIRECT" && 
+								chat.participants.length === 2 &&
+								chat.participants.some(p => p.user.id === user.id) &&
+								chat.participants.some(p => p.user.id === currentUser?.id)
+							);
 
-								{/* User Info */}
-								<div className="flex-1 min-w-0">
-									<div className="font-medium text-gray-900 dark:text-white">
-										{user.firstName} {user.lastName}
+							return (
+								<div
+									key={user.id}
+									className={`flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer ${
+										existingChat ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+									}`}
+									onClick={() => handleCreateDirectChat(user)}
+								>
+									{/* Avatar with online status */}
+									<div className="relative flex-shrink-0">
+										{renderAvatar(user, "w-[50px] h-[50px]")}
+										{/* Online status indicator */}
+										{isUserOnline && isUserOnline(user.id) && (
+											<span className="absolute -bottom-0.5 -right-0.5 z-10 block h-3 w-3 rounded-full border-2 border-white bg-success-500 dark:border-gray-900"></span>
+										)}
 									</div>
-									<div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-										{user.role?.toLowerCase().replace('_', ' ')}
+
+									{/* User Info */}
+									<div className="flex-1 min-w-0">
+										<div className="font-medium text-gray-900 dark:text-white">
+											{user.firstName} {user.lastName}
+										</div>
+										<div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+											{user.role?.toLowerCase().replace('_', ' ')}
+											{existingChat && (
+												<span className="ml-2 text-blue-600 dark:text-blue-400">
+													• Already chatting
+												</span>
+											)}
+										</div>
 									</div>
 								</div>
-							</div>
-						))
+							);
+						})
 					)}
 
 					{/* Loading More Indicator */}
