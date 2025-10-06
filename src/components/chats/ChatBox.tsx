@@ -188,7 +188,7 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 								className={`flex ${isSender ? "justify-end" : "items-start gap-4"}`}
 							>
 								{!isSender && (
-									<div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+									<div className="relative w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
 										{(() => {
 											// Create a UserListItem-like object for renderAvatar
 											const senderUser: UserData = {
@@ -198,6 +198,10 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 											};
 											return renderAvatar(senderUser, "w-10 h-10");
 										})()}
+										{/* Online status indicator */}
+										{isUserOnline && isUserOnline(message.senderId) && (
+											<span className="absolute -bottom-0.5 -right-0.5 z-10 block h-3 w-3 rounded-full border-2 border-white bg-success-500 dark:border-gray-900"></span>
+										)}
 									</div>
 								)}
 

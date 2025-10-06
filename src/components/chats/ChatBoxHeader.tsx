@@ -101,6 +101,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		return { firstName: "Group", lastName: "Chat" };
 	};
 
+
 	return (
 		<div className="sticky flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 xl:px-6">
 			<div className="flex items-center gap-3">
@@ -123,17 +124,28 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 						};
 						return renderAvatar(userForAvatar, "w-12 h-12");
 					})()}
-					{chatRoom && chatRoom.type === "DIRECT" && chatRoom.participants.length === 2 && (() => {
-						const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
-						const isOtherUserOnline = otherParticipant && isUserOnline ? isUserOnline(otherParticipant.user.id) : false;
+					{chatRoom && (() => {
+						let showOnlineIndicator = false;
 						
-						return isOtherUserOnline ? (
+						if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+							// For direct chats, show if the other participant is online
+							const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
+							showOnlineIndicator = otherParticipant && isUserOnline ? isUserOnline(otherParticipant.user.id) : false;
+						} else if (chatRoom.type === "group") {
+							// For group chats, show if any participant (except current user) is online
+							const onlineCount = chatRoom.participants.filter(p => 
+								p.user.id !== currentUser?.id && isUserOnline && isUserOnline(p.user.id)
+							).length;
+							showOnlineIndicator = onlineCount > 0;
+						}
+						
+						return showOnlineIndicator ? (
 							<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
 						) : null;
 					})()}
 				</div>
 
-				<h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+				<h5 className="text-sm font-medium text-gray-900 dark:text-white">
 					{getChatDisplayName()}
 				</h5>
 			</div>
