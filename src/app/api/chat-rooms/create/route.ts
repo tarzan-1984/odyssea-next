@@ -11,11 +11,23 @@ export async function POST(request: NextRequest) {
 
 		const body = await request.json();
 		const { name, type, loadId, participantIds } = body;
+		
+		console.log('API route body=================', body);
+		console.log('API route name=================', name);
+		console.log('API route loadId=================', loadId);
 
-		// Validate required fields
-		if (!name || !type || !loadId || !participantIds || !Array.isArray(participantIds)) {
+		// Validate required fields (loadId is optional)
+		if (!name || !type || !participantIds || !Array.isArray(participantIds)) {
 			return NextResponse.json(
-				{ error: "Missing required fields: name, type, loadId, participantIds" },
+				{ error: "Missing required fields: name, type, participantIds" },
+				{ status: 400 }
+			);
+		}
+
+		// Ensure name is a string and not undefined
+		if (typeof name !== 'string' || name.trim() === '') {
+			return NextResponse.json(
+				{ error: "Name must be a non-empty string" },
 				{ status: 400 }
 			);
 		}
@@ -36,6 +48,31 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		// Additional validation for specific chat types
+		if (type === "DIRECT" && participantIds.length !== 2) {
+			return NextResponse.json(
+				{ error: "Direct chats must have exactly 2 participants" },
+				{ status: 400 }
+			);
+		}
+
+		if (type === "GROUP" && participantIds.length < 2) {
+			return NextResponse.json(
+				{ error: "Group chats must have at least 2 participants" },
+				{ status: 400 }
+			);
+		}
+
+		// Build payload conditionally including optional loadId
+		const payload: Record<string, unknown> = {
+			name,
+			type,
+			participantIds,
+		};
+		if (loadId && typeof loadId === 'string' && loadId.trim() !== '') {
+			payload.loadId = loadId;
+		}
+
 		// Make request to backend API
 		const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/chat-rooms`, {
 			method: "POST",
@@ -43,12 +80,7 @@ export async function POST(request: NextRequest) {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${accessToken}`,
 			},
-			body: JSON.stringify({
-				name,
-				type,
-				loadId,
-				participantIds,
-			}),
+			body: JSON.stringify(payload),
 		});
 
 		const data = await response.json();

@@ -13,13 +13,13 @@ import { twMerge } from "tailwind-merge";
  * @returns The avatar element (either an Image or a div with initials).
  */
 export function renderAvatar(item?: UserData | UserListItem | null, className?: string) {
-	if (!item) return <div className="w-10 h-10 bg-gray-300 rounded-full" />;
+	if (!item) return <div className={twMerge("w-10 h-10 bg-gray-300 rounded-full", className)} />;
 
 	if ("avatar" in item && item.avatar) {
 		return (
 			<Image
-				width={40}
-				height={40}
+				width={15}
+				height={15}
 				src={item.avatar}
 				alt="user"
 				className={twMerge("rounded-full object-cover", className)}
@@ -45,10 +45,24 @@ export function renderAvatar(item?: UserData | UserListItem | null, className?: 
 		.map(n => n.charAt(0).toUpperCase())
 		.join("");
 
+	// Determine text size based on className
+	const getTextSize = (className?: string) => {
+		if (className?.includes('w-[50px]') || className?.includes('h-[50px]') || className?.includes('w-12') || className?.includes('h-12')) {
+			return 'text-lg';
+		}
+		if (className?.includes('w-[40px]') || className?.includes('h-[40px]')) {
+			return 'text-base';
+		}
+		if (className?.includes('w-[30px]') || className?.includes('h-[30px]')) {
+			return 'text-sm';
+		}
+		return 'text-xs'; // default for 15px
+	};
+
 	return (
 		<div
 			className={twMerge(
-				"flex items-center justify-center rounded-full bg-[#465fff] text-white font-semibold text-lg w-10 h-10",
+				`flex items-center justify-center rounded-full bg-[#465fff] text-white font-semibold ${getTextSize(className)} w-[15px] h-[15px]`,
 				className
 			)}
 		>

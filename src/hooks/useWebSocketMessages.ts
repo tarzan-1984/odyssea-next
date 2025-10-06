@@ -10,7 +10,8 @@ interface UseWebSocketMessagesProps {
 	onNewMessage?: (message: Message) => void;
 	onMessageSent?: (data: { messageId: string; chatRoomId: string }) => void;
 	onMessageRead?: (data: { messageId: string; readBy: string }) => void;
-	onUserTyping?: (data: { userId: string; chatRoomId: string; isTyping: boolean }) => void;
+	onUserTyping?: (data: { userId: string; chatRoomId: string; isTyping: boolean; firstName?: string }) => void;
+	onUserOnline?: (data: { userId: string; chatRoomId: string; isOnline: boolean }) => void;
 	onError?: (error: { message: string; details?: string }) => void;
 }
 
@@ -20,6 +21,7 @@ export const useWebSocketMessages = ({
 	onMessageSent,
 	onMessageRead,
 	onUserTyping,
+	onUserOnline,
 	onError,
 }: UseWebSocketMessagesProps) => {
 	const {
@@ -32,7 +34,7 @@ export const useWebSocketMessages = ({
 		markMessageAsRead,
 	} = useWebSocket();
 	const { addMessage, updateMessage } = useChatStore();
-	const [isTyping, setIsTyping] = useState<Record<string, boolean>>({});
+	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string }>>({});
 	const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 	const currentRoomRef = useRef<string | null>(null);
 
@@ -40,6 +42,14 @@ export const useWebSocketMessages = ({
 	useEffect(() => {
 		if (isConnected && chatRoomId && currentRoomRef.current !== chatRoomId) {
 			console.log("useWebSocketMessages: Joining chat room:", chatRoomId);
+			
+			// Clear typing state and timeout when switching chat rooms
+			setIsTyping({});
+			if (typingTimeout) {
+				clearTimeout(typingTimeout);
+				setTypingTimeout(null);
+			}
+			
 			currentRoomRef.current = chatRoomId;
 			joinChatRoom(chatRoomId);
 		}
@@ -52,6 +62,11 @@ export const useWebSocketMessages = ({
 				console.log("useWebSocketMessages: Leaving chat room:", currentRoomRef.current);
 				leaveChatRoom(currentRoomRef.current);
 				currentRoomRef.current = null;
+			}
+			
+			// Clear typing timeout on unmount
+			if (typingTimeout) {
+				clearTimeout(typingTimeout);
 			}
 		};
 	}, []); // Remove leaveChatRoom from dependencies to prevent loops
@@ -84,13 +99,27 @@ export const useWebSocketMessages = ({
 			userId: string;
 			chatRoomId: string;
 			isTyping: boolean;
+			firstName?: string;
 		}) => {
 			if (data.chatRoomId === chatRoomId) {
 				setIsTyping(prev => ({
 					...prev,
-					[data.userId]: data.isTyping,
+					[data.userId]: {
+						isTyping: data.isTyping,
+						firstName: data.firstName,
+					},
 				}));
 				onUserTyping?.(data);
+			}
+		};
+
+		const handleUserOnline = (data: {
+			userId: string;
+			chatRoomId: string;
+			isOnline: boolean;
+		}) => {
+			if (data.chatRoomId === chatRoomId) {
+				onUserOnline?.(data);
 			}
 		};
 
@@ -103,6 +132,7 @@ export const useWebSocketMessages = ({
 		socket.on("messageSent", handleMessageSent);
 		socket.on("messageRead", handleMessageRead);
 		socket.on("userTyping", handleUserTyping);
+		socket.on("userOnline", handleUserOnline);
 		socket.on("error", handleError);
 
 		// Cleanup listeners
@@ -111,6 +141,7 @@ export const useWebSocketMessages = ({
 			socket.off("messageSent", handleMessageSent);
 			socket.off("messageRead", handleMessageRead);
 			socket.off("userTyping", handleUserTyping);
+			socket.off("userOnline", handleUserOnline);
 			socket.off("error", handleError);
 		};
 	}, [socket, chatRoomId]); // Remove callback functions from dependencies to prevent loops
@@ -132,18 +163,22 @@ export const useWebSocketMessages = ({
 		(isTyping: boolean) => {
 			sendTyping(chatRoomId, isTyping);
 
-			// Auto-stop typing indicator after 3 seconds
+			// Auto-stop typing indicator after 4 seconds
 			if (isTyping) {
+				// Clear any existing timeout
 				if (typingTimeout) {
 					clearTimeout(typingTimeout);
 				}
 
+				// Set new timeout to stop typing indicator after 4 seconds
 				const timeout = setTimeout(() => {
 					sendTyping(chatRoomId, false);
-				}, 3000);
+					setTypingTimeout(null);
+				}, 4000);
 
 				setTypingTimeout(timeout);
 			} else {
+				// User stopped typing, clear the timeout
 				if (typingTimeout) {
 					clearTimeout(typingTimeout);
 					setTypingTimeout(null);

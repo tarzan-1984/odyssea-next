@@ -113,16 +113,16 @@ export interface UserOrganizedData {
 }
 
 export interface UserData {
-	id: string;
-	role: string;
-	status: string;
-	externalId: string;
+	id?: string;
+	role?: string;
+	status?: string;
+	externalId?: string;
 	avatar?: string;
-	email: string;
+	email?: string;
 	firstName: string;
 	lastName: string;
-	phone: string;
-	location: string;
+	phone?: string;
+	location?: string;
 	organized_data?: UserOrganizedData;
 }
 
@@ -337,6 +337,7 @@ export interface UserListItem {
 	type: string;
 	vin: string;
 	profilePhoto?: string;
+	avatar?: string;
 	status: string;
 	externalId?: string;
 }

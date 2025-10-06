@@ -5,12 +5,18 @@ import Image from "next/image";
 
 interface UserAvatarProps {
 	src?: string;
-	alt: string;
-	firstName: string;
-	lastName: string;
-	width: number;
-	height: number;
+	alt?: string;
+	firstName?: string;
+	lastName?: string;
+	width?: number;
+	height?: number;
 	className?: string;
+	user?: {
+		firstName: string;
+		lastName: string;
+		profilePhoto?: string;
+	};
+	size?: "sm" | "md" | "lg";
 }
 
 export default function UserAvatar({
@@ -21,7 +27,25 @@ export default function UserAvatar({
 	width,
 	height,
 	className = "",
+	user,
+	size = "md",
 }: UserAvatarProps) {
+	// Use user object if provided, otherwise use individual props
+	const finalFirstName = user?.firstName || firstName || "";
+	const finalLastName = user?.lastName || lastName || "";
+	const finalSrc = user?.profilePhoto || src;
+	const finalAlt = alt || `${finalFirstName} ${finalLastName}`;
+
+	// Size configurations
+	const sizeConfig = {
+		sm: { width: 32, height: 32, textSize: "text-xs" },
+		md: { width: 40, height: 40, textSize: "text-sm" },
+		lg: { width: 48, height: 48, textSize: "text-base" },
+	};
+
+	const config = sizeConfig[size];
+	const finalWidth = width || config.width;
+	const finalHeight = height || config.height;
 	const [imageError, setImageError] = useState(false);
 	const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -64,26 +88,26 @@ export default function UserAvatar({
 	};
 
 	// Show initials if no src, image error, or image not loaded yet
-	const showInitials = !src || imageError || !imageLoaded;
+	const showInitials = !finalSrc || imageError || !imageLoaded;
 
 	return (
 		<div
 			className={`relative overflow-hidden rounded-full ${className}`}
-			style={{ width, height }}
+			style={{ width: finalWidth, height: finalHeight }}
 		>
 			{showInitials ? (
 				<div
-					className={`flex items-center justify-center w-full h-full text-white font-semibold ${getBackgroundColor(firstName, lastName)}`}
-					style={{ fontSize: `${Math.min(width, height) * 0.4}px` }}
+					className={`flex items-center justify-center w-full h-full text-white font-semibold ${config.textSize} ${getBackgroundColor(finalFirstName, finalLastName)}`}
+					style={{ fontSize: `${Math.min(finalWidth, finalHeight) * 0.4}px` }}
 				>
-					{getInitials(firstName, lastName)}
+					{getInitials(finalFirstName, finalLastName)}
 				</div>
 			) : (
 				<Image
-					width={width}
-					height={height}
-					src={src}
-					alt={alt}
+					width={finalWidth}
+					height={finalHeight}
+					src={finalSrc}
+					alt={finalAlt}
 					className="object-cover w-full h-full"
 					onError={handleImageError}
 					onLoad={handleImageLoad}

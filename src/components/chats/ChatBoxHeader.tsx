@@ -6,13 +6,18 @@ import { MoreDotIcon } from "@/icons";
 import Image from "next/image";
 import UserAvatar from "../common/UserAvatar";
 import { ChatRoom } from "@/app-api/chatApi";
+import { renderAvatar } from "@/helpers";
+import { useCurrentUser } from "@/stores/userStore";
+import { UserListItem } from "@/app-api/api-types";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
+	isUserOnline?: (userId: string) => boolean;
 }
 
-export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
+export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const currentUser = useCurrentUser();
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -30,9 +35,9 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 		}
 
 		// For direct chats, show the other participant's name
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant) {
 				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
@@ -54,9 +59,9 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 	const getChatAvatar = (): string => {
 		if (!chatRoom) return "/images/avatars/avatar-default.jpg";
 
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant?.user.avatar) {
 				return otherParticipant.user.avatar;
@@ -70,9 +75,9 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
 
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant) {
 				return {
@@ -102,21 +107,30 @@ export default function ChatBoxHeader({ chatRoom }: ChatBoxHeaderProps) {
 				<div className="relative h-12 w-full max-w-[48px] rounded-full">
 					{(() => {
 						const userData = getChatUserData();
-						return (
-							<UserAvatar
-								src={userData.avatar}
-								alt={`${userData.firstName} profile`}
-								firstName={userData.firstName}
-								lastName={userData.lastName}
-								width={48}
-								height={48}
-								className="w-full h-full"
-							/>
-						);
+						// Create a UserListItem-like object for renderAvatar
+						const userForAvatar: UserListItem = {
+							id: chatRoom?.id || "",
+							firstName: userData.firstName,
+							lastName: userData.lastName,
+							role: "USER",
+							email: "",
+							phone: "",
+							location: "",
+							type: "",
+							vin: "",
+							avatar: userData.avatar,
+							status: "ACTIVE",
+						};
+						return renderAvatar(userForAvatar, "w-12 h-12");
 					})()}
-					{chatRoom && (
-						<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-					)}
+					{chatRoom && chatRoom.type === "DIRECT" && chatRoom.participants.length === 2 && (() => {
+						const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
+						const isOtherUserOnline = otherParticipant && isUserOnline ? isUserOnline(otherParticipant.user.id) : false;
+						
+						return isOtherUserOnline ? (
+							<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
+						) : null;
+					})()}
 				</div>
 
 				<h5 className="text-sm font-medium text-gray-500 dark:text-gray-400">

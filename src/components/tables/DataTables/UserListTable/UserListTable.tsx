@@ -281,7 +281,7 @@ export default function UserListTable() {
 												href={`users/${item?.id}`}
 												className="flex items-center gap-3"
 											>
-												{item && renderAvatar(item)}
+												{item && renderAvatar(item, "w-[50px] h-[50px]")}
 												<div>
 													<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
 														{item?.firstName && item?.lastName

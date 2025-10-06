@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { chatApi, ChatRoom } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import chatRooms from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
 
 // Hook for managing chat synchronization between Zustand store, IndexedDB, and API
@@ -38,26 +39,35 @@ export const useChatSync = () => {
 			const hasCachedRooms = await indexedDBChatService.hasChatRooms();
 
 			if (hasCachedRooms) {
-				// Load from cache for immediate display
-				const cachedRooms = await indexedDBChatService.getChatRooms();
-				if (cachedRooms.length > 0) {
-					setChatRooms(cachedRooms);
-					setLoadingChatRooms(false);
+				// Check if cache is fresh (less than 5 minutes old)
+				const isCacheFresh = await indexedDBChatService.isCacheFresh("chatRooms", 5);
 
-					// Check if cache is fresh (less than 5 minutes old)
-					const isCacheFresh = await indexedDBChatService.isCacheFresh("chatRooms", 5);
-
-					// Only update from API if cache is not fresh
-					if (!isCacheFresh) {
-						try {
-							const apiRooms = await chatApi.getChatRooms();
-							setChatRooms(apiRooms);
-							await indexedDBChatService.saveChatRooms(apiRooms);
-						} catch (apiError) {
-							console.warn("Background API update failed:", apiError);
-						}
+				if (isCacheFresh) {
+					// Load from cache for immediate display only if cache is fresh
+					const cachedRooms = await indexedDBChatService.getChatRooms();
+					if (cachedRooms.length > 0) {
+						setChatRooms(cachedRooms);
+						setLoadingChatRooms(false);
+						return;
 					}
+				}
+
+				// If cache is not fresh, load from API and update cache
+				try {
+					const apiRooms = await chatApi.getChatRooms();
+					setChatRooms(apiRooms);
+					await indexedDBChatService.saveChatRooms(apiRooms);
+					setLoadingChatRooms(false);
 					return;
+				} catch (apiError) {
+					console.warn("API update failed, falling back to cached data:", apiError);
+					// Fallback to cached data if API fails
+					const cachedRooms = await indexedDBChatService.getChatRooms();
+					if (cachedRooms.length > 0) {
+						setChatRooms(cachedRooms);
+						setLoadingChatRooms(false);
+						return;
+					}
 				}
 			}
 
@@ -234,10 +244,36 @@ export const useChatSync = () => {
 			participantIds: string[];
 		}) => {
 			try {
-				// Create chat room via API
-				const newChatRoom = await chatApi.createChatRoom(chatRoomData);
-				setChatRooms([newChatRoom, ...chatRooms]);
-				await indexedDBChatService.addChatRoom(newChatRoom);
+				// Create chat room via API with WebSocket notifications
+				const result = await chatRooms.createChatRoom(chatRoomData);
+				
+				if (result.success && result.data) {
+					// Transform result.data to match ChatRoom interface
+					const chatData = result.data; // Store in variable to avoid TS18048 error
+					const chatRoom = {
+						...chatData,
+						isArchived: false,
+						updatedAt: chatData.createdAt, // Use createdAt as updatedAt for new chat
+						participants: chatData.participants.map((userData: any) => ({
+							id: `participant_${userData.id}_${chatData.id}`,
+							chatRoomId: chatData.id,
+							userId: userData.id,
+							joinedAt: chatData.createdAt,
+							user: {
+								id: userData.id,
+								firstName: userData.firstName,
+								lastName: userData.lastName,
+								avatar: userData.avatar,
+								role: userData.role,
+							},
+						})),
+					};
+					// Add chat room to local state
+					setChatRooms([chatRoom, ...chatRooms]);
+					await indexedDBChatService.addChatRoom(chatRoom);
+				} else {
+					throw new Error(result.error || "Failed to create chat room");
+				}
 			} catch (error) {
 				console.error("Failed to create chat room:", error);
 				setError("Failed to create chat room");

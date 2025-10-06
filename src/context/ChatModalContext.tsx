@@ -5,6 +5,9 @@ interface ChatModalContextType {
 	isAddRoomModalOpen: boolean;
 	openAddRoomModal: () => void;
 	closeAddRoomModal: () => void;
+	isContactsModalOpen: boolean;
+	openContactsModal: () => void;
+	closeContactsModal: () => void;
 }
 
 const ChatModalContext = createContext<ChatModalContextType | undefined>(undefined);
@@ -23,6 +26,7 @@ interface ChatModalProviderProps {
 
 export const ChatModalProvider: React.FC<ChatModalProviderProps> = ({ children }) => {
 	const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
+	const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
 
 	const openAddRoomModal = () => {
 		setIsAddRoomModalOpen(true);
@@ -31,12 +35,22 @@ export const ChatModalProvider: React.FC<ChatModalProviderProps> = ({ children }
 		setIsAddRoomModalOpen(false);
 	};
 
+	const openContactsModal = () => {
+		setIsContactsModalOpen(true);
+	};
+	const closeContactsModal = () => {
+		setIsContactsModalOpen(false);
+	};
+
 	return (
 		<ChatModalContext.Provider
 			value={{
 				isAddRoomModalOpen,
 				openAddRoomModal,
 				closeAddRoomModal,
+				isContactsModalOpen,
+				openContactsModal,
+				closeContactsModal,
 			}}
 		>
 			{children}

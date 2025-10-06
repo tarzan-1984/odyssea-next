@@ -50,6 +50,13 @@ interface UserTypingData {
 	userId: string;
 	chatRoomId: string;
 	isTyping: boolean;
+	firstName?: string;
+}
+
+interface UserOnlineData {
+	userId: string;
+	chatRoomId: string;
+	isOnline: boolean;
 }
 
 interface ChatRoomCreatedData {
@@ -240,10 +247,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			// Update connection status or room state if needed
 		});
 
-		// Handle typing events
-		newSocket.on("userTyping", (data: any) => {
-			console.log("User typing:", data);
-		});
+		// Handle typing events - this will be handled by useWebSocketMessages hook
+		// newSocket.on("userTyping", (data: any) => {
+		// 	console.log("User typing:", data);
+		// });
+
+		// Handle online status events - this will be handled by useWebSocketMessages hook
+		// newSocket.on("userOnline", (data: any) => {
+		// 	console.log("User online status:", data);
+		// });
 
 		// Handle error events
 		newSocket.on("error", (data: any) => {

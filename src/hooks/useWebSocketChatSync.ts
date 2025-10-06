@@ -7,6 +7,7 @@ import { useWebSocketMessages } from "./useWebSocketMessages";
 import { useWebSocketChatRooms } from "./useWebSocketChatRooms";
 import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
+import { useOnlineStatus } from "./useOnlineStatus";
 
 /**
  * Enhanced chat sync hook that integrates WebSocket real-time functionality
@@ -15,6 +16,7 @@ import { useCurrentUser } from "@/stores/userStore";
 export const useWebSocketChatSync = () => {
 	const { isConnected } = useWebSocket();
 	const currentUser = useCurrentUser();
+	const { updateUserOnlineStatus, isUserOnline } = useOnlineStatus();
 
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
@@ -33,7 +35,11 @@ export const useWebSocketChatSync = () => {
 			console.log("Message read confirmation:", data);
 		},
 		onUserTyping: data => {
-			console.log("User typing:", data);
+			//console.log("User typing:", data);
+		},
+		onUserOnline: data => {
+			console.log("User online status:", data);
+			updateUserOnlineStatus(data.userId, data.isOnline);
 		},
 		onError: error => {
 			console.error("WebSocket message error:", error);
@@ -187,5 +193,8 @@ export const useWebSocketChatSync = () => {
 		webSocketNotifications: {
 			markNotificationAsRead: webSocketNotifications.markNotificationAsRead,
 		},
+
+		// Online status functionality
+		isUserOnline,
 	};
 };

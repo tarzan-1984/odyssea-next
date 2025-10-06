@@ -9,6 +9,8 @@ import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 // WebSocket functionality is now passed via props
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
+import { renderAvatar } from "@/helpers";
+import { UserData } from "@/app-api/api-types";
 
 interface ChatBoxProps {
 	selectedChatRoom?: ChatRoom;
@@ -31,6 +33,7 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 		loadMessages,
 		sendMessage,
 		webSocketMessages: { sendTyping, isTyping },
+		isUserOnline,
 	} = webSocketChatSync;
 
 	// Get error from chat store
@@ -89,6 +92,9 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 		if (!selectedChatRoom) return;
 
 		try {
+			// Stop typing indicator before sending message
+			sendTyping(false);
+			
 			// Use WebSocket-enabled send message
 			await sendMessage(messageData);
 
@@ -103,13 +109,12 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 
 	const getMessageTime = (createdAt: string): string => {
 		const messageTime = new Date(createdAt);
-		const now = new Date();
-		const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-
-		if (diffInMinutes < 1) return "Just now";
-		if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-		if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-		return `${Math.floor(diffInMinutes / 1440)}d ago`;
+		// Format time without seconds: "10:20 AM" instead of "10:20:20 AM"
+		return messageTime.toLocaleTimeString('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true
+		});
 	};
 
 	const isImageFile = (fileName?: string): boolean => {
@@ -150,7 +155,7 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 	return (
 		<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4">
 			{/* Header */}
-			<ChatBoxHeader chatRoom={selectedChatRoom} />
+			<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
 			{/* Messages */}
 			<div
@@ -184,32 +189,15 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 							>
 								{!isSender && (
 									<div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-										{message.sender.avatar ? (
-											<Image
-												width={40}
-												height={40}
-												src={message.sender.avatar}
-												alt={`${message.sender.firstName} profile`}
-												className="object-cover object-center w-full h-full"
-												onError={e => {
-													// Hide image and show fallback
-													const target = e.target as HTMLImageElement;
-													target.style.display = "none";
-													const parent = target.parentElement;
-													if (parent) {
-														parent.innerHTML = `
-															<div class="w-full h-full flex items-center justify-center bg-brand-500 text-white text-sm font-medium">
-																${message.sender.firstName?.charAt(0) || "U"}
-															</div>
-														`;
-													}
-												}}
-											/>
-										) : (
-											<div className="w-full h-full flex items-center justify-center bg-brand-500 text-white text-sm font-medium">
-												{message.sender.firstName?.charAt(0) || "U"}
-											</div>
-										)}
+										{(() => {
+											// Create a UserListItem-like object for renderAvatar
+											const senderUser: UserData = {
+												firstName: message.sender.firstName,
+												lastName: message.sender.lastName,
+												avatar: message.sender.avatar || (message.sender as any).profilePhoto,
+											};
+											return renderAvatar(senderUser, "w-10 h-10");
+										})()}
 									</div>
 								)}
 
@@ -332,7 +320,7 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 					})
 				)}
 				{/* Typing indicator */}
-				{Object.keys(isTyping).length > 0 && (
+				{Object.entries(isTyping).some(([userId, data]) => data.isTyping) && (
 					<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
 						<div className="flex space-x-1">
 							<div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
@@ -345,7 +333,30 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 								style={{ animationDelay: "0.2s" }}
 							></div>
 						</div>
-						<span className="text-sm">Someone is typing...</span>
+						<span className="text-sm">
+							{(() => {
+								const typingUsers = Object.entries(isTyping).filter(([userId, data]) => data.isTyping);
+								if (typingUsers.length === 0) return "";
+								
+								// Use firstName from WebSocket data or fallback to participant data
+								const typingUserNames = typingUsers.map(([userId, data]) => {
+									if (data.firstName) {
+										return data.firstName;
+									}
+									// Fallback to participant data if firstName not available
+									const participant = selectedChatRoom?.participants.find(p => p.user.id === userId);
+									return participant?.user.firstName || "Someone";
+								});
+								
+								if (typingUserNames.length === 1) {
+									return `${typingUserNames[0]} is typing...`;
+								} else if (typingUserNames.length === 2) {
+									return `${typingUserNames[0]} and ${typingUserNames[1]} are typing...`;
+								} else {
+									return `${typingUserNames[0]} and ${typingUserNames.length - 1} others are typing...`;
+								}
+							})()}
+						</span>
 					</div>
 				)}
 

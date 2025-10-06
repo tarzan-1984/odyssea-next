@@ -38,6 +38,11 @@ export default function ChatBoxSendForm({
 			});
 		}
 
+		// Stop typing indicator when message is sent
+		if (onTyping) {
+			onTyping(false);
+		}
+
 		// Reset form
 		setMessage("");
 		setAttachedFile(null);

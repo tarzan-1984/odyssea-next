@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import UserAvatar from "../common/UserAvatar";
+import { renderAvatar } from "@/helpers";
 import { ChatRoom, User } from "@/app-api/chatApi";
+import { UserListItem } from "@/app-api/api-types";
+import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import { MoreDotIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
@@ -22,9 +24,10 @@ export default function ChatList({
 	selectedChatId,
 	webSocketChatSync,
 }: ChatListProps) {
-	const { openAddRoomModal } = useChatModal();
+	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
+	const currentUser = useCurrentUser();
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 
@@ -41,22 +44,23 @@ export default function ChatList({
 	}, [loadChatRooms]);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
-		if (chatRoom.name) {
-			return chatRoom.name;
-		}
-
-		// For direct chats, show the other participant's name
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		// For DIRECT chats, always show the other participant's name
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant) {
 				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
 			}
 		}
 
+		// For other chats, use the chat name if available
+		if (chatRoom.name) {
+			return chatRoom.name;
+		}
+
 		// For group chats, show participant names
-		if (chatRoom.type === "group") {
+		if (chatRoom.type === "GROUP") {
 			const participantNames = chatRoom.participants
 				.slice(0, 2)
 				.map(p => p.user.firstName)
@@ -92,9 +96,9 @@ export default function ChatList({
 	};
 
 	const getChatAvatar = (chatRoom: ChatRoom): string => {
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant?.user.avatar) {
 				return otherParticipant.user.avatar;
@@ -108,9 +112,9 @@ export default function ChatList({
 	const getChatUserData = (
 		chatRoom: ChatRoom
 	): { firstName: string; lastName: string; avatar?: string } => {
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
 			if (otherParticipant) {
 				return {
@@ -136,12 +140,13 @@ export default function ChatList({
 
 	const getChatStatus = (chatRoom: ChatRoom): "online" | "offline" => {
 		// For direct chats, check if the other participant is online
-		if (chatRoom.type === "direct" && chatRoom.participants.length === 2) {
+		if (chatRoom?.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== "current-user-id"
+				p => p.user.id !== currentUser?.id
 			);
-			// In a real app, you'd check online status from API
-			return Math.random() > 0.5 ? "online" : "offline";
+			if (otherParticipant && webSocketChatSync.isUserOnline) {
+				return webSocketChatSync.isUserOnline(otherParticipant.user.id) ? "online" : "offline";
+			}
 		}
 
 		return "offline";
@@ -199,10 +204,13 @@ export default function ChatList({
 								View More
 							</DropdownItem>
 							<DropdownItem
-								onItemClick={closeDropdownTwo}
+								onItemClick={() => {
+									openContactsModal();
+									setIsOpenTwo(false);
+								}}
 								className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
 							>
-								Delete
+								Contacts
 							</DropdownItem>
 						</Dropdown>
 					</div>
@@ -249,7 +257,7 @@ export default function ChatList({
 				) : (
 					<div className="space-y-1 p-2">
 						{chatRooms.map(chatRoom => {
-							const isSelected = selectedChatId === chatRoom.id;
+							const isSelected = selectedChatId === chatRoom?.id;
 							const status = getChatStatus(chatRoom);
 
 							return (
@@ -265,17 +273,21 @@ export default function ChatList({
 									<div className="relative flex-shrink-0">
 										{(() => {
 											const userData = getChatUserData(chatRoom);
-											return (
-												<UserAvatar
-													src={userData.avatar}
-													alt={getChatDisplayName(chatRoom)}
-													firstName={userData.firstName}
-													lastName={userData.lastName}
-													width={48}
-													height={48}
-													className="w-12 h-12"
-												/>
-											);
+											// Create a UserListItem-like object for renderAvatar
+											const userForAvatar: UserListItem = {
+												id: chatRoom.id,
+												firstName: userData.firstName,
+												lastName: userData.lastName,
+												role: "USER",
+												email: "",
+												phone: "",
+												location: "",
+												type: "",
+												vin: "",
+												avatar: userData.avatar,
+												status: "ACTIVE",
+											};
+											return renderAvatar(userForAvatar, "w-12 h-12");
 										})()}
 										{status === "online" && (
 											<div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
@@ -284,7 +296,7 @@ export default function ChatList({
 
 									<div className="flex-1 ml-3 text-left min-w-0">
 										<div className="flex items-center justify-between">
-											<h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+											<h3 className="text-base font-medium text-gray-900 dark:text-white truncate">
 												{getChatDisplayName(chatRoom)}
 											</h3>
 											<span className="text-xs text-gray-500 dark:text-gray-400">

@@ -23,7 +23,7 @@ interface FormData {
 export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProps) {
 	const [formData, setFormData] = useState<FormData>({
 		name: "",
-		loadId: "",
+		loadId: "", // Keep for future use when field is uncommented
 		participantIds: [],
 	});
 	const [users, setUsers] = useState<UserListItem[]>([]);
@@ -46,7 +46,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 		if (!isOpen) {
 			setFormData({
 				name: "",
-				loadId: "",
+				loadId: "", // Keep for future use when field is uncommented
 				participantIds: [],
 			});
 			setError("");
@@ -67,7 +67,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 			});
 
 			if (response.success && response.data) {
-				const newUsers = response.data.data || [];
+				const newUsers = response.data.data.users || [];
 				setUsers(newUsers);
 			} else {
 				setError(response.error || "Failed to load users");
@@ -108,11 +108,12 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 			return;
 		}
 
-		if (!formData.loadId.trim()) {
-			setError("Load ID is required");
-			setIsLoading(false);
-			return;
-		}
+		// Load ID is optional for general chats
+		// if (!formData.loadId.trim()) {
+		// 	setError("Load ID is required");
+		// 	setIsLoading(false);
+		// 	return;
+		// }
 
 		if (formData.participantIds.length === 0) {
 			setError("At least one participant is required");
@@ -124,8 +125,8 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 			// Use our new createChatRoom function from useChatSync
 			await createChatRoom({
 				name: formData.name.trim(),
-				type: "DIRECT", // Default to DIRECT as specified in requirements
-				loadId: formData.loadId.trim(),
+				type: "GROUP", // Group chat for multiple participants
+				// loadId: formData.loadId.trim(), // Commented out since field is hidden
 				participantIds: formData.participantIds,
 			});
 
@@ -144,7 +145,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 	// Convert users to MultiSelect options format
 	const userOptions = users.map(user => ({
 		value: user.id,
-		text: user.driver_name || user.driver_email,
+		text: user.firstName || user.email,
 		selected: formData.participantIds.includes(user.id),
 	}));
 
@@ -157,7 +158,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 			<form onSubmit={handleSubmit} className="space-y-6">
 				<div className="flex items-center justify-between mb-6">
 					<h4 className="text-lg font-medium text-gray-800 dark:text-white/90">
-						Create New Chat Room
+						Create Group Chat
 					</h4>
 				</div>
 
@@ -175,23 +176,23 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 						<Input
 							id="roomName"
 							type="text"
-							placeholder="Enter room name (e.g., Load #12345 Discussion)"
+							placeholder="Enter group name (e.g., Project Team, Marketing Group)"
 							defaultValue={formData.name}
 							onChange={e => handleInputChange("name", e.target.value)}
 						/>
 					</div>
 
-					{/* Load ID Field */}
-					<div>
-						<Label htmlFor="loadId">Load ID *</Label>
+					{/* Load ID Field - Hidden for now */}
+					{/* <div>
+						<Label htmlFor="loadId">Load ID (Optional)</Label>
 						<Input
 							id="loadId"
 							type="text"
-							placeholder="Enter load ID (e.g., load_123)"
+							placeholder="Enter load ID for load-related chats (e.g., load_123)"
 							defaultValue={formData.loadId}
 							onChange={e => handleInputChange("loadId", e.target.value)}
 						/>
-					</div>
+					</div> */}
 
 					{/* Participants Multi-Select */}
 					<div>
@@ -225,7 +226,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 						}
 						disabled={isLoading || isLoadingUsers}
 					>
-						{isLoading ? "Creating..." : "Create Room"}
+						{isLoading ? "Creating..." : "Create Group"}
 					</Button>
 				</div>
 			</form>

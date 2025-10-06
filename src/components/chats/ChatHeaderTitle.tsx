@@ -7,7 +7,7 @@ import { useChatModal } from "@/context/ChatModalContext";
 
 export default function ChatHeaderTitle() {
 	const [isOpen, setIsOpen] = useState(false);
-	const { openAddRoomModal } = useChatModal();
+	const { openAddRoomModal, openContactsModal } = useChatModal();
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -45,10 +45,13 @@ export default function ChatHeaderTitle() {
 						View More
 					</DropdownItem>
 					<DropdownItem
-						onItemClick={closeDropdown}
+						onItemClick={() => {
+							openContactsModal();
+							closeDropdown();
+						}}
 						className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
 					>
-						Delete
+						Contacts
 					</DropdownItem>
 				</Dropdown>
 			</div>
