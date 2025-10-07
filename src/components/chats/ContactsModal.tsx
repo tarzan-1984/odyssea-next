@@ -227,13 +227,26 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 
 				{/* Search Input */}
 				<div className="mb-6">
-					<Input
-						type="text"
-						placeholder="Search contacts..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="w-full"
-					/>
+					<div className="relative">
+						<Input
+							type="text"
+							placeholder="Search contacts..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="w-full pr-10"
+						/>
+						{searchQuery && (
+							<button
+								type="button"
+								onClick={() => setSearchQuery("")}
+								className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+							>
+								<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						)}
+					</div>
 				</div>
 
 				{/* Error Message */}

@@ -2,7 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { chatApi, ChatRoom } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
-import chatRooms from "@/app-api/chatRooms";
+import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
 
 // Hook for managing chat synchronization between Zustand store, IndexedDB, and API
@@ -29,11 +29,33 @@ export const useChatSync = () => {
 		saveMessagesToCache,
 	} = useChatStore();
 
+	// Helper function to normalize participants data
+	const normalizeParticipants = (participants: any[]): any[] => {
+		return participants.map((p: any) => ({
+			...p,
+			user: {
+				id: p.user.id,
+				firstName: p.user.firstName,
+				lastName: p.user.lastName,
+				avatar: p.user.profilePhoto ?? p.user.avatar ?? "",
+				role: p.user.role ?? "USER",
+			},
+		}));
+	};
+
 	// Load chat rooms from API and sync with cache
 	const loadChatRooms = useCallback(async () => {
 		try {
 			setLoadingChatRooms(true);
 			setError(null);
+
+			// Helper: ensure currentChatRoom points to an existing room
+			const ensureCurrentRoomValidity = (rooms: ChatRoom[]) => {
+				const current = useChatStore.getState().currentChatRoom;
+				if (current && !rooms.find(r => r.id === current.id)) {
+					setCurrentChatRoom(null);
+				}
+			};
 
 			// Check if we have cached chat rooms first
 			const hasCachedRooms = await indexedDBChatService.hasChatRooms();
@@ -47,6 +69,7 @@ export const useChatSync = () => {
 					const cachedRooms = await indexedDBChatService.getChatRooms();
 					if (cachedRooms.length > 0) {
 						setChatRooms(cachedRooms);
+						ensureCurrentRoomValidity(cachedRooms);
 						setLoadingChatRooms(false);
 						return;
 					}
@@ -55,8 +78,13 @@ export const useChatSync = () => {
 				// If cache is not fresh, load from API and update cache
 				try {
 					const apiRooms = await chatApi.getChatRooms();
-					setChatRooms(apiRooms);
-					await indexedDBChatService.saveChatRooms(apiRooms);
+					const normalizedRooms = apiRooms.map(room => ({
+						...room,
+						participants: normalizeParticipants(room.participants || []),
+					}));
+					setChatRooms(normalizedRooms);
+					ensureCurrentRoomValidity(normalizedRooms);
+					await indexedDBChatService.saveChatRooms(normalizedRooms);
 					setLoadingChatRooms(false);
 					return;
 				} catch (apiError) {
@@ -65,6 +93,7 @@ export const useChatSync = () => {
 					const cachedRooms = await indexedDBChatService.getChatRooms();
 					if (cachedRooms.length > 0) {
 						setChatRooms(cachedRooms);
+						ensureCurrentRoomValidity(cachedRooms);
 						setLoadingChatRooms(false);
 						return;
 					}
@@ -74,8 +103,13 @@ export const useChatSync = () => {
 			// If no cached data, load from API
 			try {
 				const apiRooms = await chatApi.getChatRooms();
-				setChatRooms(apiRooms);
-				await indexedDBChatService.saveChatRooms(apiRooms);
+				const normalizedRooms = apiRooms.map(room => ({
+					...room,
+					participants: normalizeParticipants(room.participants || []),
+				}));
+				setChatRooms(normalizedRooms);
+				ensureCurrentRoomValidity(normalizedRooms);
+				await indexedDBChatService.saveChatRooms(normalizedRooms);
 			} catch (apiError) {
 				console.warn("API unavailable, no cached data available:", apiError);
 				setError("Failed to load chat rooms");
@@ -236,20 +270,34 @@ export const useChatSync = () => {
 	);
 
 	// Create a new chat room
-	const createChatRoom = useCallback(
-		async (chatRoomData: {
-			name?: string;
-			type: string;
-			loadId?: string;
-			participantIds: string[];
-		}) => {
+    const createChatRoom = useCallback(
+        async (chatRoomData: {
+            name: string;
+            type: "DIRECT" | "GROUP";
+            loadId?: string;
+            participantIds: string[];
+            avatar?: string;
+        }): Promise<ChatRoom | undefined> => {
 			try {
-				// Create chat room via API with WebSocket notifications
-				const result = await chatRooms.createChatRoom(chatRoomData);
-				
+				console.log("useChatSync: Creating chat room with data:", chatRoomData);
+
+                // Create chat room via API with WebSocket notifications
+                const result = await chatRoomsApi.createChatRoom({
+                    name: chatRoomData.name,
+                    type: chatRoomData.type,
+                    loadId: chatRoomData.loadId ?? "",
+                    participantIds: chatRoomData.participantIds,
+                    avatar: chatRoomData.avatar,
+                });
+
+				console.log("useChatSync: API result:", result);
+				console.log("useChatSync: Raw participants from backend:", result.data?.participants);
+
 				if (result.success && result.data) {
+					console.log("useChatSync: Chat room created successfully, transforming data...");
 					// Transform result.data to match ChatRoom interface
 					const chatData = result.data; // Store in variable to avoid TS18048 error
+
 					const chatRoom = {
 						...chatData,
 						isArchived: false,
@@ -260,27 +308,33 @@ export const useChatSync = () => {
 							userId: userData.id,
 							joinedAt: chatData.createdAt,
 							user: {
-								id: userData.id,
-								firstName: userData.firstName,
-								lastName: userData.lastName,
-								avatar: userData.avatar,
-								role: userData.role,
+								id: userData.user.id,
+								firstName: userData.user.firstName,
+								lastName: userData.user.lastName,
+								avatar: userData.user.profilePhoto ?? userData.avatar ?? "",
+								role: userData.user.role ?? "USER",
 							},
 						})),
 					};
+					console.log("useChatSync: Transformed chat room:", chatRoom);
+
 					// Add chat room to local state
 					setChatRooms([chatRoom, ...chatRooms]);
 					await indexedDBChatService.addChatRoom(chatRoom);
+					console.log("useChatSync: Chat room added to store and cache");
+					return chatRoom as unknown as ChatRoom;
 				} else {
+					console.error("useChatSync: API returned error:", result.error);
 					throw new Error(result.error || "Failed to create chat room");
 				}
 			} catch (error) {
-				console.error("Failed to create chat room:", error);
+				console.error("useChatSync: Failed to create chat room:", error);
 				setError("Failed to create chat room");
 			}
-		},
-		[chatRooms, setChatRooms, setError]
-	);
+			return undefined;
+        },
+        [chatRooms, setChatRooms, setError]
+    );
 
 	// Mark message as read
 	const markMessageAsRead = useCallback(async (messageId: string) => {

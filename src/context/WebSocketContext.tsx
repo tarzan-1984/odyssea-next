@@ -316,10 +316,29 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// No need to duplicate event handlers here
 
 		// Chat room events
-		newSocket.on("chatRoomCreated", (data: ChatRoomCreatedData) => {
-			console.log("Chat room created:", data);
-			addChatRoom(data.chatRoom);
-		});
+        newSocket.on("chatRoomCreated", (data: any) => {
+            console.log("Chat room created:", data);
+            // Backend may emit either the chat room object directly or wrapped as { chatRoom }
+            const raw: any = (data && "chatRoom" in data) ? data.chatRoom : data;
+            if (raw && raw.id) {
+                // Normalize participant avatar field (profilePhoto -> avatar)
+                const normalized: ChatRoom = {
+                    ...raw,
+                    participants: Array.isArray(raw.participants)
+                        ? raw.participants.map((p: any) => ({
+                              ...p,
+                              user: {
+                                  ...p.user,
+                                  avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+                              },
+                          }))
+                        : [],
+                };
+                addChatRoom(normalized);
+            } else {
+                console.error("Invalid chatRoomCreated payload", data);
+            }
+        });
 
 		newSocket.on("chatRoomUpdated", (data: ChatRoomUpdatedData) => {
 			console.log("Chat room updated:", data);
@@ -327,13 +346,40 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.on("participantsAdded", (data: ParticipantsAddedData) => {
-			console.log("Participants added:", data);
-			// Handle participants added if needed
+			try {
+				const { chatRoomId, newParticipants } = data;
+				// Read current room from store
+				const state = useChatStore.getState();
+				const room = state.chatRooms.find(r => r.id === chatRoomId);
+				if (!room) return;
+				// Normalize avatar field
+				const normalized = (newParticipants || []).map((p: any) => ({
+					...p,
+					user: {
+						...p.user,
+						avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+					},
+				}));
+
+				const merged = [...room.participants, ...normalized];
+				updateChatRoom(chatRoomId, { participants: merged });
+			} catch (e) {
+				console.error("Failed to handle participantsAdded:", e);
+			}
 		});
 
 		newSocket.on("participantRemoved", (data: ParticipantRemovedData) => {
 			console.log("Participant removed:", data);
-			// Handle participant removed if needed
+			try {
+				const { chatRoomId, removedUserId } = data;
+				const state = useChatStore.getState();
+				const room = state.chatRooms.find(r => r.id === chatRoomId);
+				if (!room) return;
+				const filtered = room.participants.filter(p => p.userId !== removedUserId);
+				updateChatRoom(chatRoomId, { participants: filtered });
+			} catch (e) {
+				console.error("Failed to handle participantRemoved:", e);
+			}
 		});
 
 		// Notification events

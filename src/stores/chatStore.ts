@@ -57,6 +57,9 @@ interface ChatState {
 
 	// Action to clear all data (for logout)
 	clearAllData: () => void;
+
+	// Action to clear cache from IndexedDB
+	clearCache: () => Promise<void>;
 }
 
 // Create the chat store with Zustand
@@ -100,11 +103,15 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				updateChatRoom: (chatRoomId, updates) => {
-					const { chatRooms } = get();
+					const { chatRooms, currentChatRoom } = get();
 					const updatedRooms = chatRooms.map(room =>
 						room.id === chatRoomId ? { ...room, ...updates } : room
 					);
-					set({ chatRooms: updatedRooms }, false, "updateChatRoom");
+					const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
+					if (currentChatRoom?.id === chatRoomId) {
+						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+					}
+					set(updatedState as any, false, "updateChatRoom");
 				},
 
 				// Message actions
@@ -209,6 +216,16 @@ export const useChatStore = create<ChatState>()(
 						false,
 						"clearAllData"
 					);
+				},
+
+				// Clear cache from IndexedDB
+				clearCache: async () => {
+					try {
+						await indexedDBChatService.clearCache();
+						console.log("Cache cleared successfully");
+					} catch (error) {
+						console.error("Failed to clear cache:", error);
+					}
 				},
 			}),
 			{

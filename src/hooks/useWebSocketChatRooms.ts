@@ -40,10 +40,16 @@ export const useWebSocketChatRooms = ({
 	useEffect(() => {
 		if (!socket) return;
 
-		const handleChatRoomCreated = (data: { chatRoom: ChatRoom }) => {
+		const handleChatRoomCreated = (data: { chatRoom: ChatRoom } | ChatRoom) => {
+			// Normalize payload: server can send { chatRoom } or ChatRoom
+			const room: ChatRoom | undefined = (data as any)?.chatRoom ? (data as any).chatRoom : (data as any);
+			if (!room || !room.id) {
+				console.error("Invalid chatRoomCreated payload", data);
+				return;
+			}
 			// Add chat room to store
-			addChatRoom(data.chatRoom);
-			onChatRoomCreated?.(data.chatRoom);
+			addChatRoom(room);
+			onChatRoomCreated?.(room);
 		};
 
 		const handleChatRoomUpdated = (data: {
@@ -120,8 +126,8 @@ export const useWebSocketChatRooms = ({
 	);
 
 	// Update chat room
-	const updateChatRoomHandler = useCallback(
-		(data: { chatRoomId: string; updates: { name?: string; isArchived?: boolean } }) => {
+    const updateChatRoomHandler = useCallback(
+        (data: { chatRoomId: string; updates: { name?: string; isArchived?: boolean; avatar?: string } }) => {
 			if (socket && isConnected) {
 				setIsLoading(true);
 				socket.emit("updateChatRoom", data);

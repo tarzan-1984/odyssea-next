@@ -40,20 +40,34 @@ export const useWebSocketMessages = ({
 
 	// Join chat room when component mounts or chatRoomId changes
 	useEffect(() => {
+		// If there is a valid room id and it's different from the current one — join it
 		if (isConnected && chatRoomId && currentRoomRef.current !== chatRoomId) {
 			console.log("useWebSocketMessages: Joining chat room:", chatRoomId);
-			
+
 			// Clear typing state and timeout when switching chat rooms
 			setIsTyping({});
 			if (typingTimeout) {
 				clearTimeout(typingTimeout);
 				setTypingTimeout(null);
 			}
-			
+
 			currentRoomRef.current = chatRoomId;
 			joinChatRoom(chatRoomId);
+			return;
 		}
-	}, [isConnected, chatRoomId]); // Remove joinChatRoom from dependencies to prevent loops
+
+		// When there is no selected room (empty id) but we were previously in a room — leave it
+		if (isConnected && !chatRoomId && currentRoomRef.current) {
+			console.log("useWebSocketMessages: Leaving chat room because no room is selected:", currentRoomRef.current);
+			leaveChatRoom(currentRoomRef.current);
+			currentRoomRef.current = null;
+			setIsTyping({});
+			if (typingTimeout) {
+				clearTimeout(typingTimeout);
+				setTypingTimeout(null);
+			}
+		}
+	}, [isConnected, chatRoomId]); // Remove join/leave from deps to prevent loops
 
 	// Leave chat room on unmount
 	useEffect(() => {

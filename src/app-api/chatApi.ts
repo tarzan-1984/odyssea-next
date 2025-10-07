@@ -22,6 +22,8 @@ export interface ChatRoom {
 	name?: string;
 	type: string;
 	loadId?: string;
+    avatar?: string;
+	adminId?: string;
 	isArchived: boolean;
 	createdAt: string;
 	updatedAt: string;

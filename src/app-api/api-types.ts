@@ -440,6 +440,7 @@ export interface CreateChatRoomData {
     type: "DIRECT" | "GROUP";
     loadId: string;
     participantIds: string[];
+    avatar?: string;
 }
 
 export interface CreateChatRoomResponse {

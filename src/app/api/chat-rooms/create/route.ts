@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		const body = await request.json();
-		const { name, type, loadId, participantIds } = body;
+		const { name, type, loadId, participantIds, avatar } = body;
 		
 		console.log('API route body=================', body);
 		console.log('API route name=================', name);
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Build payload conditionally including optional loadId
+		// Build payload conditionally including optional loadId and avatar
 		const payload: Record<string, unknown> = {
 			name,
 			type,
@@ -71,6 +71,9 @@ export async function POST(request: NextRequest) {
 		};
 		if (loadId && typeof loadId === 'string' && loadId.trim() !== '') {
 			payload.loadId = loadId;
+		}
+		if (avatar && typeof avatar === 'string' && avatar.trim() !== '') {
+			(payload as any).avatar = avatar;
 		}
 
 		// Make request to backend API

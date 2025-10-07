@@ -11,6 +11,7 @@ import { MoreDotIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+import { useChatStore } from "@/stores/chatStore";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -27,7 +28,9 @@ export default function ChatList({
 	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
+
 	const currentUser = useCurrentUser();
+	const { clearCache } = useChatStore();
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 
@@ -95,8 +98,8 @@ export default function ChatList({
 		return "";
 	};
 
-	const getChatAvatar = (chatRoom: ChatRoom): string => {
-		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+    const getChatAvatar = (chatRoom: ChatRoom): string => {
+        if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== currentUser?.id
 			);
@@ -105,8 +108,13 @@ export default function ChatList({
 			}
 		}
 
-		// Default avatar for group chats or when no profile photo
-		return "/images/avatars/avatar-default.jpg";
+        // For GROUP chats, prefer chatRoom.avatar if set
+        if (chatRoom.type === "GROUP" && chatRoom.avatar) {
+            return chatRoom.avatar;
+        }
+
+        // Default avatar
+        return "/images/avatars/avatar-default.jpg";
 	};
 
 	const getChatUserData = (
@@ -179,6 +187,17 @@ export default function ChatList({
 					</div>
 				</div>
 				<div className="flex items-center gap-1">
+					{/* Temporary cache clear button */}
+					<button
+						onClick={async () => {
+							await clearCache();
+							window.location.reload();
+						}}
+						className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+						title="Clear cache and reload"
+					>
+						Clear Cache
+					</button>
 					<div>
 						<button className="dropdown-toggle d-block" onClick={toggleDropdownTwo}>
 							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
@@ -196,12 +215,6 @@ export default function ChatList({
 								className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
 							>
 								Add New Room
-							</DropdownItem>
-							<DropdownItem
-								onItemClick={closeDropdownTwo}
-								className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-							>
-								View More
 							</DropdownItem>
 							<DropdownItem
 								onItemClick={() => {
@@ -245,8 +258,8 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Chat List */}
-			<div className="flex-1 overflow-y-auto">
+            {/* Chat List */}
+            <div className="overflow-y-auto h-[400px] max-h-[calc(100vh-220px)]">
 				{!chatRooms || chatRooms.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-gray-500 text-center">
@@ -271,25 +284,21 @@ export default function ChatList({
 									}`}
 								>
 									<div className="relative flex-shrink-0">
-										{(() => {
-											const userData = getChatUserData(chatRoom);
-											// Create a UserListItem-like object for renderAvatar
-											const userForAvatar: UserListItem = {
-												id: chatRoom.id,
-												firstName: userData.firstName,
-												lastName: userData.lastName,
-												role: "USER",
-												email: "",
-												phone: "",
-												location: "",
-												type: "",
-												vin: "",
-												avatar: userData.avatar,
-												status: "ACTIVE",
-											};
-											return renderAvatar(userForAvatar, "w-12 h-12");
-										})()}
-										{status === "online" && (
+                                        {chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
+                                            <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                                {(() => {
+                                                    const name = getChatDisplayName(chatRoom);
+                                                    const parts = name.trim().split(/\s+/).filter(Boolean);
+                                                    const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
+                                                    return initials;
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            // Fallback to avatar logic
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={getChatAvatar(chatRoom)} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                                        )}
+                                        {chatRoom.type === "DIRECT" && status === "online" && (
 											<div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
 										)}
 									</div>
@@ -308,12 +317,12 @@ export default function ChatList({
 										</p>
 									</div>
 
-									{chatRoom.unreadCount !== 0 && (
+							{typeof chatRoom.unreadCount === "number" && chatRoom.unreadCount > 0 && (
 										<div className="ml-2 flex-shrink-0">
 											<div className="w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-												{chatRoom.unreadCount && chatRoom.unreadCount > 99
+										{chatRoom.unreadCount > 99
 													? "99+"
-													: chatRoom.unreadCount}
+											: chatRoom.unreadCount}
 											</div>
 										</div>
 									)}

@@ -13,11 +13,11 @@ import { renderAvatar } from "@/helpers";
 import { UserData } from "@/app-api/api-types";
 
 interface ChatBoxProps {
-	selectedChatRoom?: ChatRoom;
-	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+    selectedChatRoomId?: string;
+    webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 }
 
-export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBoxProps) {
+export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatBoxProps) {
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -36,8 +36,9 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 		isUserOnline,
 	} = webSocketChatSync;
 
-	// Get error from chat store
-	const error = useChatStore(state => state.error);
+    // Get error and live chat room from store
+    const error = useChatStore(state => state.error);
+    const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
@@ -72,11 +73,11 @@ export default function ChatBox({ selectedChatRoom, webSocketChatSync }: ChatBox
 		[loadMessages]
 	);
 
-	useEffect(() => {
-		if (selectedChatRoom) {
-			loadMessagesForRoom(selectedChatRoom.id);
-		}
-	}, [selectedChatRoom, loadMessagesForRoom]);
+    useEffect(() => {
+        if (selectedChatRoomId) {
+            loadMessagesForRoom(selectedChatRoomId);
+        }
+    }, [selectedChatRoomId, loadMessagesForRoom]);
 
 	// Scroll to bottom when messages change (for new messages)
 	useEffect(() => {

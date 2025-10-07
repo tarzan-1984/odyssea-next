@@ -11,7 +11,7 @@ const chatRooms = {
 	 * @param roomData - Chat room data including name, type, loadId, and participant IDs
 	 * @returns Promise with chat room creation result
 	 */
-	async createChatRoom(roomData: CreateChatRoomData): Promise<CreateChatRoomResponse> {
+    async createChatRoom(roomData: CreateChatRoomData): Promise<CreateChatRoomResponse> {
 		try {
 			const response = await fetch("/api/chat-rooms/create", {
 				method: "POST",
@@ -19,7 +19,7 @@ const chatRooms = {
 					"Content-Type": "application/json",
 				},
 				credentials: "include", // Include cookies for authentication
-				body: JSON.stringify(roomData),
+                body: JSON.stringify(roomData),
 			});
 
 			const data = await response.json();

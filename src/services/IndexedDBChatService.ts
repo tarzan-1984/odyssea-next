@@ -330,44 +330,42 @@ class IndexedDBChatService {
 	}
 
 	// Chat rooms operations
-	async saveChatRooms(chatRooms: ChatRoom[]): Promise<void> {
-		try {
-			// Check if we already have chat rooms
-			const hasExistingRooms = await this.hasChatRooms();
-			const existingCount = await this.getChatRoomsCount();
+    async saveChatRooms(chatRooms: ChatRoom[]): Promise<void> {
+        try {
+            const db = await this.ensureDB();
+            const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+            const store = transaction.objectStore(CHAT_ROOMS_STORE);
 
-			// If we have the same or more chat rooms, skip saving
-			if (hasExistingRooms && existingCount >= chatRooms.length) {
-				console.log(`Skipping save for chat rooms - already have ${existingCount} rooms`);
-				return;
-			}
+            // Полная замена списка комнат: сначала очищаем, затем сохраняем новый список,
+            // чтобы не оставались комнаты, которых уже нет на сервере
+            await new Promise<void>((resolve, reject) => {
+                const clearReq = store.clear();
+                clearReq.onsuccess = () => resolve();
+                clearReq.onerror = () => reject(clearReq.error);
+            });
 
-			const db = await this.ensureDB();
-			const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
-			const store = transaction.objectStore(CHAT_ROOMS_STORE);
+            // Convert chat rooms to stored format
+            const storedChatRooms: StoredChatRoom[] = chatRooms.map(chatRoom => ({
+                ...chatRoom,
+                cachedAt: Date.now(),
+                version: 1,
+            }));
 
-			// Convert chat rooms to stored format
-			const storedChatRooms: StoredChatRoom[] = chatRooms.map(chatRoom => ({
-				...chatRoom,
-				cachedAt: Date.now(),
-				version: 1,
-			}));
+            // Save each chat room
+            for (const chatRoom of storedChatRooms) {
+                await new Promise<void>((resolve, reject) => {
+                    const request = store.put(chatRoom);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
 
-			// Save each chat room
-			for (const chatRoom of storedChatRooms) {
-				await new Promise<void>((resolve, reject) => {
-					const request = store.put(chatRoom);
-					request.onsuccess = () => resolve();
-					request.onerror = () => reject(request.error);
-				});
-			}
-
-			console.log(`Saved ${chatRooms.length} chat rooms to IndexedDB`);
-		} catch (error) {
-			console.error("Failed to save chat rooms to IndexedDB:", error);
-			throw error;
-		}
-	}
+            console.log(`Saved ${chatRooms.length} chat rooms to IndexedDB`);
+        } catch (error) {
+            console.error("Failed to save chat rooms to IndexedDB:", error);
+            throw error;
+        }
+    }
 
 	async getChatRooms(): Promise<ChatRoom[]> {
 		try {

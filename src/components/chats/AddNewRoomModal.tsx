@@ -11,6 +11,7 @@ import { useChatSync } from "@/hooks/useChatSync";
 import { renderAvatar } from "@/helpers";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useCurrentUser } from "@/stores/userStore";
+import { S3Uploader } from "@/app-api/S3Uploader";
 
 interface AddNewRoomModalProps {
 	isOpen: boolean;
@@ -18,18 +19,19 @@ interface AddNewRoomModalProps {
 }
 
 interface FormData {
-	name: string;
-	loadId: string;
-	participantIds: string[];
+    name: string;
+    loadId: string;
+    participantIds: string[];
 }
 
 export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProps) {
-	const [formData, setFormData] = useState<FormData>({
-		name: "",
-		loadId: "", // Keep for future use when field is uncommented
-		participantIds: [],
-	});
+    const [formData, setFormData] = useState<FormData>({
+        name: "",
+        loadId: "",
+        participantIds: [],
+    });
 	const [users, setUsers] = useState<UserListItem[]>([]);
+	const [selectedUsersMap, setSelectedUsersMap] = useState<Record<string, UserListItem>>({});
 	const [isLoading, setIsLoading] = useState(false);
 	const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -37,6 +39,10 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 	const [currentPage, setCurrentPage] = useState(1);
 	const [hasMore, setHasMore] = useState(true);
 	const [error, setError] = useState<string>("");
+	const [avatarFile, setAvatarFile] = useState<File | null>(null);
+	const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+	const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+	const uploader = new S3Uploader();
 
 	// Use our new chat sync hook
 	const { createChatRoom } = useChatSync();
@@ -57,18 +63,26 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 	// Reset form when modal closes
 	useEffect(() => {
 		if (!isOpen) {
-			setFormData({
-				name: "",
-				loadId: "", // Keep for future use when field is uncommented
-				participantIds: [],
-			});
+            setFormData({
+                name: "",
+                loadId: "",
+                participantIds: [],
+            });
 			setError("");
 			setUsers([]);
+			setSelectedUsersMap({});
 			setSearchQuery("");
 			setCurrentPage(1);
 			setHasMore(true);
 		}
 	}, [isOpen]);
+
+	// cleanup preview URL
+	useEffect(() => {
+		return () => {
+			if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+		};
+	}, [avatarPreview]);
 
 /**
  * Fetch users with pagination and optional search
@@ -157,6 +171,12 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		setIsLoading(true);
 		setError("");
 
+		console.log("Form submission started:", {
+			name: formData.name,
+			participantIds: formData.participantIds,
+			participantCount: formData.participantIds.length
+		});
+
 		// Validate form data
 		if (!formData.name.trim()) {
 			setError("Room name is required");
@@ -177,15 +197,30 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 			return;
 		}
 
+		console.log("Validation passed, creating chat room...");
+
 		try {
-			// Use our new createChatRoom function from useChatSync
-			await createChatRoom({
+           // 1) optionally upload avatar and get path
+           let avatarPath: string | undefined;
+           if (avatarFile) {
+               setIsUploadingAvatar(true);
+               const ts = Math.floor(Date.now() / 1000);
+               const ext = avatarFile.name.split('.').pop() || 'jpg';
+               const tempName = `avatar-chat_temp_${ts}.${ext}`;
+               const { fileUrl } = await uploader.upload(new File([avatarFile], tempName, { type: avatarFile.type }));
+               avatarPath = fileUrl;
+               setIsUploadingAvatar(false);
+           }
+
+           await createChatRoom({
 				name: formData.name.trim(),
 				type: "GROUP", // Group chat for multiple participants
 				// loadId: formData.loadId.trim(), // Commented out since field is hidden
-				participantIds: formData.participantIds,
+               participantIds: formData.participantIds,
+               avatar: avatarPath,
 			});
 
+			console.log("Chat room created successfully");
 			// Success - close modal and reset form
 			onClose();
 			// The chat room will be automatically added to Zustand and IndexedDB
@@ -205,13 +240,20 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		selected: formData.participantIds.includes(user.id),
 	}));
 
+	const handleAvatarPick: React.ChangeEventHandler<HTMLInputElement> = e => {
+		const f = e.target.files?.[0] || null;
+		setAvatarFile(f);
+		if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+		setAvatarPreview(f ? URL.createObjectURL(f) : null);
+	};
+
 	return (
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
 			className="max-w-[584px] w-full mx-auto p-4 sm:p-6 lg:p-10"
 		>
-			<form onSubmit={handleSubmit} className="space-y-6">
+			<form onSubmit={handleSubmit} className="space-y-6 max-h-[70vh] overflow-y-auto">
 				<div className="flex items-center justify-between mb-6">
 					<h4 className="text-lg font-medium text-gray-800 dark:text-white/90">
 						Create Group Chat
@@ -238,6 +280,20 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 						/>
 					</div>
 
+					{/* Optional Avatar Upload */}
+					<div>
+						<Label htmlFor="roomAvatar">Avatar (optional)</Label>
+						<div className="flex items-center gap-3">
+							{avatarPreview ? (
+								// eslint-disable-next-line @next/next/no-img-element
+								<img src={avatarPreview} alt="preview" className="w-12 h-12 rounded-full object-cover" />
+							) : (
+								<div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-800" />)
+							}
+							<input id="roomAvatar" type="file" accept="image/*" onChange={handleAvatarPick} />
+						</div>
+					</div>
+
 					{/* Load ID Field - Hidden for now */}
 					{/* <div>
 						<Label htmlFor="loadId">Load ID (Optional)</Label>
@@ -254,10 +310,10 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 					<div className="space-y-3">
 						<Label>Participants *</Label>
 						{/* Selected chips */}
-						{formData.participantIds.length > 0 && (
+					{formData.participantIds.length > 0 && (
 							<div className="flex flex-wrap gap-2">
-								{formData.participantIds.map(pid => {
-									const u = users.find(x => x.id === pid);
+							{formData.participantIds.map(pid => {
+								const u = selectedUsersMap[pid] ?? users.find(x => x.id === pid);
 									if (!u) return null;
 									return (
 										<div key={pid} className="flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
@@ -266,7 +322,14 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 											<button
 												type="button"
 												className="text-gray-500 hover:text-red-600"
-												onClick={() => handleInputChange("participantIds", formData.participantIds.filter(id => id !== pid))}
+											onClick={() => {
+												handleInputChange("participantIds", formData.participantIds.filter(id => id !== pid));
+												setSelectedUsersMap(prev => {
+													const copy = { ...prev };
+													delete copy[pid];
+													return copy;
+												});
+											}}
 											>
 												×
 											</button>
@@ -277,13 +340,27 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 						)}
 
 						{/* Search */}
-						<Input
-							id="participantsSearch"
-							type="text"
-							placeholder="Search users..."
-							value={searchQuery}
-							onChange={e => setSearchQuery(String((e.target as HTMLInputElement).value))}
-						/>
+						<div className="relative">
+							<Input
+								id="participantsSearch"
+								type="text"
+								placeholder="Search users..."
+								value={searchQuery}
+								onChange={e => setSearchQuery(String((e.target as HTMLInputElement).value))}
+								className="pr-10"
+							/>
+							{searchQuery && (
+								<button
+									type="button"
+									onClick={() => setSearchQuery("")}
+									className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+								>
+									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							)}
+						</div>
 
 						{/* Users list */}
 						<div className="max-h-72 overflow-y-auto space-y-2" onScroll={handleScroll}>
@@ -300,11 +377,23 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 											type="button"
 											className={`w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
 											onClick={() => {
-												if (selected) {
-													handleInputChange("participantIds", formData.participantIds.filter(id => id !== u.id));
-												} else {
-													handleInputChange("participantIds", [...formData.participantIds, u.id]);
-												}
+												// Use functional state update to avoid stale closures
+												setFormData(prev => {
+													const already = prev.participantIds.includes(u.id);
+													const nextIds = already
+														? prev.participantIds.filter(id => id !== u.id)
+														: [...prev.participantIds, u.id];
+													return { ...prev, participantIds: nextIds };
+												});
+												setSelectedUsersMap(prev => {
+													const exists = !!prev[u.id];
+													if (exists) {
+														const copy = { ...prev };
+														delete copy[u.id];
+														return copy;
+													}
+													return { ...prev, [u.id]: u };
+												});
 											}}
 										>
 											<div className="relative flex-shrink-0">
