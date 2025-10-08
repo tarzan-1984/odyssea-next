@@ -290,8 +290,6 @@ export const useChatSync = () => {
                     avatar: chatRoomData.avatar,
                 });
 
-				console.log("useChatSync: API result:", result);
-				console.log("useChatSync: Raw participants from backend:", result.data?.participants);
 
 				if (result.success && result.data) {
 					console.log("useChatSync: Chat room created successfully, transforming data...");

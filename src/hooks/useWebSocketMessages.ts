@@ -42,7 +42,7 @@ export const useWebSocketMessages = ({
 	useEffect(() => {
 		// If there is a valid room id and it's different from the current one — join it
 		if (isConnected && chatRoomId && currentRoomRef.current !== chatRoomId) {
-			console.log("useWebSocketMessages: Joining chat room:", chatRoomId);
+			//console.log("useWebSocketMessages: Joining chat room:", chatRoomId);
 
 			// Clear typing state and timeout when switching chat rooms
 			setIsTyping({});
@@ -58,7 +58,7 @@ export const useWebSocketMessages = ({
 
 		// When there is no selected room (empty id) but we were previously in a room — leave it
 		if (isConnected && !chatRoomId && currentRoomRef.current) {
-			console.log("useWebSocketMessages: Leaving chat room because no room is selected:", currentRoomRef.current);
+		//	console.log("useWebSocketMessages: Leaving chat room because no room is selected:", currentRoomRef.current);
 			leaveChatRoom(currentRoomRef.current);
 			currentRoomRef.current = null;
 			setIsTyping({});
@@ -73,11 +73,11 @@ export const useWebSocketMessages = ({
 	useEffect(() => {
 		return () => {
 			if (currentRoomRef.current) {
-				console.log("useWebSocketMessages: Leaving chat room:", currentRoomRef.current);
+				//`console.log("useWebSocketMessages: Leaving chat room:", currentRoomRef.current);
 				leaveChatRoom(currentRoomRef.current);
 				currentRoomRef.current = null;
 			}
-			
+
 			// Clear typing timeout on unmount
 			if (typingTimeout) {
 				clearTimeout(typingTimeout);

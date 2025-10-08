@@ -130,7 +130,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Debug logging for URL (only once on mount)
 	const [urlLogged, setUrlLogged] = useState(false);
 	if (process.env.NODE_ENV === "development" && !urlLogged) {
-		console.log("WebSocket URL:", wsUrl);
+		//console.log("WebSocket URL:", wsUrl);
 		setUrlLogged(true);
 	}
 
@@ -169,8 +169,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 
 		// Create new socket connection with authentication (without namespace)
-		console.log("Attempting to connect to:", wsUrl);
-		console.log("Token length:", token.length);
 
 		const newSocket = io(wsUrl, {
 			auth: {
@@ -185,8 +183,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("connect", () => {
 			if (process.env.NODE_ENV === "development") {
 				console.log("WebSocket connected");
-				console.log("Socket ID:", newSocket.id);
-				console.log("Socket connected:", newSocket.connected);
+				//console.log("Socket ID:", newSocket.id);
+				//console.log("Socket connected:", newSocket.connected);
 			}
 			setIsConnected(true);
 			reconnectAttempts.current = 0;
@@ -200,7 +198,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle server's connected event (with user data)
 		newSocket.on("connected", (data: any) => {
-			console.log("Server connected event:", data);
+			//console.log("Server connected event:", data);
 		});
 
 		// Handle message sent confirmation
@@ -220,30 +218,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle chat room events
 		newSocket.on("chatRoomCreated", (data: any) => {
-			console.log("Chat room created:", data);
+			//console.log("Chat room created:", data);
 		});
 
 		newSocket.on("chatRoomUpdated", (data: any) => {
-			console.log("Chat room updated:", data);
+			//console.log("Chat room updated:", data);
 		});
 
 		// Handle user events
 		newSocket.on("userJoined", (data: any) => {
-			console.log("User joined chat room:", data);
+			//console.log("User joined chat room:", data);
 		});
 
 		newSocket.on("userLeft", (data: any) => {
-			console.log("User left chat room:", data);
+			//console.log("User left chat room:", data);
 		});
 
 		// Handle room join/leave confirmations
 		newSocket.on("joinedChatRoom", (data: any) => {
-			console.log("Successfully joined chat room:", data);
+			//console.log("Successfully joined chat room:", data);
 			// Update connection status or room state if needed
 		});
 
 		newSocket.on("leftChatRoom", (data: any) => {
-			console.log("Successfully left chat room:", data);
+			//console.log("Successfully left chat room:", data);
 			// Update connection status or room state if needed
 		});
 
@@ -265,13 +263,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle any other events for debugging
 		newSocket.onAny((eventName: string, ...args: any[]) => {
 			if (process.env.NODE_ENV === "development") {
-				console.log(`Received event '${eventName}' from server:`, args);
+				//console.log(`Received event '${eventName}' from server:`, args);
 			}
 		});
 
 		newSocket.on("disconnect", (reason: string) => {
 			if (process.env.NODE_ENV === "development") {
-				console.log("WebSocket disconnected:", reason);
+				//console.log("WebSocket disconnected:", reason);
 			}
 			setIsConnected(false);
 
@@ -352,7 +350,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
 				if (!room) return;
-				
+
 				// Normalize avatar field
 				const normalized = (newParticipants || []).map((p: any) => ({
 					...p,
@@ -368,13 +366,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const userId = p.user?.id || p.userId;
 					return !existingUserIds.has(userId);
 				});
-				
-				console.log("Adding participants:", { 
-					existing: room.participants.length, 
+
+				console.log("Adding participants:", {
+					existing: room.participants.length,
 					incoming: normalized.length,
-					unique: newUniqueParticipants.length 
+					unique: newUniqueParticipants.length
 				});
-				
+
 				// Only merge if there are actually new participants
 				if (newUniqueParticipants.length > 0) {
 					const merged = [...room.participants, ...newUniqueParticipants];
@@ -394,10 +392,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (!room) return;
 				// removedUserId is user.id from users table, so compare with p.user?.id
 				const filtered = room.participants.filter(p => (p.user?.id || p.userId) !== removedUserId);
-				console.log("Filtered participants after removal:", { 
-					before: room.participants.length, 
+				console.log("Filtered participants after removal:", {
+					before: room.participants.length,
 					after: filtered.length,
-					removedUserId 
+					removedUserId
 				});
 				updateChatRoom(chatRoomId, { participants: filtered });
 			} catch (e) {
@@ -459,11 +457,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const joinChatRoom = useCallback(
 		(chatRoomId: string) => {
 			if (socket && isConnected) {
-				console.log("Joining chat room:", chatRoomId);
-				socket.emit("joinChatRoom", { chatRoomId });
-				console.log("joinChatRoom event emitted to server");
+				//console.log("Joining chat room:", chatRoomId);
+				//socket.emit("joinChatRoom", { chatRoomId });
+				//console.log("joinChatRoom event emitted to server");
 			} else {
-				console.log("Cannot join chat room: socket not connected or not available");
+				//console.log("Cannot join chat room: socket not connected or not available");
 			}
 		},
 		[socket, isConnected]

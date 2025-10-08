@@ -6,9 +6,9 @@ import usersApi from "@/app-api/users";
 import { UserListItem } from "@/app-api/api-types";
 import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
-import chatRooms from "@/app-api/chatRooms";
 import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+import { useChatSync } from "@/hooks/useChatSync";
 
 interface ContactsModalProps {
 	isOpen: boolean;
@@ -28,7 +28,8 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 
 	// Get current user and chat store
 	const currentUser = useCurrentUser();
-	const { addChatRoom, chatRooms } = useChatStore();
+	const { chatRooms } = useChatStore();
+	const { createChatRoom } = useChatSync();
 	
 	// Get online status functionality
 	const { isUserOnline } = useWebSocketChatSync();
@@ -56,50 +57,29 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 				return;
 			}
 
-			// Ensure firstName and lastName are strings
-			const firstName = contact?.firstName? String(contact.firstName || '').trim() : '';
-			const lastName = contact?.lastName? String(contact.lastName || '').trim() : '';
+		// Ensure firstName and lastName are strings
+		const firstName = contact?.firstName? String(contact.firstName || '').trim() : '';
+		const lastName = contact?.lastName? String(contact.lastName || '').trim() : '';
 
-			if (!firstName || !lastName) {
-				setError("Contact name is required");
-				return;
-			}
+		if (!firstName || !lastName) {
+			setError("Contact name is required");
+			return;
+		}
 
-			const result = await chatRooms.createChatRoom({
-				name: `${firstName} ${lastName}`, // Name for direct chat
-				type: "DIRECT",
-				loadId: "", // Empty for direct chats
-				participantIds: [currentUser.id, contact.id], // Only 2 participants
-			});
+		// Create direct chat using the same method as group chats
+		const chatRoom = await createChatRoom({
+			name: `${firstName} ${lastName}`, // Name for direct chat
+			type: "DIRECT",
+			loadId: "", // Empty for direct chats
+			participantIds: [currentUser.id, contact.id], // Only 2 participants
+		});
 
-			if (result.success && result.data) {
-				// Add chat room to store for immediate UI update
-				// Transform result.data to match ChatRoom interface
-				const chatData = result.data; // Store in variable to avoid TS18048 error
-				const chatRoom = {
-					...chatData,
-					isArchived: false,
-					updatedAt: chatData.createdAt, // Use createdAt as updatedAt for new chat
-					participants: chatData.participants.map((userData: any) => ({
-						id: `participant_${userData.id}_${chatData.id}`,
-						chatRoomId: chatData.id,
-						userId: userData.id,
-						joinedAt: chatData.createdAt,
-						user: {
-							id: userData.id,
-							firstName: userData.firstName,
-							lastName: userData.lastName,
-							avatar: userData.avatar,
-							role: userData.role,
-						},
-					})),
-				};
-				addChatRoom(chatRoom);
-				// Close modal on success
-				onClose();
-			} else {
-				setError(result.error || "Failed to create direct chat");
-			}
+		if (chatRoom) {
+			// Close modal - chat room is already added to store via createChatRoom
+			onClose();
+		} else {
+			setError("Failed to create direct chat");
+		}
 		} catch (error) {
 			console.error("Error creating direct chat:", error);
 			setError("Network error occurred");

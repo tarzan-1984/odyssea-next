@@ -49,18 +49,18 @@ export const useWebSocketChatSync = () => {
 	// WebSocket chat room management
 	const webSocketChatRooms = useWebSocketChatRooms({
 		onChatRoomCreated: chatRoom => {
-			console.log("Chat room created via WebSocket:", chatRoom);
+			//console.log("Chat room created via WebSocket:", chatRoom);
 			// Chat room is automatically added to store by useWebSocketChatRooms
 		},
 		onChatRoomUpdated: data => {
-			console.log("Chat room updated via WebSocket:", data);
+			//console.log("Chat room updated via WebSocket:", data);
 			// Chat room is automatically updated in store by useWebSocketChatRooms
 		},
 		onParticipantsAdded: data => {
-			console.log("Participants added via WebSocket:", data);
+			//console.log("Participants added via WebSocket:", data);
 		},
 		onParticipantRemoved: data => {
-			console.log("Participant removed via WebSocket:", data);
+			//console.log("Participant removed via WebSocket:", data);
 		},
 		onError: error => {
 			console.error("WebSocket chat room error:", error);
