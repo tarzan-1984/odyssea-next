@@ -116,7 +116,7 @@ class IndexedDBChatService {
 				});
 			}
 
-			console.log(`Saved ${messages.length} messages for chat room ${chatRoomId}`);
+			//console.log(`Saved ${messages.length} messages for chat room ${chatRoomId}`);
 
 			// Cleanup old messages to prevent cache from growing too large
 			await this.cleanupOldMessages(chatRoomId);
@@ -322,7 +322,7 @@ class IndexedDBChatService {
 				request.onerror = () => reject(request.error);
 			});
 
-			console.log(`Deleted messages for chat room ${chatRoomId}`);
+			//console.log(`Deleted messages for chat room ${chatRoomId}`);
 		} catch (error) {
 			console.error("Failed to delete messages from IndexedDB:", error);
 			throw error;

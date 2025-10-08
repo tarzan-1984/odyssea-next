@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { renderAvatar } from "@/helpers";
 import { UserData } from "@/app-api/api-types";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface ChatBoxProps {
     selectedChatRoomId?: string;
@@ -27,6 +28,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Use WebSocket chat sync for real-time functionality from props
 	const {
+		onlineStatus,
 		messages,
 		isLoadingMessages: loading,
 		isSendingMessage: sending,
@@ -95,7 +97,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		try {
 			// Stop typing indicator before sending message
 			sendTyping(false);
-			
+
 			// Use WebSocket-enabled send message
 			await sendMessage(messageData);
 
@@ -342,7 +344,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 							{(() => {
 								const typingUsers = Object.entries(isTyping).filter(([userId, data]) => data.isTyping);
 								if (typingUsers.length === 0) return "";
-								
+
 								// Use firstName from WebSocket data or fallback to participant data
 								const typingUserNames = typingUsers.map(([userId, data]) => {
 									if (data.firstName) {
@@ -352,7 +354,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 									const participant = selectedChatRoom?.participants.find(p => p.user.id === userId);
 									return participant?.user.firstName || "Someone";
 								});
-								
+
 								if (typingUserNames.length === 1) {
 									return `${typingUserNames[0]} is typing...`;
 								} else if (typingUserNames.length === 2) {

@@ -3,12 +3,8 @@ import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { MoreDotIcon } from "@/icons";
-import Image from "next/image";
-import UserAvatar from "../common/UserAvatar";
 import { ChatRoom } from "@/app-api/chatApi";
-import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
-import { UserListItem } from "@/app-api/api-types";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 
 interface ChatBoxHeaderProps {
@@ -129,13 +125,13 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
                     )}
 					{chatRoom && (() => {
 						let showOnlineIndicator = false;
-						
+
 					if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 						// For direct chats, show if the other participant is online
 						const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 						showOnlineIndicator = otherParticipant && isUserOnline ? isUserOnline(otherParticipant.user.id) : false;
 					}
-						
+
 						return showOnlineIndicator ? (
 							<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
 						) : null;
@@ -184,6 +180,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			isOpen={isParticipantsModalOpen}
 			onClose={() => setIsParticipantsModalOpen(false)}
 			chatRoom={chatRoom || null}
+			isUserOnline={isUserOnline}
 		/>
 	</>
 	);

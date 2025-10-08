@@ -16,7 +16,7 @@ import { useOnlineStatus } from "./useOnlineStatus";
 export const useWebSocketChatSync = () => {
 	const { isConnected } = useWebSocket();
 	const currentUser = useCurrentUser();
-	const { updateUserOnlineStatus, isUserOnline } = useOnlineStatus();
+	const { onlineStatus, updateUserOnlineStatus, isUserOnline } = useOnlineStatus();
 
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
@@ -131,10 +131,14 @@ export const useWebSocketChatSync = () => {
 				});
 			} else {
 				// Fallback to API-based chat room creation
-				await chatSync.createChatRoom(chatRoomData);
+				await chatSync.createChatRoom({
+					...chatRoomData,
+					name: chatRoomData.name || `Chat ${Date.now()}`, // Provide default name if not specified
+					type: chatRoomData.type as "DIRECT" | "GROUP", // Ensure correct type
+				});
 			}
 		},
-		[isConnected, webSocketChatRooms, chatSync.createChatRoom]
+		[isConnected, webSocketChatRooms.createChatRoom, chatSync.createChatRoom]
 	);
 
 	// Enhanced mark message as read function that uses WebSocket when available
@@ -196,5 +200,6 @@ export const useWebSocketChatSync = () => {
 
 		// Online status functionality
 		isUserOnline,
+		onlineStatus,
 	};
 };

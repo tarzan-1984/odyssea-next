@@ -7,7 +7,6 @@ import { UserListItem } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
 import { renderAvatar } from "@/helpers";
 import usersApi from "@/app-api/users";
-import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useWebSocketChatRooms } from "@/hooks/useWebSocketChatRooms";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { S3Uploader } from "@/app-api/S3Uploader";
@@ -19,13 +18,14 @@ interface ChatParticipantsModalProps {
 	onClose: () => void;
 	chatRoom: ChatRoom | null;
 	onAddParticipant?: () => void;
+	isUserOnline?: (userId: string) => boolean;
 }
 
 export default function ChatParticipantsModal({
 	isOpen,
 	onClose,
 	chatRoom,
-	onAddParticipant,
+	isUserOnline
 }: ChatParticipantsModalProps) {
 	const [users, setUsers] = useState<UserListItem[]>([]);
 	const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -43,7 +43,6 @@ export default function ChatParticipantsModal({
 	const [addedUserIds, setAddedUserIds] = useState<string[]>([]);
 	const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
 	const currentUser = useCurrentUser();
-	const { isUserOnline } = useWebSocketChatSync();
 	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms({});
 	const { socket, isConnected } = useWebSocket();
 	const updateChatRoomInStore = useChatStore(state => state.updateChatRoom);
@@ -125,6 +124,7 @@ export default function ChatParticipantsModal({
 		if (!isLoadingMore && hasMoreUsers) {
 			const nextPage = currentPage + 1;
 			setCurrentPage(nextPage);
+			// eslint-disable-next-line no-void
 			void fetchUsers(nextPage, true, searchQuery);
 		}
 	};
@@ -196,6 +196,7 @@ export default function ChatParticipantsModal({
 			setRemovedUserIds(prev => (prev.includes(userId) ? prev : [...prev, userId]));
 		}
 		// refresh current user list so the removed user becomes eligible to appear
+		// eslint-disable-next-line no-void
 		void fetchUsers(1, false, searchQuery);
 	};
 
@@ -205,6 +206,7 @@ export default function ChatParticipantsModal({
 		const t = setTimeout(() => {
 			setCurrentPage(1);
 			setHasMoreUsers(true);
+			// eslint-disable-next-line no-void
 			void fetchUsers(1, false, searchQuery);
 		}, 300);
 		return () => clearTimeout(t);
@@ -215,7 +217,6 @@ export default function ChatParticipantsModal({
 
 		// Check WebSocket connection
 		if (!socket || !isConnected) {
-			console.error("WebSocket not connected, cannot save changes");
 			return;
 		}
 
@@ -236,7 +237,6 @@ export default function ChatParticipantsModal({
 				const { fileUrl } = await uploader.upload(new File([avatarFile], tempName, { type: avatarFile.type }));
 				newAvatarPath = fileUrl;
 				setIsUploadingAvatar(false);
-				console.log("Avatar uploaded:", newAvatarPath);
 			}
 
 			// 2) Persist avatar update
@@ -378,7 +378,7 @@ export default function ChatParticipantsModal({
 					{/* Existing Participants (local state) */}
 					{localParticipants.map(participant => {
 						const isAdmin = participant.userId === chatRoom?.adminId;
-						const isOnline = isUserOnline && isUserOnline(participant.userId);
+						const isOnline = isUserOnline && isUserOnline(participant.user.id);
 						const safeUser = {
 							firstName: participant.user?.firstName || "",
 							lastName: participant.user?.lastName || "",

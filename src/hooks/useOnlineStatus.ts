@@ -33,7 +33,7 @@ export const useOnlineStatus = () => {
 				}));
 				offlineTimeouts.current.delete(userId);
 			}, 5000);
-			
+
 			offlineTimeouts.current.set(userId, timeout);
 		}
 	};
