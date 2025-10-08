@@ -187,7 +187,8 @@ export default function ChatParticipantsModal({
 
 	const handleRemoveParticipant = (userId: string) => {
 		// admin can remove any non-admin; UI already restricts rendering of the button
-		setLocalParticipants(prev => prev.filter(p => p.userId !== userId));
+		// userId is user.id from users table, so compare with p.user?.id
+		setLocalParticipants(prev => prev.filter(p => (p.user?.id || p.userId) !== userId));
 		if (addedUserIds.includes(userId)) {
 			// was newly added in this session; just undo the add
 			setAddedUserIds(prev => prev.filter(id => id !== userId));
@@ -416,7 +417,9 @@ export default function ChatParticipantsModal({
 										type="button"
 										onClick={(e) => {
 											e.stopPropagation();
-											const userIdToRemove = participant.userId || participant.user?.id;
+											// Backend expects user.id from users table, not participant.userId
+											const userIdToRemove = participant.user?.id || participant.userId;
+											console.log("Removing participant:", { userId: userIdToRemove, participant });
 											if (userIdToRemove) {
 												handleRemoveParticipant(userIdToRemove);
 											}

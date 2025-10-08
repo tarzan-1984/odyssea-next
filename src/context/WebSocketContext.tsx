@@ -375,7 +375,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
 				if (!room) return;
-				const filtered = room.participants.filter(p => p.userId !== removedUserId);
+				// removedUserId is user.id from users table, so compare with p.user?.id
+				const filtered = room.participants.filter(p => (p.user?.id || p.userId) !== removedUserId);
+				console.log("Filtered participants after removal:", { 
+					before: room.participants.length, 
+					after: filtered.length,
+					removedUserId 
+				});
 				updateChatRoom(chatRoomId, { participants: filtered });
 			} catch (e) {
 				console.error("Failed to handle participantRemoved:", e);

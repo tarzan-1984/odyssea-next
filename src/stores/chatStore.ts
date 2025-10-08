@@ -102,17 +102,22 @@ export const useChatStore = create<ChatState>()(
 					}
 				},
 
-				updateChatRoom: (chatRoomId, updates) => {
-					const { chatRooms, currentChatRoom } = get();
-					const updatedRooms = chatRooms.map(room =>
-						room.id === chatRoomId ? { ...room, ...updates } : room
-					);
-					const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
-					if (currentChatRoom?.id === chatRoomId) {
-						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
-					}
-					set(updatedState as any, false, "updateChatRoom");
-				},
+			updateChatRoom: (chatRoomId, updates) => {
+				const { chatRooms, currentChatRoom } = get();
+				const updatedRooms = chatRooms.map(room =>
+					room.id === chatRoomId ? { ...room, ...updates } : room
+				);
+				const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
+				if (currentChatRoom?.id === chatRoomId) {
+					updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+				}
+				set(updatedState as any, false, "updateChatRoom");
+				
+				// Sync to IndexedDB
+				indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
+					console.error("Failed to update chat room in IndexedDB:", error);
+				});
+			},
 
 				// Message actions
 				setMessages: messages => {
