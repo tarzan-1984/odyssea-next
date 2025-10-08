@@ -11,12 +11,6 @@ export default function Profile() {
 	// This hook loads user data from cookies into Zustand store
 	const { currentUser, isInitializing } = useUserInit();
 
-	useEffect(() => {
-		if(!isInitializing && currentUser?.id) {
-			console.log('currentUser++++', currentUser);
-		}
-	}, [isInitializing])
-
 	if (isInitializing) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">

@@ -9,6 +9,7 @@ import { useCurrentUser, useUpdateUserField } from "@/stores/userStore";
 import { renderAvatar } from "@/helpers";
 import { clientAuth } from "@/utils/auth";
 import {UserData} from "@/app-api/api-types";
+import { S3Uploader } from "@/app-api/S3Uploader";
 
 interface IFormDataImportTable {
 	upload: File | null;
@@ -64,21 +65,13 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 		setUploadError(null);
 
 		try {
-			// Step 1: Upload file to server
-			const formData = new FormData();
-			formData.append("file", file);
-			formData.append("userId", user.id);
-
-			const uploadResponse = await fetch("/api/upload/avatar", {
-				method: "POST",
-				body: formData,
-			});
-
-			const uploadData = await uploadResponse.json();
-
-			if (!uploadResponse.ok) {
-				throw new Error(uploadData.error || "Upload failed");
-			}
+			// Step 1: Upload file to S3 cloud storage
+			const uploader = new S3Uploader();
+			const timestamp = Math.floor(Date.now() / 1000);
+			const extension = file.name.split('.').pop() || 'jpg';
+			const fileName = `avatar-user_${user.id}_${timestamp}.${extension}`;
+			
+			const { fileUrl } = await uploader.upload(new File([file], fileName, { type: file.type }));
 
 			// Step 2: Update user profile with new avatar URL
 			const updateResponse = await fetch("/api/users/update-avatar", {
@@ -87,7 +80,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					avatarUrl: uploadData.avatarUrl,
+					avatarUrl: fileUrl,
 				}),
 			});
 
@@ -99,7 +92,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 
 			if(user.id === currentUser?.id) {
 				// Step 3: Update local state (Zustand)
-				updateUserField("avatar", uploadData.avatarUrl);
+				updateUserField("avatar", fileUrl);
 
 				// Step 4: Update cookies with new avatar URL
 				if (user) {
@@ -110,7 +103,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 						lastName: user.lastName,
 						role: user.role,
 						status: user.status,
-						avatar: uploadData.avatarUrl, // Update avatar in cookies
+						avatar: fileUrl, // Update avatar in cookies
 						externalId: user.externalId || "",
 						phone: user.phone || "",
 						location: user.location || "",
