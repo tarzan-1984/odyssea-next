@@ -352,6 +352,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
 				if (!room) return;
+				
 				// Normalize avatar field
 				const normalized = (newParticipants || []).map((p: any) => ({
 					...p,
@@ -361,8 +362,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					},
 				}));
 
-				const merged = [...room.participants, ...normalized];
-				updateChatRoom(chatRoomId, { participants: merged });
+				// Filter out participants that already exist in the room (by userId)
+				const existingUserIds = new Set(room.participants.map(p => p.user?.id || p.userId));
+				const newUniqueParticipants = normalized.filter(p => {
+					const userId = p.user?.id || p.userId;
+					return !existingUserIds.has(userId);
+				});
+				
+				console.log("Adding participants:", { 
+					existing: room.participants.length, 
+					incoming: normalized.length,
+					unique: newUniqueParticipants.length 
+				});
+				
+				// Only merge if there are actually new participants
+				if (newUniqueParticipants.length > 0) {
+					const merged = [...room.participants, ...newUniqueParticipants];
+					updateChatRoom(chatRoomId, { participants: merged });
+				}
 			} catch (e) {
 				console.error("Failed to handle participantsAdded:", e);
 			}
