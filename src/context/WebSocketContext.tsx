@@ -137,7 +137,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const connect = () => {
 		// Only connect if we have a current user
 		if (!currentUser) {
-			console.log("No current user, skipping WebSocket connection");
 			return;
 		}
 
@@ -152,19 +151,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		const token = getAuthToken();
 
 		if (!token) {
-			console.log("No authentication token found, skipping WebSocket connection");
-			console.log("Available cookies:", document.cookie);
-			console.log("User authenticated:", clientAuth.isAuthenticated());
 			return;
 		}
 
 		// Validate WebSocket URL
 		if (!wsUrl || wsUrl.includes("https/")) {
 			console.error("Invalid WebSocket URL:", wsUrl);
-			console.log("Environment variables:", {
-				NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
-				NODE_ENV: process.env.NODE_ENV,
-			});
 			return;
 		}
 
@@ -181,11 +173,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Connection event handlers
 		newSocket.on("connect", () => {
-			if (process.env.NODE_ENV === "development") {
-				console.log("WebSocket connected");
-				//console.log("Socket ID:", newSocket.id);
-				//console.log("Socket connected:", newSocket.connected);
-			}
 			setIsConnected(true);
 			reconnectAttempts.current = 0;
 
@@ -203,13 +190,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle message sent confirmation
 		newSocket.on("messageSent", (data: any) => {
-			console.log("Message sent confirmation from server:", data);
 			// Update message status in store if needed
 		});
 
 		// Handle new message from server
 		newSocket.on("newMessage", (data: any) => {
-			console.log("New message received from server:", data);
 			// Add message to store if it's for the current chat room
 			if (data.chatRoomId && data.message) {
 				// This will be handled by useWebSocketMessages hook
@@ -314,32 +299,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// No need to duplicate event handlers here
 
 		// Chat room events
-        newSocket.on("chatRoomCreated", (data: any) => {
-            console.log("Chat room created:", data);
-            // Backend may emit either the chat room object directly or wrapped as { chatRoom }
-            const raw: any = (data && "chatRoom" in data) ? data.chatRoom : data;
-            if (raw && raw.id) {
-                // Normalize participant avatar field (profilePhoto -> avatar)
-                const normalized: ChatRoom = {
-                    ...raw,
-                    participants: Array.isArray(raw.participants)
-                        ? raw.participants.map((p: any) => ({
-                              ...p,
-                              user: {
-                                  ...p.user,
-                                  avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
-                              },
-                          }))
-                        : [],
-                };
-                addChatRoom(normalized);
-            } else {
-                console.error("Invalid chatRoomCreated payload", data);
-            }
-        });
+		newSocket.on("chatRoomCreated", (data: any) => {
+			// Backend may emit either the chat room object directly or wrapped as { chatRoom }
+			const raw: any = data && "chatRoom" in data ? data.chatRoom : data;
+			if (raw && raw.id) {
+				// Normalize participant avatar field (profilePhoto -> avatar)
+				const normalized: ChatRoom = {
+					...raw,
+					participants: Array.isArray(raw.participants)
+						? raw.participants.map((p: any) => ({
+								...p,
+								user: {
+									...p.user,
+									avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+								},
+							}))
+						: [],
+				};
+				addChatRoom(normalized);
+			} else {
+				console.error("Invalid chatRoomCreated payload", data);
+			}
+		});
 
 		newSocket.on("chatRoomUpdated", (data: ChatRoomUpdatedData) => {
-			console.log("Chat room updated:", data);
 			updateChatRoom(data.chatRoomId, data.updatedChatRoom);
 		});
 
@@ -349,6 +332,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Read current room from store
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
+
+				// Check if current user is among the newly added participants
+				const isCurrentUserAdded = (newParticipants || []).some((p: any) => {
+					const userId = p.user?.id || p.userId;
+					return userId === currentUser?.id;
+				});
+
+				// If current user was added to a new chat room, we need to create the chat room
+				if (isCurrentUserAdded && !room) {
+					// We need to fetch the full chat room data from the server
+					// For now, let's emit an event to trigger a chat room refresh
+					window.dispatchEvent(
+						new CustomEvent("chatRoomAdded", {
+							detail: { chatRoomId },
+						})
+					);
+					return;
+				}
+
+				// If room doesn't exist and current user wasn't added, ignore
 				if (!room) return;
 
 				// Normalize avatar field
@@ -367,11 +370,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					return !existingUserIds.has(userId);
 				});
 
-				console.log("Adding participants:", {
-					existing: room.participants.length,
-					incoming: normalized.length,
-					unique: newUniqueParticipants.length
-				});
+				// Adding participants to existing room
 
 				// Only merge if there are actually new participants
 				if (newUniqueParticipants.length > 0) {
@@ -384,34 +383,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.on("participantRemoved", (data: ParticipantRemovedData) => {
-			console.log("Participant removed:", data);
 			try {
 				const { chatRoomId, removedUserId } = data;
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
 				if (!room) return;
-				
+
 				// Check if the removed user is the current user
 				if (currentUser?.id === removedUserId) {
-					console.log("Current user was removed from chat room:", chatRoomId);
 					// Remove the entire chat room from the list and cache
 					state.removeChatRoom(chatRoomId);
-					
+
 					// If this was the current chat room, clear it
 					if (state.currentChatRoom?.id === chatRoomId) {
 						state.setCurrentChatRoom(null);
 					}
 					return;
 				}
-				
+
 				// Otherwise, just remove the participant from the room
 				// removedUserId is user.id from users table, so compare with p.user?.id
-				const filtered = room.participants.filter(p => (p.user?.id || p.userId) !== removedUserId);
-				console.log("Filtered participants after removal:", {
-					before: room.participants.length,
-					after: filtered.length,
-					removedUserId
-				});
+				const filtered = room.participants.filter(
+					p => (p.user?.id || p.userId) !== removedUserId
+				);
+				// Participant removed from existing room
 				updateChatRoom(chatRoomId, { participants: filtered });
 			} catch (e) {
 				console.error("Failed to handle participantRemoved:", e);
@@ -420,12 +415,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Notification events
 		newSocket.on("notification", (data: NotificationData) => {
-			console.log("Notification received:", data);
 			// Handle notifications if needed
 		});
 
 		newSocket.on("roleBroadcast", (data: RoleBroadcastData) => {
-			console.log("Role broadcast received:", data);
 			// Handle role broadcasts if needed
 		});
 
@@ -434,14 +427,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 	const attemptReconnect = () => {
 		if (reconnectAttempts.current >= maxReconnectAttempts) {
-			console.log("Max reconnection attempts reached");
 			return;
 		}
 
 		reconnectAttempts.current++;
 		const delay = Math.min(5000 * Math.pow(2, reconnectAttempts.current), 60000); // Start with 5s, max 60s
 
-		console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current})`);
+		// Attempting to reconnect
 
 		reconnectTimeoutRef.current = setTimeout(() => {
 			connect();
@@ -472,11 +464,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const joinChatRoom = useCallback(
 		(chatRoomId: string) => {
 			if (socket && isConnected) {
-				//console.log("Joining chat room:", chatRoomId);
 				//socket.emit("joinChatRoom", { chatRoomId });
-				//console.log("joinChatRoom event emitted to server");
-			} else {
-				//console.log("Cannot join chat room: socket not connected or not available");
 			}
 		},
 		[socket, isConnected]
@@ -485,7 +473,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const leaveChatRoom = useCallback(
 		(chatRoomId: string) => {
 			if (socket && isConnected) {
-				console.log("Leaving chat room:", chatRoomId);
 				socket.emit("leaveChatRoom", { chatRoomId });
 			}
 		},
@@ -493,10 +480,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	);
 
 	const sendMessage = (data: SendMessageData) => {
-		console.log("WebSocket sendMessage called:", { data, isConnected, socket: !!socket });
 		if (socket && isConnected) {
-			console.log("Emitting sendMessage event to server:", data);
-
 			// Send message data in the format expected by the backend
 			const messageData = {
 				chatRoomId: data.chatRoomId,
@@ -506,9 +490,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				fileSize: data.fileSize,
 			};
 
-			console.log("Sending message data:", messageData);
 			socket.emit("sendMessage", messageData);
-			console.log("sendMessage event emitted to server");
 		} else {
 			console.error("Cannot send message: socket not connected or not available");
 		}
@@ -530,11 +512,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const getAuthToken = (): string | null => {
 		// Use the project's clientAuth utility to get the access token
 		const token = clientAuth.getAccessToken();
-		console.log("WebSocket auth token check:", {
-			hasToken: !!token,
-			tokenLength: token?.length || 0,
-			isAuthenticated: clientAuth.isAuthenticated(),
-		});
+		// WebSocket auth token check
 		return token || null;
 	};
 

@@ -270,29 +270,25 @@ export const useChatSync = () => {
 	);
 
 	// Create a new chat room
-    const createChatRoom = useCallback(
-        async (chatRoomData: {
-            name: string;
-            type: "DIRECT" | "GROUP";
-            loadId?: string;
-            participantIds: string[];
-            avatar?: string;
-        }): Promise<ChatRoom | undefined> => {
+	const createChatRoom = useCallback(
+		async (chatRoomData: {
+			name: string;
+			type: "DIRECT" | "GROUP";
+			loadId?: string;
+			participantIds: string[];
+			avatar?: string;
+		}): Promise<ChatRoom | undefined> => {
 			try {
-				console.log("useChatSync: Creating chat room with data:", chatRoomData);
-
-                // Create chat room via API with WebSocket notifications
-                const result = await chatRoomsApi.createChatRoom({
-                    name: chatRoomData.name,
-                    type: chatRoomData.type,
-                    loadId: chatRoomData.loadId ?? "",
-                    participantIds: chatRoomData.participantIds,
-                    avatar: chatRoomData.avatar,
-                });
-
+				// Create chat room via API with WebSocket notifications
+				const result = await chatRoomsApi.createChatRoom({
+					name: chatRoomData.name,
+					type: chatRoomData.type,
+					loadId: chatRoomData.loadId ?? "",
+					participantIds: chatRoomData.participantIds,
+					avatar: chatRoomData.avatar,
+				});
 
 				if (result.success && result.data) {
-					console.log("useChatSync: Chat room created successfully, transforming data...");
 					// Transform result.data to match ChatRoom interface
 					const chatData = result.data; // Store in variable to avoid TS18048 error
 
@@ -314,12 +310,9 @@ export const useChatSync = () => {
 							},
 						})),
 					};
-					console.log("useChatSync: Transformed chat room:", chatRoom);
-
 					// Add chat room to local state
 					setChatRooms([chatRoom, ...chatRooms]);
 					await indexedDBChatService.addChatRoom(chatRoom);
-					console.log("useChatSync: Chat room added to store and cache");
 					return chatRoom as unknown as ChatRoom;
 				} else {
 					console.error("useChatSync: API returned error:", result.error);
@@ -330,9 +323,9 @@ export const useChatSync = () => {
 				setError("Failed to create chat room");
 			}
 			return undefined;
-        },
-        [chatRooms, setChatRooms, setError]
-    );
+		},
+		[chatRooms, setChatRooms, setError]
+	);
 
 	// Mark message as read
 	const markMessageAsRead = useCallback(async (messageId: string) => {
@@ -377,6 +370,48 @@ export const useChatSync = () => {
 		// Clear cache
 		await indexedDBChatService.clearCache();
 	}, []);
+
+	// Load a single chat room by ID (useful for newly added chat rooms)
+	const loadSingleChatRoom = useCallback(async (chatRoomId: string) => {
+		try {
+			const chatRoom = await chatApi.getChatRoom(chatRoomId);
+
+			// Normalize participants data
+			const normalizedRoom = {
+				...chatRoom,
+				participants: normalizeParticipants(chatRoom.participants || []),
+			};
+
+			// Add to store
+			const state = useChatStore.getState();
+			const existingRooms = state.chatRooms;
+			const roomExists = existingRooms.some(room => room.id === chatRoomId);
+
+			if (!roomExists) {
+				state.addChatRoom(normalizedRoom);
+				// Save to cache
+				await indexedDBChatService.saveChatRooms([...existingRooms, normalizedRoom]);
+			}
+		} catch (error) {
+			console.error("Failed to load single chat room:", error);
+		}
+	}, []);
+
+	// Listen for chat room added events
+	useEffect(() => {
+		const handleChatRoomAdded = (event: CustomEvent) => {
+			const { chatRoomId } = event.detail;
+			if (chatRoomId) {
+				loadSingleChatRoom(chatRoomId);
+			}
+		};
+
+		window.addEventListener("chatRoomAdded", handleChatRoomAdded as EventListener);
+
+		return () => {
+			window.removeEventListener("chatRoomAdded", handleChatRoomAdded as EventListener);
+		};
+	}, [loadSingleChatRoom]);
 
 	// Sync data when connection is restored
 	useEffect(() => {

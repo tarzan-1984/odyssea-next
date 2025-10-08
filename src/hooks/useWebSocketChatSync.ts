@@ -38,7 +38,6 @@ export const useWebSocketChatSync = () => {
 			//console.log("User typing:", data);
 		},
 		onUserOnline: data => {
-			console.log("User online status:", data);
 			updateUserOnlineStatus(data.userId, data.isOnline);
 		},
 		onError: error => {
