@@ -31,6 +31,7 @@ interface ChatState {
 	setChatRooms: (chatRooms: ChatRoom[]) => void;
 	addChatRoom: (chatRoom: ChatRoom) => void;
 	updateChatRoom: (chatRoomId: string, updates: Partial<ChatRoom>) => void;
+	removeChatRoom: (chatRoomId: string) => void;
 
 	// Actions for managing messages
 	setMessages: (messages: Message[]) => void;
@@ -116,6 +117,25 @@ export const useChatStore = create<ChatState>()(
 				// Sync to IndexedDB
 				indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
 					console.error("Failed to update chat room in IndexedDB:", error);
+				});
+			},
+
+			removeChatRoom: chatRoomId => {
+				const { chatRooms, currentChatRoom } = get();
+				const updatedRooms = chatRooms.filter(room => room.id !== chatRoomId);
+				const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
+				
+				// If the removed room was the current chat, clear it
+				if (currentChatRoom?.id === chatRoomId) {
+					updatedState.currentChatRoom = null;
+					updatedState.messages = [];
+				}
+				
+				set(updatedState as any, false, "removeChatRoom");
+
+				// Remove from IndexedDB
+				indexedDBChatService.deleteChatRoom(chatRoomId).catch(error => {
+					console.error("Failed to delete chat room from IndexedDB:", error);
 				});
 			},
 

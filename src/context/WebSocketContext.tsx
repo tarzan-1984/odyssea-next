@@ -390,6 +390,21 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const state = useChatStore.getState();
 				const room = state.chatRooms.find(r => r.id === chatRoomId);
 				if (!room) return;
+				
+				// Check if the removed user is the current user
+				if (currentUser?.id === removedUserId) {
+					console.log("Current user was removed from chat room:", chatRoomId);
+					// Remove the entire chat room from the list and cache
+					state.removeChatRoom(chatRoomId);
+					
+					// If this was the current chat room, clear it
+					if (state.currentChatRoom?.id === chatRoomId) {
+						state.setCurrentChatRoom(null);
+					}
+					return;
+				}
+				
+				// Otherwise, just remove the participant from the room
 				// removedUserId is user.id from users table, so compare with p.user?.id
 				const filtered = room.participants.filter(p => (p.user?.id || p.userId) !== removedUserId);
 				console.log("Filtered participants after removal:", {

@@ -689,6 +689,64 @@ class IndexedDBChatService {
 			return { messages: 0, chatRooms: 0 };
 		}
 	}
+
+	async updateChatRoom(chatRoomId: string, updates: Partial<ChatRoom>): Promise<void> {
+		try {
+			const db = await this.ensureDB();
+			const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+			const store = transaction.objectStore(CHAT_ROOMS_STORE);
+
+			await new Promise<void>((resolve, reject) => {
+				const getRequest = store.get(chatRoomId);
+				getRequest.onsuccess = () => {
+					const existingRoom = getRequest.result as StoredChatRoom | undefined;
+					if (existingRoom) {
+						const updatedRoom: StoredChatRoom = {
+							...existingRoom,
+							...updates,
+							cachedAt: Date.now(), // Update cache timestamp
+						};
+
+						const putRequest = store.put(updatedRoom);
+						putRequest.onsuccess = () => resolve();
+						putRequest.onerror = () => reject(putRequest.error);
+					} else {
+						reject(new Error("Chat room not found"));
+					}
+				};
+				getRequest.onerror = () => reject(getRequest.error);
+			});
+
+			console.log(`Updated chat room ${chatRoomId} in IndexedDB`);
+		} catch (error) {
+			console.error("Failed to update chat room in IndexedDB:", error);
+			throw error;
+		}
+	}
+
+	async deleteChatRoom(chatRoomId: string): Promise<void> {
+		try {
+			const db = await this.ensureDB();
+			
+			// Delete chat room
+			const chatRoomTransaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+			const chatRoomStore = chatRoomTransaction.objectStore(CHAT_ROOMS_STORE);
+			
+			await new Promise<void>((resolve, reject) => {
+				const deleteRequest = chatRoomStore.delete(chatRoomId);
+				deleteRequest.onsuccess = () => resolve();
+				deleteRequest.onerror = () => reject(deleteRequest.error);
+			});
+
+			// Delete associated messages
+			await this.deleteMessages(chatRoomId);
+
+			console.log(`Deleted chat room ${chatRoomId} and its messages from IndexedDB`);
+		} catch (error) {
+			console.error("Failed to delete chat room from IndexedDB:", error);
+			throw error;
+		}
+	}
 }
 
 // Export singleton instance
