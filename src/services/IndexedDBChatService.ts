@@ -146,18 +146,24 @@ class IndexedDBChatService {
 						(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 					);
 
+
 					// Apply pagination if specified
-					if (offset) {
-						messages = messages.slice(offset);
-					}
+					// For chat messages, we want the LATEST messages (reverse order)
 					if (limit) {
-						messages = messages.slice(0, limit);
+						// Take the last N messages (most recent)
+						messages = messages.slice(-limit);
+					}
+					if (offset) {
+						// Apply offset from the beginning of the limited set
+						messages = messages.slice(offset);
 					}
 
 					// Convert back to Message format (remove cache metadata)
 					const result: Message[] = messages.map(
 						({ cachedAt, version, ...message }) => message
 					);
+
+
 					resolve(result);
 				};
 
@@ -243,7 +249,6 @@ class IndexedDBChatService {
 				request.onerror = () => reject(request.error);
 			});
 
-			console.log(`Added message ${message.id} to IndexedDB`);
 		} catch (error) {
 			console.error("Failed to add message to IndexedDB:", error);
 			throw error;

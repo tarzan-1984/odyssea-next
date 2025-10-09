@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { FileInputUploader } from "../FileInputUploader/FileInputUploader";
+import EmojiPicker from "../ui/EmojiPicker";
 
 interface ChatBoxSendFormProps {
 	onSendMessage?: (message: {
@@ -27,6 +28,9 @@ export default function ChatBoxSendForm({
 		fileSize: number;
 	} | null>(null);
 	const [showFileUploader, setShowFileUploader] = useState<boolean>(false);
+	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+	const emojiButtonRef = useRef<HTMLButtonElement>(null);
+	const emojiPickerRef = useRef<HTMLDivElement>(null);
 
 	const handleSendMessage = () => {
 		if (!message.trim() && !attachedFile) return;
@@ -47,6 +51,7 @@ export default function ChatBoxSendForm({
 		setMessage("");
 		setAttachedFile(null);
 		setShowFileUploader(false);
+		setShowEmojiPicker(false);
 	};
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -75,6 +80,40 @@ export default function ChatBoxSendForm({
 		setAttachedFile(fileData);
 		setShowFileUploader(false);
 	};
+
+	const handleEmojiSelect = (emoji: string) => {
+		setMessage(prev => prev + emoji);
+		// Focus back to input after emoji selection
+		const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+		if (input) {
+			input.focus();
+		}
+	};
+
+	// Close emoji picker when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			
+			// Don't close if clicking on the emoji button or emoji picker itself
+			if (
+				emojiButtonRef.current?.contains(target) ||
+				emojiPickerRef.current?.contains(target)
+			) {
+				return;
+			}
+			
+			setShowEmojiPicker(false);
+		};
+
+		if (showEmojiPicker) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [showEmojiPicker]);
 
 	const removeAttachedFile = () => {
 		setAttachedFile(null);
@@ -183,7 +222,9 @@ export default function ChatBoxSendForm({
 			>
 				<div className="relative w-full">
 					<button
+						ref={emojiButtonRef}
 						type="button"
+						onClick={() => setShowEmojiPicker(!showEmojiPicker)}
 						className="absolute text-gray-500 -translate-y-1/2 left-1 top-1/2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3"
 					>
 						<svg
@@ -202,6 +243,14 @@ export default function ChatBoxSendForm({
 							/>
 						</svg>
 					</button>
+
+					{/* Emoji Picker */}
+					<EmojiPicker
+						ref={emojiPickerRef}
+						isOpen={showEmojiPicker}
+						onClose={() => setShowEmojiPicker(false)}
+						onEmojiSelect={handleEmojiSelect}
+					/>
 
 					<input
 						type="text"
