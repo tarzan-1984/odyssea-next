@@ -46,8 +46,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	// No need to duplicate useWebSocketMessages here
 
 	// Function to scroll to bottom of messages
-	const scrollToBottom = () => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	const scrollToBottom = (smooth: boolean = true) => {
+		messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
 	};
 
 	// Check if user is scrolled up
@@ -67,10 +67,10 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		async (chatRoomId: string) => {
 			try {
 				await loadMessages(chatRoomId);
-				// Scroll to bottom after messages are loaded
+				// Scroll to bottom instantly after messages are loaded (no smooth animation)
 				setTimeout(() => {
-					scrollToBottom();
-				}, 100);
+					scrollToBottom(false);
+				}, 10);
 			} catch (err) {
 				console.error("Failed to load messages:", err);
 			}
