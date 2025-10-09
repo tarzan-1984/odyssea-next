@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { useChatStore } from "@/stores/chatStore";
 import { Message } from "@/app-api/chatApi";
+import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
 interface UseWebSocketMessagesProps {
 	chatRoomId: string;
@@ -32,6 +33,7 @@ export const useWebSocketMessages = ({
 		sendMessage,
 		sendTyping,
 		markMessageAsRead,
+		markChatRoomAsRead,
 	} = useWebSocket();
 	const { addMessage, updateMessage } = useChatStore();
 	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string }>>({});
@@ -42,7 +44,9 @@ export const useWebSocketMessages = ({
 	useEffect(() => {
 		// If there is a valid room id and it's different from the current one — join it
 		if (isConnected && chatRoomId && currentRoomRef.current !== chatRoomId) {
-			//console.log("useWebSocketMessages: Joining chat room:", chatRoomId);
+
+			// Don't leave previous room - stay in multiple rooms to receive messages
+			// This ensures we receive messages from all chat rooms, not just the active one
 
 			// Clear typing state and timeout when switching chat rooms
 			setIsTyping({});
@@ -52,13 +56,17 @@ export const useWebSocketMessages = ({
 			}
 
 			currentRoomRef.current = chatRoomId;
+			// Join the new room (without leaving the previous one)
 			joinChatRoom(chatRoomId);
+
+			// Mark all messages as read in this chat
+			console.log("📖 Marking chat room as read:", chatRoomId);
+			markChatRoomAsRead(chatRoomId);
 			return;
 		}
 
 		// When there is no selected room (empty id) but we were previously in a room — leave it
 		if (isConnected && !chatRoomId && currentRoomRef.current) {
-		//	console.log("useWebSocketMessages: Leaving chat room because no room is selected:", currentRoomRef.current);
 			leaveChatRoom(currentRoomRef.current);
 			currentRoomRef.current = null;
 			setIsTyping({});
@@ -73,7 +81,6 @@ export const useWebSocketMessages = ({
 	useEffect(() => {
 		return () => {
 			if (currentRoomRef.current) {
-				//`console.log("useWebSocketMessages: Leaving chat room:", currentRoomRef.current);
 				leaveChatRoom(currentRoomRef.current);
 				currentRoomRef.current = null;
 			}
@@ -104,8 +111,21 @@ export const useWebSocketMessages = ({
 		};
 
 		const handleMessageRead = (data: { messageId: string; readBy: string }) => {
+			console.log("📖 Message read notification received:", data);
 			// Update message read status in store
 			updateMessage(data.messageId, { isRead: true });
+
+			// Also update in IndexedDB to keep cache in sync
+			const { messages } = useChatStore.getState();
+			const message = messages.find(msg => msg.id === data.messageId);
+			if (message) {
+				const updatedMessage = { ...message, isRead: true };
+				indexedDBChatService.addMessage(updatedMessage).catch((error: Error) => {
+					console.error("Failed to update message in IndexedDB:", error);
+				});
+				console.log("💾 Updated message in IndexedDB:", data.messageId);
+			}
+
 			onMessageRead?.(data);
 		};
 

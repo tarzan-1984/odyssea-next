@@ -25,11 +25,11 @@ export const useWebSocketChatSync = () => {
 	const webSocketMessages = useWebSocketMessages({
 		chatRoomId: chatSync.currentChatRoom?.id || "",
 		onNewMessage: message => {
-			console.log("New message received via WebSocket:", message);
-			// Message is automatically added to store by useWebSocketMessages
+			// Message is automatically added to store by WebSocketContext
+			// No need to log here as it creates confusion
 		},
 		onMessageSent: data => {
-			console.log("Message sent confirmation:", data);
+			// Message sent confirmation handled by WebSocketContext
 		},
 		onMessageRead: data => {
 			console.log("Message read confirmation:", data);

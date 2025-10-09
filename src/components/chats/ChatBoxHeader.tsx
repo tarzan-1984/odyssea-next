@@ -28,11 +28,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const getChatDisplayName = (): string => {
 		if (!chatRoom) return "Select a chat";
 
-		if (chatRoom.name) {
-			return chatRoom.name;
-		}
-
-		// For direct chats, show the other participant's name
+		// For direct chats, ALWAYS show the other participant's name (ignore chatRoom.name)
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== currentUser?.id
@@ -42,8 +38,12 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			}
 		}
 
-		// For group chats, show participant names
-		if (chatRoom.type === "group") {
+		// For group chats, use chatRoom.name if available, otherwise show participant names
+		if (chatRoom.name) {
+			return chatRoom.name;
+		}
+
+		if (chatRoom.type === "GROUP") {
 			const participantNames = chatRoom.participants
 				.slice(0, 2)
 				.map(p => p.user.firstName)

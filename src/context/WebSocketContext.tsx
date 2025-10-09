@@ -7,6 +7,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
+import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
 // WebSocket context interface
 interface WebSocketContextType {
@@ -19,6 +20,7 @@ interface WebSocketContextType {
 	sendMessage: (data: SendMessageData) => void;
 	sendTyping: (chatRoomId: string, isTyping: boolean) => void;
 	markMessageAsRead: (messageId: string, chatRoomId: string) => void;
+	markChatRoomAsRead: (chatRoomId: string) => void;
 }
 
 // Message sending interface
@@ -197,7 +199,53 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("newMessage", (data: any) => {
 			// Add message to store if it's for the current chat room
 			if (data.chatRoomId && data.message) {
-				// This will be handled by useWebSocketMessages hook
+				
+				// Update chat room's lastMessage for ALL chats (not just current one)
+				const state = useChatStore.getState();
+				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
+				
+				if (chatRoom) {
+					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
+					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
+					
+			// Update lastMessage for all chats
+			const updates: any = {
+				lastMessage: data.message,
+				updatedAt: data.message.createdAt
+			};
+			
+			
+			// Increment unreadCount only if:
+			// 1. This is NOT the current active chat
+			// 2. The message is NOT from the current user
+			if (!isCurrentChat && !isMessageFromCurrentUser) {
+				updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
+			}
+			
+			state.updateChatRoom(data.chatRoomId, updates);
+			
+			// Always save message to IndexedDB for persistence
+			indexedDBChatService.addMessage(data.message).catch((error: Error) => {
+				console.error("Failed to save message to IndexedDB:", error);
+			});
+			
+			// Also add to store if this is the current chat (for immediate display)
+			// This ensures messages appear even if useWebSocketMessages hasn't processed yet
+			if (isCurrentChat) {
+				addMessage(data.message);
+				
+				// Auto-mark message as read if it's in the current active chat
+				// and it's not from the current user (don't mark own messages as read)
+				
+				if (!isMessageFromCurrentUser) {
+					
+					// Use the current socket (newSocket) to emit messageRead
+					if (newSocket && newSocket.connected) {
+					newSocket.emit("messageRead", { messageId: data.message.id, chatRoomId: data.chatRoomId });
+				}
+			}
+		}
+	}
 			}
 		});
 
@@ -228,6 +276,40 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("leftChatRoom", (data: any) => {
 			//console.log("Successfully left chat room:", data);
 			// Update connection status or room state if needed
+		});
+
+		// Handle bulk messages marked as read
+		newSocket.on("messagesMarkedAsRead", (data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
+			const state = useChatStore.getState();
+			
+			// Update all messages in the store
+			const updatedMessages = state.messages.map(msg =>
+				data.messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+			);
+			
+			// Calculate how many messages were marked as read
+			const readCount = data.messageIds.length;
+			
+			// Update chat room's unreadCount
+			const updatedRooms = state.chatRooms.map(room => {
+				if (room.id === data.chatRoomId && room.unreadCount && room.unreadCount > 0) {
+					const newUnreadCount = Math.max(0, room.unreadCount - readCount);
+					const updatedRoom = { ...room, unreadCount: newUnreadCount };
+					
+					// Save updated room to IndexedDB
+					indexedDBChatService.updateChatRoom(room.id, { unreadCount: newUnreadCount }).catch((error: Error) => {
+						console.error("Failed to update chat room in IndexedDB:", error);
+					});
+					
+					
+					return updatedRoom;
+				}
+				return room;
+			});
+			
+		// Update store with new messages and rooms
+		state.setMessages(updatedMessages);
+		useChatStore.setState({ chatRooms: updatedRooms }, false, "messagesMarkedAsRead");
 		});
 
 		// Handle typing events - this will be handled by useWebSocketMessages hook
@@ -503,8 +585,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	};
 
 	const markMessageAsRead = (messageId: string, chatRoomId: string) => {
-		if (socket && isConnected) {
+		if (socket && isConnected && socket.connected) {
 			socket.emit("messageRead", { messageId, chatRoomId });
+		}
+	};
+
+	const markChatRoomAsRead = (chatRoomId: string) => {
+		if (socket && isConnected) {
+			socket.emit("markChatRoomAsRead", { chatRoomId });
 		}
 	};
 
@@ -547,6 +635,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		sendMessage,
 		sendTyping,
 		markMessageAsRead,
+		markChatRoomAsRead,
 	};
 
 	return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;

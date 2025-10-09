@@ -103,22 +103,23 @@ export const useChatStore = create<ChatState>()(
 					}
 				},
 
-			updateChatRoom: (chatRoomId, updates) => {
-				const { chatRooms, currentChatRoom } = get();
-				const updatedRooms = chatRooms.map(room =>
-					room.id === chatRoomId ? { ...room, ...updates } : room
-				);
-				const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
-				if (currentChatRoom?.id === chatRoomId) {
-					updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
-				}
-				set(updatedState as any, false, "updateChatRoom");
-				
-				// Sync to IndexedDB
-				indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
-					console.error("Failed to update chat room in IndexedDB:", error);
-				});
-			},
+		updateChatRoom: (chatRoomId, updates) => {
+			const { chatRooms, currentChatRoom } = get();
+			
+			const updatedRooms = chatRooms.map(room =>
+				room.id === chatRoomId ? { ...room, ...updates } : room
+			);
+			const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
+			if (currentChatRoom?.id === chatRoomId) {
+				updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+			}
+			set(updatedState as any, false, "updateChatRoom");
+			
+			// Sync to IndexedDB
+			indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
+				console.error("Failed to update chat room in IndexedDB:", error);
+			});
+		},
 
 			removeChatRoom: chatRoomId => {
 				const { chatRooms, currentChatRoom } = get();
@@ -144,22 +145,43 @@ export const useChatStore = create<ChatState>()(
 					set({ messages, error: null }, false, "setMessages");
 				},
 
-				addMessage: message => {
-					const { messages } = get();
-					// Check if message already exists to avoid duplicates
-					const exists = messages.some(msg => msg.id === message.id);
-					if (!exists) {
-						set({ messages: [...messages, message] }, false, "addMessage");
-					}
-				},
+		addMessage: message => {
+			const { messages } = get();
+			// Check if message already exists to avoid duplicates
+			const exists = messages.some(msg => msg.id === message.id);
+			if (!exists) {
+				const newMessages = [...messages, message];
+				set({ messages: newMessages }, false, "addMessage");
+				// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
+			}
+		},
 
-				updateMessage: (messageId, updates) => {
-					const { messages } = get();
-					const updatedMessages = messages.map(msg =>
-						msg.id === messageId ? { ...msg, ...updates } : msg
-					);
-					set({ messages: updatedMessages }, false, "updateMessage");
-				},
+		updateMessage: (messageId, updates) => {
+			const { messages, chatRooms } = get();
+			const message = messages.find(msg => msg.id === messageId);
+			const updatedMessages = messages.map(msg =>
+				msg.id === messageId ? { ...msg, ...updates } : msg
+			);
+			
+			// If marking as read, update unreadCount in chat rooms
+			if (updates.isRead === true && message && !message.isRead && message.chatRoomId) {
+				const updatedRooms = chatRooms.map(room => {
+					if (room.id === message.chatRoomId && room.unreadCount && room.unreadCount > 0) {
+						const updatedRoom = { ...room, unreadCount: room.unreadCount - 1 };
+						// Save updated room to IndexedDB
+						indexedDBChatService.updateChatRoom(updatedRoom).catch((error: Error) => {
+							console.error("Failed to update chat room in IndexedDB:", error);
+						});
+						return updatedRoom;
+					}
+					return room;
+				});
+				set({ messages: updatedMessages, chatRooms: updatedRooms }, false, "updateMessage");
+				return;
+			}
+			
+			set({ messages: updatedMessages }, false, "updateMessage");
+		},
 
 				prependMessages: newMessages => {
 					const { messages } = get();

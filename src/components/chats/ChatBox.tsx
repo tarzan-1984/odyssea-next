@@ -12,6 +12,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { renderAvatar } from "@/helpers";
 import { UserData } from "@/app-api/api-types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import MessageReadStatus from "./MessageReadStatus";
 
 interface ChatBoxProps {
     selectedChatRoomId?: string;
@@ -28,7 +29,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Use WebSocket chat sync for real-time functionality from props
 	const {
-		onlineStatus,
 		messages,
 		isLoadingMessages: loading,
 		isSendingMessage: sending,
@@ -58,6 +58,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			setIsUserScrolledUp(!isAtBottom);
 		}
 	};
+
+	// Note: Messages are now marked as read automatically by the backend when joining a chat room
+	// The backend sends a 'messagesMarkedAsRead' event which is handled in WebSocketContext
 
 	// Load messages when chat room changes
 	const loadMessagesForRoom = useCallback(
@@ -315,12 +318,20 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										</div>
 									)}
 
-									{/* Timestamp */}
-									<p className="mt-2 text-gray-500 text-theme-xs dark:text-gray-400">
-										{isSender
-											? getMessageTime(message.createdAt)
-											: `${message.sender.firstName}, ${getMessageTime(message.createdAt)}`}
-									</p>
+									{/* Timestamp and read status */}
+									<div className={`mt-2 flex items-center gap-1 ${isSender ? "justify-end" : ""}`}>
+										{isSender && (
+											<MessageReadStatus
+												isRead={message.isRead}
+												className="flex-shrink-0"
+											/>
+										)}
+										<p className="text-gray-500 text-theme-xs dark:text-gray-400">
+											{isSender
+												? getMessageTime(message.createdAt)
+												: `${message.sender.firstName}, ${getMessageTime(message.createdAt)}`}
+										</p>
+									</div>
 								</div>
 							</div>
 						);
