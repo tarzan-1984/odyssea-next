@@ -208,44 +208,41 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
 					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
 					
-			// Update lastMessage for all chats
-			const updates: any = {
-				lastMessage: data.message,
-				updatedAt: data.message.createdAt
-			};
-			
-			
-			// Increment unreadCount only if:
-			// 1. This is NOT the current active chat
-			// 2. The message is NOT from the current user
-			if (!isCurrentChat && !isMessageFromCurrentUser) {
-				updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
-			}
-			
-			state.updateChatRoom(data.chatRoomId, updates);
-			
-			// Always save message to IndexedDB for persistence
-			indexedDBChatService.addMessage(data.message).catch((error: Error) => {
-				console.error("Failed to save message to IndexedDB:", error);
-			});
-			
-			// Also add to store if this is the current chat (for immediate display)
-			// This ensures messages appear even if useWebSocketMessages hasn't processed yet
-			if (isCurrentChat) {
-				addMessage(data.message);
-				
-				// Auto-mark message as read if it's in the current active chat
-				// and it's not from the current user (don't mark own messages as read)
-				
-				if (!isMessageFromCurrentUser) {
+					// Update lastMessage for all chats
+					const updates: any = {
+						lastMessage: data.message,
+						updatedAt: data.message.createdAt
+					};
 					
-					// Use the current socket (newSocket) to emit messageRead
-					if (newSocket && newSocket.connected) {
-					newSocket.emit("messageRead", { messageId: data.message.id, chatRoomId: data.chatRoomId });
+					// Increment unreadCount only if:
+					// 1. This is NOT the current active chat
+					// 2. The message is NOT from the current user
+					if (!isCurrentChat && !isMessageFromCurrentUser) {
+						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
+					}
+					
+					state.updateChatRoom(data.chatRoomId, updates);
+					
+					// Always save message to IndexedDB for persistence
+					indexedDBChatService.addMessage(data.message).catch((error: Error) => {
+						console.error("Failed to save message to IndexedDB:", error);
+					});
+					
+					// Also add to store if this is the current chat (for immediate display)
+					// This ensures messages appear even if useWebSocketMessages hasn't processed yet
+					if (isCurrentChat) {
+						addMessage(data.message);
+						
+						// Auto-mark message as read if it's in the current active chat
+						// and it's not from the current user (don't mark own messages as read)
+						if (!isMessageFromCurrentUser) {
+							// Use the current socket (newSocket) to emit messageRead
+							if (newSocket && newSocket.connected) {
+								newSocket.emit("messageRead", { messageId: data.message.id, chatRoomId: data.chatRoomId });
+							}
+						}
+					}
 				}
-			}
-		}
-	}
 			}
 		});
 
