@@ -258,6 +258,35 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			//console.log("Chat room updated:", data);
 		});
 
+		// Handle chat room deletion
+		newSocket.on("chatRoomDeleted", (data: { chatRoomId: string; deletedBy: string }) => {
+			const state = useChatStore.getState();
+			state.removeChatRoom(data.chatRoomId);
+		});
+
+		// Handle chat room hidden for current user
+		newSocket.on("chatRoomHidden", (data: { chatRoomId: string }) => {
+			const state = useChatStore.getState();
+			state.removeChatRoom(data.chatRoomId);
+		});
+
+		// Handle chat room restoration
+		newSocket.on("chatRoomRestored", async (data: { chatRoomId: string }) => {
+			// Reload chat rooms to show the restored chat
+			try {
+				const response = await fetch("/api/chat-rooms", {
+					credentials: "include",
+				});
+				if (response.ok) {
+					const data = await response.json();
+					const state = useChatStore.getState();
+					state.setChatRooms(data.data || []);
+				}
+			} catch (error) {
+				console.error("Failed to reload chat rooms after restoration:", error);
+			}
+		});
+
 		// Handle user events
 		newSocket.on("userJoined", (data: any) => {
 			//console.log("User joined chat room:", data);

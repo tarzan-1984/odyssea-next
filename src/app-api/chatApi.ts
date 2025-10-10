@@ -173,6 +173,12 @@ class ChatApiClient {
 		});
 	}
 
+	deleteChatRoom(chatRoomId: string): Promise<{ deleted: boolean; hidden?: boolean; left?: boolean }> {
+		return this.request<{ deleted: boolean; hidden?: boolean; left?: boolean }>(`/chat-rooms/${chatRoomId}`, {
+			method: "DELETE",
+		});
+	}
+
 	// Users
 	getUsers(): Promise<User[]> {
 		return this.request<User[]>("/users");

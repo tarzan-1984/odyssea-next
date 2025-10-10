@@ -7,6 +7,7 @@ import { useWebSocketMessages } from "./useWebSocketMessages";
 import { useWebSocketChatRooms } from "./useWebSocketChatRooms";
 import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
+import { useChatStore } from "@/stores/chatStore";
 import { useOnlineStatus } from "./useOnlineStatus";
 
 /**
@@ -20,6 +21,49 @@ export const useWebSocketChatSync = () => {
 
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
+	const { loadChatRooms } = chatSync;
+	
+	// Add specific chat room to cache and store
+	const addChatRoomToCache = useCallback(async (chatRoomId: string) => {
+		console.log("🎯 Adding specific chat room to cache and store:", chatRoomId);
+		try {
+			// Import chatApi to fetch the specific chat room
+			const { chatApi } = await import("@/app-api/chatApi");
+			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
+			
+			// Fetch the specific chat room from API
+			const chatRoom = await chatApi.getChatRoom(chatRoomId);
+			console.log("📥 Fetched chat room from API:", { id: chatRoom.id, name: chatRoom.name });
+			
+			// Load last message for the chat room
+			try {
+				const messagesResponse = await chatApi.getMessages(chatRoomId, 1, 1);
+				if (messagesResponse.messages.length > 0) {
+					const lastMessage = messagesResponse.messages[0];
+					chatRoom.lastMessage = lastMessage;
+					console.log("📝 Loaded last message:", { content: lastMessage.content, createdAt: lastMessage.createdAt });
+				}
+			} catch (messageError) {
+				console.warn("⚠️ Failed to load last message:", messageError);
+			}
+			
+			// Add to Zustand store
+			const { addChatRoom } = useChatStore.getState();
+			addChatRoom(chatRoom);
+			console.log("✅ Added chat room to Zustand store");
+			
+			// Add to IndexedDB cache: get current chat rooms, add new one, save all
+			const currentChatRooms = await indexedDBChatService.getChatRooms();
+			const updatedChatRooms = [...currentChatRooms, chatRoom];
+			await indexedDBChatService.saveChatRooms(updatedChatRooms);
+			console.log("✅ Added chat room to IndexedDB cache");
+			
+			return chatRoom;
+		} catch (error) {
+			console.error("❌ Failed to add chat room to cache:", error);
+			throw error;
+		}
+	}, []);
 
 	// WebSocket message handling for current chat room
 	const webSocketMessages = useWebSocketMessages({
@@ -59,7 +103,23 @@ export const useWebSocketChatSync = () => {
 			//console.log("Participants added via WebSocket:", data);
 		},
 		onParticipantRemoved: data => {
-			//console.log("Participant removed via WebSocket:", data);
+			// If current user was removed from the chat, remove it from cache and store
+			if (data.removedUserId === currentUser?.id) {
+				// Remove from store
+				const { removeChatRoom } = useChatStore.getState();
+				removeChatRoom(data.chatRoomId);
+				
+				// Remove from IndexedDB cache
+				import("@/services/IndexedDBChatService").then(({ indexedDBChatService }) => {
+					indexedDBChatService.deleteChatRoom(data.chatRoomId);
+				});
+			}
+		},
+		onAddedToChatRoom: data => {
+			// Add the specific chat room to cache and store
+			addChatRoomToCache(data.chatRoomId).catch(error => {
+				console.error("❌ Failed to add chat room to cache and store:", error);
+			});
 		},
 		onError: error => {
 			console.error("WebSocket chat room error:", error);

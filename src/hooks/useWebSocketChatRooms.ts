@@ -22,6 +22,10 @@ interface UseWebSocketChatRoomsProps {
 		removedUserId: string;
 		removedBy: string;
 	}) => void;
+	onAddedToChatRoom?: (data: {
+		chatRoomId: string;
+		addedBy: string;
+	}) => void;
 	onError?: (error: { message: string; details?: string }) => void;
 }
 
@@ -30,6 +34,7 @@ export const useWebSocketChatRooms = ({
 	onChatRoomUpdated,
 	onParticipantsAdded,
 	onParticipantRemoved,
+	onAddedToChatRoom,
 	onError,
 }: UseWebSocketChatRoomsProps) => {
 	const { socket, isConnected } = useWebSocket();
@@ -78,6 +83,19 @@ export const useWebSocketChatRooms = ({
 			onParticipantRemoved?.(data);
 		};
 
+		const handleAddedToChatRoom = (data: {
+			chatRoomId: string;
+			addedBy: string;
+		}) => {
+			// When user is added to a chat room, we need to reload chat rooms
+			// to include the new chat in the list
+			console.log("🎯 WebSocket received addedToChatRoom event:", data);
+			
+			// Force reload chat rooms from API to get the latest data
+			// This ensures the chat room appears in the list with current state
+			onAddedToChatRoom?.(data);
+		};
+
 		const handleError = (error: { message: string; details?: string }) => {
 			setIsLoading(false);
 			onError?.(error);
@@ -88,6 +106,7 @@ export const useWebSocketChatRooms = ({
 		socket.on("chatRoomUpdated", handleChatRoomUpdated);
 		socket.on("participantsAdded", handleParticipantsAdded);
 		socket.on("participantRemoved", handleParticipantRemoved);
+		socket.on("addedToChatRoom", handleAddedToChatRoom);
 		socket.on("error", handleError);
 
 		// Cleanup listeners
@@ -96,6 +115,7 @@ export const useWebSocketChatRooms = ({
 			socket.off("chatRoomUpdated", handleChatRoomUpdated);
 			socket.off("participantsAdded", handleParticipantsAdded);
 			socket.off("participantRemoved", handleParticipantRemoved);
+			socket.off("addedToChatRoom", handleAddedToChatRoom);
 			socket.off("error", handleError);
 		};
 	}, [
@@ -106,6 +126,7 @@ export const useWebSocketChatRooms = ({
 		onChatRoomUpdated,
 		onParticipantsAdded,
 		onParticipantRemoved,
+		onAddedToChatRoom,
 		onError,
 	]);
 

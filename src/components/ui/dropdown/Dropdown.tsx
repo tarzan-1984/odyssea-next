@@ -41,7 +41,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
 		<div
 			ref={dropdownRef}
 			className={cn(
-				"absolute z-40 right-0 mt-2 rounded-xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark",
+				"absolute z-50 right-0 mt-2 rounded-xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark",
 				className
 			)}
 		>

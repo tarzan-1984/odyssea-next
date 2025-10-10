@@ -20,6 +20,8 @@ import BoxIconLine from "./box-line.svg";
 import ShootingStarIcon from "./shooting-star.svg";
 import DollarLineIcon from "./dollar-line.svg";
 import TrashBinIcon from "./trash.svg";
+import TrashDeleteIcon from "./trash-delete.svg";
+import EditIcon from "./edit.svg";
 import AngleUpIcon from "./angle-up.svg";
 import AngleDownIcon from "./angle-down.svg";
 import PencilIcon from "./pencil.svg";
@@ -86,6 +88,8 @@ export {
 	ShootingStarIcon,
 	DollarLineIcon,
 	TrashBinIcon,
+	TrashDeleteIcon,
+	EditIcon,
 	AngleUpIcon,
 	AngleDownIcon,
 	PencilIcon,

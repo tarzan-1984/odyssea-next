@@ -60,7 +60,6 @@ export const useWebSocketMessages = ({
 			joinChatRoom(chatRoomId);
 
 			// Mark all messages as read in this chat
-			console.log("📖 Marking chat room as read:", chatRoomId);
 			markChatRoomAsRead(chatRoomId);
 			return;
 		}

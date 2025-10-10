@@ -430,6 +430,30 @@ class IndexedDBChatService {
 		}
 	}
 
+	// Delete a specific chat room from cache
+	async deleteChatRoom(chatRoomId: string): Promise<void> {
+		try {
+			const db = await this.ensureDB();
+			const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+			const store = transaction.objectStore(CHAT_ROOMS_STORE);
+
+			await new Promise<void>((resolve, reject) => {
+				const request = store.delete(chatRoomId);
+				request.onsuccess = () => {
+					console.log(`Deleted chat room ${chatRoomId} from IndexedDB`);
+					resolve();
+				};
+				request.onerror = () => {
+					console.error("Failed to delete chat room from IndexedDB:", request.error);
+					reject(request.error);
+				};
+			});
+		} catch (error) {
+			console.error("Failed to delete chat room from IndexedDB:", error);
+			throw error;
+		}
+	}
+
 	// Get chat rooms count
 	async getChatRoomsCount(): Promise<number> {
 		try {
