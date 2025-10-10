@@ -96,37 +96,6 @@ export default function ChatList({
 		return "";
 	};
 
-    const getChatAvatar = (chatRoom: ChatRoom): string => {
-        if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
-			
-			console.log("🖼️ getChatAvatar for DIRECT chat:", {
-				chatRoomId: chatRoom.id,
-				currentUserId: currentUser?.id,
-				participants: chatRoom.participants.map(p => ({ id: p.user.id, firstName: p.user.firstName })),
-				otherParticipant: otherParticipant ? { 
-					id: otherParticipant.user.id, 
-					avatar: otherParticipant.user.avatar,
-					profilePhoto: otherParticipant.user.profilePhoto,
-					fullUser: otherParticipant.user
-				} : null
-			});
-			
-			if (otherParticipant?.user.avatar) {
-				return otherParticipant.user.avatar;
-			}
-		}
-
-        // For GROUP chats, prefer chatRoom.avatar if set
-        if (chatRoom.type === "GROUP" && chatRoom.avatar) {
-            return chatRoom.avatar;
-        }
-
-        // Default avatar
-        return "/images/avatars/avatar-default.jpg";
-	};
 
 	const getChatUserData = (
 		chatRoom: ChatRoom
@@ -294,9 +263,33 @@ export default function ChatList({
                                                 })()}
                                             </div>
                                         ) : (
-                                            // Fallback to avatar logic
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={getChatAvatar(chatRoom)} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                                            // Use renderAvatar for DIRECT chats
+                                            (() => {
+                                                if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+                                                    const otherParticipant = chatRoom.participants.find(
+                                                        p => p.user.id !== currentUser?.id
+                                                    );
+                                                    if (otherParticipant) {
+                                                        const userData = {
+                                                            firstName: otherParticipant.user.firstName,
+                                                            lastName: otherParticipant.user.lastName,
+                                                            avatar: otherParticipant.user.avatar || (otherParticipant.user as any).profilePhoto
+                                                        };
+                                                        return renderAvatar(userData, "w-12 h-12");
+                                                    }
+                                                }
+                                                
+                                                // Fallback for GROUP chats with avatar
+                                                if (chatRoom.avatar) {
+                                                    return (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img src={chatRoom.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                                                    );
+                                                }
+                                                
+                                                // Final fallback - should not happen
+                                                return renderAvatar(null, "w-12 h-12");
+                                            })()
                                         )}
                                         {chatRoom.type === "DIRECT" && status === "online" && (
 											<div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>

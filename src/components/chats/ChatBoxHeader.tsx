@@ -5,6 +5,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { MoreDotIcon, TrashDeleteIcon, EditIcon } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
+import { renderAvatar } from "@/helpers";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 
@@ -61,26 +62,6 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		return "Unknown Chat";
 	};
 
-	const getChatAvatar = (): string => {
-		if (!chatRoom) return "/images/avatars/avatar-default.jpg";
-
-		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
-			if (otherParticipant?.user.avatar) {
-				return otherParticipant.user.avatar;
-			}
-		}
-
-		// For GROUP chats, prefer chat avatar when present
-		if (chatRoom.type === "GROUP" && chatRoom.avatar) {
-			return chatRoom.avatar;
-		}
-
-		// Default avatar for group chats or when no profile photo
-		return "/images/avatars/avatar-default.jpg";
-	};
 
 	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
@@ -117,19 +98,48 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		<div className="sticky flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 xl:px-6">
 			<div className="flex items-center gap-3">
                 <div className="relative h-12 w-full max-w-[48px] rounded-full">
-                    {chatRoom && chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
-                        <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            {(() => {
-                                const name = getChatDisplayName();
-                                const parts = name.trim().split(/\s+/).filter(Boolean);
-                                const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
-                                return initials;
-                            })()}
-                        </div>
-                    ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={getChatAvatar()} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
-                    )}
+                    {(() => {
+                        if (!chatRoom) {
+                            return renderAvatar(null, "w-12 h-12");
+                        }
+                        
+                        if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+                            const otherParticipant = chatRoom.participants.find(
+                                p => p.user.id !== currentUser?.id
+                            );
+                            if (otherParticipant) {
+                                const userData = {
+                                    firstName: otherParticipant.user.firstName,
+                                    lastName: otherParticipant.user.lastName,
+                                    avatar: otherParticipant.user.avatar || (otherParticipant.user as any).profilePhoto
+                                };
+                                return renderAvatar(userData, "w-12 h-12");
+                            }
+                        }
+                        
+                        // For GROUP chats, prefer chat avatar when present
+                        if (chatRoom.type === "GROUP" && chatRoom.avatar) {
+                            return (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={chatRoom.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                            );
+                        }
+                        
+                        // Fallback for GROUP chats without avatar
+                        if (chatRoom.type === "GROUP") {
+                            const name = getChatDisplayName();
+                            const parts = name.trim().split(/\s+/).filter(Boolean);
+                            const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
+                            return (
+                                <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                    {initials}
+                                </div>
+                            );
+                        }
+                        
+                        // Final fallback
+                        return renderAvatar(null, "w-12 h-12");
+                    })()}
 					{chatRoom && (() => {
 						let showOnlineIndicator = false;
 

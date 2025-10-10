@@ -197,8 +197,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle new message from server
 		newSocket.on("newMessage", (data: any) => {
-			console.log("📨 Received newMessage:", { chatRoomId: data.chatRoomId, messageId: data.message?.id });
-			
 			// Add message to store if it's for the current chat room
 			if (data.chatRoomId && data.message) {
 				
@@ -209,12 +207,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (chatRoom) {
 					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
 					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
-					
-					console.log("🔍 Message details:", {
-						isCurrentChat,
-						isMessageFromCurrentUser,
-						currentUnreadCount: chatRoom.unreadCount || 0
-					});
 					
 					// Update lastMessage for all chats
 					const updates: any = {
@@ -227,11 +219,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					// 2. The message is NOT from the current user
 					if (!isCurrentChat && !isMessageFromCurrentUser) {
 						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
-						console.log("📈 Incrementing unreadCount:", updates.unreadCount);
 					}
 					
 					state.updateChatRoom(data.chatRoomId, updates);
-					console.log("✅ Chat room updated:", { chatRoomId: data.chatRoomId, updates });
 					
 					// Always save message to IndexedDB for persistence
 					indexedDBChatService.addMessage(data.message).catch((error: Error) => {
@@ -439,32 +429,21 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("chatRoomCreated", async (data: any) => {
 			// Backend may emit either the chat room object directly or wrapped as { chatRoom }
 			const raw: any = data && "chatRoom" in data ? data.chatRoom : data;
-			console.log("🎯 Received chatRoomCreated:", raw);
 			
 			if (raw && raw.id) {
 				// Normalize participant avatar field (profilePhoto -> avatar)
 				const normalized: ChatRoom = {
 					...raw,
 					participants: Array.isArray(raw.participants)
-						? raw.participants.map((p: any) => {
-								const normalizedUser = {
+						? raw.participants.map((p: any) => ({
+								...p,
+								user: {
 									...p.user,
 									avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
-								};
-								console.log("👤 Normalized participant:", {
-									id: p.user?.id,
-									firstName: p.user?.firstName,
-									profilePhoto: p.user?.profilePhoto,
-									avatar: normalizedUser.avatar
-								});
-								return {
-									...p,
-									user: normalizedUser,
-								};
-							})
+								},
+							}))
 						: [],
 				};
-				console.log("✅ Normalized chat room:", normalized);
 				addChatRoom(normalized);
 				
 				// Save to IndexedDB
@@ -473,9 +452,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const currentChatRooms = await indexedDBChatService.getChatRooms();
 					const updatedChatRooms = [...currentChatRooms, normalized];
 					await indexedDBChatService.saveChatRooms(updatedChatRooms);
-					console.log("✅ New chat room saved to IndexedDB:", normalized.id);
 				} catch (dbError) {
 					console.error("Failed to save new chat room to IndexedDB:", dbError);
+				}
+				
+				// Automatically join the WebSocket room for the new chat
+				// This ensures the user receives real-time messages in this chat
+				if (newSocket && newSocket.connected) {
+					newSocket.emit("joinChatRoom", { chatRoomId: normalized.id });
 				}
 			} else {
 				console.error("Invalid chatRoomCreated payload", data);
