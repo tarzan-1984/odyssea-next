@@ -106,6 +106,8 @@ export const useChatStore = create<ChatState>()(
 		updateChatRoom: (chatRoomId, updates) => {
 			const { chatRooms, currentChatRoom } = get();
 			
+			console.log("🔄 updateChatRoom called:", { chatRoomId, updates });
+			
 			const updatedRooms = chatRooms.map(room =>
 				room.id === chatRoomId ? { ...room, ...updates } : room
 			);
@@ -114,6 +116,8 @@ export const useChatStore = create<ChatState>()(
 				updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
 			}
 			set(updatedState as any, false, "updateChatRoom");
+			
+			console.log("✅ Chat room updated in store:", { chatRoomId, updatedRooms: updatedRooms.find(r => r.id === chatRoomId) });
 			
 			// Sync to IndexedDB
 			indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {

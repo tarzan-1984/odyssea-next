@@ -46,6 +46,13 @@ export default function DeleteChatConfirmModal({
 				await chatApi.deleteChatRoom(chatRoom.id);
 			}
 
+			// Clear current chat room if it was the deleted one
+			const { useChatStore } = await import("@/stores/chatStore");
+			const state = useChatStore.getState();
+			if (state.currentChatRoom?.id === chatRoom.id) {
+				state.setCurrentChatRoom(null);
+			}
+			
 			onDeleteSuccess?.();
 			onClose();
 		} catch (error) {

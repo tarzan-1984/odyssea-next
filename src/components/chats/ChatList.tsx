@@ -101,6 +101,19 @@ export default function ChatList({
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user.id !== currentUser?.id
 			);
+			
+			console.log("🖼️ getChatAvatar for DIRECT chat:", {
+				chatRoomId: chatRoom.id,
+				currentUserId: currentUser?.id,
+				participants: chatRoom.participants.map(p => ({ id: p.user.id, firstName: p.user.firstName })),
+				otherParticipant: otherParticipant ? { 
+					id: otherParticipant.user.id, 
+					avatar: otherParticipant.user.avatar,
+					profilePhoto: otherParticipant.user.profilePhoto,
+					fullUser: otherParticipant.user
+				} : null
+			});
+			
 			if (otherParticipant?.user.avatar) {
 				return otherParticipant.user.avatar;
 			}

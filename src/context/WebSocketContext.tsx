@@ -197,6 +197,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle new message from server
 		newSocket.on("newMessage", (data: any) => {
+			console.log("📨 Received newMessage:", { chatRoomId: data.chatRoomId, messageId: data.message?.id });
+			
 			// Add message to store if it's for the current chat room
 			if (data.chatRoomId && data.message) {
 				
@@ -207,6 +209,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (chatRoom) {
 					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
 					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
+					
+					console.log("🔍 Message details:", {
+						isCurrentChat,
+						isMessageFromCurrentUser,
+						currentUnreadCount: chatRoom.unreadCount || 0
+					});
 					
 					// Update lastMessage for all chats
 					const updates: any = {
@@ -219,9 +227,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					// 2. The message is NOT from the current user
 					if (!isCurrentChat && !isMessageFromCurrentUser) {
 						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
+						console.log("📈 Incrementing unreadCount:", updates.unreadCount);
 					}
 					
 					state.updateChatRoom(data.chatRoomId, updates);
+					console.log("✅ Chat room updated:", { chatRoomId: data.chatRoomId, updates });
 					
 					// Always save message to IndexedDB for persistence
 					indexedDBChatService.addMessage(data.message).catch((error: Error) => {
@@ -259,12 +269,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("chatRoomDeleted", (data: { chatRoomId: string; deletedBy: string }) => {
 			const state = useChatStore.getState();
 			state.removeChatRoom(data.chatRoomId);
+			
+			// Clear currentChatRoom if it was the deleted chat
+			if (state.currentChatRoom?.id === data.chatRoomId) {
+				state.setCurrentChatRoom(null);
+			}
 		});
 
 		// Handle chat room hidden for current user
 		newSocket.on("chatRoomHidden", (data: { chatRoomId: string }) => {
 			const state = useChatStore.getState();
 			state.removeChatRoom(data.chatRoomId);
+			
+			// Clear currentChatRoom if it was the hidden chat
+			if (state.currentChatRoom?.id === data.chatRoomId) {
+				state.setCurrentChatRoom(null);
+			}
 		});
 
 		// Handle chat room restoration
@@ -275,9 +295,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					credentials: "include",
 				});
 				if (response.ok) {
-					const data = await response.json();
+					const chatRoomsData = await response.json();
+					const chatRooms = chatRoomsData.data || [];
 					const state = useChatStore.getState();
-					state.setChatRooms(data.data || []);
+					state.setChatRooms(chatRooms);
+					
+					// Save restored chat rooms to IndexedDB
+					try {
+						await indexedDBChatService.saveChatRooms(chatRooms);
+						console.log("✅ Restored chat rooms saved to IndexedDB");
+					} catch (dbError) {
+						console.error("Failed to save restored chat rooms to IndexedDB:", dbError);
+					}
 				}
 			} catch (error) {
 				console.error("Failed to reload chat rooms after restoration:", error);
@@ -407,24 +436,47 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// No need to duplicate event handlers here
 
 		// Chat room events
-		newSocket.on("chatRoomCreated", (data: any) => {
+		newSocket.on("chatRoomCreated", async (data: any) => {
 			// Backend may emit either the chat room object directly or wrapped as { chatRoom }
 			const raw: any = data && "chatRoom" in data ? data.chatRoom : data;
+			console.log("🎯 Received chatRoomCreated:", raw);
+			
 			if (raw && raw.id) {
 				// Normalize participant avatar field (profilePhoto -> avatar)
 				const normalized: ChatRoom = {
 					...raw,
 					participants: Array.isArray(raw.participants)
-						? raw.participants.map((p: any) => ({
-								...p,
-								user: {
+						? raw.participants.map((p: any) => {
+								const normalizedUser = {
 									...p.user,
 									avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
-								},
-							}))
+								};
+								console.log("👤 Normalized participant:", {
+									id: p.user?.id,
+									firstName: p.user?.firstName,
+									profilePhoto: p.user?.profilePhoto,
+									avatar: normalizedUser.avatar
+								});
+								return {
+									...p,
+									user: normalizedUser,
+								};
+							})
 						: [],
 				};
+				console.log("✅ Normalized chat room:", normalized);
 				addChatRoom(normalized);
+				
+				// Save to IndexedDB
+				try {
+					const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
+					const currentChatRooms = await indexedDBChatService.getChatRooms();
+					const updatedChatRooms = [...currentChatRooms, normalized];
+					await indexedDBChatService.saveChatRooms(updatedChatRooms);
+					console.log("✅ New chat room saved to IndexedDB:", normalized.id);
+				} catch (dbError) {
+					console.error("Failed to save new chat room to IndexedDB:", dbError);
+				}
 			} else {
 				console.error("Invalid chatRoomCreated payload", data);
 			}
