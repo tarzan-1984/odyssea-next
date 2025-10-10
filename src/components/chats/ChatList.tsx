@@ -11,7 +11,6 @@ import { MoreDotIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
-import { useChatStore } from "@/stores/chatStore";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -30,7 +29,6 @@ export default function ChatList({
 		webSocketChatSync;
 
 	const currentUser = useCurrentUser();
-	const { clearCache } = useChatStore();
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 
@@ -187,17 +185,6 @@ export default function ChatList({
 					</div>
 				</div>
 				<div className="flex items-center gap-1">
-					{/* Temporary cache clear button */}
-					<button
-						onClick={async () => {
-							await clearCache();
-							window.location.reload();
-						}}
-						className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-						title="Clear cache and reload"
-					>
-						Clear Cache
-					</button>
 					<div>
 						<button className="dropdown-toggle d-block" onClick={toggleDropdownTwo}>
 							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />

@@ -265,13 +265,29 @@ export const useChatStore = create<ChatState>()(
 					);
 				},
 
-				// Clear cache from IndexedDB
+				// Clear cache from IndexedDB and reset store
 				clearCache: async () => {
 					try {
+						// Clear IndexedDB cache
 						await indexedDBChatService.clearCache();
+						
+						// Clear Zustand store
+						set({
+							currentChatRoom: null,
+							messages: [],
+							chatRooms: [],
+							isLoadingMessages: false,
+							isLoadingChatRooms: false,
+							isSendingMessage: false,
+							error: null,
+							hasMoreMessages: false,
+							currentPage: 1,
+						}, false, "clearCache");
+						
 						console.log("Cache cleared successfully");
 					} catch (error) {
 						console.error("Failed to clear cache:", error);
+						throw error;
 					}
 				},
 			}),

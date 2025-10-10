@@ -7,10 +7,16 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { clientAuth } from "@/utils/auth";
 import authentication from "@/app-api/authentication";
 import { useCurrentUser } from "@/stores/userStore";
+import { TrashDeleteIcon } from "@/icons";
+import { useChatStore } from "@/stores/chatStore";
+import ConfirmModal from "../ui/ConfirmModal";
 
 export default function UserDropdown() {
 	const [isOpen, setIsOpen] = useState(false);
+	const [isClearingCache, setIsClearingCache] = useState(false);
+	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 	const currentUser = useCurrentUser();
+	const { clearCache } = useChatStore();
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -19,6 +25,35 @@ export default function UserDropdown() {
 	function closeDropdown() {
 		setIsOpen(false);
 	}
+
+	const handleClearCacheClick = () => {
+		setIsConfirmModalOpen(true);
+		closeDropdown();
+	};
+
+	const handleConfirmClearCache = async () => {
+		if (isClearingCache) return;
+		
+		setIsClearingCache(true);
+		try {
+			// Clear cache and store
+			await clearCache();
+			console.log("Cache cleared successfully");
+			
+			// Reload chat data from API
+			window.location.reload();
+		} catch (error) {
+			console.error("Failed to clear cache:", error);
+			// You could add a toast notification here
+		} finally {
+			setIsClearingCache(false);
+			setIsConfirmModalOpen(false);
+		}
+	};
+
+	const handleCancelClearCache = () => {
+		setIsConfirmModalOpen(false);
+	};
 
 	const handleSignOut = async () => {
 		try {
@@ -136,9 +171,20 @@ export default function UserDropdown() {
 						</DropdownItem>
 					</li>
 				</ul>
+				
+				{/* Clear Cache Button */}
+				<button
+					onClick={handleClearCacheClick}
+					className="flex items-center gap-3 px-3 py-2 mt-3 font-medium text-red-600 rounded-lg group text-theme-sm hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+				>
+					<TrashDeleteIcon className="w-6 h-6 text-red-500 group-hover:text-red-700 dark:text-red-400 dark:group-hover:text-red-300" />
+					Clear Cache
+				</button>
+				
+				{/* Sign Out Button */}
 				<button
 					onClick={handleSignOut}
-					className="flex items-center gap-3 px-3 py-2 mt-3 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+					className="flex items-center gap-3 px-3 py-2 mt-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
 				>
 					<svg
 						className="fill-gray-500 group-hover:fill-gray-700 dark:group-hover:fill-gray-300"
@@ -158,6 +204,20 @@ export default function UserDropdown() {
 					Sign out
 				</button>
 			</Dropdown>
+
+			{/* Clear Cache Confirmation Modal */}
+			<ConfirmModal
+				isOpen={isConfirmModalOpen}
+				onClose={handleCancelClearCache}
+				onConfirm={handleConfirmClearCache}
+				title="Clear Chat Cache"
+				message="Are you sure you want to clear the chat cache? This will remove all cached messages and chat data from your device. The page will automatically reload to fetch fresh data from the server."
+				confirmText="Clear Cache"
+				cancelText="Cancel"
+				isLoading={isClearingCache}
+				icon={<TrashDeleteIcon className="w-6 h-6" />}
+				variant="danger"
+			/>
 		</div>
 	);
 }
