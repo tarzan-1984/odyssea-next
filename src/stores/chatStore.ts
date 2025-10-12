@@ -61,6 +61,9 @@ interface ChatState {
 
 	// Action to clear cache from IndexedDB
 	clearCache: () => Promise<void>;
+
+	// Action to load more messages (for infinite scroll)
+	loadMoreMessages: () => Promise<void>;
 }
 
 // Create the chat store with Zustand
@@ -292,6 +295,63 @@ export const useChatStore = create<ChatState>()(
 					} catch (error) {
 						console.error("Failed to clear cache:", error);
 						throw error;
+					}
+				},
+
+				loadMoreMessages: async () => {
+					const { currentChatRoom, currentPage, hasMoreMessages, isLoadingMessages, messages } = get();
+					
+					// Enhanced validation before loading more messages
+					if (
+						!currentChatRoom || 
+						!hasMoreMessages || 
+						isLoadingMessages ||
+						messages.length === 0 // Don't load more if no initial messages
+					) {
+						return;
+					}
+
+					try {
+						set({ isLoadingMessages: true }, false, "loadMoreMessages");
+
+						// Import chatApi dynamically
+						const { chatApi } = await import("@/app-api/chatApi");
+						
+						// Load next page of messages
+						const nextPage = currentPage + 1;
+						const result = await chatApi.getMessages(currentChatRoom.id, nextPage, 50);
+						
+						if (result.messages && result.messages.length > 0) {
+							const { messages } = get();
+							
+							// Remove duplicates by creating a Map of message IDs
+							const existingMessageIds = new Set(messages.map(msg => msg.id));
+							const newMessages = result.messages.filter(msg => !existingMessageIds.has(msg.id));
+							
+							// Prepend only new messages to the beginning of the array
+							const updatedMessages = [...newMessages, ...messages];
+							
+							set({
+								messages: updatedMessages,
+								currentPage: nextPage,
+								hasMoreMessages: result.hasMore,
+								isLoadingMessages: false,
+							}, false, "loadMoreMessages");
+
+							// Save to IndexedDB
+							await indexedDBChatService.saveMessages(currentChatRoom.id, result.messages);
+						} else {
+							set({
+								hasMoreMessages: false,
+								isLoadingMessages: false,
+							}, false, "loadMoreMessages");
+						}
+					} catch (error) {
+						console.error("Failed to load more messages:", error);
+						set({ 
+							isLoadingMessages: false,
+							error: "Failed to load more messages"
+						}, false, "loadMoreMessages");
 					}
 				},
 			}),

@@ -25,6 +25,8 @@ export const useChatSync = () => {
 		setLoadingMessages,
 		setLoadingChatRooms,
 		setError,
+		setCurrentPage,
+		setHasMoreMessages,
 		loadMessagesFromCache,
 		saveMessagesToCache,
 	} = useChatStore();
@@ -148,6 +150,10 @@ export const useChatSync = () => {
 					if (cachedMessages.length > 0) {
 						setMessages(cachedMessages);
 						setLoadingMessages(false);
+						
+						// Set initial pagination state for cached messages
+						setCurrentPage(page);
+						setHasMoreMessages(cachedMessages.length >= limit); // Assume there might be more if we got full page
 
 						// Check if cache is fresh for this specific chat room (less than 5 minutes old for messages)
 						const isCacheFresh = await indexedDBChatService.isMessagesCacheFresh(
@@ -167,6 +173,8 @@ export const useChatSync = () => {
 									)
 								) {
 									setMessages(response.messages);
+									setCurrentPage(page);
+									setHasMoreMessages(response.hasMore);
 									await indexedDBChatService.saveMessages(
 										chatRoomId,
 										response.messages
@@ -187,6 +195,10 @@ export const useChatSync = () => {
 					const response = await chatApi.getMessages(chatRoomId, page, limit);
 					setMessages(response.messages);
 					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
+					
+					// Update pagination state
+					setCurrentPage(page);
+					setHasMoreMessages(response.hasMore);
 				} catch (apiError) {
 					console.warn("API unavailable, no cached data available:", apiError);
 					setError("Failed to load messages");

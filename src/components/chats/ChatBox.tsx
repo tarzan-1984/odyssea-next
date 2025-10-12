@@ -38,26 +38,83 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		isUserOnline,
 	} = webSocketChatSync;
 
-    // Get error and live chat room from store
+	// Get error, chat room, and pagination state from store
     const error = useChatStore(state => state.error);
     const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
+    const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
+    const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
+
+	// Deduplicate messages to prevent duplicate keys
+	const uniqueMessages = React.useMemo(() => {
+		const messageMap = new Map();
+		messages.forEach(message => {
+			messageMap.set(message.id, message);
+		});
+		return Array.from(messageMap.values());
+	}, [messages]);
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
 
 	// Function to scroll to bottom of messages
 	const scrollToBottom = (smooth: boolean = true) => {
-		messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
+		isProgrammaticScrollRef.current = true;
+		messagesEndRef.current?.scrollIntoView({ behavior: "instant" }); // Always instant scroll
+		
+		// Reset the flag after a short delay to allow for scroll completion
+		setTimeout(() => {
+			isProgrammaticScrollRef.current = false;
+		}, 50); // Reduced delay since it's instant
 	};
 
-	// Check if user is scrolled up
-	const handleScroll = () => {
+	// Check if user is scrolled up and handle infinite scroll
+	const isLoadingMoreRef = useRef(false);
+	const hasUserScrolledRef = useRef(false);
+	const isProgrammaticScrollRef = useRef(false);
+	
+	const handleScroll = useCallback(() => {
 		if (messagesContainerRef.current) {
 			const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
 			const isAtBottom = scrollHeight - scrollTop - clientHeight < 100; // 100px threshold
 			setIsUserScrolledUp(!isAtBottom);
+
+			// Skip tracking if this is a programmatic scroll
+			if (isProgrammaticScrollRef.current) {
+				return;
+			}
+
+			// Track if user has actually scrolled (not just initial position or programmatic scroll)
+			if (scrollTop > 10) {
+				hasUserScrolledRef.current = true;
+			}
+
+			// Check if there's actually scrollable content
+			const hasScrollableContent = scrollHeight > clientHeight;
+			
+			// Load more messages when user scrolls near the top
+			// Only if:
+			// 1. There's scrollable content (more messages than fit in container)
+			// 2. User scrolled to top (scrollTop < 200px)
+			// 3. User has actually scrolled before (not initial position)
+			// 4. There are more messages to load (hasMoreMessages)
+			// 5. Not currently loading
+			// 6. Not already loading more messages
+			if (
+				hasScrollableContent &&
+				scrollTop < 200 && 
+				hasUserScrolledRef.current && // User has actually scrolled
+				hasMoreMessages && 
+				!loading && 
+				!isLoadingMoreRef.current &&
+				uniqueMessages.length > 0 // Only after initial messages are loaded
+			) {
+				isLoadingMoreRef.current = true;
+				loadMoreMessages().finally(() => {
+					isLoadingMoreRef.current = false;
+				});
+			}
 		}
-	};
+	}, [hasMoreMessages, loading, loadMoreMessages, uniqueMessages.length]);
 
 	// Note: Messages are now marked as read automatically by the backend when joining a chat room
 	// The backend sends a 'messagesMarkedAsRead' event which is handled in WebSocketContext
@@ -66,10 +123,19 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const loadMessagesForRoom = useCallback(
 		async (chatRoomId: string) => {
 			try {
+				// Reset pagination state when switching chat rooms
+				useChatStore.getState().setCurrentPage(1);
+				useChatStore.getState().setHasMoreMessages(true);
+				
+				// Reset scroll tracking for new chat
+				hasUserScrolledRef.current = false;
+				isLoadingMoreRef.current = false;
+				isProgrammaticScrollRef.current = false;
+				
 				await loadMessages(chatRoomId);
-				// Scroll to bottom instantly after messages are loaded (no smooth animation)
+				// Scroll to bottom instantly after messages are loaded
 				setTimeout(() => {
-					scrollToBottom(false);
+					scrollToBottom();
 				}, 10);
 			} catch (err) {
 				console.error("Failed to load messages:", err);
@@ -86,10 +152,10 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Scroll to bottom when messages change (for new messages)
 	useEffect(() => {
-		if (messages.length > 0 && !isUserScrolledUp) {
+		if (uniqueMessages.length > 0 && !isUserScrolledUp) {
 			scrollToBottom();
 		}
-	}, [messages.length, isUserScrolledUp]);
+	}, [uniqueMessages.length, isUserScrolledUp]);
 
 	const handleSendMessage = async (messageData: {
 		content: string;
@@ -169,7 +235,32 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				onScroll={handleScroll}
 				className="flex-1 max-h-full p-5 space-y-6 overflow-auto custom-scrollbar xl:space-y-8 xl:p-6"
 			>
-				{loading ? (
+				{/* Loading indicator for older messages */}
+				{loading && uniqueMessages.length > 0 && (
+					<div className="flex items-center justify-center py-4">
+						<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+							<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+								<circle
+									className="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									strokeWidth="4"
+									fill="none"
+								/>
+								<path
+									className="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								/>
+							</svg>
+							<span className="text-sm">Loading older messages...</span>
+						</div>
+					</div>
+				)}
+
+				{loading && uniqueMessages.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-gray-500">Loading messages...</div>
 					</div>
@@ -177,7 +268,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 					<div className="flex items-center justify-center h-full">
 						<div className="text-red-500">{error}</div>
 					</div>
-				) : messages.length === 0 ? (
+				) : uniqueMessages.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-center text-gray-500 dark:text-gray-400">
 							<p>No messages yet</p>
@@ -185,12 +276,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						</div>
 					</div>
 				) : (
-					messages.map(message => {
+					uniqueMessages.map((message, index) => {
 						const isSender = message.senderId === currentUser?.id;
 
 						return (
 							<div
-								key={message.id}
+								key={`${message.id}-${index}`}
 								className={`flex ${isSender ? "justify-end" : "items-start gap-4"}`}
 							>
 								{!isSender && (
