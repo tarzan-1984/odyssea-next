@@ -98,10 +98,10 @@ export default function DeleteChatConfirmModal({
 	const getActionText = () => {
 		if (!chatRoom) return "Delete";
 
-		if (chatRoom.type === "GROUP" && chatRoom.adminId && chatRoom.adminId !== "") {
-			return "Delete Chat";
-		} else if (chatRoom.type === "GROUP") {
-			return "Leave Chat";
+		if (chatRoom.type === "GROUP") {
+			// Check if current user is the admin
+			const isCurrentUserAdmin = chatRoom.adminId === currentUser?.id;
+			return isCurrentUserAdmin ? "Delete Chat" : "Leave Chat";
 		} else {
 			return "Delete Chat";
 		}

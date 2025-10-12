@@ -187,7 +187,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
                             className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
                         >
                             <TrashDeleteIcon className="w-4 h-4" />
-                            Delete
+                            {chatRoom?.type === "GROUP" && chatRoom?.adminId !== currentUser?.id ? "Leave" : "Delete"}
                         </DropdownItem>
 					</Dropdown>
 				</div>
