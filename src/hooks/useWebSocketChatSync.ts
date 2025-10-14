@@ -22,7 +22,7 @@ export const useWebSocketChatSync = () => {
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
 	const { loadChatRooms } = chatSync;
-	
+
 	// Add specific chat room to cache and store
 	const addChatRoomToCache = useCallback(async (chatRoomId: string) => {
 		console.log("🎯 Adding specific chat room to cache and store:", chatRoomId);
@@ -30,11 +30,11 @@ export const useWebSocketChatSync = () => {
 			// Import chatApi to fetch the specific chat room
 			const { chatApi } = await import("@/app-api/chatApi");
 			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
-			
+
 			// Fetch the specific chat room from API
 			const chatRoom = await chatApi.getChatRoom(chatRoomId);
 			console.log("📥 Fetched chat room from API:", { id: chatRoom.id, name: chatRoom.name });
-			
+
 			// Load last message for the chat room
 			try {
 				const messagesResponse = await chatApi.getMessages(chatRoomId, 1, 1);
@@ -46,18 +46,18 @@ export const useWebSocketChatSync = () => {
 			} catch (messageError) {
 				console.warn("⚠️ Failed to load last message:", messageError);
 			}
-			
+
 			// Add to Zustand store
 			const { addChatRoom } = useChatStore.getState();
 			addChatRoom(chatRoom);
 			console.log("✅ Added chat room to Zustand store");
-			
+
 			// Add to IndexedDB cache: get current chat rooms, add new one, save all
 			const currentChatRooms = await indexedDBChatService.getChatRooms();
 			const updatedChatRooms = [...currentChatRooms, chatRoom];
 			await indexedDBChatService.saveChatRooms(updatedChatRooms);
 			console.log("✅ Added chat room to IndexedDB cache");
-			
+
 			return chatRoom;
 		} catch (error) {
 			console.error("❌ Failed to add chat room to cache:", error);
@@ -76,7 +76,7 @@ export const useWebSocketChatSync = () => {
 			// Message sent confirmation handled by WebSocketContext
 		},
 		onMessageRead: data => {
-			console.log("Message read confirmation:", data);
+			//console.log("Message read confirmation:", data);
 		},
 		onUserTyping: data => {
 			//console.log("User typing:", data);
@@ -108,7 +108,7 @@ export const useWebSocketChatSync = () => {
 				// Remove from store
 				const { removeChatRoom } = useChatStore.getState();
 				removeChatRoom(data.chatRoomId);
-				
+
 				// Remove from IndexedDB cache
 				import("@/services/IndexedDBChatService").then(({ indexedDBChatService }) => {
 					indexedDBChatService.deleteChatRoom(data.chatRoomId);
@@ -147,12 +147,6 @@ export const useWebSocketChatSync = () => {
 			content: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
 		}) => {
-			console.log("sendMessageWithWebSocket called:", {
-				isConnected,
-				currentChatRoom: chatSync.currentChatRoom?.id,
-				currentChatRoomName: chatSync.currentChatRoom?.name,
-				messageData,
-			});
 
 			if (isConnected && chatSync.currentChatRoom) {
 				// Use WebSocket for real-time messaging

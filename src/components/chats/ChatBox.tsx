@@ -43,6 +43,13 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
     const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
     const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
     const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
+    
+    // Archive-related state and actions
+    const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
+    const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
+    const loadArchivedMessages = useChatStore(state => state.loadArchivedMessages);
+    const getNextAvailableArchive = useChatStore(state => state.getNextAvailableArchive);
+    const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
 	// Deduplicate messages to prevent duplicate keys
 	const uniqueMessages = React.useMemo(() => {
@@ -96,25 +103,59 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			// 1. There's scrollable content (more messages than fit in container)
 			// 2. User scrolled to top (scrollTop < 200px)
 			// 3. User has actually scrolled before (not initial position)
-			// 4. There are more messages to load (hasMoreMessages)
-			// 5. Not currently loading
-			// 6. Not already loading more messages
+			// 4. Not currently loading
+			// 5. Not already loading more messages
 			if (
 				hasScrollableContent &&
 				scrollTop < 200 && 
 				hasUserScrolledRef.current && // User has actually scrolled
-				hasMoreMessages && 
 				!loading && 
 				!isLoadingMoreRef.current &&
+				!isLoadingArchivedMessages &&
 				uniqueMessages.length > 0 // Only after initial messages are loaded
 			) {
 				isLoadingMoreRef.current = true;
-				loadMoreMessages().finally(() => {
-					isLoadingMoreRef.current = false;
-				});
+
+				// Stabilize scroll position after we prepend older messages
+				const container = messagesContainerRef.current;
+				const prevScrollHeight = container.scrollHeight;
+				const prevScrollTop = container.scrollTop;
+
+				const finalize = () => {
+					// Adjust scroll so that the user's viewport stays anchored
+					const newScrollHeight = container.scrollHeight;
+					const delta = newScrollHeight - prevScrollHeight;
+					isProgrammaticScrollRef.current = true;
+					container.scrollTop = prevScrollTop + delta;
+					setTimeout(() => {
+						isProgrammaticScrollRef.current = false;
+						isLoadingMoreRef.current = false;
+					}, 50);
+				};
+
+				// First try to load from PostgreSQL
+				if (hasMoreMessages) {
+					Promise.resolve(loadMoreMessages()).finally(finalize);
+				} else {
+					// PostgreSQL is exhausted, try to load from archive
+					if (isLoadingAvailableArchives) {
+						// Archives are still loading, set pending flag
+						setPendingArchiveLoad(true);
+						isLoadingMoreRef.current = false;
+					} else {
+						const nextArchive = getNextAvailableArchive();
+						if (nextArchive) {
+							Promise.resolve(
+								loadArchivedMessages(nextArchive.year, nextArchive.month, nextArchive.day)
+							).finally(finalize);
+						} else {
+							isLoadingMoreRef.current = false;
+						}
+					}
+				}
 			}
 		}
-	}, [hasMoreMessages, loading, loadMoreMessages, uniqueMessages.length]);
+	}, [hasMoreMessages, loading, loadMoreMessages, isLoadingArchivedMessages, isLoadingAvailableArchives, loadArchivedMessages, getNextAvailableArchive, setPendingArchiveLoad, uniqueMessages.length]);
 
 	// Note: Messages are now marked as read automatically by the backend when joining a chat room
 	// The backend sends a 'messagesMarkedAsRead' event which is handled in WebSocketContext
@@ -236,7 +277,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				className="flex-1 max-h-full p-5 space-y-6 overflow-auto custom-scrollbar xl:space-y-8 xl:p-6"
 			>
 				{/* Loading indicator for older messages */}
-				{loading && uniqueMessages.length > 0 && (
+				{(loading || isLoadingArchivedMessages) && uniqueMessages.length > 0 && (
 					<div className="flex items-center justify-center py-4">
 						<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
 							<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -255,7 +296,10 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 								/>
 							</svg>
-							<span className="text-sm">Loading older messages...</span>
+							<span className="text-sm">
+								{loading && "Loading older messages..."}
+								{isLoadingArchivedMessages && "Loading archive..."}
+							</span>
 						</div>
 					</div>
 				)}

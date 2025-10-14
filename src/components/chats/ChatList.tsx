@@ -199,33 +199,6 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Search */}
-
-			<div className="mt-4">
-				<div className="relative my-2">
-					<input
-						type="text"
-						placeholder="Search..."
-						className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-[42px] pr-3.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-					/>
-					<svg
-						className="absolute -translate-y-1/2 left-4 top-1/2 text-gray-500"
-						width="20"
-						height="20"
-						viewBox="0 0 24 24"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-					>
-						<path
-							d="M21 21L16.65 16.65M19 11C19 15.4183 15.4183 19 11 19C6.58172 19 3 15.4183 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11Z"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						/>
-					</svg>
-				</div>
-			</div>
 
             {/* Chat List */}
             <div className="overflow-y-auto h-[400px] max-h-[calc(100vh-220px)]">

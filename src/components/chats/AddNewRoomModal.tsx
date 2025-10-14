@@ -56,7 +56,7 @@ export default function AddNewRoomModal({ isOpen, onClose }: AddNewRoomModalProp
 			setUsers([]);
 			setCurrentPage(1);
 			setHasMore(true);
-			void fetchUsers(1, "", false);
+			fetchUsers(1, "", false);
 		}
 	}, [isOpen]);
 
@@ -133,7 +133,7 @@ useEffect(() => {
 	const t = setTimeout(() => {
 		setCurrentPage(1);
 		setHasMore(true);
-		void fetchUsers(1, searchQuery, false);
+		fetchUsers(1, searchQuery, false);
 	}, 300);
 	return () => clearTimeout(t);
 }, [searchQuery, isOpen]);
@@ -141,7 +141,7 @@ useEffect(() => {
 // Infinite scroll helpers
 const loadMoreUsers = () => {
 	if (!isLoadingMore && hasMore) {
-		void fetchUsers(currentPage + 1, searchQuery, true);
+		fetchUsers(currentPage + 1, searchQuery, true);
 	}
 };
 

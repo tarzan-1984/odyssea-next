@@ -132,12 +132,12 @@ export default function OtpForm() {
 				if (accessToken && refreshToken && userData) {
 					// Transform UserData from API format to client format
 					const clientUserData = {
-						id: userData.id,
+						id: userData.id || "",
 						email: userData.email || "",
 						firstName: userData.firstName || "",
 						lastName: userData.lastName || "",
-						role: userData.role,
-						status: userData.status,
+						role: userData.role || "",
+						status: userData.status || "",
 						avatar: userData.avatar || "",
 						externalId: userData.externalId || "",
 						phone: userData.phone || "",

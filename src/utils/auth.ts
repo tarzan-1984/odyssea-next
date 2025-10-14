@@ -152,6 +152,21 @@ export const clientAuth = {
 	getToken: (): string | undefined => {
 		return clientAuth.getAccessToken();
 	},
+
+	// Fetch with automatic authentication headers
+	fetch: async (url: string, options: RequestInit = {}) => {
+		const token = clientAuth.getAccessToken();
+		const headers = {
+			'Content-Type': 'application/json',
+			...(token && { Authorization: `Bearer ${token}` }),
+			...options.headers,
+		};
+
+		return fetch(url, {
+			...options,
+			headers,
+		});
+	},
 };
 
 // Server-side functions for API routes using NextRequest

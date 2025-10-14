@@ -1,13 +1,132 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import { useNotifications, useUnreadCount, useLoadNotifications, useLoadMoreNotifications, useMarkAsRead, useGetUnreadCount } from "@/stores/notificationsStore";
+
+// Component for notification avatar (image or initials)
+function NotificationAvatar({ avatar }: { avatar?: string }) {
+	const isImageUrl = avatar && (avatar.startsWith('http://') || avatar.startsWith('https://'));
+	
+	if (isImageUrl) {
+		return (
+			<span className="relative block w-10 h-10 rounded-full overflow-hidden">
+				<img
+					width={40}
+					height={40}
+					src={avatar}
+					alt="User avatar"
+					className="w-full h-full object-cover"
+					onError={(e) => {
+						// Fallback to initials if image fails to load
+						const target = e.target as HTMLImageElement;
+						target.style.display = 'none';
+						const parent = target.parentElement;
+						if (parent) {
+							parent.innerHTML = `<div class="w-10 h-10 flex items-center justify-center text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-full">??</div>`;
+						}
+					}}
+				/>
+			</span>
+		);
+	} else if (avatar && avatar.length === 2) {
+		// Display as initials
+		return (
+			<span className="relative block w-10 h-10 rounded-full bg-brand-500 text-white flex items-center justify-center text-sm font-medium">
+				{avatar}
+			</span>
+		);
+	} else {
+		// Fallback to default
+		return (
+			<span className="relative block w-10 h-10 rounded-full bg-gray-400 text-white flex items-center justify-center text-sm font-medium">
+				??
+			</span>
+		);
+	}
+}
+
+// Component for individual notification item
+function NotificationItem({ notification, onClose }: { notification: any; onClose: () => void }) {
+	const markAsRead = useMarkAsRead();
+
+	const formatTime = (createdAt: string): string => {
+		const date = new Date(createdAt);
+		const now = new Date();
+		const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+		if (diffInMinutes < 1) return 'Now';
+		if (diffInMinutes < 60) return `${diffInMinutes}m`;
+		if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+		if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d`;
+		
+		return date.toLocaleDateString('en-US', {
+			day: 'numeric',
+			month: 'short',
+		});
+	};
+
+	const handleClick = () => {
+		if (!notification.isRead) {
+			markAsRead(notification.id);
+		}
+		onClose();
+	};
+
+	return (
+		<li>
+			<div
+				onClick={handleClick}
+				className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 cursor-pointer transition-colors ${
+					!notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+				}`}
+			>
+				<NotificationAvatar avatar={notification.avatar} />
+
+				<span className="block flex-1">
+					<div className="flex justify-between items-start">
+						<div className="flex-1">
+							<span className={`mb-1.5 space-x-1 block text-theme-sm ${
+								!notification.isRead 
+									? 'text-gray-800 dark:text-white/90' 
+									: 'text-gray-500 dark:text-gray-400'
+							}`}>
+								<span className="font-medium">
+									{notification.title}
+								</span>
+							</span>
+
+							<span className={`block text-theme-sm mb-1.5 ${
+								!notification.isRead 
+									? 'text-gray-700 dark:text-gray-200' 
+									: 'text-gray-500 dark:text-gray-400'
+							}`}>
+								{notification.message}
+							</span>
+						</div>
+
+						{/* Time in the right side */}
+						<span className="text-gray-500 text-theme-xs dark:text-gray-400 ml-2 flex-shrink-0">
+							{formatTime(notification.createdAt)}
+						</span>
+					</div>
+
+					{/* Unread indicator */}
+					{!notification.isRead && (
+						<div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+					)}
+				</span>
+			</div>
+		</li>
+	);
+}
 
 export default function NotificationDropdown() {
 	const [isOpen, setIsOpen] = useState(false);
-	const [notifying, setNotifying] = useState(true);
+	const notifications = useNotifications();
+	const unreadCount = useUnreadCount();
+	const loadNotifications = useLoadNotifications();
+	const loadMoreNotifications = useLoadMoreNotifications();
+	const getUnreadCount = useGetUnreadCount();
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -19,21 +138,30 @@ export default function NotificationDropdown() {
 
 	const handleClick = () => {
 		toggleDropdown();
-		setNotifying(false);
 	};
+
+	// Notifications are now loaded automatically by NotificationsInitializer
+	// Only load more if user scrolls to bottom and there are more notifications
+	useEffect(() => {
+		if (isOpen && notifications.length === 0) {
+			// Notifications should have been loaded on app start
+		}
+	}, [isOpen, notifications.length]);
+
+	// Unread count is now loaded automatically by NotificationsInitializer
+	// No need to load it here
 	return (
 		<div className="relative">
 			<button
 				className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
 				onClick={handleClick}
 			>
-				<span
-					className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-						!notifying ? "hidden" : "flex"
-					}`}
-				>
-					<span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
-				</span>
+				{/* Unread notification badge */}
+				{unreadCount > 0 && (
+					<span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+						{unreadCount > 99 ? '99+' : unreadCount}
+					</span>
+				)}
 				<svg
 					className="fill-current"
 					width="20"
@@ -56,7 +184,7 @@ export default function NotificationDropdown() {
 			>
 				<div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-700">
 					<h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-						Notification
+						Notifications
 					</h5>
 					<button
 						onClick={toggleDropdown}
@@ -79,305 +207,23 @@ export default function NotificationDropdown() {
 					</button>
 				</div>
 				<ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-					{/* Example notification items */}
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-02.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Terry Franci
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>5 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-03.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 block space-x-1  text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Alena Franci
-									</span>
-									<span> requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>8 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-							href="#"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-04.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 block space-x-1 text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Jocelyn Kenter
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>15 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-							href="#"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-05.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Brandon Philips
-									</span>
-									<span> requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>1 hr ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-							onItemClick={closeDropdown}
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-02.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Terry Franci
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>5 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-03.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Alena Franci
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>8 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-04.jpg"
-									alt="User"
-									className="w-full overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Jocelyn Kenter
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>15 min ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-
-					<li>
-						<DropdownItem
-							onItemClick={closeDropdown}
-							className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-							href="#"
-						>
-							<span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-								<Image
-									width={40}
-									height={40}
-									src="/images/user/user-05.jpg"
-									alt="User"
-									className="overflow-hidden rounded-full"
-								/>
-								<span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
-							</span>
-
-							<span className="block">
-								<span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Brandon Philips
-									</span>
-									<span>requests permission to change</span>
-									<span className="font-medium text-gray-800 dark:text-white/90">
-										Project - Nganter App
-									</span>
-								</span>
-
-								<span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-									<span>Project</span>
-									<span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-									<span>1 hr ago</span>
-								</span>
-							</span>
-						</DropdownItem>
-					</li>
-					{/* Add more items as needed */}
+					{notifications.length === 0 ? (
+						<li className="p-6 text-center text-gray-500 dark:text-gray-400">
+							<svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
+							</svg>
+							<p className="text-sm">No notifications</p>
+						</li>
+					) : (
+						notifications.map((notification) => (
+							<NotificationItem
+								key={notification.id}
+								notification={notification}
+								onClose={closeDropdown}
+							/>
+						))
+					)}
 				</ul>
-				<Link
-					href="/"
-					className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-				>
-					View All Notifications
-				</Link>
 			</Dropdown>
 		</div>
 	);

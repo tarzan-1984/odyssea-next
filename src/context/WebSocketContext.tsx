@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
+import { useNotificationsStore, useAddNotification, useUpdateUnreadCount } from "@/stores/notificationsStore";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
@@ -125,6 +126,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Get store actions
 	const { addMessage, addChatRoom, updateChatRoom, updateMessage } = useChatStore();
 	const currentUser = useUserStore(state => state.currentUser);
+	const addNotification = useAddNotification();
+	const updateUnreadCount = useUpdateUnreadCount();
 
 	// WebSocket URL from environment variables
 	const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
@@ -253,6 +256,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.on("chatRoomUpdated", (data: any) => {
 			//console.log("Chat room updated:", data);
+		});
+
+		// Handle notification events
+		newSocket.on("notification", (data: NotificationData) => {
+			console.log("📨 New notification received:", data);
+			// Add notification to store
+			addNotification(data);
+		});
+
+		newSocket.on("unreadCountUpdate", (data: { unreadCount: number }) => {
+			console.log("📊 Unread count updated:", data.unreadCount);
+			// Update unread count in store
+			updateUnreadCount(data.unreadCount);
 		});
 
 		// Handle chat room deletion

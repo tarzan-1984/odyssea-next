@@ -98,11 +98,11 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 				if (user) {
 					const updatedUserData = {
 						id: user.id,
-						email: user.email,
+						email: user.email || "",
 						firstName: user.firstName,
 						lastName: user.lastName,
-						role: user.role,
-						status: user.status,
+						role: user.role || "",
+						status: user.status || "",
 						avatar: fileUrl, // Update avatar in cookies
 						externalId: user.externalId || "",
 						phone: user.phone || "",

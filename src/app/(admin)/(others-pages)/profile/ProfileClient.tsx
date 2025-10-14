@@ -13,7 +13,7 @@ export default function ProfileClient() {
 
 	return (
 		<>
-			<UserContactCard />
+			<UserContactCard user={currentUser} />
 			{/*<UserVehicleEquipmentCard authorizedUserRole={authorizedUserRole} />*/}
 		</>
 	);

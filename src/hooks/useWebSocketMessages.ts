@@ -110,7 +110,6 @@ export const useWebSocketMessages = ({
 		};
 
 		const handleMessageRead = (data: { messageId: string; readBy: string }) => {
-			console.log("📖 Message read notification received:", data);
 			// Update message read status in store
 			updateMessage(data.messageId, { isRead: true });
 
@@ -122,7 +121,6 @@ export const useWebSocketMessages = ({
 				indexedDBChatService.addMessage(updatedMessage).catch((error: Error) => {
 					console.error("Failed to update message in IndexedDB:", error);
 				});
-				console.log("💾 Updated message in IndexedDB:", data.messageId);
 			}
 
 			onMessageRead?.(data);
@@ -182,7 +180,6 @@ export const useWebSocketMessages = ({
 	// Send message function
 	const sendMessageHandler = useCallback(
 		(data: { content: string; fileUrl?: string; fileName?: string; fileSize?: number }) => {
-			console.log("sendMessageHandler called:", { chatRoomId, data });
 			sendMessage({
 				chatRoomId,
 				...data,

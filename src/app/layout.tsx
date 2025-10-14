@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import UserInitializer from "@/components/common/UserInitializer";
+import NotificationsInitializer from "@/components/common/NotificationsInitializer";
 
 const outfit = Outfit({
 	subsets: ["latin"],
@@ -24,6 +25,7 @@ export default function RootLayout({
 					<SidebarProvider>
 						<WebSocketProvider>
 							<UserInitializer />
+							<NotificationsInitializer />
 							{children}
 						</WebSocketProvider>
 					</SidebarProvider>

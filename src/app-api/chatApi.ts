@@ -14,7 +14,7 @@ export interface User {
 	firstName: string;
 	lastName: string;
 	avatar?: string;
-	role: string;
+	role?: string;
 }
 
 export interface ChatRoom {
