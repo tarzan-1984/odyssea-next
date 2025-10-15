@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
       `${backendUrl}/v1/notifications?page=${page}&limit=${limit}`,
       {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
       `${backendUrl}/v1/notifications/mark-all-read`,
       {

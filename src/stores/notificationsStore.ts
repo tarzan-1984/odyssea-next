@@ -21,6 +21,9 @@ interface NotificationsActions {
   getUnreadCount: () => Promise<void>;
   clearNotifications: () => void;
   setError: (error: string | null) => void;
+  // WebSocket actions
+  addNotification: (notification: Notification) => void;
+  updateUnreadCount: (unreadCount: number) => void;
 }
 
 type NotificationsStore = NotificationsState & NotificationsActions;
@@ -43,18 +46,10 @@ export const useNotificationsStore = create<NotificationsStore>()(
 
         loadNotifications: async (page: number = 1) => {
           set({ isLoading: true, error: null });
-          
+
           try {
             const result = await notificationsApi.getNotifications(page, 8);
-            
-            // Выводим ответ на запрос получения уведомлений
-            console.log('📋 Notifications response:', {
-              notifications: result.notifications,
-              total: result.total,
-              hasMore: result.hasMore,
-              unreadCount: result.unreadCount
-            });
-            
+
             set({
               notifications: result.notifications,
               hasMore: result.hasMore,
@@ -64,7 +59,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
             });
           } catch (error) {
             console.error('Failed to load notifications:', error);
-            set({ 
+            set({
               error: 'Failed to load notifications',
               isLoading: false,
             });
@@ -73,15 +68,15 @@ export const useNotificationsStore = create<NotificationsStore>()(
 
         loadMoreNotifications: async () => {
           const { currentPage, hasMore, isLoadingMore, notifications } = get();
-          
+
           if (!hasMore || isLoadingMore) return;
-          
+
           set({ isLoadingMore: true });
-          
+
           try {
             const nextPage = currentPage + 1;
             const result = await notificationsApi.getNotifications(nextPage, 8);
-            
+
             set({
               notifications: [...notifications, ...result.notifications],
               hasMore: result.hasMore,
@@ -90,7 +85,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
             });
           } catch (error) {
             console.error('Failed to load more notifications:', error);
-            set({ 
+            set({
               error: 'Failed to load more notifications',
               isLoadingMore: false,
             });
@@ -100,7 +95,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
         markAsRead: async (notificationId: string) => {
           try {
             await notificationsApi.markAsRead(notificationId);
-            
+
             // Update local state
             const { notifications, unreadCount } = get();
             const updatedNotifications = notifications.map(notification =>
@@ -108,7 +103,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
                 ? { ...notification, isRead: true }
                 : notification
             );
-            
+
             set({
               notifications: updatedNotifications,
               unreadCount: Math.max(0, unreadCount - 1),
@@ -122,13 +117,13 @@ export const useNotificationsStore = create<NotificationsStore>()(
         markAllAsRead: async () => {
           try {
             await notificationsApi.markAllAsRead();
-            
+
             // Update local state
             const { notifications } = get();
             const updatedNotifications = notifications.map(notification =>
               ({ ...notification, isRead: true })
             );
-            
+
             set({
               notifications: updatedNotifications,
               unreadCount: 0,

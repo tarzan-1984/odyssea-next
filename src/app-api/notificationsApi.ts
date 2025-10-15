@@ -116,12 +116,13 @@ class NotificationsApi {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
 
-      if (!result.success) {
+      if (!result.data.success) {
         throw new Error(result.error || 'Failed to mark all notifications as read');
       }
     } catch (error) {

@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { useNotifications, useUnreadCount, useLoadNotifications, useLoadMoreNotifications, useMarkAsRead, useGetUnreadCount } from "@/stores/notificationsStore";
+import { useNotifications, useUnreadCount, useLoadNotifications, useLoadMoreNotifications, useMarkAllAsRead, useGetUnreadCount, useNotificationsStore } from "@/stores/notificationsStore";
+import { useUserStore } from "@/stores/userStore";
 
 // Component for notification avatar (image or initials)
 function NotificationAvatar({ avatar }: { avatar?: string }) {
@@ -46,9 +47,7 @@ function NotificationAvatar({ avatar }: { avatar?: string }) {
 }
 
 // Component for individual notification item
-function NotificationItem({ notification, onClose }: { notification: any; onClose: () => void }) {
-	const markAsRead = useMarkAsRead();
-
+function NotificationItem({ notification }: { notification: any }) {
 	const formatTime = (createdAt: string): string => {
 		const date = new Date(createdAt);
 		const now = new Date();
@@ -65,18 +64,10 @@ function NotificationItem({ notification, onClose }: { notification: any; onClos
 		});
 	};
 
-	const handleClick = () => {
-		if (!notification.isRead) {
-			markAsRead(notification.id);
-		}
-		onClose();
-	};
-
 	return (
 		<li>
 			<div
-				onClick={handleClick}
-				className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 cursor-pointer transition-colors ${
+				className={`flex gap-3 rounded-lg p-3 px-4.5 py-3 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors ${
 					!notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
 				}`}
 			>
@@ -109,11 +100,6 @@ function NotificationItem({ notification, onClose }: { notification: any; onClos
 							{formatTime(notification.createdAt)}
 						</span>
 					</div>
-
-					{/* Unread indicator */}
-					{!notification.isRead && (
-						<div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-					)}
 				</span>
 			</div>
 		</li>
@@ -122,11 +108,15 @@ function NotificationItem({ notification, onClose }: { notification: any; onClos
 
 export default function NotificationDropdown() {
 	const [isOpen, setIsOpen] = useState(false);
+	const [isLoadingMore, setIsLoadingMore] = useState(false);
 	const notifications = useNotifications();
 	const unreadCount = useUnreadCount();
 	const loadNotifications = useLoadNotifications();
 	const loadMoreNotifications = useLoadMoreNotifications();
+	const markAllAsRead = useMarkAllAsRead();
 	const getUnreadCount = useGetUnreadCount();
+	const currentUser = useUserStore(state => state.currentUser);
+	const hasMore = useNotificationsStore(state => state.hasMore);
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -136,7 +126,32 @@ export default function NotificationDropdown() {
 		setIsOpen(false);
 	}
 
-	const handleClick = () => {
+	const handleLoadMore = async () => {
+		if (!currentUser?.id || isLoadingMore) return;
+		
+		setIsLoadingMore(true);
+		try {
+			// Load more notifications
+			await loadMoreNotifications(currentUser.id);
+			
+			// Mark all notifications as read after loading more
+			await markAllAsRead(currentUser.id);
+		} catch (error) {
+			console.error('Failed to load more notifications:', error);
+		} finally {
+			setIsLoadingMore(false);
+		}
+	};
+
+	const handleClick = async () => {
+		if (!isOpen && currentUser?.id) {
+			// Mark all notifications as read when opening dropdown
+			try {
+				await markAllAsRead(currentUser.id);
+			} catch (error) {
+				console.error('Failed to mark notifications as read:', error);
+			}
+		}
 		toggleDropdown();
 	};
 
@@ -206,7 +221,7 @@ export default function NotificationDropdown() {
 						</svg>
 					</button>
 				</div>
-				<ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
+				<ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar space-y-2">
 					{notifications.length === 0 ? (
 						<li className="p-6 text-center text-gray-500 dark:text-gray-400">
 							<svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -215,13 +230,34 @@ export default function NotificationDropdown() {
 							<p className="text-sm">No notifications</p>
 						</li>
 					) : (
-						notifications.map((notification) => (
-							<NotificationItem
-								key={notification.id}
-								notification={notification}
-								onClose={closeDropdown}
-							/>
-						))
+						<>
+							{notifications.map((notification) => (
+								<NotificationItem
+									key={notification.id}
+									notification={notification}
+								/>
+							))}
+							
+							{/* Load More Button */}
+							{hasMore && (
+								<li className="mt-2">
+									<button
+										onClick={handleLoadMore}
+										disabled={isLoadingMore}
+										className="w-full px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:border-gray-600"
+									>
+										{isLoadingMore ? (
+											<div className="flex items-center justify-center">
+												<div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mr-2"></div>
+												Loading...
+											</div>
+										) : (
+											'Load More'
+										)}
+									</button>
+								</li>
+							)}
+						</>
 					)}
 				</ul>
 			</Dropdown>

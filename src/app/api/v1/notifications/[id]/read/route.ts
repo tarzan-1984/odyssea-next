@@ -25,7 +25,7 @@ export async function POST(
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
       `${backendUrl}/v1/notifications/${id}/read`,
       {

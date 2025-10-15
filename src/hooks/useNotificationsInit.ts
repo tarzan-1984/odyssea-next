@@ -12,9 +12,7 @@ export const useNotificationsInit = () => {
     if (token) {
       // Load notifications (which now includes unread count) on app initialization
       loadNotifications(1) // Load first page (8 notifications + unread count)
-        .then(() => {
-          console.log('✅ Notifications initialized successfully - loaded notifications and unread count in one request');
-        })
+        .then(() => {})
         .catch(error => {
           console.warn('⚠️ Could not initialize notifications:', error);
         });
