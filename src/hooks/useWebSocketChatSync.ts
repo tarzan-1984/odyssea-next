@@ -25,7 +25,6 @@ export const useWebSocketChatSync = () => {
 
 	// Add specific chat room to cache and store
 	const addChatRoomToCache = useCallback(async (chatRoomId: string) => {
-		console.log("🎯 Adding specific chat room to cache and store:", chatRoomId);
 		try {
 			// Import chatApi to fetch the specific chat room
 			const { chatApi } = await import("@/app-api/chatApi");
@@ -33,7 +32,6 @@ export const useWebSocketChatSync = () => {
 
 			// Fetch the specific chat room from API
 			const chatRoom = await chatApi.getChatRoom(chatRoomId);
-			console.log("📥 Fetched chat room from API:", { id: chatRoom.id, name: chatRoom.name });
 
 			// Load last message for the chat room
 			try {
@@ -41,7 +39,6 @@ export const useWebSocketChatSync = () => {
 				if (messagesResponse.messages.length > 0) {
 					const lastMessage = messagesResponse.messages[0];
 					chatRoom.lastMessage = lastMessage;
-					console.log("📝 Loaded last message:", { content: lastMessage.content, createdAt: lastMessage.createdAt });
 				}
 			} catch (messageError) {
 				console.warn("⚠️ Failed to load last message:", messageError);
@@ -50,13 +47,11 @@ export const useWebSocketChatSync = () => {
 			// Add to Zustand store
 			const { addChatRoom } = useChatStore.getState();
 			addChatRoom(chatRoom);
-			console.log("✅ Added chat room to Zustand store");
 
 			// Add to IndexedDB cache: get current chat rooms, add new one, save all
 			const currentChatRooms = await indexedDBChatService.getChatRooms();
 			const updatedChatRooms = [...currentChatRooms, chatRoom];
 			await indexedDBChatService.saveChatRooms(updatedChatRooms);
-			console.log("✅ Added chat room to IndexedDB cache");
 
 			return chatRoom;
 		} catch (error) {
@@ -129,11 +124,9 @@ export const useWebSocketChatSync = () => {
 	// WebSocket notifications
 	const webSocketNotifications = useWebSocketNotifications({
 		onNotification: notification => {
-			console.log("Notification received via WebSocket:", notification);
 			// Handle notifications as needed
 		},
 		onRoleBroadcast: broadcast => {
-			console.log("Role broadcast received via WebSocket:", broadcast);
 			// Handle role broadcasts as needed
 		},
 		onError: error => {
@@ -150,7 +143,6 @@ export const useWebSocketChatSync = () => {
 
 			if (isConnected && chatSync.currentChatRoom) {
 				// Use WebSocket for real-time messaging
-				console.log("Using WebSocket to send message");
 				webSocketMessages.sendMessage({
 					content: messageData.content,
 					fileUrl: messageData.fileData?.fileUrl,
@@ -159,7 +151,6 @@ export const useWebSocketChatSync = () => {
 				});
 			} else {
 				// Fallback to API-based messaging
-				console.log("Using API fallback to send message");
 				await chatSync.sendMessage(messageData);
 			}
 		},
@@ -211,7 +202,7 @@ export const useWebSocketChatSync = () => {
 	// Auto-connect WebSocket when user is available
 	useEffect(() => {
 		if (currentUser && !isConnected) {
-			console.log("User available, WebSocket should connect automatically");
+			// User available, WebSocket should connect automatically
 		}
 	}, [currentUser, isConnected]);
 

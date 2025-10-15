@@ -1,9 +1,24 @@
 import { useEffect, useCallback } from "react";
 import { useChatStore } from "@/stores/chatStore";
-import { chatApi, ChatRoom } from "@/app-api/chatApi";
+import { chatApi, ChatRoom, Message } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
+
+// Helper function to merge cached messages with real-time updates from store
+const mergeMessagesWithUpdates = (cachedMessages: Message[], currentMessages: Message[]): Message[] => {
+	// Create a map of current messages by ID for quick lookup
+	const currentMessagesMap = new Map(currentMessages.map(msg => [msg.id, msg]));
+	
+	// Merge cached messages with updates from current store
+	const mergedMessages = cachedMessages.map(cachedMsg => {
+		const currentMsg = currentMessagesMap.get(cachedMsg.id);
+		// If message exists in current store, use the updated version (especially for isRead status)
+		return currentMsg || cachedMsg;
+	});
+	
+	return mergedMessages;
+};
 
 // Hook for managing chat synchronization between Zustand store, IndexedDB, and API
 export const useChatSync = () => {
@@ -148,7 +163,10 @@ export const useChatSync = () => {
 						(page - 1) * limit
 					);
 					if (cachedMessages.length > 0) {
-						setMessages(cachedMessages);
+						// Merge cached messages with any real-time updates from store
+						const { messages: currentMessages } = useChatStore.getState();
+						const mergedMessages = mergeMessagesWithUpdates(cachedMessages, currentMessages);
+						setMessages(mergedMessages);
 						setLoadingMessages(false);
 						
 						// Set initial pagination state for cached messages
@@ -172,7 +190,10 @@ export const useChatSync = () => {
 										(msg, index) => msg.id !== cachedMessages[index]?.id
 									)
 								) {
-									setMessages(response.messages);
+									// Merge API messages with real-time updates from store
+									const { messages: currentMessages } = useChatStore.getState();
+									const mergedMessages = mergeMessagesWithUpdates(response.messages, currentMessages);
+									setMessages(mergedMessages);
 									setCurrentPage(page);
 									setHasMoreMessages(response.hasMore);
 									await indexedDBChatService.saveMessages(
@@ -193,7 +214,10 @@ export const useChatSync = () => {
 				// If no cached data, load from API
 				try {
 					const response = await chatApi.getMessages(chatRoomId, page, limit);
-					setMessages(response.messages);
+					// Merge API messages with any real-time updates from store
+					const { messages: currentMessages } = useChatStore.getState();
+					const mergedMessages = mergeMessagesWithUpdates(response.messages, currentMessages);
+					setMessages(mergedMessages);
 					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
 					
 					// Update pagination state

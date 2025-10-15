@@ -27,6 +27,7 @@ import {
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
+import { UnreadCountBadge } from "@/components/common/UnreadCountBadge";
 
 type NavItem = {
 	name: string;
@@ -355,6 +356,10 @@ const AppSidebar: React.FC = () => {
 								</span>
 								{(isExpanded || isHovered || isMobileOpen) && (
 									<span className={`menu-item-text`}>{nav.name}</span>
+								)}
+								{/* Show unread count badge for Chat link */}
+								{nav.path === "/chat" && (isExpanded || isHovered || isMobileOpen) && (
+									<UnreadCountBadge className="ml-auto" />
 								)}
 							</Link>
 						)

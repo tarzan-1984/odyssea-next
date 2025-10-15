@@ -284,7 +284,6 @@ class IndexedDBChatService {
 				getRequest.onerror = () => reject(getRequest.error);
 			});
 
-			console.log(`Updated message ${messageId} in IndexedDB`);
 		} catch (error) {
 			console.error("Failed to update message in IndexedDB:", error);
 			throw error;
@@ -606,8 +605,6 @@ class IndexedDBChatService {
 				};
 				getRequest.onerror = () => reject(getRequest.error);
 			});
-
-			console.log(`Updated chat room ${chatRoomId} in IndexedDB`);
 		} catch (error) {
 			console.error("Failed to update chat room in IndexedDB:", error);
 			throw error;

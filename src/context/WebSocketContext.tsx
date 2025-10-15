@@ -6,6 +6,7 @@ import { io, Socket } from "socket.io-client";
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
 import { useNotificationsStore, useAddNotification, useUpdateUnreadCount } from "@/stores/notificationsStore";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
@@ -86,9 +87,11 @@ interface ParticipantRemovedData {
 
 interface NotificationData {
 	id: string;
+	userId: string;
 	title: string;
 	message: string;
 	type: string;
+	avatar?: string;
 	isRead: boolean;
 	createdAt: string;
 	chatRoomId?: string;
@@ -128,6 +131,28 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const currentUser = useUserStore(state => state.currentUser);
 	const addNotification = useAddNotification();
 	const updateUnreadCount = useUpdateUnreadCount();
+	const { playNotificationSound, enableAudio } = useNotificationSound();
+
+	// Enable audio after first user interaction
+	useEffect(() => {
+		const handleUserInteraction = () => {
+			enableAudio();
+			// Remove listeners after first interaction
+			document.removeEventListener('click', handleUserInteraction);
+			document.removeEventListener('keydown', handleUserInteraction);
+			document.removeEventListener('touchstart', handleUserInteraction);
+		};
+
+		document.addEventListener('click', handleUserInteraction);
+		document.addEventListener('keydown', handleUserInteraction);
+		document.addEventListener('touchstart', handleUserInteraction);
+
+		return () => {
+			document.removeEventListener('click', handleUserInteraction);
+			document.removeEventListener('keydown', handleUserInteraction);
+			document.removeEventListener('touchstart', handleUserInteraction);
+		};
+	}, [enableAudio]);
 
 	// WebSocket URL from environment variables
 	const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
@@ -202,43 +227,70 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("newMessage", (data: any) => {
 			// Add message to store if it's for the current chat room
 			if (data.chatRoomId && data.message) {
-				
+
 				// Update chat room's lastMessage for ALL chats (not just current one)
 				const state = useChatStore.getState();
 				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
-				
+
 				if (chatRoom) {
 					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
 					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
-					
+
 					// Update lastMessage for all chats
 					const updates: any = {
 						lastMessage: data.message,
 						updatedAt: data.message.createdAt
 					};
-					
+
 					// Increment unreadCount only if:
 					// 1. This is NOT the current active chat
 					// 2. The message is NOT from the current user
 					if (!isCurrentChat && !isMessageFromCurrentUser) {
 						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
 					}
-					
+
+					// Play notification sound for ALL participants if:
+					// 1. The message is NOT from the current user
+					// 2. This is NOT the current active chat (user is not viewing this specific chat)
+					// Sound should play on any page, except when user is in the active chat where message arrived
+					if (!isMessageFromCurrentUser && !isCurrentChat) {
+						playNotificationSound();
+					}
+
+					// Show toast notification for ALL participants if:
+					// 1. This is NOT the current active chat (user is not viewing this chat)
+					// 2. The message is NOT from the current user
+					// This works for both direct and group chats
+					if (!isCurrentChat && !isMessageFromCurrentUser) {
+						// Show toast notification
+						if (typeof window !== 'undefined' && (window as any).addToastNotification) {
+							(window as any).addToastNotification(data.message, chatRoom);
+						}
+					}
+
 					state.updateChatRoom(data.chatRoomId, updates);
-					
+
 					// Always save message to IndexedDB for persistence
 					indexedDBChatService.addMessage(data.message).catch((error: Error) => {
 						console.error("Failed to save message to IndexedDB:", error);
 					});
-					
+
 					// Also add to store if this is the current chat (for immediate display)
 					// This ensures messages appear even if useWebSocketMessages hasn't processed yet
 					if (isCurrentChat) {
 						addMessage(data.message);
-						
+
 						// Auto-mark message as read if it's in the current active chat
 						// and it's not from the current user (don't mark own messages as read)
 						if (!isMessageFromCurrentUser) {
+							// Mark message as read in store immediately
+							updateMessage(data.message.id, { isRead: true });
+							
+							// Update message as read in IndexedDB cache immediately
+							indexedDBChatService.updateMessage(data.message.id, { isRead: true }).catch((error: Error) => {
+								console.error("Failed to update message as read in IndexedDB:", error);
+							});
+
 							// Use the current socket (newSocket) to emit messageRead
 							if (newSocket && newSocket.connected) {
 								newSocket.emit("messageRead", { messageId: data.message.id, chatRoomId: data.chatRoomId });
@@ -260,13 +312,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle notification events
 		newSocket.on("notification", (data: NotificationData) => {
-			console.log("📨 New notification received:", data);
 			// Add notification to store
 			addNotification(data);
 		});
 
 		newSocket.on("unreadCountUpdate", (data: { unreadCount: number }) => {
-			console.log("📊 Unread count updated:", data.unreadCount);
 			// Update unread count in store
 			updateUnreadCount(data.unreadCount);
 		});
@@ -275,7 +325,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("chatRoomDeleted", (data: { chatRoomId: string; deletedBy: string }) => {
 			const state = useChatStore.getState();
 			state.removeChatRoom(data.chatRoomId);
-			
+
 			// Clear currentChatRoom if it was the deleted chat
 			if (state.currentChatRoom?.id === data.chatRoomId) {
 				state.setCurrentChatRoom(null);
@@ -286,7 +336,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("chatRoomHidden", (data: { chatRoomId: string }) => {
 			const state = useChatStore.getState();
 			state.removeChatRoom(data.chatRoomId);
-			
+
 			// Clear currentChatRoom if it was the hidden chat
 			if (state.currentChatRoom?.id === data.chatRoomId) {
 				state.setCurrentChatRoom(null);
@@ -305,11 +355,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const chatRooms = chatRoomsData.data || [];
 					const state = useChatStore.getState();
 					state.setChatRooms(chatRooms);
-					
+
 					// Save restored chat rooms to IndexedDB
 					try {
 						await indexedDBChatService.saveChatRooms(chatRooms);
-						console.log("✅ Restored chat rooms saved to IndexedDB");
 					} catch (dbError) {
 						console.error("Failed to save restored chat rooms to IndexedDB:", dbError);
 					}
@@ -342,32 +391,39 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle bulk messages marked as read
 		newSocket.on("messagesMarkedAsRead", (data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
 			const state = useChatStore.getState();
-			
+
 			// Update all messages in the store
 			const updatedMessages = state.messages.map(msg =>
 				data.messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
 			);
-			
+
+			// Update all messages as read in IndexedDB cache immediately
+			data.messageIds.forEach(messageId => {
+				indexedDBChatService.updateMessage(messageId, { isRead: true }).catch((error: Error) => {
+					console.error("Failed to update message as read in IndexedDB:", error);
+				});
+			});
+
 			// Calculate how many messages were marked as read
 			const readCount = data.messageIds.length;
-			
+
 			// Update chat room's unreadCount
 			const updatedRooms = state.chatRooms.map(room => {
 				if (room.id === data.chatRoomId && room.unreadCount && room.unreadCount > 0) {
 					const newUnreadCount = Math.max(0, room.unreadCount - readCount);
 					const updatedRoom = { ...room, unreadCount: newUnreadCount };
-					
+
 					// Save updated room to IndexedDB
 					indexedDBChatService.updateChatRoom(room.id, { unreadCount: newUnreadCount }).catch((error: Error) => {
 						console.error("Failed to update chat room in IndexedDB:", error);
 					});
-					
-					
+
+
 					return updatedRoom;
 				}
 				return room;
 			});
-			
+
 		// Update store with new messages and rooms
 		state.setMessages(updatedMessages);
 		useChatStore.setState({ chatRooms: updatedRooms }, false, "messagesMarkedAsRead");
@@ -445,7 +501,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("chatRoomCreated", async (data: any) => {
 			// Backend may emit either the chat room object directly or wrapped as { chatRoom }
 			const raw: any = data && "chatRoom" in data ? data.chatRoom : data;
-			
+
 			if (raw && raw.id) {
 				// Normalize participant avatar field (profilePhoto -> avatar)
 				const normalized: ChatRoom = {
@@ -461,7 +517,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						: [],
 				};
 				addChatRoom(normalized);
-				
+
 				// Save to IndexedDB
 				try {
 					const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
@@ -471,7 +527,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				} catch (dbError) {
 					console.error("Failed to save new chat room to IndexedDB:", dbError);
 				}
-				
+
 				// Automatically join the WebSocket room for the new chat
 				// This ensures the user receives real-time messages in this chat
 				if (newSocket && newSocket.connected) {

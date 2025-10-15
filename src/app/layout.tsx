@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import UserInitializer from "@/components/common/UserInitializer";
 import NotificationsInitializer from "@/components/common/NotificationsInitializer";
+import { ToastNotificationManager } from "@/components/notifications/ToastNotificationManager";
 
 const outfit = Outfit({
 	subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
 						<WebSocketProvider>
 							<UserInitializer />
 							<NotificationsInitializer />
+							<ToastNotificationManager />
 							{children}
 						</WebSocketProvider>
 					</SidebarProvider>

@@ -173,8 +173,6 @@ export const useChatStore = create<ChatState>()(
 	updateChatRoom: (chatRoomId, updates) => {
 		const { chatRooms, currentChatRoom } = get();
 
-		console.log("🔄 updateChatRoom called:", { chatRoomId, updates });
-
 		const updatedRooms = chatRooms.map(room =>
 			room.id === chatRoomId ? { ...room, ...updates } : room
 		);
@@ -187,8 +185,6 @@ export const useChatStore = create<ChatState>()(
 			updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
 		}
 		set(updatedState as any, false, "updateChatRoom");
-
-		console.log("✅ Chat room updated in store:", { chatRoomId, updatedRooms: sortedRooms.find(r => r.id === chatRoomId) });
 
 		// Sync to IndexedDB
 		indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
@@ -226,7 +222,7 @@ export const useChatStore = create<ChatState>()(
 		const exists = messages.some(msg => msg.id === message.id);
 		if (!exists) {
 			const newMessages = [...messages, message];
-			
+
 			// Update the lastMessage in the corresponding chat room
 			const updatedRooms = chatRooms.map(room => {
 				if (room.id === message.chatRoomId) {
@@ -252,6 +248,11 @@ export const useChatStore = create<ChatState>()(
 			const updatedMessages = messages.map(msg =>
 				msg.id === messageId ? { ...msg, ...updates } : msg
 			);
+
+			// Always save updated message to IndexedDB
+			indexedDBChatService.updateMessage(messageId, updates).catch((error: Error) => {
+				console.error("Failed to update message in IndexedDB:", error);
+			});
 
 			// If marking as read, update unreadCount in chat rooms
 			if (updates.isRead === true && message && !message.isRead && message.chatRoomId) {
@@ -595,10 +596,6 @@ export const useChatStore = create<ChatState>()(
 						const { messagesArchiveApi } = await import("@/app-api/messagesArchiveApi");
 
 						const archives = await messagesArchiveApi.getAvailableArchiveDays(currentChatRoom.id);
-
-						console.log("📋 [ARCHIVE] ===== RESPONSE: List of available archives =====");
-						console.log(JSON.stringify(archives, null, 2));
-						console.log("📊 [ARCHIVE] Total archives found:", archives.length);
 
 						// Save archives to state and clear loading
 						set({
