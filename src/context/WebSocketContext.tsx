@@ -573,6 +573,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		});
 
+		// Handle when current user is removed from a chat room
+		newSocket.on("removedFromChatRoom", (data: { chatRoomId: string; removedBy: string }) => {
+			try {
+				const { chatRoomId } = data;
+				const state = useChatStore.getState();
+
+				// Remove the entire chat room from the list and cache
+				state.removeChatRoom(chatRoomId);
+
+				// If this was the current chat room, clear it
+				if (state.currentChatRoom?.id === chatRoomId) {
+					state.setCurrentChatRoom(null);
+				}
+			} catch (e) {
+				console.error("Failed to handle removedFromChatRoom:", e);
+			}
+		});
+
 		// Notification events
 		newSocket.on("notification", (data: NotificationData) => {
 			// Handle notifications if needed

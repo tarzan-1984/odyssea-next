@@ -3,6 +3,15 @@ import { devtools, persist } from "zustand/middleware";
 import { ChatRoom, Message, User } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
+// Helper function to sort chat rooms by last message date
+const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
+	return [...chatRooms].sort((a, b) => {
+		const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
+		const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
+		return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
+	});
+};
+
 // Interface for chat store state
 interface ChatState {
 	// Current active chat room
@@ -136,46 +145,56 @@ export const useChatStore = create<ChatState>()(
 					}
 				},
 
-				setChatRooms: chatRooms => {
-					set({ chatRooms, error: null }, false, "setChatRooms");
-				},
-
-				addChatRoom: chatRoom => {
-					const { chatRooms } = get();
-					const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
-
-					if (existingIndex >= 0) {
-						// Update existing room
-						const updatedRooms = [...chatRooms];
-						updatedRooms[existingIndex] = chatRoom;
-						set({ chatRooms: updatedRooms }, false, "addChatRoom:update");
-					} else {
-						// Add new room to the beginning
-						set({ chatRooms: [chatRoom, ...chatRooms] }, false, "addChatRoom:add");
-					}
-				},
-
-		updateChatRoom: (chatRoomId, updates) => {
-			const { chatRooms, currentChatRoom } = get();
-
-			console.log("🔄 updateChatRoom called:", { chatRoomId, updates });
-
-			const updatedRooms = chatRooms.map(room =>
-				room.id === chatRoomId ? { ...room, ...updates } : room
-			);
-			const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
-			if (currentChatRoom?.id === chatRoomId) {
-				updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
-			}
-			set(updatedState as any, false, "updateChatRoom");
-
-			console.log("✅ Chat room updated in store:", { chatRoomId, updatedRooms: updatedRooms.find(r => r.id === chatRoomId) });
-
-			// Sync to IndexedDB
-			indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
-				console.error("Failed to update chat room in IndexedDB:", error);
-			});
+		setChatRooms: chatRooms => {
+			// Sort chat rooms by last message date when setting
+			const sortedRooms = sortChatRoomsByLastMessage(chatRooms);
+			set({ chatRooms: sortedRooms, error: null }, false, "setChatRooms");
 		},
+
+		addChatRoom: chatRoom => {
+			const { chatRooms } = get();
+			const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
+
+			if (existingIndex >= 0) {
+				// Update existing room
+				const updatedRooms = [...chatRooms];
+				updatedRooms[existingIndex] = chatRoom;
+				// Sort after update
+				const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+				set({ chatRooms: sortedRooms }, false, "addChatRoom:update");
+			} else {
+				// Add new room and sort
+				const newRooms = [chatRoom, ...chatRooms];
+				const sortedRooms = sortChatRoomsByLastMessage(newRooms);
+				set({ chatRooms: sortedRooms }, false, "addChatRoom:add");
+			}
+		},
+
+	updateChatRoom: (chatRoomId, updates) => {
+		const { chatRooms, currentChatRoom } = get();
+
+		console.log("🔄 updateChatRoom called:", { chatRoomId, updates });
+
+		const updatedRooms = chatRooms.map(room =>
+			room.id === chatRoomId ? { ...room, ...updates } : room
+		);
+
+		// Sort chat rooms by last message date after update
+		const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+
+		const updatedState: Partial<ChatState> = { chatRooms: sortedRooms };
+		if (currentChatRoom?.id === chatRoomId) {
+			updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+		}
+		set(updatedState as any, false, "updateChatRoom");
+
+		console.log("✅ Chat room updated in store:", { chatRoomId, updatedRooms: sortedRooms.find(r => r.id === chatRoomId) });
+
+		// Sync to IndexedDB
+		indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
+			console.error("Failed to update chat room in IndexedDB:", error);
+		});
+	},
 
 			removeChatRoom: chatRoomId => {
 				const { chatRooms, currentChatRoom } = get();
@@ -201,16 +220,31 @@ export const useChatStore = create<ChatState>()(
 					set({ messages, error: null }, false, "setMessages");
 				},
 
-		addMessage: message => {
-			const { messages } = get();
-			// Check if message already exists to avoid duplicates
-			const exists = messages.some(msg => msg.id === message.id);
-			if (!exists) {
-				const newMessages = [...messages, message];
-				set({ messages: newMessages }, false, "addMessage");
-				// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
-			}
-		},
+	addMessage: message => {
+		const { messages, chatRooms } = get();
+		// Check if message already exists to avoid duplicates
+		const exists = messages.some(msg => msg.id === message.id);
+		if (!exists) {
+			const newMessages = [...messages, message];
+			
+			// Update the lastMessage in the corresponding chat room
+			const updatedRooms = chatRooms.map(room => {
+				if (room.id === message.chatRoomId) {
+					return {
+						...room,
+						lastMessage: message
+					};
+				}
+				return room;
+			});
+
+			// Sort chat rooms by last message date
+			const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+
+			set({ messages: newMessages, chatRooms: sortedRooms }, false, "addMessage");
+			// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
+		}
+	},
 
 		updateMessage: (messageId, updates) => {
 			const { messages, chatRooms } = get();
