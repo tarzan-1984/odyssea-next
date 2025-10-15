@@ -215,7 +215,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle server's connected event (with user data)
 		newSocket.on("connected", (data: any) => {
-			//console.log("Server connected event:", data);
+			// Connected successfully
 		});
 
 		// Handle message sent confirmation
@@ -225,21 +225,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle new message from server
 		newSocket.on("newMessage", (data: any) => {
-			// Add message to store if it's for the current chat room
-			if (data.chatRoomId && data.message) {
+			// Handle case where data comes as array (from onAny handler)
+			const messageData = Array.isArray(data) ? data[0] : data;
 
+			// Add message to store if it's for the current chat room
+			if (messageData && messageData.chatRoomId && messageData.message) {
 				// Update chat room's lastMessage for ALL chats (not just current one)
 				const state = useChatStore.getState();
-				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
+				const chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
 
+				// Process message regardless of whether chat room is in store
+				// This ensures notifications work even when user is not on chat page
+				// If currentChatRoom is null (user not on chat page), treat as not current chat
+				const isCurrentChat = state.currentChatRoom && state.currentChatRoom.id === messageData.chatRoomId;
+				const isMessageFromCurrentUser = messageData.message.senderId === currentUser?.id;
+
+				// Update lastMessage for all chats (only if chat room exists in store)
 				if (chatRoom) {
-					const isCurrentChat = state.currentChatRoom?.id === data.chatRoomId;
-					const isMessageFromCurrentUser = data.message.senderId === currentUser?.id;
-
-					// Update lastMessage for all chats
 					const updates: any = {
-						lastMessage: data.message,
-						updatedAt: data.message.createdAt
+						lastMessage: messageData.message,
+						updatedAt: messageData.message.createdAt
 					};
 
 					// Increment unreadCount only if:
@@ -249,52 +254,62 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
 					}
 
-					// Play notification sound for ALL participants if:
-					// 1. The message is NOT from the current user
-					// 2. This is NOT the current active chat (user is not viewing this specific chat)
-					// Sound should play on any page, except when user is in the active chat where message arrived
-					if (!isMessageFromCurrentUser && !isCurrentChat) {
-						playNotificationSound();
+					state.updateChatRoom(messageData.chatRoomId, updates);
+				}
+
+				// Play notification sound for ALL participants if:
+				// 1. The message is NOT from the current user
+				// 2. This is NOT the current active chat (user is not viewing this specific chat)
+				// Sound should play on any page, except when user is in the active chat where message arrived
+				if (!isMessageFromCurrentUser && !isCurrentChat) {
+					playNotificationSound();
+				}
+
+				// Show toast notification for ALL participants if:
+				// 1. This is NOT the current active chat (user is not viewing this chat)
+				// 2. The message is NOT from the current user
+				// This works for both direct and group chats
+				if (!isCurrentChat && !isMessageFromCurrentUser) {
+					// Show toast notification
+					if (typeof window !== 'undefined' && (window as any).addToastNotification) {
+						// Create a minimal chat room object for toast if not found in store
+						const chatRoomForToast = chatRoom || {
+							id: messageData.chatRoomId,
+							name: messageData.message.receiver ? `${messageData.message.receiver.firstName} ${messageData.message.receiver.lastName}` : 'Chat',
+							type: 'DIRECT',
+							participants: [
+								{ user: messageData.message.sender },
+								{ user: messageData.message.receiver }
+							].filter(p => p.user)
+						};
+						(window as any).addToastNotification(messageData.message, chatRoomForToast);
 					}
+				}
 
-					// Show toast notification for ALL participants if:
-					// 1. This is NOT the current active chat (user is not viewing this chat)
-					// 2. The message is NOT from the current user
-					// This works for both direct and group chats
-					if (!isCurrentChat && !isMessageFromCurrentUser) {
-						// Show toast notification
-						if (typeof window !== 'undefined' && (window as any).addToastNotification) {
-							(window as any).addToastNotification(data.message, chatRoom);
-						}
-					}
+				// Always save message to IndexedDB for persistence
+				indexedDBChatService.addMessage(messageData.message).catch((error: Error) => {
+					console.error("Failed to save message to IndexedDB:", error);
+				});
 
-					state.updateChatRoom(data.chatRoomId, updates);
+				// Also add to store if this is the current chat (for immediate display)
+				// This ensures messages appear even if useWebSocketMessages hasn't processed yet
+				if (isCurrentChat) {
+					addMessage(messageData.message);
 
-					// Always save message to IndexedDB for persistence
-					indexedDBChatService.addMessage(data.message).catch((error: Error) => {
-						console.error("Failed to save message to IndexedDB:", error);
-					});
+					// Auto-mark message as read if it's in the current active chat
+					// and it's not from the current user (don't mark own messages as read)
+					if (!isMessageFromCurrentUser) {
+						// Mark message as read in store immediately
+						updateMessage(messageData.message.id, { isRead: true });
 
-					// Also add to store if this is the current chat (for immediate display)
-					// This ensures messages appear even if useWebSocketMessages hasn't processed yet
-					if (isCurrentChat) {
-						addMessage(data.message);
+						// Update message as read in IndexedDB cache immediately
+						indexedDBChatService.updateMessage(messageData.message.id, { isRead: true }).catch((error: Error) => {
+							console.error("Failed to update message as read in IndexedDB:", error);
+						});
 
-						// Auto-mark message as read if it's in the current active chat
-						// and it's not from the current user (don't mark own messages as read)
-						if (!isMessageFromCurrentUser) {
-							// Mark message as read in store immediately
-							updateMessage(data.message.id, { isRead: true });
-							
-							// Update message as read in IndexedDB cache immediately
-							indexedDBChatService.updateMessage(data.message.id, { isRead: true }).catch((error: Error) => {
-								console.error("Failed to update message as read in IndexedDB:", error);
-							});
-
-							// Use the current socket (newSocket) to emit messageRead
-							if (newSocket && newSocket.connected) {
-								newSocket.emit("messageRead", { messageId: data.message.id, chatRoomId: data.chatRoomId });
-							}
+						// Use the current socket (newSocket) to emit messageRead
+						if (newSocket && newSocket.connected) {
+							newSocket.emit("messageRead", { messageId: messageData.message.id, chatRoomId: messageData.chatRoomId });
 						}
 					}
 				}
@@ -303,11 +318,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle chat room events
 		newSocket.on("chatRoomCreated", (data: any) => {
-			//console.log("Chat room created:", data);
+			// Chat room created
 		});
 
 		newSocket.on("chatRoomUpdated", (data: any) => {
-			//console.log("Chat room updated:", data);
+			// Chat room updated
 		});
 
 		// Handle notification events
@@ -370,22 +385,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle user events
 		newSocket.on("userJoined", (data: any) => {
-			//console.log("User joined chat room:", data);
+			// User joined chat room
 		});
 
 		newSocket.on("userLeft", (data: any) => {
-			//console.log("User left chat room:", data);
+			// User left chat room
 		});
 
 		// Handle room join/leave confirmations
 		newSocket.on("joinedChatRoom", (data: any) => {
-			//console.log("Successfully joined chat room:", data);
-			// Update connection status or room state if needed
+			// Successfully joined chat room
 		});
 
 		newSocket.on("leftChatRoom", (data: any) => {
-			//console.log("Successfully left chat room:", data);
-			// Update connection status or room state if needed
+			// Successfully left chat room
 		});
 
 		// Handle bulk messages marked as read
@@ -431,12 +444,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle typing events - this will be handled by useWebSocketMessages hook
 		// newSocket.on("userTyping", (data: any) => {
-		// 	console.log("User typing:", data);
+		// 	// User typing
 		// });
 
 		// Handle online status events - this will be handled by useWebSocketMessages hook
 		// newSocket.on("userOnline", (data: any) => {
-		// 	console.log("User online status:", data);
+		// 	// User online status
 		// });
 
 		// Handle error events
@@ -447,14 +460,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle any other events for debugging
 		newSocket.onAny((eventName: string, ...args: any[]) => {
 			if (process.env.NODE_ENV === "development") {
-				//console.log(`Received event '${eventName}' from server:`, args);
 			}
 		});
 
 		newSocket.on("disconnect", (reason: string) => {
-			if (process.env.NODE_ENV === "development") {
-				//console.log("WebSocket disconnected:", reason);
-			}
 			setIsConnected(false);
 
 			// Re-enable auto-reconnect for stability

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ChatList from "./ChatList";
 import ChatBox from "./ChatBox";
 import AddNewRoomModal from "./AddNewRoomModal";
@@ -17,6 +17,14 @@ export default function ChatContainer() {
 	// Get modal states
 	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } = useChatModal();
     const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
+
+	// Clear active chat when component unmounts (user leaves chat page)
+	useEffect(() => {
+		return () => {
+			// Clear current chat room from store when leaving the chat page
+			webSocketChatSync.setCurrentChatRoom(null);
+		};
+	}, []); // Empty dependency array to run only on unmount
 
     const handleChatSelect = (chatRoom: ChatRoom) => {
         setSelectedChatRoomId(chatRoom.id);

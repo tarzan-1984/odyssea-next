@@ -85,23 +85,55 @@ export const useChatSync = () => {
 					// Load from cache for immediate display only if cache is fresh
 					const cachedRooms = await indexedDBChatService.getChatRooms();
 					if (cachedRooms.length > 0) {
-						setChatRooms(cachedRooms);
-						ensureCurrentRoomValidity(cachedRooms);
+						// Merge cached data with current store state to preserve real-time updates
+						const currentStoreRooms = useChatStore.getState().chatRooms;
+						const mergedCachedRooms = cachedRooms.map(cachedRoom => {
+							const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === cachedRoom.id);
+							if (storeRoom) {
+								// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+								return {
+									...cachedRoom,
+									unreadCount: storeRoom.unreadCount || 0,
+									lastMessage: storeRoom.lastMessage || cachedRoom.lastMessage,
+									updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
+								};
+							}
+							return cachedRoom;
+						});
+						setChatRooms(mergedCachedRooms);
+						ensureCurrentRoomValidity(mergedCachedRooms);
 						setLoadingChatRooms(false);
 						return;
 					}
 				}
 
-				// If cache is not fresh, load from API and update cache
+				// If cache is not fresh, load from API and merge with current store state
 				try {
 					const apiRooms = await chatApi.getChatRooms();
-					const normalizedRooms = apiRooms.map(room => ({
+					const normalizedApiRooms = apiRooms.map(room => ({
 						...room,
 						participants: normalizeParticipants(room.participants || []),
 					}));
-					setChatRooms(normalizedRooms);
-					ensureCurrentRoomValidity(normalizedRooms);
-					await indexedDBChatService.saveChatRooms(normalizedRooms);
+					
+					// Merge API data with current store state to preserve real-time updates
+					const currentStoreRooms = useChatStore.getState().chatRooms;
+					const mergedRooms = normalizedApiRooms.map(apiRoom => {
+						const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
+						if (storeRoom) {
+							// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+							return {
+								...apiRoom,
+								unreadCount: storeRoom.unreadCount || 0,
+								lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
+								updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
+							};
+						}
+						return apiRoom;
+					});
+					
+					setChatRooms(mergedRooms);
+					ensureCurrentRoomValidity(mergedRooms);
+					await indexedDBChatService.saveChatRooms(mergedRooms);
 					setLoadingChatRooms(false);
 					return;
 				} catch (apiError) {
@@ -109,24 +141,55 @@ export const useChatSync = () => {
 					// Fallback to cached data if API fails
 					const cachedRooms = await indexedDBChatService.getChatRooms();
 					if (cachedRooms.length > 0) {
-						setChatRooms(cachedRooms);
-						ensureCurrentRoomValidity(cachedRooms);
+						// Merge cached data with current store state
+						const currentStoreRooms = useChatStore.getState().chatRooms;
+						const mergedCachedRooms = cachedRooms.map(cachedRoom => {
+							const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === cachedRoom.id);
+							if (storeRoom) {
+								return {
+									...cachedRoom,
+									unreadCount: storeRoom.unreadCount || 0,
+									lastMessage: storeRoom.lastMessage || cachedRoom.lastMessage,
+									updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
+								};
+							}
+							return cachedRoom;
+						});
+						setChatRooms(mergedCachedRooms);
+						ensureCurrentRoomValidity(mergedCachedRooms);
 						setLoadingChatRooms(false);
 						return;
 					}
 				}
 			}
 
-			// If no cached data, load from API
+			// If no cached data, load from API and merge with current store state
 			try {
 				const apiRooms = await chatApi.getChatRooms();
-				const normalizedRooms = apiRooms.map(room => ({
+				const normalizedApiRooms = apiRooms.map(room => ({
 					...room,
 					participants: normalizeParticipants(room.participants || []),
 				}));
-				setChatRooms(normalizedRooms);
-				ensureCurrentRoomValidity(normalizedRooms);
-				await indexedDBChatService.saveChatRooms(normalizedRooms);
+				
+				// Merge API data with current store state to preserve real-time updates
+				const currentStoreRooms = useChatStore.getState().chatRooms;
+				const mergedRooms = normalizedApiRooms.map(apiRoom => {
+					const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
+					if (storeRoom) {
+						// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+						return {
+							...apiRoom,
+							unreadCount: storeRoom.unreadCount || 0,
+							lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
+							updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
+						};
+					}
+					return apiRoom;
+				});
+				
+				setChatRooms(mergedRooms);
+				ensureCurrentRoomValidity(mergedRooms);
+				await indexedDBChatService.saveChatRooms(mergedRooms);
 			} catch (apiError) {
 				console.warn("API unavailable, no cached data available:", apiError);
 				setError("Failed to load chat rooms");

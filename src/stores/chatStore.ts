@@ -374,8 +374,6 @@ export const useChatStore = create<ChatState>()(
 							hasMoreMessages: false,
 							currentPage: 1,
 						}, false, "clearCache");
-
-						console.log("Cache cleared successfully");
 					} catch (error) {
 						console.error("Failed to clear cache:", error);
 						throw error;
@@ -666,7 +664,7 @@ export const useChatStore = create<ChatState>()(
 				// Only persist essential data, not loading states or temporary data
 				partialize: state => ({
 					chatRooms: state.chatRooms,
-					currentChatRoom: state.currentChatRoom,
+					// Note: currentChatRoom is NOT persisted - it should reset on page reload
 					// Note: archivedMessagesCache is not persisted as Map cannot be serialized
 				}),
 			}

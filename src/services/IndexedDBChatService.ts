@@ -278,7 +278,9 @@ class IndexedDBChatService {
 						putRequest.onsuccess = () => resolve();
 						putRequest.onerror = () => reject(putRequest.error);
 					} else {
-						reject(new Error("Message not found"));
+						// Message not found in cache - this is normal for new messages
+						// Just resolve without error, the message will be saved when it's added
+						resolve();
 					}
 				};
 				getRequest.onerror = () => reject(getRequest.error);
@@ -600,7 +602,9 @@ class IndexedDBChatService {
 						putRequest.onsuccess = () => resolve();
 						putRequest.onerror = () => reject(putRequest.error);
 					} else {
-						reject(new Error("Chat room not found"));
+						// Chat room not found in cache - this is normal for new chat rooms
+						// Just resolve without error, the chat room will be saved when it's added
+						resolve();
 					}
 				};
 				getRequest.onerror = () => reject(getRequest.error);

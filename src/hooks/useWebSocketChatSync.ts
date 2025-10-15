@@ -71,10 +71,10 @@ export const useWebSocketChatSync = () => {
 			// Message sent confirmation handled by WebSocketContext
 		},
 		onMessageRead: data => {
-			//console.log("Message read confirmation:", data);
+			// Message read confirmation
 		},
 		onUserTyping: data => {
-			//console.log("User typing:", data);
+			// User typing
 		},
 		onUserOnline: data => {
 			updateUserOnlineStatus(data.userId, data.isOnline);
@@ -87,15 +87,13 @@ export const useWebSocketChatSync = () => {
 	// WebSocket chat room management
 	const webSocketChatRooms = useWebSocketChatRooms({
 		onChatRoomCreated: chatRoom => {
-			//console.log("Chat room created via WebSocket:", chatRoom);
 			// Chat room is automatically added to store by useWebSocketChatRooms
 		},
 		onChatRoomUpdated: data => {
-			//console.log("Chat room updated via WebSocket:", data);
 			// Chat room is automatically updated in store by useWebSocketChatRooms
 		},
 		onParticipantsAdded: data => {
-			//console.log("Participants added via WebSocket:", data);
+			// Participants added via WebSocket
 		},
 		onParticipantRemoved: data => {
 			// If current user was removed from the chat, remove it from cache and store
