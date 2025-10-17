@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
-import { MoreDotIcon } from "@/icons";
+import { MoreDotIcon, SoundOffIcon, UnreadIcon, PushPinIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import ChatListItem from "./ChatListItem";
 import { useChatModal } from "@/context/ChatModalContext";
@@ -17,6 +17,14 @@ interface ChatListProps {
 	onChatSelect: (chatRoom: ChatRoom) => void;
 	selectedChatId?: string;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+}
+
+type FilterType = 'all' | 'muted' | 'unread' | 'favorite';
+
+interface FilterOption {
+	value: FilterType;
+	label: string;
+	icon: React.ReactNode;
 }
 
 export default function ChatList({
@@ -34,6 +42,29 @@ export default function ChatList({
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+	
+	// Filter state
+	const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
+	const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+	// Filter options
+	const filterOptions: FilterOption[] = [
+		{ value: 'all', label: 'All', icon: null },
+		{ value: 'muted', label: 'Muted', icon: <SoundOffIcon className="w-3 h-3" /> },
+		{ value: 'unread', label: 'Unread', icon: <UnreadIcon className="w-3 h-3" /> },
+		{ value: 'favorite', label: 'Favorite', icon: <PushPinIcon className="w-3 h-3" /> },
+	];
+
+	// Get current filter option
+	const getCurrentFilterOption = () => {
+		return filterOptions.find(option => option.value === selectedFilter) || filterOptions[0];
+	};
+
+	// Handle filter change
+	const handleFilterChange = (filter: FilterType) => {
+		setSelectedFilter(filter);
+		setIsFilterDropdownOpen(false);
+	};
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT chats, always show the other participant's name
@@ -161,14 +192,46 @@ export default function ChatList({
 		return () => clearTimeout(timer);
 	}, [searchQuery]);
 
-	// Filter chat rooms based on search query
+	// Close dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (isFilterDropdownOpen) {
+				const target = event.target as HTMLElement;
+				if (!target.closest('.filter-dropdown')) {
+					setIsFilterDropdownOpen(false);
+				}
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [isFilterDropdownOpen]);
+
+	// Filter chat rooms based on search query and selected filter
 	const filteredChatRooms = chatRooms.filter(chatRoom => {
-		if (!debouncedSearchQuery.trim()) return true;
+		// Apply search filter
+		const matchesSearch = !debouncedSearchQuery.trim() || 
+			getChatDisplayName(chatRoom).toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 		
-		const chatName = getChatDisplayName(chatRoom).toLowerCase();
-		const searchLower = debouncedSearchQuery.toLowerCase();
+		// Apply selected filter
+		let matchesFilter = true;
+		switch (selectedFilter) {
+			case 'muted':
+				matchesFilter = chatRoom.isMuted === true;
+				break;
+			case 'unread':
+				matchesFilter = (chatRoom.unreadCount ?? 0) > 0;
+				break;
+			case 'favorite':
+				matchesFilter = chatRoom.isPinned === true;
+				break;
+			case 'all':
+			default:
+				matchesFilter = true;
+				break;
+		}
 		
-		return chatName.includes(searchLower);
+		return matchesSearch && matchesFilter;
 	});
 
 	useEffect(() => {
@@ -234,20 +297,67 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Mute All Buttons */}
-			<div className="px-0 py-2 flex gap-2">
-				<button
-					onClick={handleMuteAll}
-					className="flex-1 px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
-				>
-					Mute all
-				</button>
-				<button
-					onClick={handleUnmuteAll}
-					className="flex-1 px-3 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
-				>
-					Unmute all
-				</button>
+			{/* Filter Section */}
+			<div className="border-t border-b border-gray-200 dark:border-gray-700 py-2 px-0">
+				<div className="flex items-center gap-2">
+					{/* Mute All Buttons */}
+					<button
+						onClick={handleMuteAll}
+						className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
+					>
+						Mute all
+					</button>
+					<button
+						onClick={handleUnmuteAll}
+						className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
+					>
+						Unmute all
+					</button>
+					
+					{/* Filter Dropdown */}
+					<div className="flex-1 relative filter-dropdown">
+						<button
+							onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+							className="w-full flex items-center justify-between px-2 py-1 text-xs text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+						>
+							<div className="flex items-center gap-1">
+								{getCurrentFilterOption().icon && (
+									<div className="w-3 h-3">
+										{getCurrentFilterOption().icon}
+									</div>
+								)}
+								<span>{getCurrentFilterOption().label}</span>
+							</div>
+							<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+							</svg>
+						</button>
+						
+						{/* Dropdown Menu */}
+						{isFilterDropdownOpen && (
+							<div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg z-10">
+								{filterOptions.map((option) => (
+									<button
+										key={option.value}
+										onClick={() => handleFilterChange(option.value)}
+										className={`w-full flex items-center gap-1 px-2 py-1 text-xs text-left hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t last:rounded-b ${
+											selectedFilter === option.value 
+												? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+												: 'text-gray-700 dark:text-gray-300'
+										}`}
+									>
+										{option.icon && (
+											<div className="w-3 h-3">
+												{option.icon}
+											</div>
+										)}
+										<span>{option.label}</span>
+									</button>
+								))}
+							</div>
+						)}
+					</div>
+				</div>
 			</div>
 
             {/* Search Bar */}

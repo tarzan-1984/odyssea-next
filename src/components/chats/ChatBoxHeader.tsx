@@ -2,12 +2,13 @@
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { MoreDotIcon, TrashDeleteIcon, EditIcon } from "@/icons";
+import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { renderAvatar } from "@/helpers";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
+import FilesModal from "./FilesModal";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -18,6 +19,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isOpen, setIsOpen] = useState(false);
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
 	const currentUser = useCurrentUser();
 
 	function toggleDropdown() {
@@ -30,6 +32,11 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 	const handleDeleteClick = () => {
 		setIsDeleteModalOpen(true);
+		closeDropdown();
+	};
+
+	const handleFilesClick = () => {
+		setIsFilesModalOpen(true);
 		closeDropdown();
 	};
 
@@ -183,6 +190,13 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
                             </DropdownItem>
                         )}
                         <DropdownItem
+                            onItemClick={handleFilesClick}
+                            className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                        >
+                            <AttachmentIcon className="w-4 h-4" />
+                            Files
+                        </DropdownItem>
+                        <DropdownItem
                             onItemClick={handleDeleteClick}
                             className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
                         >
@@ -209,6 +223,12 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 				// Handle successful deletion if needed
 				// The WebSocket event will handle the actual removal from state
 			}}
+		/>
+		
+		<FilesModal
+			isOpen={isFilesModalOpen}
+			onClose={() => setIsFilesModalOpen(false)}
+			chatRoom={chatRoom}
 		/>
 	</>
 	);

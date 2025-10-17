@@ -19,7 +19,51 @@ export class S3Uploader {
 	 */
 	async upload(file: File, opts?: { filename?: string }) {
 		const filename = opts?.filename ?? file.name ?? "upload.bin";
-		const contentType = file.type || "application/octet-stream";
+		
+		// Determine content type with fallback for SVG files
+		let contentType = file.type;
+		if (!contentType) {
+			// Fallback based on file extension
+			const extension = filename.toLowerCase().split('.').pop();
+			switch (extension) {
+				case 'svg':
+					contentType = 'image/svg+xml';
+					break;
+				case 'jpg':
+				case 'jpeg':
+					contentType = 'image/jpeg';
+					break;
+				case 'png':
+					contentType = 'image/png';
+					break;
+				case 'gif':
+					contentType = 'image/gif';
+					break;
+				case 'webp':
+					contentType = 'image/webp';
+					break;
+				case 'pdf':
+					contentType = 'application/pdf';
+					break;
+				case 'txt':
+					contentType = 'text/plain';
+					break;
+				case 'json':
+					contentType = 'application/json';
+					break;
+				default:
+					contentType = 'application/octet-stream';
+			}
+		}
+
+		// Additional validation for SVG files
+		if (contentType === 'image/svg+xml' || filename.toLowerCase().endsWith('.svg')) {
+			// Validate SVG content by checking if it starts with proper SVG declaration
+			const text = await file.text();
+			if (!text.includes('<svg') || !text.includes('xmlns=')) {
+				throw new Error('Invalid SVG file format');
+			}
+		}
 
 		try {
 			// 1) Ask Nest for a presigned URL

@@ -62,6 +62,8 @@ import SoundOnIcon from "./sound-on.svg";
 import SoundOffIcon from "./sound-off.svg";
 import PinIcon from "./pin.svg";
 import PushPinIcon from "./push-pin.svg";
+import AttachmentIcon from "./attachment.svg";
+import UnreadIcon from "./unread.svg";
 
 export {
 	BoxTapped,
@@ -128,4 +130,6 @@ export {
 	SoundOffIcon,
 	PinIcon,
 	PushPinIcon,
+	AttachmentIcon,
+	UnreadIcon,
 };
