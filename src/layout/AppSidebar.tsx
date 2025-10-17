@@ -228,11 +228,11 @@ const supportItems: NavItem[] = [
 	//   ],
 	// },
 
-	{
-		icon: <BellRing />,
-		name: "Notifications",
-		path: "/notifications",
-	},
+	// {
+	// 	icon: <BellRing />,
+	// 	name: "Notifications",
+	// 	path: "/notifications",
+	// },
 	{
 		icon: <UserCircleIcon />,
 		name: "My account",
