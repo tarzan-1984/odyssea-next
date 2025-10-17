@@ -58,6 +58,10 @@ import CallIcon from "./call-icon.svg";
 import BoxMoving from "./box-tapped.svg";
 import BoxTapped from "./box-icon.svg";
 import TruckDelivery from "./truck-delivery.svg";
+import SoundOnIcon from "./sound-on.svg";
+import SoundOffIcon from "./sound-off.svg";
+import PinIcon from "./pin.svg";
+import PushPinIcon from "./push-pin.svg";
 
 export {
 	BoxTapped,
@@ -120,4 +124,8 @@ export {
 	ChevronUpIcon,
 	ChatIcon,
 	MoreDotIcon,
+	SoundOnIcon,
+	SoundOffIcon,
+	PinIcon,
+	PushPinIcon,
 };

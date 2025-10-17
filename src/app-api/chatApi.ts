@@ -30,6 +30,8 @@ export interface ChatRoom {
 	participants: ChatRoomParticipant[];
 	lastMessage?: Message;
 	unreadCount?: number;
+	isMuted?: boolean;
+	isPinned?: boolean;
 }
 
 export interface ChatRoomParticipant {
@@ -176,6 +178,25 @@ class ChatApiClient {
 	deleteChatRoom(chatRoomId: string): Promise<{ deleted: boolean; hidden?: boolean; left?: boolean }> {
 		return this.request<{ deleted: boolean; hidden?: boolean; left?: boolean }>(`/chat-rooms/${chatRoomId}`, {
 			method: "DELETE",
+		});
+	}
+
+	toggleMuteChatRoom(chatRoomId: string): Promise<{ chatRoomId: string; userId: string; mute: boolean }> {
+		return this.request<{ chatRoomId: string; userId: string; mute: boolean }>(`/chat-rooms/${chatRoomId}/mute`, {
+			method: "PUT",
+		});
+	}
+
+	togglePinChatRoom(chatRoomId: string): Promise<{ chatRoomId: string; userId: string; pin: boolean }> {
+		return this.request<{ chatRoomId: string; userId: string; pin: boolean }>(`/chat-rooms/${chatRoomId}/pin`, {
+			method: "PUT",
+		});
+	}
+
+	muteChatRooms(chatRoomIds: string[], action: 'mute' | 'unmute'): Promise<{ userId: string; mutedCount: number; chatRoomIds: string[] }> {
+		return this.request<{ userId: string; mutedCount: number; chatRoomIds: string[] }>("/chat-rooms/mute", {
+			method: "PUT",
+			body: JSON.stringify({ chatRoomIds, action }),
 		});
 	}
 

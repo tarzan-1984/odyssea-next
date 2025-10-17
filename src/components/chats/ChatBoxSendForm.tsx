@@ -21,6 +21,8 @@ export default function ChatBoxSendForm({
 	isLoading = false,
 }: ChatBoxSendFormProps) {
 	const [message, setMessage] = useState<string>("");
+	const [isSending, setIsSending] = useState(false);
+
 	const [attachedFile, setAttachedFile] = useState<{
 		fileUrl: string;
 		key: string;
@@ -32,29 +34,37 @@ export default function ChatBoxSendForm({
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
 
-	const handleSendMessage = () => {
+	const handleSendMessage = async () => {
 		if (!message.trim() && !attachedFile) return;
 
-		if (onSendMessage) {
-			onSendMessage({
-				content: message,
-				fileData: attachedFile || undefined,
-			});
-		}
+		try {
+			setIsSending(true);
 
-		// Stop typing indicator when message is sent
-		if (onTyping) {
-			onTyping(false);
-		}
+			if (onSendMessage) {
+				await onSendMessage({
+					content: message,
+					fileData: attachedFile || undefined,
+				});
+			}
 
-		// Reset form
-		setMessage("");
-		setAttachedFile(null);
-		setShowFileUploader(false);
-		setShowEmojiPicker(false);
+			// Stop typing indicator when message is sent
+			if (onTyping) {
+				onTyping(false);
+			}
+
+			// Reset form
+			setMessage("");
+			setAttachedFile(null);
+			setShowFileUploader(false);
+			setShowEmojiPicker(false);
+		} catch (error) {
+			console.error("Failed to send message:", error);
+		} finally {
+			setIsSending(false);
+		}
 	};
 
-	const handleKeyPress = (e: React.KeyboardEvent) => {
+	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 			handleSendMessage();
@@ -94,7 +104,7 @@ export default function ChatBoxSendForm({
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as Node;
-			
+
 			// Don't close if clicking on the emoji button or emoji picker itself
 			if (
 				emojiButtonRef.current?.contains(target) ||
@@ -102,7 +112,7 @@ export default function ChatBoxSendForm({
 			) {
 				return;
 			}
-			
+
 			setShowEmojiPicker(false);
 		};
 
@@ -257,8 +267,8 @@ export default function ChatBoxSendForm({
 						placeholder="Type a message"
 						value={message}
 						onChange={handleMessageChange}
-						onKeyPress={handleKeyPress}
-						disabled={disabled}
+						onKeyDown={handleKeyDown}
+						disabled={disabled || isSending}
 						className="w-full pl-12 pr-5 text-sm text-gray-800 bg-transparent border-none outline-hidden h-9 placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50"
 					/>
 				</div>
@@ -268,7 +278,7 @@ export default function ChatBoxSendForm({
 					<button
 						type="button"
 						onClick={() => setShowFileUploader(!showFileUploader)}
-						disabled={disabled}
+						disabled={disabled || isSending}
 						className="mr-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 					>
 						<svg

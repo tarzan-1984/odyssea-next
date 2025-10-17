@@ -2,10 +2,10 @@ import type React from "react";
 import Link from "next/link";
 
 interface DropdownItemProps {
-	tag?: "a" | "button";
+	tag?: "a" | "button" | "div";
 	href?: string;
 	onClick?: () => void;
-	onItemClick?: () => void;
+	onItemClick?: (event?: React.MouseEvent) => void;
 	baseClassName?: string;
 	className?: string;
 	children: React.ReactNode;
@@ -27,7 +27,7 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 			event.preventDefault();
 		}
 		if (onClick) onClick();
-		if (onItemClick) onItemClick();
+		if (onItemClick) onItemClick(event);
 	};
 
 	if (tag === "a" && href) {
@@ -35,6 +35,14 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 			<Link href={href} className={combinedClasses} onClick={handleClick}>
 				{children}
 			</Link>
+		);
+	}
+
+	if (tag === "div") {
+		return (
+			<div onClick={handleClick} className={combinedClasses}>
+				{children}
+			</div>
 		);
 	}
 

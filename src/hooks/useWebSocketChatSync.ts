@@ -138,7 +138,6 @@ export const useWebSocketChatSync = () => {
 			content: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
 		}) => {
-
 			if (isConnected && chatSync.currentChatRoom) {
 				// Use WebSocket for real-time messaging
 				webSocketMessages.sendMessage({

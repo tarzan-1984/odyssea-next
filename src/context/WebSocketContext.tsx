@@ -260,16 +260,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Play notification sound for ALL participants if:
 				// 1. The message is NOT from the current user
 				// 2. This is NOT the current active chat (user is not viewing this specific chat)
+				// 3. The chat is NOT muted
 				// Sound should play on any page, except when user is in the active chat where message arrived
-				if (!isMessageFromCurrentUser && !isCurrentChat) {
+				if (!isMessageFromCurrentUser && !isCurrentChat && !chatRoom?.isMuted) {
 					playNotificationSound();
 				}
 
 				// Show toast notification for ALL participants if:
 				// 1. This is NOT the current active chat (user is not viewing this chat)
 				// 2. The message is NOT from the current user
+				// 3. The chat is NOT muted
 				// This works for both direct and group chats
-				if (!isCurrentChat && !isMessageFromCurrentUser) {
+				if (!isCurrentChat && !isMessageFromCurrentUser && !chatRoom?.isMuted) {
 					// Show toast notification
 					if (typeof window !== 'undefined' && (window as any).addToastNotification) {
 						// Create a minimal chat room object for toast if not found in store

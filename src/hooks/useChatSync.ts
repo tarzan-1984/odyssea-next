@@ -90,10 +90,11 @@ export const useChatSync = () => {
 						const mergedCachedRooms = cachedRooms.map(cachedRoom => {
 							const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === cachedRoom.id);
 							if (storeRoom) {
-								// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+								// Use cached unreadCount if available, otherwise use store unreadCount
+								const finalUnreadCount = cachedRoom.unreadCount !== undefined ? cachedRoom.unreadCount : (storeRoom.unreadCount || 0);
 								return {
 									...cachedRoom,
-									unreadCount: storeRoom.unreadCount || 0,
+									unreadCount: finalUnreadCount,
 									lastMessage: storeRoom.lastMessage || cachedRoom.lastMessage,
 									updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 								};
@@ -120,10 +121,11 @@ export const useChatSync = () => {
 					const mergedRooms = normalizedApiRooms.map(apiRoom => {
 						const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
 						if (storeRoom) {
-							// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+							// Use API unreadCount if available, otherwise use store unreadCount
+							const finalUnreadCount = apiRoom.unreadCount !== undefined ? apiRoom.unreadCount : (storeRoom.unreadCount || 0);
 							return {
 								...apiRoom,
-								unreadCount: storeRoom.unreadCount || 0,
+								unreadCount: finalUnreadCount,
 								lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
 								updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
 							};
@@ -176,10 +178,11 @@ export const useChatSync = () => {
 				const mergedRooms = normalizedApiRooms.map(apiRoom => {
 					const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
 					if (storeRoom) {
-						// Preserve real-time updates from store (unreadCount, lastMessage, etc.)
+						// Use API unreadCount if available, otherwise use store unreadCount
+						const finalUnreadCount = apiRoom.unreadCount !== undefined ? apiRoom.unreadCount : (storeRoom.unreadCount || 0);
 						return {
 							...apiRoom,
-							unreadCount: storeRoom.unreadCount || 0,
+							unreadCount: finalUnreadCount,
 							lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
 							updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
 						};

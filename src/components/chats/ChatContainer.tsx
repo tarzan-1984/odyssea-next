@@ -37,7 +37,7 @@ export default function ChatContainer() {
 		<>
 			<div className="flex flex-col h-full gap-6 xl:flex-row xl:gap-5">
 				{/* Left Sidebar - Chat List */}
-				<div className="flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:flex xl:w-1/4">
+				<div className="flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:flex xl:w-[28%]">
 					<ChatList
 						onChatSelect={handleChatSelect}
                         selectedChatId={selectedChatRoomId || undefined}
