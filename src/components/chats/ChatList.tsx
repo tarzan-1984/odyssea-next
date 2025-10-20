@@ -380,8 +380,8 @@ export default function ChatList({
                             />
                         </svg>
                     </button>
-                    <input
-                        type="text"
+					<input
+						type="text"
                         placeholder="Search chats..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -396,22 +396,22 @@ export default function ChatList({
                                 width="16"
                                 height="16"
                                 viewBox="0 0 20 20"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                            >
-                                <path
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+					>
+						<path
                                     fillRule="evenodd"
                                     clipRule="evenodd"
                                     d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
                                     fill="currentColor"
-                                />
-                            </svg>
+						/>
+					</svg>
                         </button>
                     )}
-                </div>
-            </div>
+				</div>
+			</div>
 
-            {/* Chat List */}
+			{/* Chat List */}
             <div className="overflow-y-auto h-[400px] max-h-[calc(100vh-220px)]">
 				{!filteredChatRooms || filteredChatRooms.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
@@ -423,8 +423,8 @@ export default function ChatList({
 								</>
 							) : (
 								<>
-									<p>No chats yet</p>
-									<p className="text-sm">Start a conversation!</p>
+							<p>No chats yet</p>
+							<p className="text-sm">Start a conversation!</p>
 								</>
 							)}
 						</div>

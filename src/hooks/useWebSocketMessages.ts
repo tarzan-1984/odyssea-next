@@ -11,7 +11,7 @@ interface UseWebSocketMessagesProps {
 	onNewMessage?: (message: Message) => void;
 	onMessageSent?: (data: { messageId: string; chatRoomId: string }) => void;
 	onMessageRead?: (data: { messageId: string; readBy: string }) => void;
-	onUserTyping?: (data: { userId: string; chatRoomId: string; isTyping: boolean; firstName?: string }) => void;
+	onUserTyping?: (data: { userId: string; chatRoomId: string; isTyping: boolean; firstName?: string; role?: string }) => void;
 	onUserOnline?: (data: { userId: string; chatRoomId: string; isOnline: boolean }) => void;
 	onError?: (error: { message: string; details?: string }) => void;
 }
@@ -36,7 +36,7 @@ export const useWebSocketMessages = ({
 		markChatRoomAsRead,
 	} = useWebSocket();
 	const { addMessage, updateMessage } = useChatStore();
-	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string }>>({});
+	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string; role?: string }>>({});
 	const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 	const currentRoomRef = useRef<string | null>(null);
 
@@ -131,6 +131,7 @@ export const useWebSocketMessages = ({
 			chatRoomId: string;
 			isTyping: boolean;
 			firstName?: string;
+			role?: string;
 		}) => {
 			if (data.chatRoomId === chatRoomId) {
 				setIsTyping(prev => ({
@@ -138,6 +139,7 @@ export const useWebSocketMessages = ({
 					[data.userId]: {
 						isTyping: data.isTyping,
 						firstName: data.firstName,
+						role: data.role,
 					},
 				}));
 				onUserTyping?.(data);

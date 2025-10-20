@@ -464,7 +464,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										<p className="text-gray-500 text-theme-xs dark:text-gray-400">
 											{isSender
 												? getMessageTime(message.createdAt)
-												: `${message.sender.firstName}, ${getMessageTime(message.createdAt)}`}
+												: `${message.sender.role || 'User'}, ${getMessageTime(message.createdAt)}`}
 										</p>
 									</div>
 								</div>
@@ -491,22 +491,22 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								const typingUsers = Object.entries(isTyping).filter(([userId, data]) => data.isTyping);
 								if (typingUsers.length === 0) return "";
 
-								// Use firstName from WebSocket data or fallback to participant data
-								const typingUserNames = typingUsers.map(([userId, data]) => {
-									if (data.firstName) {
-										return data.firstName;
+								// Use role from WebSocket data or fallback to participant data
+								const typingUserRoles = typingUsers.map(([userId, data]) => {
+									if (data.role) {
+										return data.role;
 									}
-									// Fallback to participant data if firstName not available
+									// Fallback to participant data if role not available
 									const participant = selectedChatRoom?.participants.find(p => p.user.id === userId);
-									return participant?.user.firstName || "Someone";
+									return participant?.user.role || "User";
 								});
 
-								if (typingUserNames.length === 1) {
-									return `${typingUserNames[0]} is typing...`;
-								} else if (typingUserNames.length === 2) {
-									return `${typingUserNames[0]} and ${typingUserNames[1]} are typing...`;
+								if (typingUserRoles.length === 1) {
+									return `${typingUserRoles[0]} is typing...`;
+								} else if (typingUserRoles.length === 2) {
+									return `${typingUserRoles[0]} and ${typingUserRoles[1]} are typing...`;
 								} else {
-									return `${typingUserNames[0]} and ${typingUserNames.length - 1} others are typing...`;
+									return `${typingUserRoles[0]} and ${typingUserRoles.length - 1} others are typing...`;
 								}
 							})()}
 						</span>

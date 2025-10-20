@@ -124,16 +124,16 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
                             }
                         }
                         
-                        // For GROUP chats, prefer chat avatar when present
-                        if (chatRoom.type === "GROUP" && chatRoom.avatar) {
+                        // For GROUP/LOAD chats, prefer chat avatar when present
+                        if ((chatRoom.type === "GROUP" || chatRoom.type === "LOAD") && chatRoom.avatar) {
                             return (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={chatRoom.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
                             );
                         }
                         
-                        // Fallback for GROUP chats without avatar
-                        if (chatRoom.type === "GROUP") {
+                        // Fallback for GROUP/LOAD chats without avatar
+                        if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
                             const name = getChatDisplayName();
                             const parts = name.trim().split(/\s+/).filter(Boolean);
                             const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
@@ -196,13 +196,26 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
                             <AttachmentIcon className="w-4 h-4" />
                             Files
                         </DropdownItem>
-                        <DropdownItem
-                            onItemClick={handleDeleteClick}
-                            className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                        >
-                            <TrashDeleteIcon className="w-4 h-4" />
-                            {chatRoom?.type === "GROUP" && chatRoom?.adminId !== currentUser?.id ? "Leave" : "Delete"}
-                        </DropdownItem>
+                        {/* Показываем кнопку удаления только если пользователь может удалить чат */}
+                        {(() => {
+                            // Для LOAD чатов: только администраторы могут удалять
+                            if (chatRoom?.type === "LOAD") {
+                                if (currentUser?.role !== "ADMINISTRATOR") {
+                                    return null; // Скрываем кнопку
+                                }
+                            }
+                            
+                            // Для остальных типов чатов показываем кнопку
+                            return (
+                                <DropdownItem
+                                    onItemClick={handleDeleteClick}
+                                    className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                                >
+                                    <TrashDeleteIcon className="w-4 h-4" />
+                                    {chatRoom?.type === "GROUP" && chatRoom?.adminId !== currentUser?.id ? "Leave" : "Delete"}
+                                </DropdownItem>
+                            );
+                        })()}
 					</Dropdown>
 				</div>
 			</div>

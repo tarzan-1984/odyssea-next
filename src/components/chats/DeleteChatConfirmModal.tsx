@@ -33,7 +33,17 @@ export default function DeleteChatConfirmModal({
 			// Check if user is admin of group chat
 			const isCurrentUserAdmin = chatRoom.adminId === currentUser.id;
 
-			if (chatRoom.type === "GROUP" && !isCurrentUserAdmin) {
+			if (chatRoom.type === "LOAD") {
+				// For LOAD chats, only administrators can delete
+				if (currentUser.role !== "ADMINISTRATOR") {
+					console.error("Only administrators can delete LOAD chats");
+					return;
+				}
+				
+				// Call the LOAD chat deletion endpoint
+				const { chatApi } = await import("@/app-api/chatApi");
+				await chatApi.deleteLoadChat(chatRoom.loadId || "");
+			} else if (chatRoom.type === "GROUP" && !isCurrentUserAdmin) {
 				// For group chats, non-admin users should leave the chat (remove themselves)
 				removeParticipant({
 					chatRoomId: chatRoom.id,
@@ -41,7 +51,6 @@ export default function DeleteChatConfirmModal({
 				});
 			} else {
 				// For direct chats or admin deleting group chat, use the existing delete API
-				// We'll need to import chatApi back
 				const { chatApi } = await import("@/app-api/chatApi");
 				await chatApi.deleteChatRoom(chatRoom.id);
 			}
@@ -71,6 +80,8 @@ export default function DeleteChatConfirmModal({
 		} else if (chatRoom.type === "GROUP") {
 			const isCurrentUserAdmin = chatRoom.adminId === currentUser?.id;
 			return isCurrentUserAdmin ? "group chat" : "group chat";
+		} else if (chatRoom.type === "LOAD") {
+			return "load chat";
 		}
 
 		return "";
@@ -90,6 +101,8 @@ export default function DeleteChatConfirmModal({
 			} else {
 				return "Are you sure you want to leave this group chat? You will no longer receive messages from this group.";
 			}
+		} else if (chatRoom.type === "LOAD") {
+			return "Are you sure you want to delete this load chat? This will permanently delete the chat and archive all messages for all participants.";
 		}
 
 		return "";
@@ -102,6 +115,8 @@ export default function DeleteChatConfirmModal({
 			// Check if current user is the admin
 			const isCurrentUserAdmin = chatRoom.adminId === currentUser?.id;
 			return isCurrentUserAdmin ? "Delete Chat" : "Leave Chat";
+		} else if (chatRoom.type === "LOAD") {
+			return "Delete Chat";
 		} else {
 			return "Delete Chat";
 		}

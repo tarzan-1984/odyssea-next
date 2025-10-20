@@ -50,6 +50,23 @@ export default function ChatParticipantsModal({
 	// Check if current user is admin of this chat
 	const isCurrentUserAdmin = chatRoom?.adminId === currentUser?.id;
 	const isGroupChat = chatRoom?.type === "GROUP";
+	const isLoadChat = chatRoom?.type === "LOAD";
+	
+	// Roles that can manage LOAD chats (add/remove participants, change avatar)
+	const loadChatManagerRoles = [
+		'TRACKING_TL',
+		'EXPEDITE_MANAGER', 
+		'RECRUITER_TL',
+		'TRACKING',
+		'NIGHTSHIFT_TRACKING',
+		'DISPATCHER_TL',
+		'BILLING',
+		'ADMINISTRATOR'
+	];
+	
+	// Check if current user can manage this chat
+	const canManageChat = isGroupChat && isCurrentUserAdmin || 
+		isLoadChat && currentUser?.role && loadChatManagerRoles.includes(currentUser.role);
 
 	const addSectionRef = useRef<HTMLDivElement | null>(null);
 	const addSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -287,8 +304,8 @@ export default function ChatParticipantsModal({
 			className="max-w-[500px] w-full mx-auto p-4 sm:p-6"
 		>
 			<div className="pb-4 pt-16">
-				{/* Chat Avatar Section - Only for group chats and admins */}
-				{isGroupChat && isCurrentUserAdmin && (
+				{/* Chat Avatar Section - Only for manageable chats */}
+				{canManageChat && (
 					<div className="mb-6">
 						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
 							Chat Avatar
@@ -352,10 +369,16 @@ export default function ChatParticipantsModal({
 
 				{/* Second row: title left, add icon right (admin only) */}
 				<div className="flex mb-4 items-center justify-between gap-4">
-					<h4 className="text-lg font-medium text-gray-800 dark:text-white/90">
-						Participants ({chatRoom?.participants.length || 0})
-					</h4>
-					{isGroupChat && isCurrentUserAdmin && (
+					{(() => {
+						// Calculate visible participants count (hide hideParticipant=true for LOAD chats)
+						const visibleCount = (localParticipants || []).filter(p => !(isLoadChat && (p as any).hideParticipant === true)).length;
+						return (
+							<h4 className="text-lg font-medium text-gray-800 dark:text-white/90">
+								Participants ({visibleCount})
+							</h4>
+						);
+					})()}
+					{canManageChat && (
 						<button
 							onClick={focusAddParticipants}
 							className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors flex-shrink-0"
@@ -376,7 +399,9 @@ export default function ChatParticipantsModal({
 				{/* Participants List */}
 				<div className="max-h-[400px] overflow-y-auto space-y-2">
 					{/* Existing Participants (local state) */}
-					{localParticipants.map(participant => {
+					{localParticipants
+						.filter(p => !(isLoadChat && (p as any).hideParticipant === true))
+						.map(participant => {
 						const isAdmin = participant.userId === chatRoom?.adminId;
 						const isOnline = isUserOnline && isUserOnline(participant.user.id);
 						const safeUser = {
@@ -412,32 +437,38 @@ export default function ChatParticipantsModal({
 									{safeUser.role.toLowerCase().replace('_', ' ')}
 									</p>
 								</div>
-								{isGroupChat && isCurrentUserAdmin && !isAdmin && (
-									<button
-										type="button"
-										onClick={(e) => {
-											e.stopPropagation();
-											// Backend expects user.id from users table, not participant.userId
-											const userIdToRemove = participant.user?.id || participant.userId;
-											console.log("Removing participant:", { userId: userIdToRemove, participant });
-											if (userIdToRemove) {
-												handleRemoveParticipant(userIdToRemove);
-											}
-										}}
-										className="flex-shrink-0 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
-										title="Remove participant"
-									>
-										<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-											<path d="m9 12a6 6 0 1 0 -6-6 6.006 6.006 0 0 0 6 6zm0-10a4 4 0 1 1 -4 4 4 4 0 0 1 4-4zm9 21a1 1 0 0 1 -2 0 7 7 0 0 0 -14 0 1 1 0 0 1 -2 0 9 9 0 0 1 18 0zm5.707-8.707a1 1 0 1 1 -1.414 1.414l-1.793-1.793-1.793 1.793a1 1 0 0 1 -1.414-1.414l1.793-1.793-1.793-1.793a1 1 0 0 1 1.414-1.414l1.793 1.793 1.793-1.793a1 1 0 0 1 1.414 1.414l-1.793 1.793z"/>
-										</svg>
-									</button>
-								)}
+								{canManageChat && !isAdmin && (() => {
+									// For LOAD chats, don't show remove button for hidden participants (ADMINISTRATOR/BILLING)
+									if (isLoadChat && (participant as any).hideParticipant === true) {
+										return null;
+									}
+									return (
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												// Backend expects user.id from users table, not participant.userId
+												const userIdToRemove = participant.user?.id || participant.userId;
+												console.log("Removing participant:", { userId: userIdToRemove, participant });
+												if (userIdToRemove) {
+													handleRemoveParticipant(userIdToRemove);
+												}
+											}}
+											className="flex-shrink-0 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+											title="Remove participant"
+										>
+											<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+												<path d="m9 12a6 6 0 1 0 -6-6 6.006 6.006 0 0 0 6 6zm0-10a4 4 0 1 1 -4 4 4 4 0 0 1 4-4zm9 21a1 1 0 0 1 -2 0 7 7 0 0 0 -14 0 1 1 0 0 1 -2 0 9 9 0 0 1 18 0zm5.707-8.707a1 1 0 1 1 -1.414 1.414l-1.793-1.793-1.793 1.793a1 1 0 0 1 -1.414-1.414l1.793-1.793-1.793-1.793a1 1 0 0 1 1.414-1.414l1.793 1.793 1.793-1.793a1 1 0 0 1 1.414 1.414l-1.793 1.793z"/>
+											</svg>
+										</button>
+									);
+								})()}
 							</div>
 						);
 					})}
 
-					{/* Add Participant Section - Only for group chats and admins */}
-					{isGroupChat && isCurrentUserAdmin && showAddSection && (
+					{/* Add Participant Section - Only for manageable chats */}
+					{canManageChat && showAddSection && (
 						<>
 							<div ref={addSectionRef} className="border-t border-gray-200 dark:border-gray-700 pt-4">
 								<div className="flex items-center justify-between mb-3">
@@ -530,7 +561,7 @@ export default function ChatParticipantsModal({
 					<Button size="sm" variant="outline" onClick={onClose}>
 						Close
 					</Button>
-			{isGroupChat && isCurrentUserAdmin && (
+			{canManageChat && (
 				<Button size="sm" variant="primary" onClick={handleSave} disabled={isUploadingAvatar || isSaving}>
 					{isSaving ? "Saving..." : "Save"}
 				</Button>

@@ -181,6 +181,13 @@ class ChatApiClient {
 		});
 	}
 
+	deleteLoadChat(loadId: string): Promise<{ started: boolean; chatRoomId: string; jobId: string }> {
+		return this.request<{ started: boolean; chatRoomId: string; jobId: string }>(`/delete_load_chat`, {
+			method: "POST",
+			body: JSON.stringify({ load_id: loadId }),
+		});
+	}
+
 	toggleMuteChatRoom(chatRoomId: string): Promise<{ chatRoomId: string; userId: string; mute: boolean }> {
 		return this.request<{ chatRoomId: string; userId: string; mute: boolean }>(`/chat-rooms/${chatRoomId}/mute`, {
 			method: "PUT",

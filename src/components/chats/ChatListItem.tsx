@@ -233,7 +233,7 @@ export default function ChatListItem({
 			</div>
 
 			<div className="relative flex-shrink-0">
-				{chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
+				{(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") && (!chatRoom.avatar || chatRoom.avatar === "") ? (
 					<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
 						{(() => {
 							const name = getChatDisplayName(chatRoom);
@@ -259,7 +259,7 @@ export default function ChatListItem({
 							}
 						}
 
-						// Fallback for GROUP chats with avatar
+						// Fallback for GROUP/LOAD chats with avatar
 						if (chatRoom.avatar) {
 							return (
 								// eslint-disable-next-line @next/next/no-img-element
