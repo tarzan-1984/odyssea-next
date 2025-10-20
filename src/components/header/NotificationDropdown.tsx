@@ -132,10 +132,10 @@ export default function NotificationDropdown() {
 		setIsLoadingMore(true);
 		try {
 			// Load more notifications
-			await loadMoreNotifications(currentUser.id);
+			await loadMoreNotifications();
 			
 			// Mark all notifications as read after loading more
-			await markAllAsRead(currentUser.id);
+			await markAllAsRead();
 		} catch (error) {
 			console.error('Failed to load more notifications:', error);
 		} finally {
@@ -147,7 +147,7 @@ export default function NotificationDropdown() {
 		if (!isOpen && currentUser?.id) {
 			// Mark all notifications as read when opening dropdown
 			try {
-				await markAllAsRead(currentUser.id);
+				await markAllAsRead();
 			} catch (error) {
 				console.error('Failed to mark notifications as read:', error);
 			}

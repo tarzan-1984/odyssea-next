@@ -238,11 +238,13 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			}}
 		/>
 		
-		<FilesModal
-			isOpen={isFilesModalOpen}
-			onClose={() => setIsFilesModalOpen(false)}
-			chatRoom={chatRoom}
-		/>
+		{chatRoom && (
+			<FilesModal
+				isOpen={isFilesModalOpen}
+				onClose={() => setIsFilesModalOpen(false)}
+				chatRoom={chatRoom}
+			/>
+		)}
 	</>
 	);
 }

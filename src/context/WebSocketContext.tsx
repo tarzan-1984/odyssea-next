@@ -462,6 +462,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle any other events for debugging
 		newSocket.onAny((eventName: string, ...args: any[]) => {
 			if (process.env.NODE_ENV === "development") {
+				// Debug mode: log all WebSocket events
 			}
 		});
 
