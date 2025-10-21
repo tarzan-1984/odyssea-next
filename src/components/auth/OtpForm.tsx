@@ -155,8 +155,13 @@ export default function OtpForm() {
 					// Remove temporary login success cookie
 					clientAuth.removeLoginSuccess();
 
-					// Redirect to dashboard after successful verification
-					router.push("/");
+					// Force page reload to ensure middleware sees the new cookies
+					// This is especially important on Vercel where middleware might not see cookies immediately
+					if (typeof window !== "undefined") {
+						window.location.href = "/";
+					} else {
+						router.push("/");
+					}
 				} else {
 					setMessage({
 						type: "error",

@@ -33,6 +33,20 @@ export function middleware(request: NextRequest) {
 	// Get login success cookie for two-step-verification
 	const loginSuccess = request.cookies.get("login-success")?.value;
 
+	// Debug logging for Vercel
+	if (process.env.NODE_ENV === "production") {
+		console.log("🔍 Middleware Debug:", {
+			pathname,
+			isPublicPage,
+			isTwoStepVerification,
+			hasAccessToken: !!accessToken,
+			hasRefreshToken: !!refreshToken,
+			hasToken,
+			hasLoginSuccess: !!loginSuccess,
+			allCookies: Object.fromEntries(request.cookies.getAll().map(c => [c.name, c.value.substring(0, 20) + "..."]))
+		});
+	}
+
 	// Special handling for two-step-verification page
 	if (isTwoStepVerification) {
 		// Check if user has either valid tokens OR login success cookie

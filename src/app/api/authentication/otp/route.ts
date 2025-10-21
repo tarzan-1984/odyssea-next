@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
 				sameSite: "lax",
 				maxAge: 60 * 60 * 24 * 7, // 7 days
 				path: "/",
+				domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Let Vercel handle domain
 			});
 		}
 
@@ -70,8 +71,17 @@ export async function POST(request: NextRequest) {
 				sameSite: "lax",
 				maxAge: 60 * 60 * 24 * 30, // 30 days
 				path: "/",
+				domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Let Vercel handle domain
 			});
 		}
+
+		// Debug logging for Vercel
+		console.log("🍪 Setting cookies:", {
+			hasAccessToken: !!data.data?.accessToken,
+			hasRefreshToken: !!data.data?.refreshToken,
+			accessTokenLength: data.data?.accessToken?.length,
+			refreshTokenLength: data.data?.refreshToken?.length,
+		});
 
 		// Clear login-success cookie as it's no longer needed
 		response.cookies.delete("login-success");
