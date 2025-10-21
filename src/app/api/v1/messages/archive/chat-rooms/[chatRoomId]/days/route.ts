@@ -25,9 +25,8 @@ export async function GET(
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const response = await fetch(
-      `${backendUrl}/v1/messages/archive/chat-rooms/${chatRoomId}/days`,
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/messages/archive/chat-rooms/${chatRoomId}/days`,
       {
         method: 'GET',
         headers: {
@@ -42,9 +41,9 @@ export async function GET(
     }
 
     const data = await response.json();
-    
+
     console.log('🔍 [NEXT API] Backend response:', data);
-    
+
     // Backend already returns wrapped response, so return it directly
     return NextResponse.json(data);
   } catch (error) {
