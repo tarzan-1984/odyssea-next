@@ -17,23 +17,26 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Send request to backend for OTP verification
-		const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/auth/verify-otp`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				email,
-				otp,
-			}),
-		});
+		const backendResponse = await fetch(
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/auth/verify-otp`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					email,
+					otp,
+				}),
+			}
+		);
 
-		const data = await response.json();
+		const data = await backendResponse.json();
 
-		if (!response.ok) {
+		if (!backendResponse.ok) {
 			return NextResponse.json(
 				{ error: data.message || "Failed to verify OTP" },
-				{ status: response.status }
+				{ status: backendResponse.status }
 			);
 		}
 
@@ -46,7 +49,34 @@ export async function POST(request: NextRequest) {
 			data.data.refreshToken = tokenEncoder.encode(data.data.refreshToken);
 		}
 
-		return NextResponse.json(data, { status: 200 });
+		// Create response with cookies
+		const response = NextResponse.json(data, { status: 200 });
+
+		// Set cookies for tokens
+		if (data.data?.accessToken) {
+			response.cookies.set("accessToken", data.data.accessToken, {
+				httpOnly: false, // Allow client-side access for js-cookie
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 60 * 24 * 7, // 7 days
+				path: "/",
+			});
+		}
+
+		if (data.data?.refreshToken) {
+			response.cookies.set("refreshToken", data.data.refreshToken, {
+				httpOnly: false, // Allow client-side access for js-cookie
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 60 * 24 * 30, // 30 days
+				path: "/",
+			});
+		}
+
+		// Clear login-success cookie as it's no longer needed
+		response.cookies.delete("login-success");
+
+		return response;
 	} catch (error) {
 		console.error("Error during OTP verification:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -144,8 +144,7 @@ export default function OtpForm() {
 						location: userData.location || "",
 					};
 
-					// Save tokens and user data to cookies
-					clientAuth.setTokens(accessToken, refreshToken);
+					// Save user data to cookies (tokens are already set by API route)
 					clientAuth.setUserData(clientUserData);
 
 					// Also save access token to localStorage for ChatApi
@@ -154,7 +153,7 @@ export default function OtpForm() {
 					}
 
 					// Remove temporary login success cookie
-					//clientAuth.removeLoginSuccess();
+					clientAuth.removeLoginSuccess();
 
 					// Redirect to dashboard after successful verification
 					router.push("/");
