@@ -13,6 +13,7 @@ import { renderAvatar } from "@/helpers";
 import { UserData } from "@/app-api/api-types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageReadStatus from "./MessageReadStatus";
+import MessageDropdown from "./MessageDropdown";
 
 interface ChatBoxProps {
     selectedChatRoomId?: string;
@@ -43,7 +44,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
     const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
     const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
     const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
-    
+
     // Archive-related state and actions
     const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
     const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
@@ -67,7 +68,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const scrollToBottom = (smooth: boolean = true) => {
 		isProgrammaticScrollRef.current = true;
 		messagesEndRef.current?.scrollIntoView({ behavior: "instant" }); // Always instant scroll
-		
+
 		// Reset the flag after a short delay to allow for scroll completion
 		setTimeout(() => {
 			isProgrammaticScrollRef.current = false;
@@ -78,7 +79,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const isLoadingMoreRef = useRef(false);
 	const hasUserScrolledRef = useRef(false);
 	const isProgrammaticScrollRef = useRef(false);
-	
+
 	const handleScroll = useCallback(() => {
 		if (messagesContainerRef.current) {
 			const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
@@ -97,7 +98,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 			// Check if there's actually scrollable content
 			const hasScrollableContent = scrollHeight > clientHeight;
-			
+
 			// Load more messages when user scrolls near the top
 			// Only if:
 			// 1. There's scrollable content (more messages than fit in container)
@@ -107,9 +108,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			// 5. Not already loading more messages
 			if (
 				hasScrollableContent &&
-				scrollTop < 200 && 
+				scrollTop < 200 &&
 				hasUserScrolledRef.current && // User has actually scrolled
-				!loading && 
+				!loading &&
 				!isLoadingMoreRef.current &&
 				!isLoadingArchivedMessages &&
 				uniqueMessages.length > 0 // Only after initial messages are loaded
@@ -167,12 +168,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				// Reset pagination state when switching chat rooms
 				useChatStore.getState().setCurrentPage(1);
 				useChatStore.getState().setHasMoreMessages(true);
-				
+
 				// Reset scroll tracking for new chat
 				hasUserScrolledRef.current = false;
 				isLoadingMoreRef.current = false;
 				isProgrammaticScrollRef.current = false;
-				
+
 				await loadMessages(chatRoomId);
 				// Scroll to bottom instantly after messages are loaded
 				setTimeout(() => {
@@ -217,6 +218,33 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			}, 100);
 		} catch (err) {
 			console.error("Failed to send message:", err);
+		}
+	};
+
+	// Handle message dropdown actions
+	const handleDeleteMessage = async (messageId: string) => {
+		try {
+			// TODO: Implement delete message API call
+			console.log("Delete message:", messageId);
+			// await deleteMessage(messageId);
+		} catch (error) {
+			console.error("Failed to delete message:", error);
+		}
+	};
+
+	const handleReplyToMessage = (message: Message) => {
+		// TODO: Implement reply functionality
+		console.log("Reply to message:", message);
+		// This could set a reply state or focus the input with quoted message
+	};
+
+	const handleMarkMessageUnread = async (messageId: string) => {
+		try {
+			// TODO: Implement mark as unread API call
+			console.log("Mark message as unread:", messageId);
+			// await markMessageUnread(messageId);
+		} catch (error) {
+			console.error("Failed to mark message as unread:", error);
 		}
 	};
 
@@ -442,14 +470,23 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 									{/* Message content */}
 									{message.content && (
-										<div
-											className={`px-3 py-2 rounded-lg ${
-												isSender
-													? "bg-brand-500 text-white dark:bg-brand-500"
-													: "bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90"
-											} ${isSender ? "rounded-tr-sm" : "rounded-tl-sm"}`}
-										>
-											<p className="text-sm">{message.content}</p>
+										<div className="flex items-center gap-2">
+											<div
+												className={`px-3 py-2 rounded-lg ${
+													isSender
+														? "bg-brand-500 text-white dark:bg-brand-500"
+														: "bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90"
+												} ${isSender ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+											>
+												<p className="text-sm">{message.content}</p>
+											</div>
+											{/* Message dropdown */}
+											<MessageDropdown
+												message={message}
+												onDelete={handleDeleteMessage}
+												onReply={handleReplyToMessage}
+												onMarkUnread={handleMarkMessageUnread}
+											/>
 										</div>
 									)}
 
