@@ -19,8 +19,8 @@ export async function GET(
     const yearNum = parseInt(year, 10);
     const monthNum = parseInt(month, 10);
     const dayNum = parseInt(day, 10);
-    
-    if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum) || 
+
+    if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum) ||
         monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
       return NextResponse.json(
         { success: false, error: 'Invalid year, month, or day' },
@@ -38,9 +38,8 @@ export async function GET(
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const response = await fetch(
-      `${backendUrl}/v1/messages/archive/chat-rooms/${chatRoomId}/${year}/${month}/${day}`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/archive/chat-rooms/${chatRoomId}/${year}/${month}/${day}`,
       {
         method: 'GET',
         headers: {

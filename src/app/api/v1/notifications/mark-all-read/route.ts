@@ -10,9 +10,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Proxy request to backend using NEXT_PUBLIC_BACKEND_URL
-		const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-
-		const response = await fetch(`${backendUrl}/v1/notifications/mark-all-read`, {
+		const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications/mark-all-read`, {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${accessToken}`,

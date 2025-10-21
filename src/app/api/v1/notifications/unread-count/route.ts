@@ -13,9 +13,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
-      `${backendUrl}/v1/notifications/unread-count`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications/unread-count`,
       {
         method: 'GET',
         headers: {
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    
+
     // Backend already returns wrapped response, so return it directly
     return NextResponse.json(data);
   } catch (error) {

@@ -3,18 +3,14 @@ import { serverAuth } from '@/utils/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔔 Next.js API: Fetching notifications...');
-    
+
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '8';
 
-    console.log('🔔 Next.js API: Requesting page:', page, 'limit:', limit);
-
     // Get access token from server-side authentication
     const accessToken = serverAuth.getAccessToken(request);
     if (!accessToken) {
-      console.log('🔔 Next.js API: No access token found');
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -22,9 +18,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
-      `${backendUrl}/v1/notifications?page=${page}&limit=${limit}`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications?page=${page}&limit=${limit}`,
       {
         method: 'GET',
         headers: {
@@ -34,15 +29,12 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    console.log('🔔 Next.js API: Backend response status:', response.status);
-
     if (!response.ok) {
       throw new Error(`Backend responded with status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('🔔 Next.js API: Backend response data:', data);
-    
+
     // Backend already returns wrapped response, so return it directly
     return NextResponse.json(data);
   } catch (error) {
@@ -68,9 +60,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Proxy request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(
-      `${backendUrl}/v1/notifications/mark-all-read`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications/mark-all-read`,
       {
         method: 'POST',
         headers: {
@@ -86,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    
+
     // Backend already returns wrapped response, so return it directly
     return NextResponse.json(data);
   } catch (error) {
