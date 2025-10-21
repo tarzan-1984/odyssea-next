@@ -36,8 +36,7 @@ export function middleware(request: NextRequest) {
 	// Special handling for two-step-verification page
 	if (isTwoStepVerification) {
 		// Check if user has either valid tokens OR login success cookie
-
-		if (!loginSuccess) {
+		if (!loginSuccess && !hasToken) {
 			// No valid authentication method, redirect to signin
 			return NextResponse.redirect(new URL("/signin", request.url));
 		}
@@ -67,8 +66,9 @@ export const config = {
 		 * - _next/static (static files)
 		 * - _next/image (image optimization files)
 		 * - favicon.ico (favicon file)
-		 * - public folder
+		 * - images (static images)
+		 * - icons (static icons)
 		 */
-		"/((?!api|_next/static|_next/image|favicon.ico|public).*)",
+		"/((?!api|_next/static|_next/image|favicon.ico|images|icons).*)",
 	],
 };
