@@ -75,14 +75,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		// Debug logging for Vercel
-		console.log("🍪 Setting cookies:", {
-			hasAccessToken: !!data.data?.accessToken,
-			hasRefreshToken: !!data.data?.refreshToken,
-			accessTokenLength: data.data?.accessToken?.length,
-			refreshTokenLength: data.data?.refreshToken?.length,
-		});
-
 		// Clear login-success cookie as it's no longer needed
 		response.cookies.delete("login-success");
 
