@@ -16,8 +16,8 @@ import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
 
 interface ChatBoxProps {
-    selectedChatRoomId?: string;
-    webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+	selectedChatRoomId?: string;
+	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 }
 
 export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatBoxProps) {
@@ -40,17 +40,19 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	} = webSocketChatSync;
 
 	// Get error, chat room, and pagination state from store
-    const error = useChatStore(state => state.error);
-    const selectedChatRoom = useChatStore(state => state.chatRooms.find(r => r.id === selectedChatRoomId));
-    const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
-    const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
+	const error = useChatStore(state => state.error);
+	const selectedChatRoom = useChatStore(state =>
+		state.chatRooms.find(r => r.id === selectedChatRoomId)
+	);
+	const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
+	const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
 
-    // Archive-related state and actions
-    const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
-    const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
-    const loadArchivedMessages = useChatStore(state => state.loadArchivedMessages);
-    const getNextAvailableArchive = useChatStore(state => state.getNextAvailableArchive);
-    const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
+	// Archive-related state and actions
+	const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
+	const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
+	const loadArchivedMessages = useChatStore(state => state.loadArchivedMessages);
+	const getNextAvailableArchive = useChatStore(state => state.getNextAvailableArchive);
+	const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
 	// Deduplicate messages to prevent duplicate keys
 	const uniqueMessages = React.useMemo(() => {
@@ -147,7 +149,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						const nextArchive = getNextAvailableArchive();
 						if (nextArchive) {
 							Promise.resolve(
-								loadArchivedMessages(nextArchive.year, nextArchive.month, nextArchive.day)
+								loadArchivedMessages(
+									nextArchive.year,
+									nextArchive.month,
+									nextArchive.day
+								)
 							).finally(finalize);
 						} else {
 							isLoadingMoreRef.current = false;
@@ -156,7 +162,17 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				}
 			}
 		}
-	}, [hasMoreMessages, loading, loadMoreMessages, isLoadingArchivedMessages, isLoadingAvailableArchives, loadArchivedMessages, getNextAvailableArchive, setPendingArchiveLoad, uniqueMessages.length]);
+	}, [
+		hasMoreMessages,
+		loading,
+		loadMoreMessages,
+		isLoadingArchivedMessages,
+		isLoadingAvailableArchives,
+		loadArchivedMessages,
+		getNextAvailableArchive,
+		setPendingArchiveLoad,
+		uniqueMessages.length,
+	]);
 
 	// Note: Messages are now marked as read automatically by the backend when joining a chat room
 	// The backend sends a 'messagesMarkedAsRead' event which is handled in WebSocketContext
@@ -186,11 +202,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		[loadMessages]
 	);
 
-    useEffect(() => {
-        if (selectedChatRoomId) {
-            loadMessagesForRoom(selectedChatRoomId);
-        }
-    }, [selectedChatRoomId, loadMessagesForRoom]);
+	useEffect(() => {
+		if (selectedChatRoomId) {
+			loadMessagesForRoom(selectedChatRoomId);
+		}
+	}, [selectedChatRoomId, loadMessagesForRoom]);
 
 	// Scroll to bottom when messages change (for new messages)
 	useEffect(() => {
@@ -224,11 +240,27 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	// Handle message dropdown actions
 	const handleDeleteMessage = async (messageId: string) => {
 		try {
-			// TODO: Implement delete message API call
-			console.log("Delete message:", messageId);
-			// await deleteMessage(messageId);
+			const response = await fetch(`/api/messages/${messageId}`, {
+				method: "DELETE",
+				credentials: "include",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.message || "Failed to delete message");
+			}
+
+			const result = await response.json();
+			console.log("Message deleted successfully:", result);
+
+			// The WebSocket event will handle updating the UI
+			// No need to manually update the store here
 		} catch (error) {
 			console.error("Failed to delete message:", error);
+			// You might want to show a toast notification here
 		}
 	};
 
@@ -251,10 +283,10 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const getMessageTime = (createdAt: string): string => {
 		const messageTime = new Date(createdAt);
 		// Format time without seconds: "10:20 AM" instead of "10:20:20 AM"
-		return messageTime.toLocaleTimeString('en-US', {
-			hour: 'numeric',
-			minute: '2-digit',
-			hour12: true
+		return messageTime.toLocaleTimeString("en-US", {
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: true,
 		});
 	};
 
@@ -363,7 +395,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 											const senderUser: UserData = {
 												firstName: message.sender.firstName,
 												lastName: message.sender.lastName,
-												avatar: message.sender.avatar || (message.sender as any).profilePhoto,
+												avatar:
+													message.sender.avatar ||
+													(message.sender as any).profilePhoto,
 											};
 											return renderAvatar(senderUser, "w-10 h-10");
 										})()}
@@ -483,6 +517,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 											{/* Message dropdown */}
 											<MessageDropdown
 												message={message}
+												currentUser={currentUser}
 												onDelete={handleDeleteMessage}
 												onReply={handleReplyToMessage}
 												onMarkUnread={handleMarkMessageUnread}
@@ -491,7 +526,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 									)}
 
 									{/* Timestamp and read status */}
-									<div className={`mt-2 flex items-center gap-1 ${isSender ? "justify-end" : ""}`}>
+									<div
+										className={`mt-2 flex items-center gap-1 ${isSender ? "justify-end" : ""}`}
+									>
 										{isSender && (
 											<MessageReadStatus
 												isRead={message.isRead}
@@ -501,7 +538,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										<p className="text-gray-500 text-theme-xs dark:text-gray-400">
 											{isSender
 												? getMessageTime(message.createdAt)
-												: `${message.sender.role || 'User'}, ${getMessageTime(message.createdAt)}`}
+												: `${message.sender.role || "User"}, ${getMessageTime(message.createdAt)}`}
 										</p>
 									</div>
 								</div>
@@ -525,7 +562,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						</div>
 						<span className="text-sm">
 							{(() => {
-								const typingUsers = Object.entries(isTyping).filter(([userId, data]) => data.isTyping);
+								const typingUsers = Object.entries(isTyping).filter(
+									([userId, data]) => data.isTyping
+								);
 								if (typingUsers.length === 0) return "";
 
 								// Use firstName from WebSocket data or fallback to participant data
@@ -534,7 +573,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										return data.firstName;
 									}
 									// Fallback to participant data if firstName not available
-									const participant = selectedChatRoom?.participants.find(p => p.user.id === userId);
+									const participant = selectedChatRoom?.participants.find(
+										p => p.user.id === userId
+									);
 									return participant?.user.firstName || "User";
 								});
 
