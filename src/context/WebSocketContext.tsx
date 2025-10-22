@@ -421,7 +421,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle messages marked as unread
 		newSocket.on(
 			"messagesMarkedAsUnread",
-			(data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
+			async (data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
 				const state = useChatStore.getState();
 
 				// Get chat room type to determine logic
@@ -472,7 +472,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				state.setChatRooms(updatedRooms);
 
 				// Update IndexedDB cache
-				const { indexedDBChatService } = require("@/services/IndexedDBChatService");
+				const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
 				
 				// Update messages in IndexedDB
 				data.messageIds.forEach(messageId => {
