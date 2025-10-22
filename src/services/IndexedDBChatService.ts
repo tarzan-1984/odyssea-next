@@ -292,6 +292,27 @@ class IndexedDBChatService {
 		}
 	}
 
+	async deleteMessage(messageId: string): Promise<void> {
+		try {
+			const db = await this.ensureDB();
+			const transaction = db.transaction([MESSAGES_STORE], "readwrite");
+			const store = transaction.objectStore(MESSAGES_STORE);
+
+			await new Promise<void>((resolve, reject) => {
+				const deleteRequest = store.delete(messageId);
+				deleteRequest.onsuccess = () => {
+					resolve();
+				};
+				deleteRequest.onerror = () => reject(deleteRequest.error);
+			});
+
+			//console.log(`Deleted message ${messageId} from IndexedDB`);
+		} catch (error) {
+			console.error("Failed to delete message from IndexedDB:", error);
+			throw error;
+		}
+	}
+
 	async deleteMessages(chatRoomId: string): Promise<void> {
 		try {
 			const db = await this.ensureDB();

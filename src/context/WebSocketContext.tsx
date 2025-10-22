@@ -379,11 +379,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const updatedMessages = state.messages.filter(msg => msg.id !== data.messageId);
 				state.setMessages(updatedMessages);
 
-				// Update IndexedDB cache - we'll need to implement a single message delete method
-				// For now, we'll skip IndexedDB update as it doesn't have a single message delete method
-				// indexedDBChatService.deleteMessage(data.messageId).catch((error: Error) => {
-				// 	console.error("Failed to delete message from IndexedDB:", error);
-				// });
+			// Update IndexedDB cache
+			indexedDBChatService.deleteMessage(data.messageId).catch((error: Error) => {
+				console.error("Failed to delete message from IndexedDB:", error);
+			});
 
 				// Update chat room's last message if the deleted message was the last one
 				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);

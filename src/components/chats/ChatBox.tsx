@@ -256,8 +256,36 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			const result = await response.json();
 			console.log("Message deleted successfully:", result);
 
-			// The WebSocket event will handle updating the UI
-			// No need to manually update the store here
+			// Immediately remove message from store and cache for better UX
+			const state = useChatStore.getState();
+			const updatedMessages = state.messages.filter(msg => msg.id !== messageId);
+			state.setMessages(updatedMessages);
+
+			// Update IndexedDB cache immediately
+			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
+			indexedDBChatService.deleteMessage(messageId).catch((error: Error) => {
+				console.error("Failed to delete message from IndexedDB:", error);
+			});
+
+			// Update chat room's last message if the deleted message was the last one
+			const chatRoom = state.chatRooms.find(room => room.id === result.chatRoomId);
+			if (chatRoom && chatRoom.lastMessage?.id === messageId) {
+				// Find the new last message
+				const remainingMessages = updatedMessages.filter(msg => msg.chatRoomId === result.chatRoomId);
+				const newLastMessage = remainingMessages.length > 0 
+					? remainingMessages[remainingMessages.length - 1] 
+					: null;
+
+				// Update chat room with new last message
+				const updatedChatRooms = state.chatRooms.map(room => 
+					room.id === result.chatRoomId 
+						? { ...room, lastMessage: newLastMessage || undefined }
+						: room
+				);
+				state.setChatRooms(updatedChatRooms);
+			}
+
+			// The WebSocket event will also handle updating the UI (redundant but safe)
 		} catch (error) {
 			console.error("Failed to delete message:", error);
 			// You might want to show a toast notification here
