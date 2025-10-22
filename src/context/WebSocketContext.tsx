@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
+import { isMessageReadByUser } from "@/app-api/chatApi";
 import {
 	useNotificationsStore,
 	useAddNotification,
@@ -96,7 +97,8 @@ interface NotificationData {
 	message: string;
 	type: string;
 	avatar?: string;
-	isRead: boolean;
+	isRead: boolean; // Global read status
+	readBy?: string[]; // Array of user IDs who read the notification
 	createdAt: string;
 	chatRoomId?: string;
 }
@@ -309,17 +311,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					// and it's not from the current user (don't mark own messages as read)
 					if (!isMessageFromCurrentUser) {
 						// Mark message as read in store immediately
-						updateMessage(messageData.message.id, { isRead: true });
-
-						// Update message as read in IndexedDB cache immediately
-						indexedDBChatService
-							.updateMessage(messageData.message.id, { isRead: true })
-							.catch((error: Error) => {
-								console.error(
-									"Failed to update message as read in IndexedDB:",
-									error
-								);
+						const currentReadBy = messageData.message.readBy || [];
+						if (!currentReadBy.includes(currentUser.id)) {
+							updateMessage(messageData.message.id, { 
+								isRead: true, // Global read status
+								readBy: [...currentReadBy, currentUser.id] // Per-user read status
 							});
+
+							// Update message as read in IndexedDB cache immediately
+							indexedDBChatService
+								.updateMessage(messageData.message.id, { 
+									isRead: true,
+									readBy: [...currentReadBy, currentUser.id] 
+								})
+								.catch((error: Error) => {
+									console.error(
+										"Failed to update message as read in IndexedDB:",
+										error
+									);
+								});
+						}
 
 						// Use the current socket (newSocket) to emit messageRead
 						if (newSocket && newSocket.connected) {
@@ -407,6 +418,98 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		);
 
+		// Handle messages marked as unread
+		newSocket.on(
+			"messagesMarkedAsUnread",
+			(data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
+				const state = useChatStore.getState();
+
+				// Get chat room type to determine logic
+				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
+				const isDirectChat = chatRoom?.type === 'DIRECT';
+
+				// Update messages in store
+				const updatedMessages = state.messages.map(msg => {
+					if (data.messageIds.includes(msg.id)) {
+						const currentReadBy = msg.readBy || [];
+						const updatedReadBy = currentReadBy.filter(id => id !== data.userId);
+						
+						if (isDirectChat) {
+							// For DIRECT chats: set both isRead to false and remove user from readBy
+							return { 
+								...msg, 
+								isRead: false, // Global read status becomes false
+								readBy: updatedReadBy
+							};
+						} else {
+							// For GROUP and LOAD chats: only remove user from readBy, keep isRead as true
+							return { 
+								...msg, 
+								readBy: updatedReadBy,
+								// Keep isRead as true (global status doesn't change)
+							};
+						}
+					}
+					return msg;
+				});
+				state.setMessages(updatedMessages);
+
+				// Update unread counts on chat room - only for the user who marked as unread
+				const updatedRooms = state.chatRooms.map(room => {
+					if (room.id !== data.chatRoomId) return room;
+					
+					// Only increment unread count for the user who marked the message as unread
+					// Other participants should not see increased unread count
+					const currentUser = useUserStore.getState().currentUser;
+					if (currentUser && currentUser.id === data.userId) {
+						const increment = data.messageIds.length;
+						const unread = (room.unreadCount || 0) + increment;
+						return { ...room, unreadCount: unread };
+					}
+					
+					return room; // No change for other users
+				});
+				state.setChatRooms(updatedRooms);
+
+				// Update IndexedDB cache
+				const { indexedDBChatService } = require("@/services/IndexedDBChatService");
+				
+				// Update messages in IndexedDB
+				data.messageIds.forEach(messageId => {
+					const message = updatedMessages.find(msg => msg.id === messageId);
+					if (message) {
+						if (isDirectChat) {
+							indexedDBChatService.updateMessage(messageId, {
+								isRead: false,
+								readBy: message.readBy
+							}).catch((error: Error) => {
+								console.error("Failed to update message in IndexedDB:", error);
+							});
+						} else {
+							indexedDBChatService.updateMessage(messageId, {
+								readBy: message.readBy
+							}).catch((error: Error) => {
+								console.error("Failed to update message in IndexedDB:", error);
+							});
+						}
+					}
+				});
+
+				// Update chat room unread count in IndexedDB
+				const currentUser = useUserStore.getState().currentUser;
+				if (currentUser && currentUser.id === data.userId) {
+					const updatedRoom = updatedRooms.find(room => room.id === data.chatRoomId);
+					if (updatedRoom) {
+						indexedDBChatService.updateChatRoom(data.chatRoomId, {
+							unreadCount: updatedRoom.unreadCount
+						}).catch((error: Error) => {
+							console.error("Failed to update chat room unread count in IndexedDB:", error);
+						});
+					}
+				}
+			}
+		);
+
 		// Handle chat room hidden for current user
 		newSocket.on("chatRoomHidden", (data: { chatRoomId: string }) => {
 			const state = useChatStore.getState();
@@ -468,17 +571,38 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const state = useChatStore.getState();
 
 				// Update all messages in the store
-				const updatedMessages = state.messages.map(msg =>
-					data.messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
-				);
+				const updatedMessages = state.messages.map(msg => {
+					if (data.messageIds.includes(msg.id)) {
+						const currentReadBy = msg.readBy || [];
+						const updatedReadBy = currentReadBy.includes(data.userId) 
+							? currentReadBy 
+							: [...currentReadBy, data.userId];
+						return { 
+							...msg, 
+							isRead: true, // Global read status
+							readBy: updatedReadBy // Per-user read status
+						};
+					}
+					return msg;
+				});
 
 				// Update all messages as read in IndexedDB cache immediately
 				data.messageIds.forEach(messageId => {
-					indexedDBChatService
-						.updateMessage(messageId, { isRead: true })
-						.catch((error: Error) => {
-							console.error("Failed to update message as read in IndexedDB:", error);
-						});
+					const message = state.messages.find(m => m.id === messageId);
+					if (message) {
+						const currentReadBy = message.readBy || [];
+						const updatedReadBy = currentReadBy.includes(data.userId) 
+							? currentReadBy 
+							: [...currentReadBy, data.userId];
+						indexedDBChatService
+							.updateMessage(messageId, { 
+								isRead: true,
+								readBy: updatedReadBy 
+							})
+							.catch((error: Error) => {
+								console.error("Failed to update message as read in IndexedDB:", error);
+							});
+					}
 				});
 
 				// Calculate how many messages were marked as read

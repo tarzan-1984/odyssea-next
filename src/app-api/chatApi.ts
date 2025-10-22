@@ -51,7 +51,8 @@ export interface Message {
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
-	isRead: boolean;
+	isRead: boolean; // Global read status (true when any participant reads)
+	readBy?: string[]; // Array of user IDs who read the message
 	createdAt: string;
 	sender: User;
 	receiver?: User;
@@ -64,6 +65,16 @@ export interface SendMessageDto {
 	fileName?: string;
 	fileSize?: number;
 }
+
+// Helper function to check if a message is read by a specific user
+export const isMessageReadByUser = (message: Message, userId: string): boolean => {
+	return message.readBy?.includes(userId) || false;
+};
+
+// Helper function to get read count for a message
+export const getMessageReadCount = (message: Message): number => {
+	return message.readBy?.length || 0;
+};
 
 export interface CreateChatRoomDto {
 	name?: string;

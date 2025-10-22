@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		const { id: messageId } = await params;
 
@@ -16,10 +16,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		}
 
 		// Forward request to backend
-		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/${messageId}`;
+		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/${messageId}/unread`;
 
 		const response = await fetch(backendUrl, {
-			method: "DELETE",
+			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${accessToken}`,
@@ -34,7 +34,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		const data = await response.json();
 		return NextResponse.json(data);
 	} catch (error) {
-		console.error("Error deleting message:", error);
-		return NextResponse.json({ error: "Failed to delete message" }, { status: 500 });
+		console.error("Error marking message as unread:", error);
+		return NextResponse.json({ error: "Failed to mark message as unread" }, { status: 500 });
 	}
 }

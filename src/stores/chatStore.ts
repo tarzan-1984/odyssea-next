@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { ChatRoom, Message, User } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin status, mute status, and last message date
 const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
@@ -282,20 +283,28 @@ export const useChatStore = create<ChatState>()(
 			});
 
 			// If marking as read, update unreadCount in chat rooms
-			if (updates.isRead === true && message && !message.isRead && message.chatRoomId) {
-				const updatedRooms = chatRooms.map(room => {
-					if (room.id === message.chatRoomId && room.unreadCount && room.unreadCount > 0) {
-						const updatedRoom = { ...room, unreadCount: room.unreadCount - 1 };
-						// Save updated room to IndexedDB
-						indexedDBChatService.updateChatRoom(updatedRoom.id, { unreadCount: updatedRoom.unreadCount }).catch((error: Error) => {
-							console.error("Failed to update chat room in IndexedDB:", error);
+			if (updates.readBy && message && message.chatRoomId) {
+				const currentUser = useUserStore.getState().currentUser;
+				if (currentUser && currentUser.id) {
+					const wasRead = message.readBy?.includes(currentUser.id) || false;
+					const isNowRead = updates.readBy.includes(currentUser.id);
+					
+					if (!wasRead && isNowRead) {
+						const updatedRooms = chatRooms.map(room => {
+							if (room.id === message.chatRoomId && room.unreadCount && room.unreadCount > 0) {
+								const updatedRoom = { ...room, unreadCount: room.unreadCount - 1 };
+								// Save updated room to IndexedDB
+								indexedDBChatService.updateChatRoom(updatedRoom.id, { unreadCount: updatedRoom.unreadCount }).catch((error: Error) => {
+									console.error("Failed to update chat room in IndexedDB:", error);
+								});
+								return updatedRoom;
+							}
+							return room;
 						});
-						return updatedRoom;
+						set({ messages: updatedMessages, chatRooms: updatedRooms }, false, "updateMessage");
+						return;
 					}
-					return room;
-				});
-				set({ messages: updatedMessages, chatRooms: updatedRooms }, false, "updateMessage");
-				return;
+				}
 			}
 
 			set({ messages: updatedMessages }, false, "updateMessage");

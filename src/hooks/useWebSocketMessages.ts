@@ -111,14 +111,23 @@ export const useWebSocketMessages = ({
 
 		const handleMessageRead = (data: { messageId: string; readBy: string }) => {
 			// Update message read status in store
-			updateMessage(data.messageId, { isRead: true });
-
-			// Also update in IndexedDB to keep cache in sync
 			const { messages } = useChatStore.getState();
 			const message = messages.find(msg => msg.id === data.messageId);
 			if (message) {
-				const updatedMessage = { ...message, isRead: true };
-				indexedDBChatService.addMessage(updatedMessage).catch((error: Error) => {
+				const currentReadBy = message.readBy || [];
+				const updatedReadBy = currentReadBy.includes(data.readBy) 
+					? currentReadBy 
+					: [...currentReadBy, data.readBy];
+				updateMessage(data.messageId, { 
+					isRead: true, // Global read status
+					readBy: updatedReadBy // Per-user read status
+				});
+
+				// Also update in IndexedDB to keep cache in sync
+				indexedDBChatService.updateMessage(data.messageId, { 
+					isRead: true,
+					readBy: updatedReadBy 
+				}).catch((error: Error) => {
 					console.error("Failed to update message in IndexedDB:", error);
 				});
 			}
@@ -151,9 +160,8 @@ export const useWebSocketMessages = ({
 			chatRoomId: string;
 			isOnline: boolean;
 		}) => {
-			if (data.chatRoomId === chatRoomId) {
-				onUserOnline?.(data);
-			}
+			// Process userOnline events globally, not just for current chat room
+			onUserOnline?.(data);
 		};
 
 		const handleError = (error: { message: string; details?: string }) => {

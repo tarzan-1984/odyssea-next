@@ -7,7 +7,8 @@ export interface Notification {
   message: string;
   type: string;
   avatar?: string;
-  isRead: boolean;
+  isRead: boolean; // Global read status
+  readBy?: string[]; // Array of user IDs who read the notification
   createdAt: string;
 }
 
@@ -21,6 +22,11 @@ export interface NotificationsResponse {
 export interface UnreadCountResponse {
   unreadCount: number;
 }
+
+// Helper function to check if a notification is read by a specific user
+export const isNotificationReadByUser = (notification: Notification, userId: string): boolean => {
+  return notification.readBy?.includes(userId) || false;
+};
 
 class NotificationsApi {
   private baseUrl = '/api/v1/notifications';

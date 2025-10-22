@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatBoxHeader from "./ChatBoxHeader";
 import ChatBoxSendForm from "./ChatBoxSendForm";
 import Image from "next/image";
-import { Message, ChatRoom } from "@/app-api/chatApi";
+import { Message, ChatRoom, isMessageReadByUser } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 // WebSocket functionality is now passed via props
 import { useCurrentUser } from "@/stores/userStore";
@@ -300,9 +300,89 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const handleMarkMessageUnread = async (messageId: string) => {
 		try {
-			// TODO: Implement mark as unread API call
-			console.log("Mark message as unread:", messageId);
-			// await markMessageUnread(messageId);
+			const response = await fetch(`/api/messages/${messageId}/unread`, {
+				method: "PUT",
+				credentials: "include",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.message || "Failed to mark message as unread");
+			}
+
+			const result = await response.json();
+
+			// Get chat room type to determine logic
+			const state = useChatStore.getState();
+			const chatRoom = state.chatRooms.find(room => room.id === result.chatRoomId);
+			const isDirectChat = chatRoom?.type === 'DIRECT';
+
+			// Optimistically update UI and cache
+			const updatedMessages = state.messages.map(msg => {
+				if (msg.id === messageId) {
+					const currentReadBy = msg.readBy || [];
+					const updatedReadBy = currentReadBy.filter(id => id !== currentUser?.id);
+					
+					if (isDirectChat) {
+						// For DIRECT chats: set both isRead to false and remove user from readBy
+						return { 
+							...msg, 
+							isRead: false, // Global read status becomes false
+							readBy: updatedReadBy
+						};
+					} else {
+						// For GROUP and LOAD chats: only remove user from readBy, keep isRead as true
+						return { 
+							...msg, 
+							readBy: updatedReadBy,
+							// Keep isRead as true (global status doesn't change)
+						};
+					}
+				}
+				return msg;
+			});
+			state.setMessages(updatedMessages);
+
+			// Increment unread count for the room
+			const updatedRooms = state.chatRooms.map(room =>
+				room.id === result.chatRoomId
+					? { ...room, unreadCount: (room.unreadCount || 0) + 1 }
+					: room
+			);
+			state.setChatRooms(updatedRooms);
+
+			// Update cache
+			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
+			const message = updatedMessages.find(m => m.id === messageId);
+			if (message) {
+				if (isDirectChat) {
+					indexedDBChatService.updateMessage(messageId, { 
+						isRead: false,
+						readBy: message.readBy
+					}).catch((error: Error) => {
+						console.error("Failed to update message in IndexedDB:", error);
+					});
+				} else {
+					indexedDBChatService.updateMessage(messageId, { 
+						readBy: message.readBy
+					}).catch((error: Error) => {
+						console.error("Failed to update message in IndexedDB:", error);
+					});
+				}
+			}
+
+			// Update chat room unread count in IndexedDB
+			const updatedRoom = updatedRooms.find(room => room.id === result.chatRoomId);
+			if (updatedRoom) {
+				indexedDBChatService.updateChatRoom(result.chatRoomId, {
+					unreadCount: updatedRoom.unreadCount
+				}).catch((error: Error) => {
+					console.error("Failed to update chat room unread count in IndexedDB:", error);
+				});
+			}
 		} catch (error) {
 			console.error("Failed to mark message as unread:", error);
 		}
