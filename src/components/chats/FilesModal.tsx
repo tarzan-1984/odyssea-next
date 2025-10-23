@@ -6,6 +6,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import { DownloadIcon, FileIcon } from "@/icons";
 import { chatApi } from "@/app-api/chatApi";
 import { messagesArchiveApi, ArchiveDay } from "@/app-api/messagesArchiveApi";
+import FilePreview from "./FilePreview";
 
 interface FilesModalProps {
 	isOpen: boolean;
@@ -32,6 +33,7 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 	const [currentArchiveIndex, setCurrentArchiveIndex] = useState(0);
 	const [isLoadingArchives, setIsLoadingArchives] = useState(false);
 	const [isLoadingFromArchive, setIsLoadingFromArchive] = useState(false);
+	
 	
 	
 	const currentUser = useCurrentUser();
@@ -232,15 +234,41 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 		}
 	};
 
-	const handleDownload = (fileUrl: string, fileName: string) => {
-		const link = document.createElement('a');
-		link.href = fileUrl;
-		link.download = fileName;
-		link.target = '_blank';
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
+	const handleDownload = async (fileUrl: string, fileName: string, messageId: string, e?: React.MouseEvent) => {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+		
+		try {
+			// Download file directly from cloud storage
+			const response = await fetch(fileUrl, {
+				method: 'GET',
+				mode: 'cors',
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to download file');
+			}
+
+			// Get the file blob
+			const blob = await response.blob();
+			
+			// Create download link
+			const url = window.URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = fileName;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			window.URL.revokeObjectURL(url);
+		} catch (error) {
+			// Fallback: try to open in new tab
+			window.open(fileUrl, '_blank');
+		}
 	};
+
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
@@ -270,23 +298,36 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 						files.map((file, index) => (
 							<div
 								key={`${file.id}-${index}`}
-								className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+								className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
 							>
-								{getFileIcon(file.fileName)}
-								<div className="flex-1 min-w-0">
-									<div className="font-medium text-gray-900 dark:text-white truncate">
-										{file.fileName}
+								{/* File Header */}
+								<div className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800/50">
+									{getFileIcon(file.fileName)}
+									<div className="flex-1 min-w-0">
+										<div className="font-medium text-gray-900 dark:text-white truncate">
+											{file.fileName}
+										</div>
+										<div className="text-sm text-gray-500 dark:text-gray-400">
+											{formatFileSize(file.fileSize)} • {new Date(file.createdAt).toLocaleDateString()}
+										</div>
 									</div>
-									<div className="text-sm text-gray-500 dark:text-gray-400">
-										{formatFileSize(file.fileSize)} • {new Date(file.createdAt).toLocaleDateString()}
-									</div>
+											<button
+												onClick={(e) => handleDownload(file.fileUrl, file.fileName, file.id, e)}
+												className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+											>
+										<DownloadIcon className="w-5 h-5" />
+									</button>
 								</div>
-								<button
-									onClick={() => handleDownload(file.fileUrl, file.fileName)}
-									className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-								>
-									<DownloadIcon className="w-5 h-5" />
-								</button>
+								
+								{/* File Preview */}
+								<div className="p-3">
+									<FilePreview
+										fileUrl={file.fileUrl}
+										fileName={file.fileName}
+										fileSize={file.fileSize}
+										messageId={file.id}
+									/>
+								</div>
 							</div>
 						))
 					)}

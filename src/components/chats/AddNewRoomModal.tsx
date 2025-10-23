@@ -171,12 +171,6 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		setIsLoading(true);
 		setError("");
 
-		console.log("Form submission started:", {
-			name: formData.name,
-			participantIds: formData.participantIds,
-			participantCount: formData.participantIds.length
-		});
-
 		// Validate form data
 		if (!formData.name.trim()) {
 			setError("Room name is required");

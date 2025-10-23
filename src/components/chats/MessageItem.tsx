@@ -8,6 +8,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
 import MessageReply from "./MessageReply";
+import FilePreview from "./FilePreview";
 
 interface MessageItemProps {
 	message: Message;
@@ -43,6 +44,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 
+	const isPreviewableFile = (fileName?: string): boolean => {
+		if (!fileName) return false;
+		const previewableExtensions = [".pdf", ".docx", ".txt"];
+		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+	};
+
 	return (
 		<div
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
@@ -64,25 +71,34 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			<div className={`${isSender ? "text-right" : ""}`}>
 				{/* Image preview */}
 				{message.fileUrl && isImageFile(message.fileName) && (
-					<div className="mb-2 w-full max-w-[270px] overflow-hidden rounded-lg">
-						<img
-							src={message.fileUrl}
-							alt="chat image"
-							className="object-cover w-full h-auto max-h-48"
-							onError={e => {
-								// Hide image if it fails to load
-								const target = e.target as HTMLImageElement;
-								target.style.display = "none";
-							}}
+					<div className="mb-2">
+						<FilePreview
+							fileUrl={message.fileUrl}
+							fileName={message.fileName || "Unknown file"}
+							fileSize={message.fileSize}
+							messageId={message.id}
 						/>
 					</div>
 				)}
 
-				{/* File attachment */}
-				{message.fileUrl && !isImageFile(message.fileName) && (
+				{/* File preview for PDF, DOCX, TXT */}
+				{message.fileUrl && isPreviewableFile(message.fileName) && (
+					<div className="mb-2">
+						<FilePreview
+							fileUrl={message.fileUrl}
+							fileName={message.fileName || "Unknown file"}
+							fileSize={message.fileSize}
+							messageId={message.id}
+						/>
+					</div>
+				)}
+
+				{/* File attachment for other files */}
+				{message.fileUrl && !isImageFile(message.fileName) && !isPreviewableFile(message.fileName) && (
 					<div className="mb-2 w-full max-w-[270px]">
 						<a
 							href={message.fileUrl}
+							download={message.fileName}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
