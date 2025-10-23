@@ -137,6 +137,7 @@ export const useWebSocketChatSync = () => {
 		async (messageData: {
 			content: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+			replyData?: { avatar?: string; time: string; content: string; senderName: string };
 		}) => {
 			if (isConnected && chatSync.currentChatRoom) {
 				// Use WebSocket for real-time messaging
@@ -145,6 +146,7 @@ export const useWebSocketChatSync = () => {
 					fileUrl: messageData.fileData?.fileUrl,
 					fileName: messageData.fileData?.fileName,
 					fileSize: messageData.fileData?.fileSize,
+					replyData: messageData.replyData,
 				});
 			} else {
 				// Fallback to API-based messaging

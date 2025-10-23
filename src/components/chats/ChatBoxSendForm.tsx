@@ -3,15 +3,20 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FileInputUploader } from "../FileInputUploader/FileInputUploader";
 import EmojiPicker from "../ui/EmojiPicker";
+import ReplyPreview from "./ReplyPreview";
+import { Message } from "@/app-api/chatApi";
 
 interface ChatBoxSendFormProps {
 	onSendMessage?: (message: {
 		content: string;
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+		replyData?: Message['replyData'];
 	}) => void;
 	onTyping?: (isTyping: boolean) => void;
 	disabled?: boolean;
 	isLoading?: boolean;
+	replyingTo?: Message['replyData'];
+	onCancelReply?: () => void;
 }
 
 export default function ChatBoxSendForm({
@@ -19,6 +24,8 @@ export default function ChatBoxSendForm({
 	onTyping,
 	disabled = false,
 	isLoading = false,
+	replyingTo,
+	onCancelReply,
 }: ChatBoxSendFormProps) {
 	const [message, setMessage] = useState<string>("");
 	const [isSending, setIsSending] = useState(false);
@@ -44,6 +51,7 @@ export default function ChatBoxSendForm({
 				await onSendMessage({
 					content: message,
 					fileData: attachedFile || undefined,
+					replyData: replyingTo,
 				});
 			}
 
@@ -57,6 +65,11 @@ export default function ChatBoxSendForm({
 			setAttachedFile(null);
 			setShowFileUploader(false);
 			setShowEmojiPicker(false);
+			
+			// Cancel reply if we were replying
+			if (replyingTo && onCancelReply) {
+				onCancelReply();
+			}
 		} catch (error) {
 			console.error("Failed to send message:", error);
 		} finally {
@@ -131,6 +144,14 @@ export default function ChatBoxSendForm({
 
 	return (
 		<div className="sticky bottom-0 p-3 border-t border-gray-200 dark:border-gray-800">
+			{/* Reply Preview */}
+			{replyingTo && (
+				<ReplyPreview 
+					replyData={replyingTo} 
+					onCancel={() => onCancelReply?.()} 
+				/>
+			)}
+
 			{/* File uploader overlay */}
 			{showFileUploader && (
 				<div className="absolute bottom-full left-0 right-0 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mb-2">

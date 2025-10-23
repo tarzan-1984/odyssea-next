@@ -37,6 +37,7 @@ interface SendMessageData {
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
+	replyData?: { avatar?: string; time: string; content: string; senderName: string };
 }
 
 // WebSocket event data interfaces
@@ -924,6 +925,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				fileUrl: data.fileUrl,
 				fileName: data.fileName,
 				fileSize: data.fileSize,
+				replyData: data.replyData,
 			};
 
 			socket.emit("sendMessage", messageData);

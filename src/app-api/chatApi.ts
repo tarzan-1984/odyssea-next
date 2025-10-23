@@ -53,6 +53,12 @@ export interface Message {
 	fileSize?: number;
 	isRead: boolean; // Global read status (true when any participant reads)
 	readBy?: string[]; // Array of user IDs who read the message
+	replyData?: {
+		avatar?: string;
+		time: string;
+		content: string;
+		senderName: string;
+	};
 	createdAt: string;
 	sender: User;
 	receiver?: User;
@@ -64,6 +70,12 @@ export interface SendMessageDto {
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
+	replyData?: {
+		avatar?: string;
+		time: string;
+		content: string;
+		senderName: string;
+	};
 }
 
 // Helper function to check if a message is read by a specific user
