@@ -126,6 +126,9 @@ interface ChatState {
 	getNextAvailableArchive: () => { year: number; month: number; day: number; messageCount: number; createdAt: string } | null;
   setPendingArchiveLoad: (pending: boolean) => void;
   triggerPendingArchiveLoad: () => void;
+  
+  // User join date methods
+	getUserJoinDate: () => Date | null;
 }
 
 // Create the chat store with Zustand
@@ -631,9 +634,27 @@ export const useChatStore = create<ChatState>()(
 
 						const archives = await messagesArchiveApi.getAvailableArchiveDays(currentChatRoom.id);
 
-						// Save archives to state and clear loading
+						// Filter archives by user join date to avoid unnecessary requests
+						const { getUserJoinDate } = get();
+						const userJoinDate = getUserJoinDate();
+						
+						let filteredArchives = archives;
+						if (userJoinDate) {
+							filteredArchives = archives.filter(archive => {
+								const archiveDate = new Date(archive.year, archive.month - 1, archive.day);
+								const isAfterJoin = archiveDate >= userJoinDate;
+								
+								if (!isAfterJoin) {
+									console.log(`🚫 Filtered out archive ${archive.year}-${archive.month}-${archive.day} (before user join date)`);
+								}
+								
+								return isAfterJoin;
+							});
+						}
+
+						// Save filtered archives to state and clear loading
 						set({
-							availableArchives: archives,
+							availableArchives: filteredArchives,
 							currentArchiveIndex: 0,
 							isLoadingAvailableArchives: false
 						}, false, "getAvailableArchiveDays");
@@ -646,7 +667,7 @@ export const useChatStore = create<ChatState>()(
 							get().triggerPendingArchiveLoad();
 						}
 
-						return archives;
+						return filteredArchives;
 					} catch (error) {
 						console.error("❌ [ARCHIVE] Failed to get available archive days:", error);
 						set({ isLoadingAvailableArchives: false }, false, "getAvailableArchiveDays");
@@ -662,21 +683,37 @@ export const useChatStore = create<ChatState>()(
 					}, false, "setAvailableArchives");
 				},
 
-				// Get next available archive from the list
-				getNextAvailableArchive: () => {
-					const { availableArchives, currentArchiveIndex } = get();
+	// Get user's join date for current chat room
+	getUserJoinDate: () => {
+		const { currentChatRoom } = get();
+		const currentUser = useUserStore.getState().currentUser;
+		
+		if (!currentChatRoom || !currentUser) {
+			return null;
+		}
+		
+		const participant = currentChatRoom.participants.find(
+			p => p.userId === currentUser.id
+		);
+		
+		return participant?.joinedAt ? new Date(participant.joinedAt) : null;
+	},
 
-					if (currentArchiveIndex >= availableArchives.length) {
-						return null; // No more archives
-					}
+	// Get next available archive from the list
+	getNextAvailableArchive: () => {
+		const { availableArchives, currentArchiveIndex } = get();
 
-					const nextArchive = availableArchives[currentArchiveIndex];
+		if (currentArchiveIndex >= availableArchives.length) {
+			return null; // No more archives
+		}
 
-					// Move to next archive
-					set({ currentArchiveIndex: currentArchiveIndex + 1 }, false, "getNextAvailableArchive");
+		const nextArchive = availableArchives[currentArchiveIndex];
 
-					return nextArchive;
-				},
+		// Move to next archive
+		set({ currentArchiveIndex: currentArchiveIndex + 1 }, false, "getNextAvailableArchive");
+
+		return nextArchive;
+	},
 
 				// Set pending archive load flag
 				setPendingArchiveLoad: (pending: boolean) => {

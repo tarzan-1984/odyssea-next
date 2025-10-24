@@ -11,10 +11,6 @@ export async function POST(request: NextRequest) {
 
 		const body = await request.json();
 		const { name, type, loadId, participantIds, avatar } = body;
-		
-		console.log('API route body=================', body);
-		console.log('API route name=================', name);
-		console.log('API route loadId=================', loadId);
 
 		// Validate required fields (loadId is optional)
 		if (!name || !type || !participantIds || !Array.isArray(participantIds)) {
@@ -56,9 +52,9 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		if (type === "GROUP" && participantIds.length < 2) {
+		if (type === "GROUP" && participantIds.length < 1) {
 			return NextResponse.json(
-				{ error: "Group chats must have at least 2 participants" },
+				{ error: "Group chats must have at least 1 participant" },
 				{ status: 400 }
 			);
 		}
