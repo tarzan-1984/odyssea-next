@@ -96,14 +96,11 @@ export default function ChatListItem({
 	const handleToggleMute = async () => {
 		try {
 			const action = isMuted ? 'unmute' : 'mute';
-			console.log(`Toggle mute: current isMuted=${isMuted}, action=${action}`);
 			
 			const result = await chatApi.muteChatRooms([chatRoom.id], action);
-			console.log('Toggle mute result:', result);
 			
 			// Determine the new mute state based on action
 			const newMuteState = action === 'mute';
-			console.log(`Setting new mute state: ${newMuteState}`);
 			
 			// Update local state immediately for better UX
 			setIsMuted(newMuteState);
