@@ -42,7 +42,7 @@ export default function ChatList({
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-	
+
 	// Filter state
 	const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
 	const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -107,37 +107,40 @@ export default function ChatList({
 		setDebouncedSearchQuery("");
 	};
 
+	// Determine if all chats are muted
+	const allChatsMuted = chatRooms.length > 0 && chatRooms.every(room => room.isMuted);
+	const hasUnmutedChats = chatRooms.some(room => !room.isMuted);
+
+	// Smart mute/unmute function
+	const handleSmartMuteToggle = async () => {
+		if (allChatsMuted) {
+			// All chats are muted, so unmute all
+			await handleUnmuteAll();
+		} else {
+			// Some or no chats are muted, so mute all
+			await handleMuteAll();
+		}
+	};
+
 	const handleMuteAll = async () => {
 		try {
-			console.log("Muting all chats...");
-			console.log("All chat rooms:", chatRooms);
-			console.log("Chat rooms length:", chatRooms.length);
-			
 			// Get all unmuted chat room IDs
 			const unmutedChatRoomIds = chatRooms
 				.filter(room => !room.isMuted)
 				.map(room => room.id);
-			
-			console.log("Unmuted chat room IDs:", unmutedChatRoomIds);
-			console.log("Unmuted chat room IDs length:", unmutedChatRoomIds.length);
-			console.log("Chat rooms with isMuted status:", chatRooms.map(room => ({ id: room.id, name: room.name, isMuted: room.isMuted })));
-			
+
 			if (unmutedChatRoomIds.length === 0) {
-				console.log("No unmuted chats to mute - exiting early");
 				return;
 			}
-			
-			console.log("Proceeding to mute", unmutedChatRoomIds.length, "chats");
-			
+
 			// Call the API with specific chat room IDs and mute action
 			const result = await chatApi.muteChatRooms(unmutedChatRoomIds, 'mute');
-			console.log("Mute all result:", result);
-			
+
 			// Update the store with the muted status for all affected chat rooms
 			result.chatRoomIds.forEach(chatRoomId => {
 				updateChatRoom(chatRoomId, { isMuted: true });
 			});
-			
+
 			// Refresh chat list to update UI
 			loadChatRooms();
 		} catch (error) {
@@ -147,35 +150,23 @@ export default function ChatList({
 
 	const handleUnmuteAll = async () => {
 		try {
-			console.log("Unmuting all chats...");
-			console.log("All chat rooms:", chatRooms);
-			console.log("Chat rooms length:", chatRooms.length);
-			
 			// Get all muted chat room IDs
 			const mutedChatRoomIds = chatRooms
 				.filter(room => room.isMuted)
 				.map(room => room.id);
-			
-			console.log("Muted chat room IDs:", mutedChatRoomIds);
-			console.log("Muted chat room IDs length:", mutedChatRoomIds.length);
-			console.log("Chat rooms with isMuted status:", chatRooms.map(room => ({ id: room.id, name: room.name, isMuted: room.isMuted })));
-			
+
 			if (mutedChatRoomIds.length === 0) {
-				console.log("No muted chats to unmute - exiting early");
 				return;
 			}
-			
-			console.log("Proceeding to unmute", mutedChatRoomIds.length, "chats");
-			
+
 			// Call the API with specific chat room IDs and unmute action
 			const result = await chatApi.muteChatRooms(mutedChatRoomIds, 'unmute');
-			console.log("Unmute all result:", result);
-			
+
 			// Update the store with the unmuted status for all affected chat rooms
 			result.chatRoomIds.forEach(chatRoomId => {
 				updateChatRoom(chatRoomId, { isMuted: false });
 			});
-			
+
 			// Refresh chat list to update UI
 			loadChatRooms();
 		} catch (error) {
@@ -210,9 +201,9 @@ export default function ChatList({
 	// Filter chat rooms based on search query and selected filter
 	const filteredChatRooms = chatRooms.filter(chatRoom => {
 		// Apply search filter
-		const matchesSearch = !debouncedSearchQuery.trim() || 
+		const matchesSearch = !debouncedSearchQuery.trim() ||
 			getChatDisplayName(chatRoom).toLowerCase().includes(debouncedSearchQuery.toLowerCase());
-		
+
 		// Apply selected filter
 		let matchesFilter = true;
 		switch (selectedFilter) {
@@ -230,7 +221,7 @@ export default function ChatList({
 				matchesFilter = true;
 				break;
 		}
-		
+
 		return matchesSearch && matchesFilter;
 	});
 
@@ -300,20 +291,16 @@ export default function ChatList({
 			{/* Filter Section */}
 			<div className="border-t border-b border-gray-200 dark:border-gray-700 py-2 px-0">
 				<div className="flex items-center gap-2">
-					{/* Mute All Buttons */}
-					<button
-						onClick={handleMuteAll}
-						className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
-					>
-						Mute all
-					</button>
-					<button
-						onClick={handleUnmuteAll}
-						className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
-					>
-						Unmute all
-					</button>
-					
+					{/* Smart Mute/Unmute Button */}
+					{chatRooms.length > 0 && (
+						<button
+							onClick={handleSmartMuteToggle}
+							className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
+						>
+							{allChatsMuted ? "Unmute all" : "Mute all"}
+						</button>
+					)}
+
 					{/* Filter Dropdown */}
 					<div className="flex-1 relative filter-dropdown">
 						<button
@@ -332,7 +319,7 @@ export default function ChatList({
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
 							</svg>
 						</button>
-						
+
 						{/* Dropdown Menu */}
 						{isFilterDropdownOpen && (
 							<div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg z-10">
@@ -341,8 +328,8 @@ export default function ChatList({
 										key={option.value}
 										onClick={() => handleFilterChange(option.value)}
 										className={`w-full flex items-center gap-1 px-2 py-1 text-xs text-left hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t last:rounded-b ${
-											selectedFilter === option.value 
-												? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+											selectedFilter === option.value
+												? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
 												: 'text-gray-700 dark:text-gray-300'
 										}`}
 									>
@@ -388,7 +375,7 @@ export default function ChatList({
                         className="dark:bg-dark-900 h-9 w-full rounded-lg border border-gray-300 bg-transparent pl-9 pr-9 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     />
                     {searchQuery && (
-                        <button 
+                        <button
                             onClick={clearSearch}
                             className="absolute -translate-y-1/2 right-3 top-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                         >
