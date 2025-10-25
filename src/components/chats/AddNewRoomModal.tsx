@@ -96,7 +96,11 @@ const fetchUsers = async (page: number = 1, search: string = "", append: boolean
 	setError("");
 
 	try {
-		const params: Record<string, any> = { page, limit: 20 };
+		const params: Record<string, any> = { 
+			page, 
+			limit: 20,
+			status: "ACTIVE" // Only show active users for chat creation
+		};
 		if (search) params.search = search;
 
 		const response = await usersApi.getAllUsers(params);

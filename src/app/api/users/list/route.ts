@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
 		const search = body.search;
 		const sort = body.sort;
 		const role = body.role; // Role filter - empty string means "show all"
+		const status = body.status; // Status filter - if not provided, backend will default to ACTIVE
 
 		// Build query string for backend
 		const queryParams = new URLSearchParams();
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
 		if (search) queryParams.append("search", search);
 		if (sort) queryParams.append("sort", JSON.stringify(sort));
 		if (role && role !== "") queryParams.append("role", role); // Only add role if it's not empty
+		if (status && status !== "") queryParams.append("status", status); // Only add status if it's not empty
 
 		// Send request to backend for user list
 		const response = await fetch(

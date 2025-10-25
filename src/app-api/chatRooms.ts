@@ -59,6 +59,7 @@ const chatRooms = {
 				body: JSON.stringify({
 					page: 1,
 					limit: 100, // Get more users for selection
+					status: "ACTIVE", // Only show active users for chat creation
 				}),
 			});
 
