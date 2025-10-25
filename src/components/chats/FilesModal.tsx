@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "../ui/modal";
 import { ChatRoom, Message } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
+import { useUserStore } from "@/stores/userStore";
 import { DownloadIcon, FileIcon } from "@/icons";
 import { chatApi } from "@/app-api/chatApi";
 import { messagesArchiveApi, ArchiveDay } from "@/app-api/messagesArchiveApi";
@@ -24,6 +25,7 @@ interface FileMessage extends Message {
 export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProps) {
 	const [files, setFiles] = useState<FileMessage[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
+	const [isInitialLoading, setIsInitialLoading] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
 	const [page, setPage] = useState(1);
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -39,27 +41,31 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 	const currentUser = useCurrentUser();
 
 
-	// Load files from regular API (newest messages first)
+	// Load files from database API (only messages with fileUrl)
 	const loadFilesFromAPI = useCallback(async (pageNum: number, isLoadMore: boolean = false) => {
-		if (!chatRoom?.id) return { fileMessages: [], hasMore: false };
+		if (!chatRoom?.id) return { fileMessages: [], hasMore: false, total: 0 };
 
 		try {
-			// Load messages with files from API
-			const response = await chatApi.getMessages(chatRoom.id, pageNum, 10);
-			const messages = response.messages;
+			// Load files directly from API (already filtered by fileUrl)
+			const response = await chatApi.getFiles(chatRoom.id, pageNum, 10);
+			const fileMessages = response.messages as FileMessage[];
 			
-			// Filter only messages with file attachments
-			const fileMessages = messages.filter((msg: Message) => 
-				msg.fileUrl && msg.fileName && msg.fileSize
-			) as FileMessage[];
+			console.log(`📁 [FilesModal] Loaded ${fileMessages.length} files from API (page ${pageNum})`);
+			console.log(`📁 [FilesModal] Total files available: ${response.total}`);
+			
+			if (fileMessages.length > 0) {
+				console.log(`📁 [FilesModal] File messages:`, fileMessages.map(f => ({
+					id: f.id,
+					fileName: f.fileName,
+					fileSize: f.fileSize,
+					createdAt: f.createdAt
+				})));
+			}
 
-			// Sort by creation time (newest first)
-			fileMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-			return { fileMessages, hasMore: response.hasMore };
+			return { fileMessages, hasMore: response.hasMore, total: response.total };
 		} catch (error) {
 			console.error("Failed to load files from API:", error);
-			return { fileMessages: [], hasMore: false };
+			return { fileMessages: [], hasMore: false, total: 0 };
 		}
 	}, [chatRoom?.id]);
 
@@ -97,7 +103,7 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 
 	// Load available archives
 	const loadAvailableArchives = useCallback(async () => {
-		if (!chatRoom?.id) return;
+		if (!chatRoom?.id) return [];
 
 		try {
 			setIsLoadingArchives(true);
@@ -112,8 +118,10 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 			
 			setAvailableArchives(archives);
 			setCurrentArchiveIndex(0);
+			return archives;
 		} catch (error) {
 			console.error("Failed to load available archives:", error);
+			return [];
 		} finally {
 			setIsLoadingArchives(false);
 		}
@@ -127,15 +135,15 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 				const nextPage = page + 1;
 				setPage(nextPage);
 				
-				// Try to load from API first
+				// Try to load from database API first
 				const apiResult = await loadFilesFromAPI(nextPage, true);
 				
 				if (apiResult.fileMessages.length > 0) {
-					// We have files from API
+					// We have files from database
 					setFiles(prev => [...prev, ...apiResult.fileMessages]);
 					setHasMore(apiResult.hasMore);
 				} else if (availableArchives.length > 0 && currentArchiveIndex < availableArchives.length) {
-					// No more files from API, try archives
+					// No more files from database, try archives
 					const archive = availableArchives[currentArchiveIndex];
 					const archiveFiles = await loadFilesFromArchive(archive);
 					
@@ -168,24 +176,54 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 	// Load initial files when modal opens
 	useEffect(() => {
 		if (isOpen && chatRoom?.id) {
+			console.log(`📁 [FilesModal] Opening files modal for chat room: ${chatRoom.id}`);
+			
+			// Check user join date
+			const currentUser = useUserStore.getState().currentUser;
+			if (currentUser) {
+				const participant = chatRoom.participants.find(p => p.userId === currentUser.id);
+				if (participant) {
+					console.log(`📁 [FilesModal] User joined chat at: ${participant.joinedAt}`);
+					console.log(`📁 [FilesModal] Chat created at: ${chatRoom.createdAt}`);
+				} else {
+					console.log(`📁 [FilesModal] User not found in participants`);
+				}
+			}
+			
 			setPage(1);
 			setFiles([]);
 			setHasMore(true);
 			setCurrentArchiveIndex(0);
 			setAvailableArchives([]);
+			setIsInitialLoading(false);
 			
-			// Load archives first, then files
+			// Load files from database first
 			const initializeFiles = async () => {
-				await loadAvailableArchives();
-				// Load files after archives are loaded
-				const apiResult = await loadFilesFromAPI(1, false);
-				setFiles(apiResult.fileMessages);
-				setHasMore(apiResult.hasMore);
+				console.log(`📁 [FilesModal] Initializing files for chat room: ${chatRoom.id}`);
+				setIsInitialLoading(true);
+				
+				try {
+					// Load files from database API
+					const apiResult = await loadFilesFromAPI(1, false);
+					console.log(`📁 [FilesModal] Initial load result:`, {
+						filesFound: apiResult.fileMessages.length,
+						hasMore: apiResult.hasMore,
+						total: apiResult.total
+					});
+					
+					setFiles(apiResult.fileMessages);
+					setHasMore(apiResult.hasMore);
+					
+					// Load archives in background for future pagination
+					loadAvailableArchives();
+				} finally {
+					setIsInitialLoading(false);
+				}
 			};
 			
 			initializeFiles();
 		}
-	}, [isOpen, chatRoom?.id, loadAvailableArchives, loadFilesFromAPI]);
+	}, [isOpen, chatRoom?.id, loadAvailableArchives, loadFilesFromAPI, loadFilesFromArchive]);
 
 	// Reset state when modal closes
 	useEffect(() => {
@@ -286,7 +324,11 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 					className="max-h-96 overflow-y-auto space-y-3"
 					onScroll={handleScroll}
 				>
-					{isLoading ? (
+					{isInitialLoading ? (
+						<div className="flex justify-center py-8">
+							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+						</div>
+					) : isLoadingMore ? (
 						<div className="flex justify-center py-8">
 							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
 						</div>
