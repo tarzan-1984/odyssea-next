@@ -314,16 +314,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						// Mark message as read in store immediately
 						const currentReadBy = messageData.message.readBy || [];
 						if (!currentReadBy.includes(currentUser.id)) {
-							updateMessage(messageData.message.id, { 
+							updateMessage(messageData.message.id, {
 								isRead: true, // Global read status
-								readBy: [...currentReadBy, currentUser.id] // Per-user read status
+								readBy: [...currentReadBy, currentUser.id], // Per-user read status
 							});
 
 							// Update message as read in IndexedDB cache immediately
 							indexedDBChatService
-								.updateMessage(messageData.message.id, { 
+								.updateMessage(messageData.message.id, {
 									isRead: true,
-									readBy: [...currentReadBy, currentUser.id] 
+									readBy: [...currentReadBy, currentUser.id],
 								})
 								.catch((error: Error) => {
 									console.error(
@@ -391,10 +391,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const updatedMessages = state.messages.filter(msg => msg.id !== data.messageId);
 				state.setMessages(updatedMessages);
 
-			// Update IndexedDB cache
-			indexedDBChatService.deleteMessage(data.messageId).catch((error: Error) => {
-				console.error("Failed to delete message from IndexedDB:", error);
-			});
+				// Update IndexedDB cache
+				indexedDBChatService.deleteMessage(data.messageId).catch((error: Error) => {
+					console.error("Failed to delete message from IndexedDB:", error);
+				});
 
 				// Update chat room's last message if the deleted message was the last one
 				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
@@ -427,25 +427,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 				// Get chat room type to determine logic
 				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
-				const isDirectChat = chatRoom?.type === 'DIRECT';
+				const isDirectChat = chatRoom?.type === "DIRECT";
 
 				// Update messages in store
 				const updatedMessages = state.messages.map(msg => {
 					if (data.messageIds.includes(msg.id)) {
 						const currentReadBy = msg.readBy || [];
 						const updatedReadBy = currentReadBy.filter(id => id !== data.userId);
-						
+
 						if (isDirectChat) {
 							// For DIRECT chats: set both isRead to false and remove user from readBy
-							return { 
-								...msg, 
+							return {
+								...msg,
 								isRead: false, // Global read status becomes false
-								readBy: updatedReadBy
+								readBy: updatedReadBy,
 							};
 						} else {
 							// For GROUP and LOAD chats: only remove user from readBy, keep isRead as true
-							return { 
-								...msg, 
+							return {
+								...msg,
 								readBy: updatedReadBy,
 								// Keep isRead as true (global status doesn't change)
 							};
@@ -458,7 +458,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Update unread counts on chat room - only for the user who marked as unread
 				const updatedRooms = state.chatRooms.map(room => {
 					if (room.id !== data.chatRoomId) return room;
-					
+
 					// Only increment unread count for the user who marked the message as unread
 					// Other participants should not see increased unread count
 					const currentUser = useUserStore.getState().currentUser;
@@ -467,31 +467,35 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						const unread = (room.unreadCount || 0) + increment;
 						return { ...room, unreadCount: unread };
 					}
-					
+
 					return room; // No change for other users
 				});
 				state.setChatRooms(updatedRooms);
 
 				// Update IndexedDB cache
 				const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
-				
+
 				// Update messages in IndexedDB
 				data.messageIds.forEach(messageId => {
 					const message = updatedMessages.find(msg => msg.id === messageId);
 					if (message) {
 						if (isDirectChat) {
-							indexedDBChatService.updateMessage(messageId, {
-								isRead: false,
-								readBy: message.readBy
-							}).catch((error: Error) => {
-								console.error("Failed to update message in IndexedDB:", error);
-							});
+							indexedDBChatService
+								.updateMessage(messageId, {
+									isRead: false,
+									readBy: message.readBy,
+								})
+								.catch((error: Error) => {
+									console.error("Failed to update message in IndexedDB:", error);
+								});
 						} else {
-							indexedDBChatService.updateMessage(messageId, {
-								readBy: message.readBy
-							}).catch((error: Error) => {
-								console.error("Failed to update message in IndexedDB:", error);
-							});
+							indexedDBChatService
+								.updateMessage(messageId, {
+									readBy: message.readBy,
+								})
+								.catch((error: Error) => {
+									console.error("Failed to update message in IndexedDB:", error);
+								});
 						}
 					}
 				});
@@ -501,11 +505,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (currentUser && currentUser.id === data.userId) {
 					const updatedRoom = updatedRooms.find(room => room.id === data.chatRoomId);
 					if (updatedRoom) {
-						indexedDBChatService.updateChatRoom(data.chatRoomId, {
-							unreadCount: updatedRoom.unreadCount
-						}).catch((error: Error) => {
-							console.error("Failed to update chat room unread count in IndexedDB:", error);
-						});
+						indexedDBChatService
+							.updateChatRoom(data.chatRoomId, {
+								unreadCount: updatedRoom.unreadCount,
+							})
+							.catch((error: Error) => {
+								console.error(
+									"Failed to update chat room unread count in IndexedDB:",
+									error
+								);
+							});
 					}
 				}
 			}
@@ -575,13 +584,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const updatedMessages = state.messages.map(msg => {
 					if (data.messageIds.includes(msg.id)) {
 						const currentReadBy = msg.readBy || [];
-						const updatedReadBy = currentReadBy.includes(data.userId) 
-							? currentReadBy 
+						const updatedReadBy = currentReadBy.includes(data.userId)
+							? currentReadBy
 							: [...currentReadBy, data.userId];
-						return { 
-							...msg, 
+						return {
+							...msg,
 							isRead: true, // Global read status
-							readBy: updatedReadBy // Per-user read status
+							readBy: updatedReadBy, // Per-user read status
 						};
 					}
 					return msg;
@@ -592,16 +601,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const message = state.messages.find(m => m.id === messageId);
 					if (message) {
 						const currentReadBy = message.readBy || [];
-						const updatedReadBy = currentReadBy.includes(data.userId) 
-							? currentReadBy 
+						const updatedReadBy = currentReadBy.includes(data.userId)
+							? currentReadBy
 							: [...currentReadBy, data.userId];
 						indexedDBChatService
-							.updateMessage(messageId, { 
+							.updateMessage(messageId, {
 								isRead: true,
-								readBy: updatedReadBy 
+								readBy: updatedReadBy,
 							})
 							.catch((error: Error) => {
-								console.error("Failed to update message as read in IndexedDB:", error);
+								console.error(
+									"Failed to update message as read in IndexedDB:",
+									error
+								);
 							});
 					}
 				});
@@ -609,9 +621,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Calculate how many messages were marked as read
 				const readCount = data.messageIds.length;
 
-				// Update chat room's unreadCount
+				// Update chat room's unreadCount only if the current user read the messages
+				// This ensures that unreadCount is only decremented for the user who actually read them
+				// For group/load chats, each user has their own unreadCount based on their readBy status
 				const updatedRooms = state.chatRooms.map(room => {
-					if (room.id === data.chatRoomId && room.unreadCount && room.unreadCount > 0) {
+					if (
+						room.id === data.chatRoomId &&
+						data.userId === currentUser?.id &&
+						room.unreadCount &&
+						room.unreadCount > 0
+					) {
 						const newUnreadCount = Math.max(0, room.unreadCount - readCount);
 						const updatedRoom = { ...room, unreadCount: newUnreadCount };
 
