@@ -10,12 +10,12 @@ interface ChatBoxSendFormProps {
 	onSendMessage?: (message: {
 		content: string;
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
-		replyData?: Message['replyData'];
+		replyData?: Message["replyData"];
 	}) => void;
 	onTyping?: (isTyping: boolean) => void;
 	disabled?: boolean;
 	isLoading?: boolean;
-	replyingTo?: Message['replyData'];
+	replyingTo?: Message["replyData"];
 	onCancelReply?: () => void;
 }
 
@@ -40,6 +40,7 @@ export default function ChatBoxSendForm({
 	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
 
 	const handleSendMessage = async () => {
 		if (!message.trim() && !attachedFile) return;
@@ -65,11 +66,16 @@ export default function ChatBoxSendForm({
 			setAttachedFile(null);
 			setShowFileUploader(false);
 			setShowEmojiPicker(false);
-			
+
 			// Cancel reply if we were replying
 			if (replyingTo && onCancelReply) {
 				onCancelReply();
 			}
+
+			// Focus back to input after sending message
+			requestAnimationFrame(() => {
+				inputRef.current?.focus();
+			});
 		} catch (error) {
 			console.error("Failed to send message:", error);
 		} finally {
@@ -107,10 +113,9 @@ export default function ChatBoxSendForm({
 	const handleEmojiSelect = (emoji: string) => {
 		setMessage(prev => prev + emoji);
 		// Focus back to input after emoji selection
-		const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-		if (input) {
-			input.focus();
-		}
+		requestAnimationFrame(() => {
+			inputRef.current?.focus();
+		});
 	};
 
 	// Close emoji picker when clicking outside
@@ -130,11 +135,11 @@ export default function ChatBoxSendForm({
 		};
 
 		if (showEmojiPicker) {
-			document.addEventListener('mousedown', handleClickOutside);
+			document.addEventListener("mousedown", handleClickOutside);
 		}
 
 		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [showEmojiPicker]);
 
@@ -146,10 +151,7 @@ export default function ChatBoxSendForm({
 		<div className="sticky bottom-0 p-3 border-t border-gray-200 dark:border-gray-800">
 			{/* Reply Preview */}
 			{replyingTo && (
-				<ReplyPreview 
-					replyData={replyingTo} 
-					onCancel={() => onCancelReply?.()} 
-				/>
+				<ReplyPreview replyData={replyingTo} onCancel={() => onCancelReply?.()} />
 			)}
 
 			{/* File uploader overlay */}
@@ -284,6 +286,7 @@ export default function ChatBoxSendForm({
 					/>
 
 					<input
+						ref={inputRef}
 						type="text"
 						placeholder="Type a message"
 						value={message}
@@ -318,7 +321,6 @@ export default function ChatBoxSendForm({
 							/>
 						</svg>
 					</button>
-
 
 					{/* Send button */}
 					<button
