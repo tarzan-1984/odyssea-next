@@ -13,11 +13,10 @@ export const useUserInit = () => {
 	const userData = clientAuth.getUserData();
 
 	useEffect(() => {
-
 		// Only initialize if user is not already loaded
 		if (!currentUser) {
 			const userData = clientAuth.getUserData();
-			
+
 			if (userData) {
 				// Convert the user data from cookies to the format expected by the store
 				const userDataForStore = {
@@ -34,19 +33,13 @@ export const useUserInit = () => {
 				};
 
 				setCurrentUser(userDataForStore);
-				
+
 				// Reset current chat room to ensure no stale state from previous session
 				setCurrentChatRoom(null);
-				
-				// Load chat rooms for global unread count
-				chatApi.getChatRooms()
-					.then((chatRooms) => {
-						setChatRooms(chatRooms);
-					})
-					.catch((error) => {
-						console.error("Failed to load chat rooms:", error);
-					});
-				
+
+				// Chat rooms are loaded globally via ChatSyncInitializer/useChatSync.
+				// Intentionally do not trigger here to avoid overwriting fresh counters.
+
 				setIsInitializing(false);
 			} else {
 				// No user data found, finish initialization

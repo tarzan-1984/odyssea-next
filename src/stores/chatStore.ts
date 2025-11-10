@@ -10,7 +10,7 @@ const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
 		// First priority: pin status - pinned chats go to top regardless of mute status
 		if (a.isPinned && !b.isPinned) return -1;
 		if (!a.isPinned && b.isPinned) return 1;
-		
+
 		// If both have same pin status, then consider mute status
 		if (a.isPinned === b.isPinned) {
 			// If both are pinned, sort by last message date (mute doesn't matter)
@@ -19,20 +19,20 @@ const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
 				const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
 				return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
 			}
-			
+
 			// If both are not pinned, then mute status matters
 			if (!a.isPinned && !b.isPinned) {
 				// Muted chats go to bottom
 				if (a.isMuted && !b.isMuted) return 1;
 				if (!a.isMuted && b.isMuted) return -1;
-				
+
 				// If both have same mute status, sort by last message date
 				const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
 				const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
 				return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
 			}
 		}
-		
+
 		// Fallback - should not reach here
 		const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
 		const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
@@ -68,7 +68,13 @@ interface ChatState {
 	isLoadingArchivedMessages: boolean;
 	isLoadingAvailableArchives: boolean; // Loading list of available archives
 	archivedMessagesCache: Map<string, Message[]>; // key: "year-month-day", value: messages
-	availableArchives: { year: number; month: number; day: number; messageCount: number; createdAt: string }[];
+	availableArchives: {
+		year: number;
+		month: number;
+		day: number;
+		messageCount: number;
+		createdAt: string;
+	}[];
 	currentArchiveIndex: number; // Index of next archive to load
 	pendingArchiveLoad: boolean; // User scrolled up while archives were loading
 
@@ -114,20 +120,36 @@ interface ChatState {
 	// Action to clear cache from IndexedDB
 	clearCache: () => Promise<void>;
 
-  // Action to load more messages (for infinite scroll)
-  loadMoreMessages: () => Promise<void>;
+	// Action to load more messages (for infinite scroll)
+	loadMoreMessages: () => Promise<void>;
 
-  // Archive-related actions
+	// Archive-related actions
 	loadArchivedMessages: (year: number, month: number, day: number) => Promise<void>;
 	checkArchivedMessagesExists: (year: number, month: number, day: number) => Promise<boolean>;
-  getNextArchiveMonth: () => { year: number; month: number } | null;
-	getAvailableArchiveDays: () => Promise<{ year: number; month: number; day: number; messageCount: number; createdAt: string }[]>;
-	setAvailableArchives: (archives: { year: number; month: number; day: number; messageCount: number; createdAt: string }[]) => void;
-	getNextAvailableArchive: () => { year: number; month: number; day: number; messageCount: number; createdAt: string } | null;
-  setPendingArchiveLoad: (pending: boolean) => void;
-  triggerPendingArchiveLoad: () => void;
-  
-  // User join date methods
+	getNextArchiveMonth: () => { year: number; month: number } | null;
+	getAvailableArchiveDays: () => Promise<
+		{ year: number; month: number; day: number; messageCount: number; createdAt: string }[]
+	>;
+	setAvailableArchives: (
+		archives: {
+			year: number;
+			month: number;
+			day: number;
+			messageCount: number;
+			createdAt: string;
+		}[]
+	) => void;
+	getNextAvailableArchive: () => {
+		year: number;
+		month: number;
+		day: number;
+		messageCount: number;
+		createdAt: string;
+	} | null;
+	setPendingArchiveLoad: (pending: boolean) => void;
+	triggerPendingArchiveLoad: () => void;
+
+	// User join date methods
 	getUserJoinDate: () => Date | null;
 }
 
@@ -158,160 +180,184 @@ export const useChatStore = create<ChatState>()(
 
 				// Chat room actions
 				setCurrentChatRoom: chatRoom => {
-					set({
-						currentChatRoom: chatRoom,
-						error: null,
-						pendingArchiveLoad: false,
-						isLoadingAvailableArchives: false,
-						availableArchives: [],
-						currentArchiveIndex: 0
-					}, false, "setCurrentChatRoom");
+					set(
+						{
+							currentChatRoom: chatRoom,
+							error: null,
+							pendingArchiveLoad: false,
+							isLoadingAvailableArchives: false,
+							availableArchives: [],
+							currentArchiveIndex: 0,
+						},
+						false,
+						"setCurrentChatRoom"
+					);
 
 					// Load available archives when switching to a chat room
 					if (chatRoom) {
 						// Load archives asynchronously
-						get().getAvailableArchiveDays().catch(error => {
-							console.error("Failed to load archive days:", error);
-						});
+						get()
+							.getAvailableArchiveDays()
+							.catch(error => {
+								console.error("Failed to load archive days:", error);
+							});
 					}
 				},
 
-		setChatRooms: chatRooms => {
-			// Sort chat rooms by last message date when setting
-			const sortedRooms = sortChatRoomsByLastMessage(chatRooms);
-			set({ chatRooms: sortedRooms, error: null }, false, "setChatRooms");
-		},
+				setChatRooms: chatRooms => {
+					// Sort chat rooms by last message date when setting
+					const sortedRooms = sortChatRoomsByLastMessage(chatRooms);
+					set({ chatRooms: sortedRooms, error: null }, false, "setChatRooms");
+				},
 
-		addChatRoom: chatRoom => {
-			const { chatRooms } = get();
-			const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
+				addChatRoom: chatRoom => {
+					const { chatRooms } = get();
+					const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
 
-			if (existingIndex >= 0) {
-				// Update existing room
-				const updatedRooms = [...chatRooms];
-				updatedRooms[existingIndex] = chatRoom;
-				// Sort after update
-				const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
-				set({ chatRooms: sortedRooms }, false, "addChatRoom:update");
-			} else {
-				// Add new room and sort
-				const newRooms = [chatRoom, ...chatRooms];
-				const sortedRooms = sortChatRoomsByLastMessage(newRooms);
-				set({ chatRooms: sortedRooms }, false, "addChatRoom:add");
-			}
-		},
+					if (existingIndex >= 0) {
+						// Update existing room
+						const updatedRooms = [...chatRooms];
+						updatedRooms[existingIndex] = chatRoom;
+						// Sort after update
+						const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+						set({ chatRooms: sortedRooms }, false, "addChatRoom:update");
+					} else {
+						// Add new room and sort
+						const newRooms = [chatRoom, ...chatRooms];
+						const sortedRooms = sortChatRoomsByLastMessage(newRooms);
+						set({ chatRooms: sortedRooms }, false, "addChatRoom:add");
+					}
+				},
 
-	updateChatRoom: (chatRoomId, updates) => {
-		const { chatRooms, currentChatRoom } = get();
+				updateChatRoom: (chatRoomId, updates) => {
+					const { chatRooms, currentChatRoom } = get();
 
-		const updatedRooms = chatRooms.map(room =>
-			room.id === chatRoomId ? { ...room, ...updates } : room
-		);
+					const updatedRooms = chatRooms.map(room =>
+						room.id === chatRoomId ? { ...room, ...updates } : room
+					);
 
-		// Sort chat rooms by last message date after update
-		const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+					// Sort chat rooms by last message date after update
+					const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
 
-		const updatedState: Partial<ChatState> = { chatRooms: sortedRooms };
-		if (currentChatRoom?.id === chatRoomId) {
-			updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
-		}
-		set(updatedState as any, false, "updateChatRoom");
+					const updatedState: Partial<ChatState> = { chatRooms: sortedRooms };
+					if (currentChatRoom?.id === chatRoomId) {
+						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+					}
+					set(updatedState as any, false, "updateChatRoom");
 
-		// Sync to IndexedDB
-		indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
-			console.error("Failed to update chat room in IndexedDB:", error);
-		});
-	},
+					// Sync to IndexedDB
+					indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
+						console.error("Failed to update chat room in IndexedDB:", error);
+					});
+				},
 
-			removeChatRoom: chatRoomId => {
-				const { chatRooms, currentChatRoom } = get();
-				const updatedRooms = chatRooms.filter(room => room.id !== chatRoomId);
-				const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
+				removeChatRoom: chatRoomId => {
+					const { chatRooms, currentChatRoom } = get();
+					const updatedRooms = chatRooms.filter(room => room.id !== chatRoomId);
+					const updatedState: Partial<ChatState> = { chatRooms: updatedRooms };
 
-				// If the removed room was the current chat, clear it
-				if (currentChatRoom?.id === chatRoomId) {
-					updatedState.currentChatRoom = null;
-					updatedState.messages = [];
-				}
+					// If the removed room was the current chat, clear it
+					if (currentChatRoom?.id === chatRoomId) {
+						updatedState.currentChatRoom = null;
+						updatedState.messages = [];
+					}
 
-				set(updatedState as any, false, "removeChatRoom");
+					set(updatedState as any, false, "removeChatRoom");
 
-				// Remove from IndexedDB
-				indexedDBChatService.deleteChatRoom(chatRoomId).catch(error => {
-					console.error("Failed to delete chat room from IndexedDB:", error);
-				});
-			},
+					// Remove from IndexedDB
+					indexedDBChatService.deleteChatRoom(chatRoomId).catch(error => {
+						console.error("Failed to delete chat room from IndexedDB:", error);
+					});
+				},
 
 				// Message actions
 				setMessages: messages => {
 					set({ messages, error: null }, false, "setMessages");
 				},
 
-	addMessage: message => {
-		const { messages, chatRooms } = get();
-		// Check if message already exists to avoid duplicates
-		const exists = messages.some(msg => msg.id === message.id);
-		if (!exists) {
-			const newMessages = [...messages, message];
+				addMessage: message => {
+					const { messages, chatRooms } = get();
+					// Check if message already exists to avoid duplicates
+					const exists = messages.some(msg => msg.id === message.id);
+					if (!exists) {
+						const newMessages = [...messages, message];
 
-			// Update the lastMessage in the corresponding chat room
-			const updatedRooms = chatRooms.map(room => {
-				if (room.id === message.chatRoomId) {
-					return {
-						...room,
-						lastMessage: message
-					};
-				}
-				return room;
-			});
-
-			// Sort chat rooms by last message date
-			const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
-
-			set({ messages: newMessages, chatRooms: sortedRooms }, false, "addMessage");
-			// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
-		}
-	},
-
-		updateMessage: (messageId, updates) => {
-			const { messages, chatRooms } = get();
-			const message = messages.find(msg => msg.id === messageId);
-			const updatedMessages = messages.map(msg =>
-				msg.id === messageId ? { ...msg, ...updates } : msg
-			);
-
-			// Always save updated message to IndexedDB
-			indexedDBChatService.updateMessage(messageId, updates).catch((error: Error) => {
-				console.error("Failed to update message in IndexedDB:", error);
-			});
-
-			// If marking as read, update unreadCount in chat rooms
-			if (updates.readBy && message && message.chatRoomId) {
-				const currentUser = useUserStore.getState().currentUser;
-				if (currentUser && currentUser.id) {
-					const wasRead = message.readBy?.includes(currentUser.id) || false;
-					const isNowRead = updates.readBy.includes(currentUser.id);
-					
-					if (!wasRead && isNowRead) {
+						// Update the lastMessage in the corresponding chat room
 						const updatedRooms = chatRooms.map(room => {
-							if (room.id === message.chatRoomId && room.unreadCount && room.unreadCount > 0) {
-								const updatedRoom = { ...room, unreadCount: room.unreadCount - 1 };
-								// Save updated room to IndexedDB
-								indexedDBChatService.updateChatRoom(updatedRoom.id, { unreadCount: updatedRoom.unreadCount }).catch((error: Error) => {
-									console.error("Failed to update chat room in IndexedDB:", error);
-								});
-								return updatedRoom;
+							if (room.id === message.chatRoomId) {
+								return {
+									...room,
+									lastMessage: message,
+								};
 							}
 							return room;
 						});
-						set({ messages: updatedMessages, chatRooms: updatedRooms }, false, "updateMessage");
-						return;
-					}
-				}
-			}
 
-			set({ messages: updatedMessages }, false, "updateMessage");
-		},
+						// Sort chat rooms by last message date
+						const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+
+						set({ messages: newMessages, chatRooms: sortedRooms }, false, "addMessage");
+						// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
+					}
+				},
+
+				updateMessage: (messageId, updates) => {
+					const { messages, chatRooms } = get();
+					const message = messages.find(msg => msg.id === messageId);
+					const updatedMessages = messages.map(msg =>
+						msg.id === messageId ? { ...msg, ...updates } : msg
+					);
+
+					// Always save updated message to IndexedDB
+					indexedDBChatService.updateMessage(messageId, updates).catch((error: Error) => {
+						console.error("Failed to update message in IndexedDB:", error);
+					});
+
+					// If marking as read, update unreadCount in chat rooms
+					if (updates.readBy && message && message.chatRoomId) {
+						const currentUser = useUserStore.getState().currentUser;
+						if (currentUser && currentUser.id) {
+							const wasRead = message.readBy?.includes(currentUser.id) || false;
+							const isNowRead = updates.readBy.includes(currentUser.id);
+
+							if (!wasRead && isNowRead) {
+								const updatedRooms = chatRooms.map(room => {
+									if (
+										room.id === message.chatRoomId &&
+										room.unreadCount &&
+										room.unreadCount > 0
+									) {
+										const updatedRoom = {
+											...room,
+											unreadCount: room.unreadCount - 1,
+										};
+										// Save updated room to IndexedDB
+										indexedDBChatService
+											.updateChatRoom(updatedRoom.id, {
+												unreadCount: updatedRoom.unreadCount,
+											})
+											.catch((error: Error) => {
+												console.error(
+													"Failed to update chat room in IndexedDB:",
+													error
+												);
+											});
+										return updatedRoom;
+									}
+									return room;
+								});
+								set(
+									{ messages: updatedMessages, chatRooms: updatedRooms },
+									false,
+									"updateMessage"
+								);
+								return;
+							}
+						}
+					}
+
+					set({ messages: updatedMessages }, false, "updateMessage");
+				},
 
 				prependMessages: newMessages => {
 					const { messages } = get();
@@ -402,17 +448,21 @@ export const useChatStore = create<ChatState>()(
 						await indexedDBChatService.clearCache();
 
 						// Clear Zustand store
-						set({
-							currentChatRoom: null,
-							messages: [],
-							chatRooms: [],
-							isLoadingMessages: false,
-							isLoadingChatRooms: false,
-							isSendingMessage: false,
-							error: null,
-							hasMoreMessages: false,
-							currentPage: 1,
-						}, false, "clearCache");
+						set(
+							{
+								currentChatRoom: null,
+								messages: [],
+								chatRooms: [],
+								isLoadingMessages: false,
+								isLoadingChatRooms: false,
+								isSendingMessage: false,
+								error: null,
+								hasMoreMessages: false,
+								currentPage: 1,
+							},
+							false,
+							"clearCache"
+						);
 					} catch (error) {
 						console.error("Failed to clear cache:", error);
 						throw error;
@@ -420,7 +470,13 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				loadMoreMessages: async () => {
-					const { currentChatRoom, currentPage, hasMoreMessages, isLoadingMessages, messages } = get();
+					const {
+						currentChatRoom,
+						currentPage,
+						hasMoreMessages,
+						isLoadingMessages,
+						messages,
+					} = get();
 
 					// Enhanced validation before loading more messages
 					if (
@@ -447,32 +503,49 @@ export const useChatStore = create<ChatState>()(
 
 							// Remove duplicates by creating a Map of message IDs
 							const existingMessageIds = new Set(messages.map(msg => msg.id));
-							const newMessages = result.messages.filter(msg => !existingMessageIds.has(msg.id));
+							const newMessages = result.messages.filter(
+								msg => !existingMessageIds.has(msg.id)
+							);
 
 							// Prepend only new messages to the beginning of the array
 							const updatedMessages = [...newMessages, ...messages];
 
-							set({
-								messages: updatedMessages,
-								currentPage: nextPage,
-								hasMoreMessages: result.hasMore,
-								isLoadingMessages: false,
-							}, false, "loadMoreMessages");
+							set(
+								{
+									messages: updatedMessages,
+									currentPage: nextPage,
+									hasMoreMessages: result.hasMore,
+									isLoadingMessages: false,
+								},
+								false,
+								"loadMoreMessages"
+							);
 
 							// Save to IndexedDB
-							await indexedDBChatService.saveMessages(currentChatRoom.id, result.messages);
+							await indexedDBChatService.saveMessages(
+								currentChatRoom.id,
+								result.messages
+							);
 						} else {
-							set({
-								hasMoreMessages: false,
-								isLoadingMessages: false,
-							}, false, "loadMoreMessages");
+							set(
+								{
+									hasMoreMessages: false,
+									isLoadingMessages: false,
+								},
+								false,
+								"loadMoreMessages"
+							);
 						}
 					} catch (error) {
 						console.error("Failed to load more messages:", error);
-						set({
-							isLoadingMessages: false,
-							error: "Failed to load more messages"
-						}, false, "loadMoreMessages");
+						set(
+							{
+								isLoadingMessages: false,
+								error: "Failed to load more messages",
+							},
+							false,
+							"loadMoreMessages"
+						);
 					}
 				},
 
@@ -482,7 +555,11 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				setLoadingArchivedMessages: loading => {
-					set({ isLoadingArchivedMessages: loading }, false, "setLoadingArchivedMessages");
+					set(
+						{ isLoadingArchivedMessages: loading },
+						false,
+						"setLoadingArchivedMessages"
+					);
 				},
 
 				addArchivedMessages: (year, month, messages) => {
@@ -512,12 +589,18 @@ export const useChatStore = create<ChatState>()(
 					if (archivedMessagesCache.has(key)) {
 						const cachedMessages = archivedMessagesCache.get(key)!;
 						const existingMessageIds = new Set(messages.map(msg => msg.id));
-						const newMessages = cachedMessages.filter(msg => !existingMessageIds.has(msg.id));
+						const newMessages = cachedMessages.filter(
+							msg => !existingMessageIds.has(msg.id)
+						);
 
 						if (newMessages.length > 0) {
-							set({
-								messages: [...newMessages, ...messages],
-							}, false, "loadArchivedMessages");
+							set(
+								{
+									messages: [...newMessages, ...messages],
+								},
+								false,
+								"loadArchivedMessages"
+							);
 						}
 						return;
 					}
@@ -537,37 +620,58 @@ export const useChatStore = create<ChatState>()(
 
 						if (archiveFile && archiveFile.messages.length > 0) {
 							const existingMessageIds = new Set(messages.map(msg => msg.id));
-							const newMessages = archiveFile.messages.filter(msg => !existingMessageIds.has(msg.id));
+							const newMessages = archiveFile.messages.filter(
+								msg => !existingMessageIds.has(msg.id)
+							);
 
 							if (newMessages.length > 0) {
 								// Add to cache and messages
 								const newCache = new Map(archivedMessagesCache);
 								newCache.set(key, archiveFile.messages);
 
-								set({
-									messages: [...newMessages, ...messages],
-									archivedMessagesCache: newCache,
-									isLoadingArchivedMessages: false,
-								}, false, "loadArchivedMessages");
+								set(
+									{
+										messages: [...newMessages, ...messages],
+										archivedMessagesCache: newCache,
+										isLoadingArchivedMessages: false,
+									},
+									false,
+									"loadArchivedMessages"
+								);
 
 								// Save to IndexedDB
-								await indexedDBChatService.saveMessages(currentChatRoom.id, newMessages);
+								await indexedDBChatService.saveMessages(
+									currentChatRoom.id,
+									newMessages
+								);
 							} else {
-								set({
-									isLoadingArchivedMessages: false,
-								}, false, "loadArchivedMessages");
+								set(
+									{
+										isLoadingArchivedMessages: false,
+									},
+									false,
+									"loadArchivedMessages"
+								);
 							}
 						} else {
-							set({
-								isLoadingArchivedMessages: false,
-							}, false, "loadArchivedMessages");
+							set(
+								{
+									isLoadingArchivedMessages: false,
+								},
+								false,
+								"loadArchivedMessages"
+							);
 						}
 					} catch (error) {
 						console.error("❌ [ARCHIVE] Failed to load archived messages:", error);
-						set({
-							isLoadingArchivedMessages: false,
-							error: "Failed to load archived messages"
-						}, false, "loadArchivedMessages");
+						set(
+							{
+								isLoadingArchivedMessages: false,
+								error: "Failed to load archived messages",
+							},
+							false,
+							"loadArchivedMessages"
+						);
 					}
 				},
 
@@ -613,7 +717,7 @@ export const useChatStore = create<ChatState>()(
 
 					return {
 						year: prevMonth.getFullYear(),
-						month: prevMonth.getMonth() + 1
+						month: prevMonth.getMonth() + 1,
 					};
 				},
 
@@ -632,32 +736,44 @@ export const useChatStore = create<ChatState>()(
 						// Import messagesArchiveApi dynamically
 						const { messagesArchiveApi } = await import("@/app-api/messagesArchiveApi");
 
-						const archives = await messagesArchiveApi.getAvailableArchiveDays(currentChatRoom.id);
+						const archives = await messagesArchiveApi.getAvailableArchiveDays(
+							currentChatRoom.id
+						);
 
 						// Filter archives by user join date to avoid unnecessary requests
 						const { getUserJoinDate } = get();
 						const userJoinDate = getUserJoinDate();
-						
+
 						let filteredArchives = archives;
 						if (userJoinDate) {
 							filteredArchives = archives.filter(archive => {
-								const archiveDate = new Date(archive.year, archive.month - 1, archive.day);
+								const archiveDate = new Date(
+									archive.year,
+									archive.month - 1,
+									archive.day
+								);
 								const isAfterJoin = archiveDate >= userJoinDate;
-								
+
 								if (!isAfterJoin) {
-									console.log(`🚫 Filtered out archive ${archive.year}-${archive.month}-${archive.day} (before user join date)`);
+									console.log(
+										`🚫 Filtered out archive ${archive.year}-${archive.month}-${archive.day} (before user join date)`
+									);
 								}
-								
+
 								return isAfterJoin;
 							});
 						}
 
 						// Save filtered archives to state and clear loading
-						set({
-							availableArchives: filteredArchives,
-							currentArchiveIndex: 0,
-							isLoadingAvailableArchives: false
-						}, false, "getAvailableArchiveDays");
+						set(
+							{
+								availableArchives: filteredArchives,
+								currentArchiveIndex: 0,
+								isLoadingAvailableArchives: false,
+							},
+							false,
+							"getAvailableArchiveDays"
+						);
 
 						// Check if user was waiting for archives to load
 						const { pendingArchiveLoad } = get();
@@ -670,50 +786,62 @@ export const useChatStore = create<ChatState>()(
 						return filteredArchives;
 					} catch (error) {
 						console.error("❌ [ARCHIVE] Failed to get available archive days:", error);
-						set({ isLoadingAvailableArchives: false }, false, "getAvailableArchiveDays");
+						set(
+							{ isLoadingAvailableArchives: false },
+							false,
+							"getAvailableArchiveDays"
+						);
 						return [];
 					}
 				},
 
 				// Set available archives
 				setAvailableArchives: archives => {
-					set({
-						availableArchives: archives,
-						currentArchiveIndex: 0
-					}, false, "setAvailableArchives");
+					set(
+						{
+							availableArchives: archives,
+							currentArchiveIndex: 0,
+						},
+						false,
+						"setAvailableArchives"
+					);
 				},
 
-	// Get user's join date for current chat room
-	getUserJoinDate: () => {
-		const { currentChatRoom } = get();
-		const currentUser = useUserStore.getState().currentUser;
-		
-		if (!currentChatRoom || !currentUser) {
-			return null;
-		}
-		
-		const participant = currentChatRoom.participants.find(
-			p => p.userId === currentUser.id
-		);
-		
-		return participant?.joinedAt ? new Date(participant.joinedAt) : null;
-	},
+				// Get user's join date for current chat room
+				getUserJoinDate: () => {
+					const { currentChatRoom } = get();
+					const currentUser = useUserStore.getState().currentUser;
 
-	// Get next available archive from the list
-	getNextAvailableArchive: () => {
-		const { availableArchives, currentArchiveIndex } = get();
+					if (!currentChatRoom || !currentUser) {
+						return null;
+					}
 
-		if (currentArchiveIndex >= availableArchives.length) {
-			return null; // No more archives
-		}
+					const participant = currentChatRoom.participants.find(
+						p => p.userId === currentUser.id
+					);
 
-		const nextArchive = availableArchives[currentArchiveIndex];
+					return participant?.joinedAt ? new Date(participant.joinedAt) : null;
+				},
 
-		// Move to next archive
-		set({ currentArchiveIndex: currentArchiveIndex + 1 }, false, "getNextAvailableArchive");
+				// Get next available archive from the list
+				getNextAvailableArchive: () => {
+					const { availableArchives, currentArchiveIndex } = get();
 
-		return nextArchive;
-	},
+					if (currentArchiveIndex >= availableArchives.length) {
+						return null; // No more archives
+					}
+
+					const nextArchive = availableArchives[currentArchiveIndex];
+
+					// Move to next archive
+					set(
+						{ currentArchiveIndex: currentArchiveIndex + 1 },
+						false,
+						"getNextAvailableArchive"
+					);
+
+					return nextArchive;
+				},
 
 				// Set pending archive load flag
 				setPendingArchiveLoad: (pending: boolean) => {
@@ -722,12 +850,17 @@ export const useChatStore = create<ChatState>()(
 
 				// Trigger pending archive load (when user scrolled before archives loaded)
 				triggerPendingArchiveLoad: () => {
-					const { availableArchives, loadArchivedMessages, getNextAvailableArchive } = get();
+					const { availableArchives, loadArchivedMessages, getNextAvailableArchive } =
+						get();
 
 					if (availableArchives.length > 0) {
 						const nextArchive = getNextAvailableArchive();
 						if (nextArchive) {
-							loadArchivedMessages(nextArchive.year, nextArchive.month, nextArchive.day);
+							loadArchivedMessages(
+								nextArchive.year,
+								nextArchive.month,
+								nextArchive.day
+							);
 						}
 					}
 				},
@@ -748,7 +881,7 @@ export const useChatStore = create<ChatState>()(
 	)
 );
 
-// Selectors for specific parts of the state - простые селекторы без мемоизации
+// Selectors for specific parts of the state - simple selectors without memoization
 export const useCurrentChatRoom = () => useChatStore(state => state.currentChatRoom);
 export const useMessages = () => useChatStore(state => state.messages);
 export const useChatRooms = () => useChatStore(state => state.chatRooms);
@@ -760,10 +893,11 @@ export const useHasMoreMessages = () => useChatStore(state => state.hasMoreMessa
 
 // Archive selectors
 export const useHasArchivedMessages = () => useChatStore(state => state.hasArchivedMessages);
-export const useIsLoadingArchivedMessages = () => useChatStore(state => state.isLoadingArchivedMessages);
+export const useIsLoadingArchivedMessages = () =>
+	useChatStore(state => state.isLoadingArchivedMessages);
 export const useArchivedMessagesCache = () => useChatStore(state => state.archivedMessagesCache);
 
-// Action selectors - простой селектор
+// Action selectors - simple selector
 export const useChatActions = () =>
 	useChatStore(state => ({
 		setCurrentChatRoom: state.setCurrentChatRoom,

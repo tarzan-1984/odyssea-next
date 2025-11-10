@@ -9,6 +9,7 @@ import { WebSocketProvider } from "@/context/WebSocketContext";
 import UserInitializer from "@/components/common/UserInitializer";
 import NotificationsInitializer from "@/components/common/NotificationsInitializer";
 import { ToastNotificationManager } from "@/components/notifications/ToastNotificationManager";
+import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
 
 const outfit = Outfit({
 	subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
 					<SidebarProvider>
 						<WebSocketProvider>
 							<UserInitializer />
+							<ChatSyncInitializer />
 							<NotificationsInitializer />
 							<ToastNotificationManager />
 							{children}

@@ -44,7 +44,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 
 	const getChatTitle = () => {
 		if (chatRoom.type === "DIRECT") {
-			// Для прямого чата показываем имя и фамилию второго участника
+			// For DIRECT chats show the other participant's name
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user?.id !== currentUser?.id
 			);
@@ -52,7 +52,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 				? `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`
 				: "Direct Chat";
 		}
-		// Для группового чата показываем название чата
+		// For group chats show the chat name
 		return chatRoom.name || "Group Chat";
 	};
 
@@ -61,7 +61,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 			const otherParticipant = chatRoom.participants.find(
 				p => p.user?.id !== currentUser?.id
 			);
-			// Поддерживаем avatar и возможное поле profilePhoto (совместимость)
+			// Support both avatar and legacy profilePhoto fields
 			return (
 				(otherParticipant?.user?.avatar as string) ||
 				(otherParticipant?.user as any)?.profilePhoto ||

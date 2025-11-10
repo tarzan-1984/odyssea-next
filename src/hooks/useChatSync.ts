@@ -6,17 +6,20 @@ import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
 
 // Helper function to merge cached messages with real-time updates from store
-const mergeMessagesWithUpdates = (cachedMessages: Message[], currentMessages: Message[]): Message[] => {
+const mergeMessagesWithUpdates = (
+	cachedMessages: Message[],
+	currentMessages: Message[]
+): Message[] => {
 	// Create a map of current messages by ID for quick lookup
 	const currentMessagesMap = new Map(currentMessages.map(msg => [msg.id, msg]));
-	
+
 	// Merge cached messages with updates from current store
 	const mergedMessages = cachedMessages.map(cachedMsg => {
 		const currentMsg = currentMessagesMap.get(cachedMsg.id);
 		// If message exists in current store, use the updated version (especially for isRead status)
 		return currentMsg || cachedMsg;
 	});
-	
+
 	return mergedMessages;
 };
 
@@ -88,10 +91,15 @@ export const useChatSync = () => {
 						// Merge cached data with current store state to preserve real-time updates
 						const currentStoreRooms = useChatStore.getState().chatRooms;
 						const mergedCachedRooms = cachedRooms.map(cachedRoom => {
-							const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === cachedRoom.id);
+							const storeRoom = currentStoreRooms.find(
+								storeRoom => storeRoom.id === cachedRoom.id
+							);
 							if (storeRoom) {
-								// Use cached unreadCount if available, otherwise use store unreadCount
-								const finalUnreadCount = cachedRoom.unreadCount !== undefined ? cachedRoom.unreadCount : (storeRoom.unreadCount || 0);
+								// Preserve the maximum unreadCount to avoid losing real-time increments after reload
+								const finalUnreadCount = Math.max(
+									cachedRoom.unreadCount ?? 0,
+									storeRoom.unreadCount ?? 0
+								);
 								return {
 									...cachedRoom,
 									unreadCount: finalUnreadCount,
@@ -115,14 +123,19 @@ export const useChatSync = () => {
 						...room,
 						participants: normalizeParticipants(room.participants || []),
 					}));
-					
+
 					// Merge API data with current store state to preserve real-time updates
 					const currentStoreRooms = useChatStore.getState().chatRooms;
 					const mergedRooms = normalizedApiRooms.map(apiRoom => {
-						const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
+						const storeRoom = currentStoreRooms.find(
+							storeRoom => storeRoom.id === apiRoom.id
+						);
 						if (storeRoom) {
-							// Use API unreadCount if available, otherwise use store unreadCount
-							const finalUnreadCount = apiRoom.unreadCount !== undefined ? apiRoom.unreadCount : (storeRoom.unreadCount || 0);
+							// Preserve the maximum unreadCount to avoid regressing due to stale API values
+							const finalUnreadCount = Math.max(
+								apiRoom.unreadCount ?? 0,
+								storeRoom.unreadCount ?? 0
+							);
 							return {
 								...apiRoom,
 								unreadCount: finalUnreadCount,
@@ -132,7 +145,7 @@ export const useChatSync = () => {
 						}
 						return apiRoom;
 					});
-					
+
 					setChatRooms(mergedRooms);
 					ensureCurrentRoomValidity(mergedRooms);
 					await indexedDBChatService.saveChatRooms(mergedRooms);
@@ -146,11 +159,17 @@ export const useChatSync = () => {
 						// Merge cached data with current store state
 						const currentStoreRooms = useChatStore.getState().chatRooms;
 						const mergedCachedRooms = cachedRooms.map(cachedRoom => {
-							const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === cachedRoom.id);
+							const storeRoom = currentStoreRooms.find(
+								storeRoom => storeRoom.id === cachedRoom.id
+							);
 							if (storeRoom) {
 								return {
 									...cachedRoom,
-									unreadCount: storeRoom.unreadCount || 0,
+									// Keep the maximum value between cache and store
+									unreadCount: Math.max(
+										cachedRoom.unreadCount ?? 0,
+										storeRoom.unreadCount ?? 0
+									),
 									lastMessage: storeRoom.lastMessage || cachedRoom.lastMessage,
 									updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 								};
@@ -172,14 +191,19 @@ export const useChatSync = () => {
 					...room,
 					participants: normalizeParticipants(room.participants || []),
 				}));
-				
+
 				// Merge API data with current store state to preserve real-time updates
 				const currentStoreRooms = useChatStore.getState().chatRooms;
 				const mergedRooms = normalizedApiRooms.map(apiRoom => {
-					const storeRoom = currentStoreRooms.find(storeRoom => storeRoom.id === apiRoom.id);
+					const storeRoom = currentStoreRooms.find(
+						storeRoom => storeRoom.id === apiRoom.id
+					);
 					if (storeRoom) {
-						// Use API unreadCount if available, otherwise use store unreadCount
-						const finalUnreadCount = apiRoom.unreadCount !== undefined ? apiRoom.unreadCount : (storeRoom.unreadCount || 0);
+						// Preserve the maximum unreadCount to avoid regressing due to stale API values
+						const finalUnreadCount = Math.max(
+							apiRoom.unreadCount ?? 0,
+							storeRoom.unreadCount ?? 0
+						);
 						return {
 							...apiRoom,
 							unreadCount: finalUnreadCount,
@@ -189,7 +213,7 @@ export const useChatSync = () => {
 					}
 					return apiRoom;
 				});
-				
+
 				setChatRooms(mergedRooms);
 				ensureCurrentRoomValidity(mergedRooms);
 				await indexedDBChatService.saveChatRooms(mergedRooms);
@@ -231,10 +255,13 @@ export const useChatSync = () => {
 					if (cachedMessages.length > 0) {
 						// Merge cached messages with any real-time updates from store
 						const { messages: currentMessages } = useChatStore.getState();
-						const mergedMessages = mergeMessagesWithUpdates(cachedMessages, currentMessages);
+						const mergedMessages = mergeMessagesWithUpdates(
+							cachedMessages,
+							currentMessages
+						);
 						setMessages(mergedMessages);
 						setLoadingMessages(false);
-						
+
 						// Set initial pagination state for cached messages
 						setCurrentPage(page);
 						setHasMoreMessages(cachedMessages.length >= limit); // Assume there might be more if we got full page
@@ -258,7 +285,10 @@ export const useChatSync = () => {
 								) {
 									// Merge API messages with real-time updates from store
 									const { messages: currentMessages } = useChatStore.getState();
-									const mergedMessages = mergeMessagesWithUpdates(response.messages, currentMessages);
+									const mergedMessages = mergeMessagesWithUpdates(
+										response.messages,
+										currentMessages
+									);
 									setMessages(mergedMessages);
 									setCurrentPage(page);
 									setHasMoreMessages(response.hasMore);
@@ -282,10 +312,13 @@ export const useChatSync = () => {
 					const response = await chatApi.getMessages(chatRoomId, page, limit);
 					// Merge API messages with any real-time updates from store
 					const { messages: currentMessages } = useChatStore.getState();
-					const mergedMessages = mergeMessagesWithUpdates(response.messages, currentMessages);
+					const mergedMessages = mergeMessagesWithUpdates(
+						response.messages,
+						currentMessages
+					);
 					setMessages(mergedMessages);
 					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
-					
+
 					// Update pagination state
 					setCurrentPage(page);
 					setHasMoreMessages(response.hasMore);

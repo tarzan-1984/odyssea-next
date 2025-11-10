@@ -45,9 +45,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 		// For direct chats, ALWAYS show the other participant's name (ignore chatRoom.name)
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
+			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
 				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
 			}
@@ -69,14 +67,11 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		return "Unknown Chat";
 	};
 
-
 	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
 
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
+			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
 				return {
 					firstName: otherParticipant.user.firstName,
@@ -99,152 +94,175 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		return { firstName: "Group", lastName: "Chat" };
 	};
 
-
 	return (
 		<>
-		<div className="sticky flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 xl:px-6">
-			<div className="flex items-center gap-3">
-                <div className="relative h-12 w-full max-w-[48px] rounded-full">
-                    {(() => {
-                        if (!chatRoom) {
-                            return renderAvatar(null, "w-12 h-12");
-                        }
-                        
-                        if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-                            const otherParticipant = chatRoom.participants.find(
-                                p => p.user.id !== currentUser?.id
-                            );
-                            if (otherParticipant) {
-                                const userData = {
-                                    firstName: otherParticipant.user.firstName,
-                                    lastName: otherParticipant.user.lastName,
-                                    avatar: otherParticipant.user.avatar || (otherParticipant.user as any).profilePhoto
-                                };
-                                return renderAvatar(userData, "w-12 h-12");
-                            }
-                        }
-                        
-                        // For GROUP/LOAD chats, prefer chat avatar when present
-                        if ((chatRoom.type === "GROUP" || chatRoom.type === "LOAD") && chatRoom.avatar) {
-                            return (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={chatRoom.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
-                            );
-                        }
-                        
-                        // Fallback for GROUP/LOAD chats without avatar
-                        if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
-                            const name = getChatDisplayName();
-                            const parts = name.trim().split(/\s+/).filter(Boolean);
-                            const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
-                            return (
-                                <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
-                                    {initials}
-                                </div>
-                            );
-                        }
-                        
-                        // Final fallback
-                        return renderAvatar(null, "w-12 h-12");
-                    })()}
-					{chatRoom && (() => {
-						let showOnlineIndicator = false;
+			<div className="sticky flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 xl:px-6">
+				<div className="flex items-center gap-3">
+					<div className="relative h-12 w-full max-w-[48px] rounded-full">
+						{(() => {
+							if (!chatRoom) {
+								return renderAvatar(null, "w-12 h-12");
+							}
 
-					if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-						// For direct chats, show if the other participant is online
-						const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
-						showOnlineIndicator = otherParticipant && isUserOnline ? isUserOnline(otherParticipant.user.id) : false;
-					}
+							if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+								const otherParticipant = chatRoom.participants.find(
+									p => p.user.id !== currentUser?.id
+								);
+								if (otherParticipant) {
+									const userData = {
+										firstName: otherParticipant.user.firstName,
+										lastName: otherParticipant.user.lastName,
+										avatar:
+											otherParticipant.user.avatar ||
+											(otherParticipant.user as any).profilePhoto,
+									};
+									return renderAvatar(userData, "w-12 h-12");
+								}
+							}
 
-						return showOnlineIndicator ? (
-							<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
-						) : null;
-					})()}
-				</div>
+							// For GROUP/LOAD chats, prefer chat avatar when present
+							if (
+								(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") &&
+								chatRoom.avatar
+							) {
+								return (
+									// eslint-disable-next-line @next/next/no-img-element
+									<img
+										src={chatRoom.avatar}
+										alt="avatar"
+										className="w-12 h-12 rounded-full object-cover"
+									/>
+								);
+							}
 
-				<button
-					onClick={() => setIsParticipantsModalOpen(true)}
-					className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer z-10 relative"
-					type="button"
-				>
-					{getChatDisplayName()}
-				</button>
-			</div>
+							// Fallback for GROUP/LOAD chats without avatar
+							if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
+								const name = getChatDisplayName();
+								const parts = name.trim().split(/\s+/).filter(Boolean);
+								const initials =
+									(parts[0]?.[0] || "").toUpperCase() +
+									(parts[1]?.[0] || parts[0]?.[1] || "").toUpperCase();
+								return (
+									<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+										{initials}
+									</div>
+								);
+							}
 
-			<div className="flex items-center gap-3">
-				<div className="relative -mb-1.5">
-					<button onClick={toggleDropdown} className="dropdown-toggle">
-						<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+							// Final fallback
+							return renderAvatar(null, "w-12 h-12");
+						})()}
+						{chatRoom &&
+							(() => {
+								let showOnlineIndicator = false;
+
+								if (
+									chatRoom.type === "DIRECT" &&
+									chatRoom.participants.length === 2
+								) {
+									// For direct chats, show if the other participant is online
+									const otherParticipant = chatRoom.participants.find(
+										p => p.user.id !== currentUser?.id
+									);
+									showOnlineIndicator =
+										otherParticipant && isUserOnline
+											? isUserOnline(otherParticipant.user.id)
+											: false;
+								}
+
+								return showOnlineIndicator ? (
+									<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
+								) : null;
+							})()}
+					</div>
+
+					<button
+						onClick={() => setIsParticipantsModalOpen(true)}
+						className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer z-10 relative"
+						type="button"
+					>
+						{getChatDisplayName()}
 					</button>
-                    <Dropdown isOpen={isOpen} onClose={closeDropdown} className="w-40 p-2">
-                        {chatRoom?.adminId === currentUser?.id && chatRoom?.type === "GROUP" && (
-                            <DropdownItem
-                                onItemClick={() => {
-                                    closeDropdown();
-                                    setIsParticipantsModalOpen(true);
-                                }}
-                                className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-                            >
-                                <EditIcon className="w-4 h-4" />
-                                Edit
-                            </DropdownItem>
-                        )}
-                        <DropdownItem
-                            onItemClick={handleFilesClick}
-                            className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-                        >
-                            <AttachmentIcon className="w-4 h-4" />
-                            Files
-                        </DropdownItem>
-                        {/* Показываем кнопку удаления только если пользователь может удалить чат */}
-                        {(() => {
-                            // Для LOAD чатов: только администраторы могут удалять
-                            if (chatRoom?.type === "LOAD") {
-                                if (currentUser?.role !== "ADMINISTRATOR") {
-                                    return null; // Скрываем кнопку
-                                }
-                            }
-                            
-                            // Для остальных типов чатов показываем кнопку
-                            return (
-                                <DropdownItem
-                                    onItemClick={handleDeleteClick}
-                                    className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                                >
-                                    <TrashDeleteIcon className="w-4 h-4" />
-                                    {chatRoom?.type === "GROUP" && chatRoom?.adminId !== currentUser?.id ? "Leave" : "Delete"}
-                                </DropdownItem>
-                            );
-                        })()}
-					</Dropdown>
+				</div>
+
+				<div className="flex items-center gap-3">
+					<div className="relative -mb-1.5">
+						<button onClick={toggleDropdown} className="dropdown-toggle">
+							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+						</button>
+						<Dropdown isOpen={isOpen} onClose={closeDropdown} className="w-40 p-2">
+							{chatRoom?.adminId === currentUser?.id &&
+								chatRoom?.type === "GROUP" && (
+									<DropdownItem
+										onItemClick={() => {
+											closeDropdown();
+											setIsParticipantsModalOpen(true);
+										}}
+										className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+									>
+										<EditIcon className="w-4 h-4" />
+										Edit
+									</DropdownItem>
+								)}
+							<DropdownItem
+								onItemClick={handleFilesClick}
+								className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+							>
+								<AttachmentIcon className="w-4 h-4" />
+								Files
+							</DropdownItem>
+							{/* Show delete/leave button only if user is allowed to */}
+							{(() => {
+								// For LOAD chats: only administrators can delete
+								if (chatRoom?.type === "LOAD") {
+									if (currentUser?.role !== "ADMINISTRATOR") {
+										return null; // Hide the button
+									}
+								}
+
+								// For the rest of chat types show the action
+								return (
+									<DropdownItem
+										onItemClick={handleDeleteClick}
+										className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+									>
+										<TrashDeleteIcon className="w-4 h-4" />
+										{chatRoom?.type === "GROUP" &&
+										chatRoom?.adminId !== currentUser?.id
+											? "Leave"
+											: "Delete"}
+									</DropdownItem>
+								);
+							})()}
+						</Dropdown>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		{/* Participants Modal */}
-		<ChatParticipantsModal
-			isOpen={isParticipantsModalOpen}
-			onClose={() => setIsParticipantsModalOpen(false)}
-			chatRoom={chatRoom || null}
-			isUserOnline={isUserOnline}
-		/>
-		<DeleteChatConfirmModal
-			isOpen={isDeleteModalOpen}
-			onClose={() => setIsDeleteModalOpen(false)}
-			chatRoom={chatRoom}
-			onDeleteSuccess={() => {
-				// Handle successful deletion if needed
-				// The WebSocket event will handle the actual removal from state
-			}}
-		/>
-		
-		{chatRoom && (
-			<FilesModal
-				isOpen={isFilesModalOpen}
-				onClose={() => setIsFilesModalOpen(false)}
-				chatRoom={chatRoom}
+			{/* Participants Modal */}
+			<ChatParticipantsModal
+				isOpen={isParticipantsModalOpen}
+				onClose={() => setIsParticipantsModalOpen(false)}
+				chatRoom={chatRoom || null}
+				isUserOnline={isUserOnline}
 			/>
-		)}
-	</>
+			<DeleteChatConfirmModal
+				isOpen={isDeleteModalOpen}
+				onClose={() => setIsDeleteModalOpen(false)}
+				chatRoom={chatRoom}
+				onDeleteSuccess={() => {
+					// Handle successful deletion if needed
+					// The WebSocket event will handle the actual removal from state
+				}}
+			/>
+
+			{chatRoom && (
+				<FilesModal
+					isOpen={isFilesModalOpen}
+					onClose={() => setIsFilesModalOpen(false)}
+					chatRoom={chatRoom}
+				/>
+			)}
+		</>
 	);
 }

@@ -145,7 +145,6 @@ class IndexedDBChatService {
 						(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 					);
 
-
 					// Apply pagination if specified
 					// For chat messages, we want the LATEST messages (reverse order)
 					if (limit) {
@@ -161,7 +160,6 @@ class IndexedDBChatService {
 					const result: Message[] = messages.map(
 						({ cachedAt, version, ...message }) => message
 					);
-
 
 					resolve(result);
 				};
@@ -247,7 +245,6 @@ class IndexedDBChatService {
 				request.onsuccess = () => resolve();
 				request.onerror = () => reject(request.error);
 			});
-
 		} catch (error) {
 			console.error("Failed to add message to IndexedDB:", error);
 			throw error;
@@ -285,7 +282,6 @@ class IndexedDBChatService {
 				};
 				getRequest.onerror = () => reject(getRequest.error);
 			});
-
 		} catch (error) {
 			console.error("Failed to update message in IndexedDB:", error);
 			throw error;
@@ -356,42 +352,41 @@ class IndexedDBChatService {
 	}
 
 	// Chat rooms operations
-    async saveChatRooms(chatRooms: ChatRoom[]): Promise<void> {
-        try {
-            const db = await this.ensureDB();
-            const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
-            const store = transaction.objectStore(CHAT_ROOMS_STORE);
+	async saveChatRooms(chatRooms: ChatRoom[]): Promise<void> {
+		try {
+			const db = await this.ensureDB();
+			const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+			const store = transaction.objectStore(CHAT_ROOMS_STORE);
 
-            // Полная замена списка комнат: сначала очищаем, затем сохраняем новый список,
-            // чтобы не оставались комнаты, которых уже нет на сервере
-            await new Promise<void>((resolve, reject) => {
-                const clearReq = store.clear();
-                clearReq.onsuccess = () => resolve();
-                clearReq.onerror = () => reject(clearReq.error);
-            });
+			// Full replacement: clear the store first, then save the new list
+			await new Promise<void>((resolve, reject) => {
+				const clearReq = store.clear();
+				clearReq.onsuccess = () => resolve();
+				clearReq.onerror = () => reject(clearReq.error);
+			});
 
-            // Convert chat rooms to stored format
-            const storedChatRooms: StoredChatRoom[] = chatRooms.map(chatRoom => ({
-                ...chatRoom,
-                cachedAt: Date.now(),
-                version: 1,
-            }));
+			// Convert chat rooms to stored format
+			const storedChatRooms: StoredChatRoom[] = chatRooms.map(chatRoom => ({
+				...chatRoom,
+				cachedAt: Date.now(),
+				version: 1,
+			}));
 
-            // Save each chat room
-            for (const chatRoom of storedChatRooms) {
-                await new Promise<void>((resolve, reject) => {
-                    const request = store.put(chatRoom);
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => reject(request.error);
-                });
-            }
+			// Save each chat room
+			for (const chatRoom of storedChatRooms) {
+				await new Promise<void>((resolve, reject) => {
+					const request = store.put(chatRoom);
+					request.onsuccess = () => resolve();
+					request.onerror = () => reject(request.error);
+				});
+			}
 
-            console.log(`Saved ${chatRooms.length} chat rooms to IndexedDB`);
-        } catch (error) {
-            console.error("Failed to save chat rooms to IndexedDB:", error);
-            throw error;
-        }
-    }
+			// Saved chat rooms to IndexedDB
+		} catch (error) {
+			console.error("Failed to save chat rooms to IndexedDB:", error);
+			throw error;
+		}
+	}
 
 	async getChatRooms(): Promise<ChatRoom[]> {
 		try {
@@ -461,7 +456,7 @@ class IndexedDBChatService {
 			await new Promise<void>((resolve, reject) => {
 				const request = store.delete(chatRoomId);
 				request.onsuccess = () => {
-					console.log(`Deleted chat room ${chatRoomId} from IndexedDB`);
+					// Deleted chat room from IndexedDB
 					resolve();
 				};
 				request.onerror = () => {
@@ -591,8 +586,6 @@ class IndexedDBChatService {
 				request.onsuccess = () => resolve();
 				request.onerror = () => reject(request.error);
 			});
-
-			console.log(`Added chat room ${chatRoom.id} to IndexedDB`);
 		} catch (error) {
 			console.error("Failed to add chat room to IndexedDB:", error);
 			throw error;
@@ -663,9 +656,6 @@ class IndexedDBChatService {
 			// If we have more messages than keepCount, delete the oldest ones (from the beginning)
 			if (allMessages.length > keepCount) {
 				const messagesToDelete = allMessages.slice(0, allMessages.length - keepCount);
-				console.log(
-					`Cleaning up ${messagesToDelete.length} old messages for chat room ${chatRoomId}`
-				);
 
 				for (const message of messagesToDelete) {
 					await new Promise<void>((resolve, reject) => {
@@ -704,7 +694,7 @@ class IndexedDBChatService {
 				request.onerror = () => reject(request.error);
 			});
 
-			console.log("Cleared all cache from IndexedDB");
+			// Cleared all cache from IndexedDB
 		} catch (error) {
 			console.error("Failed to clear cache from IndexedDB:", error);
 			throw error;
@@ -739,7 +729,6 @@ class IndexedDBChatService {
 			return { messages: 0, chatRooms: 0 };
 		}
 	}
-
 }
 
 // Export singleton instance
