@@ -46,7 +46,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 	const isPreviewableFile = (fileName?: string): boolean => {
 		if (!fileName) return false;
-		const previewableExtensions = [".pdf", ".docx", ".txt"];
+		const previewableExtensions = [".pdf", ".docx", ".doc", ".txt"];
 		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 

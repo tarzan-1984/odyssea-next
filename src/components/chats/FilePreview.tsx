@@ -35,9 +35,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				} else if (fileExtension === 'pdf') {
 					// For PDF, we'll use iframe approach
 					setPreviewContent(fileUrl);
-				} else if (fileExtension === 'docx') {
-					// For DOCX, we'll show a placeholder with download option
-					setPreviewContent("DOCX preview not available - click to download");
+				} else if (fileExtension === 'docx' || fileExtension === 'doc') {
+					// For DOC/DOCX, use Microsoft Office web viewer
+					// Embed variant keeps it inside our UI
+					const officeViewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+					setPreviewContent(officeViewer);
 				} else if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension)) {
 					// For images, just set the URL
 					setPreviewContent(fileUrl);
@@ -94,29 +96,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				);
 
 			case 'docx':
+			case 'doc':
 				return (
-					<div className="flex items-center justify-center h-32 bg-gray-50 dark:bg-gray-800 rounded">
-						<div className="text-center">
-							<svg
-								className="w-12 h-12 mx-auto mb-2 text-gray-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-								/>
-							</svg>
-							<p className="text-sm text-gray-600 dark:text-gray-400">
-								DOCX Preview
-							</p>
-							<p className="text-xs text-gray-500 dark:text-gray-500">
-								Click to download
-							</p>
-						</div>
+					<div className="h-64 border rounded overflow-hidden">
+						<iframe
+							src={previewContent}
+							className="w-full h-full"
+							title="DOC/DOCX Preview"
+							allow="fullscreen"
+							allowFullScreen={false}
+						/>
 					</div>
 				);
 			case 'jpg':
