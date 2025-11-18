@@ -5,7 +5,7 @@ import { io, Socket } from "socket.io-client";
 
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
-import { isMessageReadByUser } from "@/app-api/chatApi";
+import { isMessageReadByUser, chatApi } from "@/app-api/chatApi";
 import {
 	useNotificationsStore,
 	useAddNotification,
@@ -231,7 +231,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		// Handle new message from server
-		newSocket.on("newMessage", (data: any) => {
+		newSocket.on("newMessage", async (data: any) => {
 			// Handle case where data comes as array (from onAny handler)
 			const messageData = Array.isArray(data) ? data[0] : data;
 
@@ -239,7 +239,58 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			if (messageData && messageData.chatRoomId && messageData.message) {
 				// Update chat room's lastMessage for ALL chats (not just current one)
 				const state = useChatStore.getState();
-				const chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
+				let chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
+
+				// If chat room doesn't exist in store, it might have been deleted/hidden
+				// Try to restore it by loading from API
+				if (!chatRoom) {
+					console.log(
+						"🔄 [WebSocket] Chat room not found in store, attempting to restore:",
+						messageData.chatRoomId
+					);
+					try {
+						const restoredRoom = await chatApi.getChatRoom(messageData.chatRoomId);
+
+						// Normalize participant avatar field (profilePhoto -> avatar)
+						const normalized: ChatRoom = {
+							...restoredRoom,
+							participants: Array.isArray(restoredRoom.participants)
+								? restoredRoom.participants.map((p: any) => ({
+										...p,
+										user: {
+											...p.user,
+											avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+										},
+									}))
+								: [],
+						};
+
+						// Add restored chat room to store
+						const { addChatRoom } = useChatStore.getState();
+						addChatRoom(normalized);
+						chatRoom = normalized;
+						console.log("✅ [WebSocket] Chat room restored:", normalized.id);
+
+						// Save restored chat room to IndexedDB
+						try {
+							const currentChatRooms = await indexedDBChatService.getChatRooms();
+							const updatedRooms = [
+								...currentChatRooms.filter(r => r.id !== normalized.id),
+								normalized,
+							];
+							await indexedDBChatService.saveChatRooms(updatedRooms);
+							console.log("✅ [WebSocket] Chat room saved to IndexedDB");
+						} catch (dbError) {
+							console.error(
+								"❌ [WebSocket] Failed to save restored chat room to IndexedDB:",
+								dbError
+							);
+						}
+					} catch (restoreError) {
+						console.error("❌ [WebSocket] Failed to restore chat room:", restoreError);
+						// Continue with message processing even if restore failed
+					}
+				}
 
 				// Process message regardless of whether chat room is in store
 				// This ensures notifications work even when user is not on chat page
