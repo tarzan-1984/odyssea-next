@@ -40,10 +40,10 @@ const eslintConfig = [
 			},
 		},
 		rules: {
-			"no-undef": "off", // Отключаем проверку неопределенных переменных для Jest файлов
-			"@typescript-eslint/no-explicit-any": "off", // Разрешаем any в Jest файлах
-			"@typescript-eslint/no-require-imports": "off", // Разрешаем require() в Jest файлах
-			"react/display-name": "off", // Отключаем проверку display name для моков
+			"no-undef": "off", // Disable undefined variable checks for Jest files
+			"@typescript-eslint/no-explicit-any": "off", // Allow use of `any` in Jest files
+			"@typescript-eslint/no-require-imports": "off", // Allow require() in Jest files
+			"react/display-name": "off", // Disable display name rule for mocks
 		},
 	},
 ];

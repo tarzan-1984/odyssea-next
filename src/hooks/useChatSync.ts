@@ -65,6 +65,12 @@ export const useChatSync = () => {
 
 	// Load chat rooms from API and sync with cache
 	const loadChatRooms = useCallback(async () => {
+		// Skip loading on public tracking page
+		if (typeof window !== "undefined" && window.location.pathname.startsWith("/tracking/")) {
+			console.log("⏭️ [useChatSync] Skipping chat rooms load on tracking page");
+			return;
+		}
+
 		try {
 			setLoadingChatRooms(true);
 			setError(null);

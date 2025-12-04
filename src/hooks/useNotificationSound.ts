@@ -14,7 +14,7 @@ export const useNotificationSound = () => {
       // Create audio element if it doesn't exist
       if (!audioRef.current) {
         audioRef.current = new Audio('/sounds/livechat.mp3');
-        audioRef.current.volume = 0.7; // 70% громкости
+        audioRef.current.volume = 0.7; // 70% volume
         audioRef.current.preload = 'auto';
       }
 
