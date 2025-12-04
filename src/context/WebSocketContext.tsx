@@ -227,10 +227,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle user location updates from backend (users table)
 		newSocket.on("userLocationUpdate", (payload: any) => {
-			console.log(
-				"[WebSocket] User location update:",
-				JSON.stringify(payload, null, 2)
-			);
+			console.log("[WebSocket] User location update");
 		});
 
 		// Handle message sent confirmation
