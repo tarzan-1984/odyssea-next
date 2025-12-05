@@ -35,8 +35,6 @@ export async function GET(
 				{ status: response.status }
 			);
 		}
-
-		console.log("Backend API response:", data);
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
 		console.error("Error getting user by external ID:", error);

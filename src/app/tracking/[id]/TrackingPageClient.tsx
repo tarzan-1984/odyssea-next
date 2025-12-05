@@ -35,7 +35,7 @@ export default function TrackingPageClient({ driverId }: TrackingPageClientProps
       </section>
 
       {/* Driver info overlay - centered at bottom with white background */}
-      <div className="absolute bottom-[25px] left-1/2 transform -translate-x-1/2 z-10">
+      <div className="absolute bottom-[25px] left-1/2 transform -translate-x-1/2 z-[1000]">
         <DriverInfo driverData={driverData} />
       </div>
     </>

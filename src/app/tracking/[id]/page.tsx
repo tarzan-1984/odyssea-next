@@ -16,7 +16,7 @@ export default async function PublicTrackingPage({ params }: PublicTrackingPageP
       <TrackingPageClient driverId={id} />
 
       {/* Header overlay - centered at top with white background */}
-      <header className="absolute top-0 left-1/2 transform -translate-x-1/2 z-10 mt-4 px-6 py-3 bg-white rounded-lg shadow-lg">
+      <header className="absolute top-0 left-1/2 transform -translate-x-1/2 z-[1000] mt-4 px-6 py-3 bg-white rounded-lg shadow-lg">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold text-slate-900">
             Live Tracking Delivery
