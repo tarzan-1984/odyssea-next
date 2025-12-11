@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TrackingMapClient from "./TrackingMapClient";
 import DriverInfo from "./DriverInfo";
 import { clientAuth } from "@/utils/auth";
+import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 
 interface DriverData {
 	firstName: string;
@@ -53,13 +54,18 @@ export default function TrackingPageClient({ driverId }: TrackingPageClientProps
 			{/* Header overlay - only show for unauthenticated users */}
 			{!isLoading && !isAuthenticated && (
 				<header className="absolute top-0 left-1/2 transform -translate-x-1/2 z-[1000] mt-4 px-6 py-3 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800">
-					<div className="space-y-1 text-center">
-						<h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-							Live Tracking Delivery
-						</h1>
-						<p className="text-sm text-slate-500 dark:text-gray-400">
-							Public map with real‑time location updates.
-						</p>
+					<div className="flex items-center justify-between gap-4">
+						<div className="space-y-1 text-center flex-1">
+							<h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
+								Live Tracking Delivery
+							</h1>
+							<p className="text-sm text-slate-500 dark:text-gray-400">
+								Public map with real‑time location updates.
+							</p>
+						</div>
+						<div className="flex-shrink-0">
+							<ThemeToggleButton />
+						</div>
 					</div>
 				</header>
 			)}
