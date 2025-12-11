@@ -1105,3 +1105,27 @@ pre[class*="language-"] {
 pre[class*="language-"].line-numbers {
 	padding-left: 2.8em !important;
 }
+
+/* Leaflet Popup Dark Theme Styles */
+.dark .leaflet-popup-content-wrapper {
+	background-color: #1f2937 !important;
+	color: #f9fafb !important;
+	border-radius: 8px;
+}
+
+.dark .leaflet-popup-tip {
+	background-color: #1f2937 !important;
+}
+
+.dark .leaflet-popup-close-button {
+	color: #9ca3af !important;
+}
+
+.dark .leaflet-popup-close-button:hover {
+	color: #f9fafb !important;
+}
+
+/* Leaflet Map Dark Theme - Invert colors and adjust for dark theme with readable text */
+.dark .leaflet-tile-pane {
+	filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1);
+}

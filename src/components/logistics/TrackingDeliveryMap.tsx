@@ -1,37 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTheme } from "@/context/ThemeContext";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
-const MapContainer = dynamic(
-	() => import("react-leaflet").then((mod) => mod.MapContainer),
-	{ ssr: false }
-);
+const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
+	ssr: false,
+});
 
-const TileLayer = dynamic(
-	() => import("react-leaflet").then((mod) => mod.TileLayer),
-	{ ssr: false }
-);
+const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
 
-const Marker = dynamic(
-	() => import("react-leaflet").then((mod) => mod.Marker),
-	{ ssr: false }
-);
+const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
 
-const Popup = dynamic(
-	() => import("react-leaflet").then((mod) => mod.Popup),
-	{ ssr: false }
-);
+const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
 
 // Fix for default marker icon in Next.js
 if (typeof window !== "undefined") {
 	delete (L.Icon.Default.prototype as any)._getIconUrl;
 	L.Icon.Default.mergeOptions({
-		iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+		iconRetinaUrl:
+			"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
 		iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
 		shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 	});
@@ -55,7 +47,30 @@ interface TrackingDeliveryMapProps {
 	driverData?: DriverData | null;
 }
 
-export default function TrackingDeliveryMap({ driverId, driverData }: TrackingDeliveryMapProps = {}) {
+export default function TrackingDeliveryMap({
+	driverId,
+	driverData,
+}: TrackingDeliveryMapProps = {}) {
+	const { theme } = useTheme();
+	const [isDark, setIsDark] = useState(false);
+
+	// Check if dark theme is active
+	useEffect(() => {
+		setIsDark(theme === "dark");
+		// Also check document class as fallback
+		const checkDark = () => {
+			setIsDark(document.documentElement.classList.contains("dark"));
+		};
+		checkDark();
+		// Listen for theme changes via MutationObserver
+		const observer = new MutationObserver(checkDark);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+		return () => observer.disconnect();
+	}, [theme]);
+
 	// Check if we have valid coordinates
 	const hasValidCoordinates = useMemo(() => {
 		return (
@@ -105,6 +120,18 @@ export default function TrackingDeliveryMap({ driverId, driverData }: TrackingDe
 		});
 	}, []);
 
+	// Get tile layer URL based on theme
+	const tileLayerUrl = useMemo(() => {
+		// Use OpenStreetMap for both themes - we'll apply CSS filters for dark theme
+		// This ensures text labels remain visible
+		return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+	}, []);
+
+	// Get tile layer attribution
+	const tileLayerAttribution = useMemo(() => {
+		return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+	}, []);
+
 	if (!hasValidCoordinates) {
 		return (
 			<div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -124,11 +151,12 @@ export default function TrackingDeliveryMap({ driverId, driverData }: TrackingDe
 				zoom={18}
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
-				// No key prop - map won't be recreated, only marker position will update
+				key={`map-${isDark ? "dark" : "light"}`}
 			>
 				<TileLayer
-					attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-					url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+					key={`tiles-${isDark ? "dark" : "light"}`}
+					attribution={tileLayerAttribution}
+					url={tileLayerUrl}
 				/>
 				{markerPosition && (
 					<Marker
@@ -138,18 +166,21 @@ export default function TrackingDeliveryMap({ driverId, driverData }: TrackingDe
 					>
 						{driverData && (
 							<Popup>
-								<div className="text-sm">
-									<p className="font-semibold">
+								<div className="text-sm dark:text-white">
+									<p className="font-semibold dark:text-white">
 										{driverData.firstName} {driverData.lastName}
 									</p>
 									{driverData.city && driverData.state && (
-										<p className="text-gray-600">
+										<p className="text-gray-600 dark:text-gray-300">
 											{driverData.city}, {driverData.state}
 										</p>
 									)}
 									{driverData.lastLocationUpdateAt && (
-										<p className="text-xs text-gray-500 mt-1">
-											Last update: {new Date(driverData.lastLocationUpdateAt).toLocaleString()}
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+											Last update:{" "}
+											{new Date(
+												driverData.lastLocationUpdateAt
+											).toLocaleString()}
 										</p>
 									)}
 								</div>
