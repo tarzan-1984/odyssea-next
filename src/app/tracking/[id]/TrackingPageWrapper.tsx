@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { clientAuth } from "@/utils/auth";
 
 interface TrackingPageWrapperProps {
-	children: React.ReactNode;
+	children: ReactNode;
 }
 
 export default function TrackingPageWrapper({ children }: TrackingPageWrapperProps) {
