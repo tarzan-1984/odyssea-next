@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -53,6 +53,7 @@ export default function TrackingDeliveryMap({
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
+	const mapRef = useRef<L.Map | null>(null);
 
 	// Check if dark theme is active
 	useEffect(() => {
@@ -132,6 +133,22 @@ export default function TrackingDeliveryMap({
 		return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 	}, []);
 
+	// Center map when coordinates change
+	useEffect(() => {
+		if (
+			mapRef.current &&
+			hasValidCoordinates &&
+			driverData?.latitude &&
+			driverData?.longitude
+		) {
+			const newCenter: [number, number] = [driverData.latitude, driverData.longitude];
+			mapRef.current.setView(newCenter, mapRef.current.getZoom(), {
+				animate: true,
+				duration: 0.5,
+			});
+		}
+	}, [driverData?.latitude, driverData?.longitude, hasValidCoordinates]);
+
 	if (!hasValidCoordinates) {
 		return (
 			<div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -152,6 +169,9 @@ export default function TrackingDeliveryMap({
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
 				key={`map-${isDark ? "dark" : "light"}`}
+				whenCreated={map => {
+					mapRef.current = map;
+				}}
 			>
 				<TileLayer
 					key={`tiles-${isDark ? "dark" : "light"}`}
