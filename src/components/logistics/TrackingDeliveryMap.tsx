@@ -18,6 +18,29 @@ const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { 
 
 const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
 
+// Component to set map reference using useMap hook
+// This component must be inside MapContainer to use useMap hook
+const MapRefSetter = dynamic(
+	() =>
+		import("react-leaflet").then((mod) => {
+			const { useMap } = mod;
+			return function MapRefSetterComponent({
+				mapRef,
+			}: {
+				mapRef: React.MutableRefObject<L.Map | null>;
+			}) {
+				const map = useMap();
+				useEffect(() => {
+					if (map) {
+						mapRef.current = map;
+					}
+				}, [map, mapRef]);
+				return null;
+			};
+		}),
+	{ ssr: false }
+);
+
 // Fix for default marker icon in Next.js
 if (typeof window !== "undefined") {
 	delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -169,10 +192,8 @@ export default function TrackingDeliveryMap({
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
 				key={`map-${isDark ? "dark" : "light"}`}
-				whenCreated={map => {
-					mapRef.current = map;
-				}}
 			>
+				<MapRefSetter mapRef={mapRef} />
 				<TileLayer
 					key={`tiles-${isDark ? "dark" : "light"}`}
 					attribution={tileLayerAttribution}
