@@ -32,7 +32,15 @@ const MapRefSetter = dynamic(
 				const map = useMap();
 				useEffect(() => {
 					if (map) {
+						// Set reference immediately
 						mapRef.current = map;
+						// Also ensure it's set when map is fully ready
+						map.whenReady(() => {
+							if (mapRef.current !== map) {
+								mapRef.current = map;
+							}
+							console.log('✅ [TrackingDeliveryMap] Map reference set and ready');
+						});
 					}
 				}, [map, mapRef]);
 				return null;
@@ -156,21 +164,46 @@ export default function TrackingDeliveryMap({
 		return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 	}, []);
 
-	// Center map when coordinates change
+	// Center map when lastLocationUpdateAt changes (every WebSocket update)
+	// This ensures map centers on driver location even if coordinates haven't changed
+	// but a new update was received. User's zoom level is preserved.
 	useEffect(() => {
+		// Only center if we have a valid lastLocationUpdateAt (meaning update was received)
 		if (
-			mapRef.current &&
-			hasValidCoordinates &&
-			driverData?.latitude &&
-			driverData?.longitude
+			!driverData?.lastLocationUpdateAt ||
+			!mapRef.current ||
+			!hasValidCoordinates ||
+			!driverData?.latitude ||
+			!driverData?.longitude
 		) {
-			const newCenter: [number, number] = [driverData.latitude, driverData.longitude];
-			mapRef.current.setView(newCenter, mapRef.current.getZoom(), {
-				animate: true,
-				duration: 0.5,
-			});
+			return;
 		}
-	}, [driverData?.latitude, driverData?.longitude, hasValidCoordinates]);
+
+		const newCenter: [number, number] = [driverData.latitude, driverData.longitude];
+		const map = mapRef.current;
+		
+		// Function to center the map while preserving user's zoom level
+		const centerMap = () => {
+			if (mapRef.current === map && map) {
+				// Get current zoom level set by user
+				const currentZoom = map.getZoom();
+				
+				// Center map on new coordinates while keeping user's zoom
+				map.setView(newCenter, currentZoom, {
+					animate: true,
+					duration: 0.5,
+				});
+				
+				console.log('📍 [TrackingDeliveryMap] Map centered to:', newCenter, 'zoom:', currentZoom, 'update time:', driverData.lastLocationUpdateAt);
+			}
+		};
+
+		// Always use whenReady to ensure map is fully initialized
+		// This is safe even if map is already loaded (whenReady resolves immediately)
+		map.whenReady(() => {
+			centerMap();
+		});
+	}, [driverData?.lastLocationUpdateAt, driverData?.latitude, driverData?.longitude, hasValidCoordinates]);
 
 	if (!hasValidCoordinates) {
 		return (
