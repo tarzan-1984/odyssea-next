@@ -37,7 +37,7 @@ export default function ChatList({
 		webSocketChatSync;
 
 	const currentUser = useCurrentUser();
-	const { updateChatRoom } = useChatStore();
+	const { updateChatRoom, updateMessage } = useChatStore();
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +174,25 @@ export default function ChatList({
 		}
 	};
 
+	const handleReadAll = async () => {
+		try {
+			// Get all chat room IDs with unread messages
+			const unreadChatRoomIds = chatRooms
+				.filter(room => (room.unreadCount || 0) > 0)
+				.map(room => room.id);
+
+			if (unreadChatRoomIds.length === 0) {
+				return; // No unread messages
+			}
+
+			// Call the API to mark all messages as read
+			const result = await chatApi.markAllMessagesAsReadByChatRooms(unreadChatRoomIds);
+
+		} catch (error) {
+			console.error("Failed to mark all messages as read:", error);
+		}
+	};
+
 	// Debounce search query
 	useEffect(() => {
 		const timer = setTimeout(() => {
@@ -298,6 +317,16 @@ export default function ChatList({
 							className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
 						>
 							{allChatsMuted ? "Unmute all" : "Mute all"}
+						</button>
+					)}
+
+					{/* Read All Button */}
+					{chatRooms.length > 0 && (
+						<button
+							onClick={handleReadAll}
+							className="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
+						>
+							Read all
 						</button>
 					)}
 

@@ -231,6 +231,23 @@ class ChatApiClient {
 		});
 	}
 
+	markAllMessagesAsReadByChatRooms(chatRoomIds: string[]): Promise<{
+		success: boolean;
+		chatRoomIds: string[];
+		messageIds: string[];
+		messagesByChatRoom: Record<string, string[]>;
+	}> {
+		return this.request<{
+			success: boolean;
+			chatRoomIds: string[];
+			messageIds: string[];
+			messagesByChatRoom: Record<string, string[]>;
+		}>("/messages/read-all", {
+			method: "PUT",
+			body: JSON.stringify({ chatRoomIds }),
+		});
+	}
+
 	deleteChatRoom(chatRoomId: string): Promise<{ deleted: boolean; hidden?: boolean; left?: boolean }> {
 		return this.request<{ deleted: boolean; hidden?: boolean; left?: boolean }>(`/chat-rooms/${chatRoomId}`, {
 			method: "DELETE",
