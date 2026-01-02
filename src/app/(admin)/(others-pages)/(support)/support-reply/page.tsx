@@ -4,7 +4,7 @@ import TicketReplyContent from "@/components/support/TicketReplyContent";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Next.js Support Reply | TailAdmin - Next.js Admin Dashboard Template",
+	title: "Odysseia Web",
 	description:
 		"This is Next.js Support Reply for TailAdmin - Next.js Tailwind CSS Admin Dashboard Template",
 };

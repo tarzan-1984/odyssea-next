@@ -5,7 +5,7 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-	title: "Task Kanban Dashboard | TailAdmin - Tailwind CSS Admin Dashboard Template",
+	title: "Odysseia Web",
 	description: "Tailwind Admin Dashboard",
 };
 

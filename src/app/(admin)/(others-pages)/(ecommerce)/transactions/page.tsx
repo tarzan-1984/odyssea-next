@@ -3,7 +3,7 @@ import TransactionList from "@/components/ecommerce/TransactionList";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Next.js E-commerce Transaction | TailAdmin - Next.js Dashboard Template",
+	title: "Odysseia Web",
 	description: "This is E-commerce  Next.js Transaction TailAdmin Dashboard Template",
 };
 

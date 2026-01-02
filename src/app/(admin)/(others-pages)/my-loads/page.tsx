@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-	title: "My Loads | TailAdmin - Next.js Dashboard Template",
+	title: "Odysseia Web",
 	description: "My Loads page for TailAdmin Dashboard Template",
 };
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { Outfit } from "next/font/google";
+import type { Metadata } from "next";
 import "./globals.css";
 import "swiper/swiper-bundle.css";
 import "simplebar-react/dist/simplebar.min.css";
@@ -14,6 +15,15 @@ import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
 const outfit = Outfit({
 	subsets: ["latin"],
 });
+
+export const metadata: Metadata = {
+	title: "Odysseia Web",
+	description: "Odysseia Web Application",
+	icons: {
+		icon: "/icon.png",
+		apple: "/icon.png",
+	},
+};
 
 export default function RootLayout({
 	children,

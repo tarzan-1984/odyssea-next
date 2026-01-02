@@ -2,7 +2,7 @@ import TrackingPageClient from "./TrackingPageClient";
 import TrackingPageWrapper from "./TrackingPageWrapper";
 
 export const metadata = {
-	title: "Live Tracking",
+	title: "Odysseia Web",
 };
 
 interface PublicTrackingPageProps {
