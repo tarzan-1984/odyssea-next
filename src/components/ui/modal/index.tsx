@@ -8,6 +8,7 @@ interface ModalProps {
 	children: React.ReactNode;
 	showCloseButton?: boolean; // New prop to control close button visibility
 	isFullscreen?: boolean; // Default to false for backwards compatibility
+	closeOnBackdropClick?: boolean; // Close modal when clicking outside the content area
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
 	className,
 	showCloseButton = true, // Default to true for backwards compatibility
 	isFullscreen = false,
+	closeOnBackdropClick = false, // Default to false for backwards compatibility
 }) => {
 	const modalRef = useRef<HTMLDivElement>(null);
 
@@ -56,16 +58,15 @@ export const Modal: React.FC<ModalProps> = ({
 
 	return (
 		<div className="fixed inset-0 flex items-center justify-center overflow-y-auto z-[99999] p-4">
-			{!isFullscreen && (
+			{(!isFullscreen || closeOnBackdropClick) && (
 				<div
 					className="fixed inset-0 h-full w-full bg-primary/70 backdrop-blur-[3px] z-[99999]"
-					onClick={onClose}
 				></div>
 			)}
 			<div
 				ref={modalRef}
 				className={`${contentClasses} ${className} relative z-[100000]`}
-				onClick={e => e.stopPropagation()}
+				onClick={closeOnBackdropClick  ? onClose : e => e.stopPropagation()}
 			>
 				{showCloseButton && (
 					<button
@@ -88,7 +89,7 @@ export const Modal: React.FC<ModalProps> = ({
 						</svg>
 					</button>
 				)}
-				<div>{children}</div>
+				{children}
 			</div>
 		</div>
 	);

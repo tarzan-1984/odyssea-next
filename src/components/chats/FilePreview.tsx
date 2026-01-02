@@ -15,6 +15,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string>("");
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
+	const [convertedImageUrl, setConvertedImageUrl] = useState<string | null>(null);
 
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
@@ -57,33 +59,66 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 						"tiff",
 					].includes(fileExtension)
 				) {
-					// For images, just set the URL
-					setPreviewContent(fileUrl);
+					// For HEIC/HEIF files, use server-side conversion to JPEG
+					if (fileExtension === "heic" || fileExtension === "heif") {
+						try {
+							// Request server-side conversion to JPEG
+							const conversionUrl = `/api/storage/convert-heic?url=${encodeURIComponent(fileUrl)}`;
+
+							// Keep loading state true until image loads
+							// The server will return JPEG, so we can use it directly as image source
+							setPreviewContent(conversionUrl);
+							// Don't set isLoading to false here - let the image onLoad handler do it
+						} catch (err) {
+							setPreviewContent("");
+							setError("HEIC preview is not available. Please download the file to view it.");
+							setIsLoading(false);
+						}
+					} else {
+						// For other images, just set the URL
+						setPreviewContent(fileUrl);
+					}
 				}
 			} catch (err) {
 				setError("Failed to load preview");
 				console.error("Preview error:", err);
-			} finally {
 				setIsLoading(false);
+			} finally {
+				// For HEIC files, don't set isLoading to false here
+				// It will be set to false when the image loads (onLoad handler)
+				if (fileExtension !== "heic" && fileExtension !== "heif") {
+					setIsLoading(false);
+				}
 			}
 		};
 
 		loadPreview();
+
+		// Cleanup: revoke object URL when component unmounts or fileUrl changes
+		return () => {
+			if (convertedImageUrl) {
+				URL.revokeObjectURL(convertedImageUrl);
+				setConvertedImageUrl(null);
+			}
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [fileUrl, fileExtension]);
 
 	const renderPreview = () => {
-		if (isLoading) {
+		// For HEIC files, show loader overlay on top of image, not as separate component
+		if (error && !(fileExtension === "heic" || fileExtension === "heif")) {
 			return (
-				<div className="flex items-center justify-center h-32">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+				<div className="flex items-center justify-center h-32 text-red-500">
+					<p>{error}</p>
 				</div>
 			);
 		}
 
-		if (error) {
+		// For non-HEIC files, show general loader if loading
+		if (isLoading && !(fileExtension === "heic" || fileExtension === "heif")) {
 			return (
-				<div className="flex items-center justify-center h-32 text-red-500">
-					<p>{error}</p>
+				<div className="flex items-center justify-center h-32">
+					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);
 		}
@@ -130,8 +165,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 			case "gif":
 			case "webp":
 			case "svg":
-			case "heic":
-			case "heif":
 			case "bmp":
 			case "tiff":
 				return (
@@ -153,6 +186,52 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 								setError("Failed to load image preview");
 							}}
 						/>
+					</div>
+				);
+			case "heic":
+			case "heif":
+				// HEIC/HEIF files are converted to JPEG on the server side
+				// Always show loader overlay if isLoading is true
+				return (
+					<div
+						className="w-full max-w-[400px] overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity relative min-h-[180px]"
+						onClick={e => {
+							e.stopPropagation();
+							// Reset modal loading state when opening modal for HEIC files
+							if (fileExtension === "heic" || fileExtension === "heif") {
+								setIsModalImageLoading(true);
+							}
+							setIsImageModalOpen(true);
+						}}
+					>
+						{isLoading && (
+							<div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg z-10">
+								<div className="flex flex-col items-center gap-2">
+									<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+									<p className="text-xs text-gray-600 dark:text-gray-400">
+										Converting HEIC...
+									</p>
+								</div>
+							</div>
+						)}
+						{previewContent && (
+							<img
+								src={previewContent}
+								alt="File preview"
+								className="object-cover w-full h-auto max-h-64"
+							onLoad={() => {
+								// Image loaded successfully, hide loader
+								setIsLoading(false);
+							}}
+							onError={e => {
+								// Hide image if it fails to load
+								const target = e.target as HTMLImageElement;
+								target.style.display = "none";
+								setError("Failed to load image preview");
+								setIsLoading(false);
+							}}
+							/>
+						)}
 					</div>
 				);
 
@@ -258,34 +337,70 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 				<Modal
 					isOpen={isImageModalOpen}
 					onClose={() => setIsImageModalOpen(false)}
-					className="max-w-[95vw] max-h-[95vh] bg-transparent shadow-none border-none p-0"
-					showCloseButton={true}
+					className="w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] flex items-center justify-center bg-black/90 shadow-none border-none p-8 overflow-hidden"
+					showCloseButton={false}
+					closeOnBackdropClick={true}
 				>
-					<div className="flex flex-col items-center justify-center w-full">
-						{/* Image Container */}
-						<div className="relative rounded-lg overflow-hidden">
+					{/* Image Container */}
+					<div className="relative flex items-center justify-center w-full h-full">
+						{/* Loader for HEIC conversion */}
+						{isModalImageLoading && (fileExtension === "heic" || fileExtension === "heif") && (
+							<div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50 rounded-lg">
+								<div className="flex flex-col items-center gap-3">
+									<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+									<p className="text-sm text-white">
+										Converting HEIC...
+									</p>
+								</div>
+							</div>
+						)}
+
+						{/* Image */}
+						{previewContent ? (
 							<img
 								src={previewContent}
 								alt={fileName}
-								className="max-w-full max-h-[85vh] object-contain"
+								className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg"
+								onClick={e => e.stopPropagation()}
+								onLoad={e => {
+									// Image loaded successfully, hide loader
+									setIsLoading(false);
+									setIsModalImageLoading(false);
+									// Check if image is already loaded (from cache)
+									const target = e.target as HTMLImageElement;
+									if (target.complete && target.naturalHeight !== 0) {
+										setIsModalImageLoading(false);
+									}
+								}}
 								onError={e => {
 									const target = e.target as HTMLImageElement;
 									target.style.display = "none";
 									setError("Failed to load image");
+									setIsModalImageLoading(false);
 									setIsImageModalOpen(false);
 								}}
+								ref={img => {
+									// Check if image is already loaded (from cache) when modal opens
+									if (img && img.complete && img.naturalHeight !== 0) {
+										setIsModalImageLoading(false);
+									}
+								}}
 							/>
-						</div>
+						) : (
+							<div className="flex items-center justify-center h-64">
+								<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+							</div>
+						)}
+					</div>
 
-						{/* Image Info */}
-						<div className="mt-4 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg text-gray-900 dark:text-white text-center shadow-lg">
-							<p className="text-sm font-medium truncate max-w-md">{fileName}</p>
-							{fileSize && (
-								<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-									{Math.round(fileSize / 1024)}KB
-								</p>
-							)}
-						</div>
+					{/* Image Info */}
+					<div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-black/70 rounded-lg text-white text-center backdrop-blur-sm">
+						<p className="text-sm font-medium truncate max-w-md">{fileName}</p>
+						{fileSize && (
+							<p className="text-xs text-gray-300 mt-1">
+								{Math.round(fileSize / 1024)}KB
+							</p>
+						)}
 					</div>
 				</Modal>
 			)}

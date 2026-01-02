@@ -40,7 +40,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 	const isImageFile = (fileName?: string): boolean => {
 		if (!fileName) return false;
-		const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+		const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif", ".bmp", ".tiff"];
 		return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 
