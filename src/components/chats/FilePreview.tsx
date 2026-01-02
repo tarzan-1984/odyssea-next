@@ -10,19 +10,18 @@ interface FilePreviewProps {
 	messageId?: string;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({
-	fileUrl,
-	fileName,
-	fileSize,
-	messageId,
-}) => {
+const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, messageId }) => {
 	const [previewContent, setPreviewContent] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string>("");
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
-	const fileExtension = fileName.toLowerCase().split('.').pop();
-	const isImage = fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension);
+	const fileExtension = fileName.toLowerCase().split(".").pop();
+	const isImage =
+		fileExtension &&
+		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff"].includes(
+			fileExtension
+		);
 
 	useEffect(() => {
 		const loadPreview = async () => {
@@ -30,20 +29,34 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				setIsLoading(true);
 				setError("");
 
-				if (fileExtension === 'txt') {
+				if (fileExtension === "txt") {
 					// Load text file content
 					const response = await fetch(fileUrl);
 					const text = await response.text();
 					setPreviewContent(text);
-				} else if (fileExtension === 'pdf') {
+				} else if (fileExtension === "pdf") {
 					// For PDF, we'll use iframe approach
 					setPreviewContent(fileUrl);
-				} else if (fileExtension === 'docx' || fileExtension === 'doc') {
+				} else if (fileExtension === "docx" || fileExtension === "doc") {
 					// For DOC/DOCX, use Microsoft Office web viewer
 					// Embed variant keeps it inside our UI
 					const officeViewer = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
 					setPreviewContent(officeViewer);
-				} else if (fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension)) {
+				} else if (
+					fileExtension &&
+					[
+						"jpg",
+						"jpeg",
+						"png",
+						"gif",
+						"webp",
+						"svg",
+						"heic",
+						"heif",
+						"bmp",
+						"tiff",
+					].includes(fileExtension)
+				) {
 					// For images, just set the URL
 					setPreviewContent(fileUrl);
 				}
@@ -76,7 +89,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		}
 
 		switch (fileExtension) {
-			case 'txt':
+			case "txt":
 				return (
 					<div className="max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-3 rounded text-sm">
 						<pre className="whitespace-pre-wrap font-mono text-gray-800 dark:text-gray-200">
@@ -85,7 +98,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					</div>
 				);
 
-			case 'pdf':
+			case "pdf":
 				return (
 					<div className="h-64 border rounded overflow-hidden">
 						<iframe
@@ -98,8 +111,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					</div>
 				);
 
-			case 'docx':
-			case 'doc':
+			case "docx":
+			case "doc":
 				return (
 					<div className="h-64 border rounded overflow-hidden">
 						<iframe
@@ -111,16 +124,20 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						/>
 					</div>
 				);
-			case 'jpg':
-			case 'jpeg':
-			case 'png':
-			case 'gif':
-			case 'webp':
-			case 'svg':
+			case "jpg":
+			case "jpeg":
+			case "png":
+			case "gif":
+			case "webp":
+			case "svg":
+			case "heic":
+			case "heif":
+			case "bmp":
+			case "tiff":
 				return (
-					<div 
+					<div
 						className="w-full max-w-[400px] overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-						onClick={(e) => {
+						onClick={e => {
 							e.stopPropagation();
 							setIsImageModalOpen(true);
 						}}
@@ -129,7 +146,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							src={previewContent}
 							alt="File preview"
 							className="object-cover w-full h-auto max-h-64"
-							onError={(e) => {
+							onError={e => {
 								// Hide image if it fails to load
 								const target = e.target as HTMLImageElement;
 								target.style.display = "none";
@@ -142,14 +159,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			default:
 				return (
 					<div className="flex items-center justify-center h-32 bg-gray-50 dark:bg-gray-800 rounded">
-						<p className="text-gray-600 dark:text-gray-400">
-							Preview not available
-						</p>
+						<p className="text-gray-600 dark:text-gray-400">Preview not available</p>
 					</div>
 				);
 		}
 	};
-
 
 	return (
 		<>
@@ -182,34 +196,32 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				</div>
 
 				{/* Preview Content */}
-				<div className="p-2">
-					{renderPreview()}
-				</div>
+				<div className="p-2">{renderPreview()}</div>
 
 				{/* Download Button */}
 				<div className="p-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
 					<button
-						onClick={async (e) => {
+						onClick={async e => {
 							e.preventDefault();
 							e.stopPropagation();
-							
+
 							try {
 								// Download file directly from cloud storage
 								const response = await fetch(fileUrl, {
-									method: 'GET',
-									mode: 'cors',
+									method: "GET",
+									mode: "cors",
 								});
 
 								if (!response.ok) {
-									throw new Error('Failed to download file');
+									throw new Error("Failed to download file");
 								}
 
 								// Get the file blob
 								const blob = await response.blob();
-								
+
 								// Create download link
 								const url = window.URL.createObjectURL(blob);
-								const link = document.createElement('a');
+								const link = document.createElement("a");
 								link.href = url;
 								link.download = fileName;
 								document.body.appendChild(link);
@@ -218,13 +230,23 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								window.URL.revokeObjectURL(url);
 							} catch (error) {
 								// Fallback: try to open in new tab
-								window.open(fileUrl, '_blank');
+								window.open(fileUrl, "_blank");
 							}
 						}}
 						className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors"
 					>
-						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+						<svg
+							className="w-4 h-4"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={2}
+								d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+							/>
 						</svg>
 						<span>Download</span>
 					</button>
@@ -246,7 +268,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								src={previewContent}
 								alt={fileName}
 								className="max-w-full max-h-[85vh] object-contain"
-								onError={(e) => {
+								onError={e => {
 									const target = e.target as HTMLImageElement;
 									target.style.display = "none";
 									setError("Failed to load image");
