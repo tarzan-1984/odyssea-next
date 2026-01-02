@@ -20,8 +20,12 @@ export const metadata: Metadata = {
 	title: "Odysseia Web",
 	description: "Odysseia Web Application",
 	icons: {
-		icon: "/icon.png",
+		icon: [
+			{ url: "/icon.png", type: "image/png" },
+			{ url: "/favicon.ico", type: "image/x-icon" },
+		],
 		apple: "/icon.png",
+		shortcut: "/favicon.ico",
 	},
 };
 
