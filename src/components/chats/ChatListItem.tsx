@@ -17,6 +17,8 @@ interface ChatListItemProps {
 	onChatSelect: (chatRoom: ChatRoom) => void;
 	isUserOnline?: (userId: string) => boolean;
 	onChatRoomUpdate?: () => void; // Callback to refresh chat list
+	isMenuOpen?: boolean; // Whether this menu is open (controlled by parent)
+	onMenuToggle?: (isOpen: boolean) => void; // Callback to notify parent about menu state
 }
 
 export default function ChatListItem({
@@ -26,19 +28,18 @@ export default function ChatListItem({
 	onChatSelect,
 	isUserOnline,
 	onChatRoomUpdate,
+	isMenuOpen = false,
+	onMenuToggle,
 }: ChatListItemProps) {
 	const currentUser = useCurrentUser();
 	const { updateChatRoom } = useChatStore();
-	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const [isMuted, setIsMuted] = useState(chatRoom.isMuted || false);
 	const [isPinned, setIsPinned] = useState(chatRoom.isPinned || false);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT chats, always show the other participant's name
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
+			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
 				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
 			}
@@ -86,22 +87,26 @@ export default function ChatListItem({
 	};
 
 	const toggleDropdown = () => {
-		setIsDropdownOpen(!isDropdownOpen);
+		if (onMenuToggle) {
+			onMenuToggle(!isMenuOpen);
+		}
 	};
 
 	const closeDropdown = () => {
-		setIsDropdownOpen(false);
+		if (onMenuToggle) {
+			onMenuToggle(false);
+		}
 	};
 
 	const handleToggleMute = async () => {
 		try {
-			const action = isMuted ? 'unmute' : 'mute';
-			
+			const action = isMuted ? "unmute" : "mute";
+
 			const result = await chatApi.muteChatRooms([chatRoom.id], action);
-			
+
 			// Determine the new mute state based on action
-			const newMuteState = action === 'mute';
-			
+			const newMuteState = action === "mute";
+
 			// Update local state immediately for better UX
 			setIsMuted(newMuteState);
 			// Update store to trigger re-sorting
@@ -139,27 +144,29 @@ export default function ChatListItem({
 			// Add small delay to prevent conflict with button click
 			setTimeout(() => {
 				const target = event.target as HTMLElement;
-				if (!target.closest('[data-menu-trigger]') && !target.closest('[data-dropdown]')) {
-					setIsDropdownOpen(false);
+				if (!target.closest("[data-menu-trigger]") && !target.closest("[data-dropdown]")) {
+					if (onMenuToggle && isMenuOpen) {
+						onMenuToggle(false);
+					}
 				}
 			}, 0);
 		};
 
-		if (isDropdownOpen) {
-			document.addEventListener('click', handleClickOutside);
+		if (isMenuOpen) {
+			document.addEventListener("click", handleClickOutside);
 		}
 
 		return () => {
-			document.removeEventListener('click', handleClickOutside);
+			document.removeEventListener("click", handleClickOutside);
 		};
-	}, [isDropdownOpen]);
+	}, [isMenuOpen, onMenuToggle]);
 
 	return (
 		<button
 			key={chatRoom.id}
-			onClick={(e) => {
+			onClick={e => {
 				// Don't select chat if clicking on menu elements
-				if ((e.target as HTMLElement).closest('[data-menu-trigger]')) {
+				if ((e.target as HTMLElement).closest("[data-menu-trigger]")) {
 					return;
 				}
 				onChatSelect(chatRoom);
@@ -168,14 +175,14 @@ export default function ChatListItem({
 				isSelected
 					? "bg-blue-100 dark:bg-blue-900/30"
 					: isMuted
-					? "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50"
-					: "hover:bg-gray-100 dark:hover:bg-gray-800"
+						? "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+						: "hover:bg-gray-100 dark:hover:bg-gray-800"
 			}`}
 		>
 			{/* Menu Icon - positioned before avatar */}
 			<div className="relative flex-shrink-0 mr-2">
 				<div
-					onClick={(e) => {
+					onClick={e => {
 						e.stopPropagation(); // Prevent chat selection when clicking menu
 						e.preventDefault();
 						toggleDropdown();
@@ -187,16 +194,16 @@ export default function ChatListItem({
 				</div>
 
 				<Dropdown
-					isOpen={isDropdownOpen}
+					isOpen={isMenuOpen}
 					onClose={() => {
-						closeDropdown()
+						closeDropdown();
 					}}
 					className="w-32 p-2 left-4 top-full mt-1"
 					data-dropdown
 				>
 					<DropdownItem
 						tag="div"
-						onItemClick={(e) => {
+						onItemClick={e => {
 							// Make TS happy if event can be undefined
 							e?.stopPropagation(); // Prevent event bubbling to parent button
 							handleToggleMute();
@@ -212,7 +219,7 @@ export default function ChatListItem({
 					</DropdownItem>
 					<DropdownItem
 						tag="div"
-						onItemClick={(e) => {
+						onItemClick={e => {
 							// Make TS happy if event can be undefined
 							e?.stopPropagation(); // Prevent event bubbling to parent button
 							handleTogglePin();
@@ -230,12 +237,15 @@ export default function ChatListItem({
 			</div>
 
 			<div className="relative flex-shrink-0">
-				{(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") && (!chatRoom.avatar || chatRoom.avatar === "") ? (
+				{(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") &&
+				(!chatRoom.avatar || chatRoom.avatar === "") ? (
 					<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
 						{(() => {
 							const name = getChatDisplayName(chatRoom);
 							const parts = name.trim().split(/\s+/).filter(Boolean);
-							const initials = (parts[0]?.[0] || "").toUpperCase() + (parts[1]?.[0] || (parts[0]?.[1] || "")).toUpperCase();
+							const initials =
+								(parts[0]?.[0] || "").toUpperCase() +
+								(parts[1]?.[0] || parts[0]?.[1] || "").toUpperCase();
 							return initials;
 						})()}
 					</div>
@@ -250,7 +260,9 @@ export default function ChatListItem({
 								const userData = {
 									firstName: otherParticipant.user.firstName,
 									lastName: otherParticipant.user.lastName,
-									avatar: otherParticipant.user.avatar || (otherParticipant.user as any).profilePhoto
+									avatar:
+										otherParticipant.user.avatar ||
+										(otherParticipant.user as any).profilePhoto,
 								};
 								return renderAvatar(userData, "w-12 h-12");
 							}
@@ -260,7 +272,11 @@ export default function ChatListItem({
 						if (chatRoom.avatar) {
 							return (
 								// eslint-disable-next-line @next/next/no-img-element
-								<img src={chatRoom.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+								<img
+									src={chatRoom.avatar}
+									alt="avatar"
+									className="w-12 h-12 rounded-full object-cover"
+								/>
 							);
 						}
 
@@ -298,9 +314,7 @@ export default function ChatListItem({
 			{typeof chatRoom.unreadCount === "number" && chatRoom.unreadCount > 0 && (
 				<div className="ml-2 flex-shrink-0">
 					<div className="w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-						{chatRoom.unreadCount > 99
-							? "99+"
-							: chatRoom.unreadCount}
+						{chatRoom.unreadCount > 99 ? "99+" : chatRoom.unreadCount}
 					</div>
 				</div>
 			)}
