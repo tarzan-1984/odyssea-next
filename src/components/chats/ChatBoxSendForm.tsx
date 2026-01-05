@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { FileInputUploader } from "../FileInputUploader/FileInputUploader";
 import EmojiPicker from "../ui/EmojiPicker";
 import ReplyPreview from "./ReplyPreview";
 import { Message } from "@/app-api/chatApi";
+import { S3Uploader } from "@/app-api/S3Uploader";
 
 interface ChatBoxSendFormProps {
 	onSendMessage?: (message: {
@@ -36,11 +36,11 @@ export default function ChatBoxSendForm({
 		fileName: string;
 		fileSize: number;
 	} | null>(null);
-	const [showFileUploader, setShowFileUploader] = useState<boolean>(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const handleSendMessage = async () => {
 		if (!message.trim() && !attachedFile) return;
@@ -64,7 +64,6 @@ export default function ChatBoxSendForm({
 			// Reset form
 			setMessage("");
 			setAttachedFile(null);
-			setShowFileUploader(false);
 			setShowEmojiPicker(false);
 
 			// Cancel reply if we were replying
@@ -100,14 +99,63 @@ export default function ChatBoxSendForm({
 		}
 	};
 
-	const handleFileUploaded = (fileData: {
-		fileUrl: string;
-		key: string;
-		fileName: string;
-		fileSize: number;
-	}) => {
-		setAttachedFile(fileData);
-		setShowFileUploader(false);
+	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		// Validate file size (10MB max)
+		const maxSize = 10 * 1024 * 1024; // 10MB
+		if (file.size > maxSize) {
+			alert(`File size must be less than 10MB`);
+			return;
+		}
+
+		// Validate file type
+		const acceptedTypes = ["image/*", "application/pdf", ".doc", ".docx", ".txt"];
+		const fileType = file.type;
+		const fileName = file.name.toLowerCase();
+
+		const isAllowed = acceptedTypes.some(type => {
+			if (type.startsWith(".")) {
+				return fileName.endsWith(type);
+			}
+			if (type.endsWith("/*")) {
+				const baseType = type.slice(0, -2);
+				return fileType.startsWith(baseType);
+			}
+			return fileType === type;
+		});
+
+		if (!isAllowed) {
+			alert("File type not allowed");
+			return;
+		}
+
+		try {
+			const uploader = new S3Uploader();
+			const { fileUrl, key } = await uploader.upload(file);
+
+			setAttachedFile({
+				fileUrl,
+				key,
+				fileName: file.name,
+				fileSize: file.size,
+			});
+		} catch (error) {
+			console.error("Upload error:", error);
+			alert(error instanceof Error ? error.message : "Upload failed");
+		} finally {
+			// Reset input to allow selecting the same file again
+			if (fileInputRef.current) {
+				fileInputRef.current.value = "";
+			}
+		}
+	};
+
+	const handleFileButtonClick = () => {
+		if (fileInputRef.current) {
+			fileInputRef.current.click();
+		}
 	};
 
 	const handleEmojiSelect = (emoji: string) => {
@@ -154,41 +202,14 @@ export default function ChatBoxSendForm({
 				<ReplyPreview replyData={replyingTo} onCancel={() => onCancelReply?.()} />
 			)}
 
-			{/* File uploader overlay */}
-			{showFileUploader && (
-				<div className="absolute bottom-full left-0 right-0 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mb-2">
-					<div className="flex items-center justify-between mb-2">
-						<h3 className="text-sm font-medium text-gray-900 dark:text-white">
-							Attach File
-						</h3>
-						<button
-							onClick={() => setShowFileUploader(false)}
-							className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								xmlns="http://www.w3.org/2000/svg"
-							>
-								<path
-									d="M18 6L6 18M6 6L18 18"
-									stroke="currentColor"
-									strokeWidth="2"
-									strokeLinecap="round"
-									strokeLinejoin="round"
-								/>
-							</svg>
-						</button>
-					</div>
-					<FileInputUploader
-						onFileUploaded={handleFileUploaded}
-						acceptedTypes="image/*,application/pdf,.doc,.docx,.txt"
-						maxSize={10}
-					/>
-				</div>
-			)}
+			{/* Hidden file input */}
+			<input
+				ref={fileInputRef}
+				type="file"
+				onChange={handleFileSelect}
+				accept="image/*,application/pdf,.doc,.docx,.txt"
+				className="hidden"
+			/>
 
 			{/* Attached file preview */}
 			{attachedFile && (
@@ -301,7 +322,7 @@ export default function ChatBoxSendForm({
 					{/* File attachment button */}
 					<button
 						type="button"
-						onClick={() => setShowFileUploader(!showFileUploader)}
+						onClick={handleFileButtonClick}
 						disabled={disabled || isSending}
 						className="mr-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 					>
