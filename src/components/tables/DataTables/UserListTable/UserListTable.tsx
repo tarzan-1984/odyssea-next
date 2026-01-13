@@ -9,6 +9,7 @@ import PaginationWithIcon from "./PaginationWithIcon";
 import Link from "next/link";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
+import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
 
 export default function UserListTable() {
@@ -19,8 +20,8 @@ export default function UserListTable() {
 	// State for search functionality
 	const [searchTerm, setSearchTerm] = useState("");
 
-	// State for role filtering
-	const [selectedRole, setSelectedRole] = useState<string>(""); // Empty means "Show all"
+	// State for role filtering - now supports multiple roles
+	const [selectedRoles, setSelectedRoles] = useState<string[]>([]); // Empty array means "Show all"
 
 	// State for data management
 	const [totalItems, setTotalItems] = useState(0);
@@ -43,7 +44,7 @@ export default function UserListTable() {
 					limit: itemsPerPage,
 					search: searchTerm,
 					sort: sortState,
-					role: selectedRole || undefined, // Pass role filter or undefined for "show all"
+					roles: selectedRoles.length > 0 ? selectedRoles : undefined, // Pass roles array or undefined for "show all"
 				});
 
 				// Process successful response
@@ -64,7 +65,7 @@ export default function UserListTable() {
 		};
 
 		fetchUsers();
-	}, [currentPage, itemsPerPage, searchTerm, sortState, selectedRole]);
+	}, [currentPage, itemsPerPage, searchTerm, sortState, selectedRoles]);
 
 	// Calculate total pages for pagination
 	const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -91,12 +92,6 @@ export default function UserListTable() {
 
 		// Update sort state
 		setSortState({ [key]: newSortOrder });
-	};
-
-	// Handle role filter change
-	const handleRoleChange = (role: string) => {
-		setSelectedRole(role);
-		setCurrentPage(1); // Reset to first page when filtering
 	};
 
 	// Define all available roles
@@ -144,13 +139,25 @@ export default function UserListTable() {
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
 
-				{/* Role filter */}
+				{/* Role filter - Multi-select */}
 				<div className="flex items-center gap-3">
-					<span className="text-gray-500 dark:text-gray-400">Filter by role:</span>
-					<CustomStaticSelect
-						options={roleOptions}
-						value={selectedRole}
-						onChangeAction={handleRoleChange}
+					<span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+						Filter by role:
+					</span>
+					<MultiSelect
+						label=""
+						options={roleOptions
+							.filter(opt => opt.value !== "") // Remove "Show all" from multi-select
+							.map(opt => ({
+								value: opt.value,
+								text: opt.label,
+								selected: selectedRoles.includes(opt.value),
+							}))}
+						defaultSelected={selectedRoles}
+						onChange={values => {
+							setSelectedRoles(values);
+							setCurrentPage(1);
+						}}
 					/>
 				</div>
 
@@ -211,10 +218,7 @@ export default function UserListTable() {
 												sortable
 													? () =>
 															handleSort(
-																key as
-																	| "role"
-																	| "location"
-																	| "type"
+																key as "role" | "location" | "type"
 															)
 													: undefined
 											}
@@ -234,8 +238,7 @@ export default function UserListTable() {
 																	  sortState.location === "asc"
 																	? "text-brand-500"
 																	: key === "type" &&
-																		  sortState.type ===
-																				"asc"
+																		  sortState.type === "asc"
 																		? "text-brand-500"
 																		: "text-gray-300 dark:text-gray-700"
 														}`}
@@ -249,8 +252,7 @@ export default function UserListTable() {
 																	  sortState.location === "desc"
 																	? "text-brand-500"
 																	: key === "type" &&
-																		  sortState.type ===
-																				"desc"
+																		  sortState.type === "desc"
 																		? "text-brand-500"
 																		: "text-gray-300 dark:text-gray-700"
 														}`}

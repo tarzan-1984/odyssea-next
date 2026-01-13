@@ -351,7 +351,7 @@ export interface CreateUserResponse {
 export interface GetAllUsersParams {
 	page?: number;
 	limit?: number;
-	role?: string;
+	roles?: string | string[]; // Can be string (comma-separated) or array
 	status?: string;
 	search?: string;
 	sort?: { [key: string]: 'asc' | 'desc' };

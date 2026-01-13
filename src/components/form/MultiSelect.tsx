@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface Option {
 	value: string;
@@ -24,6 +24,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 	const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultSelected);
 	const [isOpen, setIsOpen] = useState(false);
 	const [searchTerm, setSearchTerm] = useState("");
+	const containerRef = useRef<HTMLDivElement>(null);
 
 	const toggleDropdown = () => {
 		if (disabled) return;
@@ -60,9 +61,26 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		option.text.toLowerCase().includes(searchTerm.toLowerCase())
 	);
 
+	// Close dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+				setIsOpen(false);
+			}
+		};
+
+		if (isOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [isOpen]);
+
 	return (
-		<div className="w-full">
-			<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+		<div className="w-full" ref={containerRef}>
+			<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-white">
 				{label}
 			</label>
 
@@ -75,7 +93,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 									selectedValuesText.map((text, index) => (
 										<div
 											key={index}
-											className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pl-2.5 pr-2 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white/90 dark:hover:border-gray-800"
+											className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pl-2.5 pr-2 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white dark:hover:border-gray-800"
 										>
 											<span className="flex-initial max-w-full">{text}</span>
 											<div className="flex flex-row-reverse flex-auto">
@@ -83,7 +101,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 													onClick={() =>
 														removeOption(index, selectedOptions[index])
 													}
-													className="pl-2 text-gray-500 cursor-pointer group-hover:text-gray-400 dark:text-gray-400"
+													className="pl-2 text-gray-500 cursor-pointer group-hover:text-gray-400 dark:text-white"
 												>
 													<svg
 														className="fill-current"
@@ -106,20 +124,26 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 								) : (
 									<input
 										placeholder="Select option"
-										className="w-full h-full p-1 pr-2 text-sm bg-transparent border-0 outline-hidden appearance-none placeholder:text-gray-800 focus:border-0 focus:outline-hidden focus:ring-0 dark:placeholder:text-white/90"
+										className="w-full h-full p-1 pr-2 text-sm bg-transparent border-0 outline-hidden appearance-none placeholder:text-gray-800 focus:border-0 focus:outline-hidden focus:ring-0 dark:text-white dark:placeholder:text-white"
 										readOnly
 										value="Select option"
 									/>
 								)}
 							</div>
-							<div className="flex items-center py-1 pl-1 pr-1 w-7">
+							<div
+								className="flex items-center py-1 pl-1 pr-1 w-7"
+								onClick={e => e.stopPropagation()}
+							>
 								<button
 									type="button"
-									onClick={toggleDropdown}
-									className="w-5 h-5 text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-gray-400"
+									onClick={e => {
+										e.stopPropagation();
+										toggleDropdown();
+									}}
+									className="w-5 h-5 text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-white"
 								>
 									<svg
-										className={`stroke-current ${isOpen ? "rotate-180" : ""}`}
+										className={`stroke-current pointer-events-none ${isOpen ? "rotate-180" : ""}`}
 										width="20"
 										height="20"
 										viewBox="0 0 20 20"
@@ -169,7 +193,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 															: ""
 													}`}
 												>
-													<div className="mx-2 leading-6 text-gray-800 dark:text-white/90">
+													<div className="mx-2 leading-6 text-gray-800 dark:text-white">
 														{option.text}
 													</div>
 												</div>
@@ -177,7 +201,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 										</div>
 									))
 								) : (
-									<div className="p-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+									<div className="p-3 text-sm text-gray-500 dark:text-white text-center">
 										No participants found
 									</div>
 								)}

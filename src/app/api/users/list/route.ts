@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 		const limit = body.limit || 10;
 		const search = body.search;
 		const sort = body.sort;
-		const role = body.role; // Role filter - empty string means "show all"
+		const roles = body.roles; // Roles filter - can be array or comma-separated string
 		const status = body.status; // Status filter - if not provided, backend will default to ACTIVE
 
 		// Build query string for backend
@@ -25,7 +25,14 @@ export async function POST(request: NextRequest) {
 		if (limit) queryParams.append("limit", limit.toString());
 		if (search) queryParams.append("search", search);
 		if (sort) queryParams.append("sort", JSON.stringify(sort));
-		if (role && role !== "") queryParams.append("role", role); // Only add role if it's not empty
+		// Handle roles - convert array to comma-separated string if needed
+		if (roles) {
+			if (Array.isArray(roles) && roles.length > 0) {
+				queryParams.append("roles", roles.join(","));
+			} else if (typeof roles === "string" && roles !== "") {
+				queryParams.append("roles", roles);
+			}
+		}
 		if (status && status !== "") queryParams.append("status", status); // Only add status if it's not empty
 
 		// Send request to backend for user list
