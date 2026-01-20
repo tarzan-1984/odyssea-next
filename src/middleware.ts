@@ -16,6 +16,7 @@ const publicPages = [
 	"/error",
 	// Public tracking page is available for guests (no auth required)
 	"/tracking",
+	"/test",
 ];
 
 export function middleware(request: NextRequest) {
@@ -49,15 +50,16 @@ export function middleware(request: NextRequest) {
 
 	// Check if it's the tracking page (public, accessible to everyone including authenticated users)
 	const isTrackingPage = pathname.startsWith("/tracking");
+	const isTestPage = pathname.startsWith("/test");
 
 	// If it's a public page and user is authenticated, redirect to admin dashboard
 	// Exception: tracking page is accessible to everyone (authenticated and unauthenticated)
-	if (isPublicPage && hasToken && !isTrackingPage) {
+	if (isPublicPage && hasToken && !isTrackingPage && !isTestPage) {
 		return NextResponse.redirect(new URL("/", request.url));
 	}
 
 	// Tracking page is always accessible (no redirect needed)
-	if (isTrackingPage) {
+	if (isTrackingPage || isTestPage) {
 		return NextResponse.next();
 	}
 

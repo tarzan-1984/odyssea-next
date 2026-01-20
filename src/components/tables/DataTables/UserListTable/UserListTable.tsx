@@ -11,8 +11,10 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
+import { useCurrentUser } from "@/stores/userStore";
 
 export default function UserListTable() {
+	const currentUser = useCurrentUser();
 	// State for pagination
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -113,7 +115,21 @@ export default function UserListTable() {
 		{ value: "MORNING_TRACKING", label: "Morning Tracking" },
 		{ value: "EXPEDITE_MANAGER", label: "Expedite Manager" },
 		{ value: "DRIVER", label: "Driver" },
+		{ value: "HR_MANAGER", label: "HR Manager" },
 	];
+
+	// VIN column visibility is permission-based: show only for allowed viewer roles.
+	const vinVisibleRoles = [
+		"MODERATOR",
+		"ADMINISTRATOR",
+		"RECRUITER",
+		"RECRUITER_TL",
+		"HR_MANAGER",
+	];
+	const viewerRole = (currentUser?.role || "").trim().toUpperCase();
+	const showVinColumn = vinVisibleRoles.includes(viewerRole);
+
+	const columnCount = showVinColumn ? 7 : 6;
 
 	return (
 		<div className="overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
@@ -205,7 +221,9 @@ export default function UserListTable() {
 									{ key: "phone", label: "Phone", sortable: false },
 									{ key: "location", label: "Home location", sortable: true },
 									{ key: "type", label: "Vehicle", sortable: true },
-									{ key: "vin", label: "VIN", sortable: false },
+									...(showVinColumn
+										? [{ key: "vin", label: "VIN", sortable: false }]
+										: []),
 								].map(({ key, label, sortable }) => (
 									<TableCell
 										key={key}
@@ -269,7 +287,7 @@ export default function UserListTable() {
 							{loading ? (
 								// Loading spinner
 								<tr>
-									<td colSpan={7} className="p-2">
+									<td colSpan={columnCount} className="p-2">
 										<SpinnerOne />
 									</td>
 								</tr>
@@ -318,9 +336,11 @@ export default function UserListTable() {
 											</span>
 										</TableCell>
 										{/* Vehicle VIN */}
-										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											{item?.vin ? item.vin : "-"}
-										</TableCell>
+										{showVinColumn ? (
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+												{item?.vin ? item.vin : "-"}
+											</TableCell>
+										) : null}
 									</TableRow>
 								))
 							)}
