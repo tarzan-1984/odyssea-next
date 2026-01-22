@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
 		const sort = body.sort;
 		const roles = body.roles; // Roles filter - can be array or comma-separated string
 		const status = body.status; // Status filter - if not provided, backend will default to ACTIVE
+		const contactsOnly = body.contactsOnly; // When true, backend returns only ACTIVE users
 
 		// Build query string for backend
 		const queryParams = new URLSearchParams();
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
 			}
 		}
 		if (status && status !== "") queryParams.append("status", status); // Only add status if it's not empty
+		if (contactsOnly) queryParams.append("contactsOnly", "true");
 
 		// Send request to backend for user list
 		const response = await fetch(

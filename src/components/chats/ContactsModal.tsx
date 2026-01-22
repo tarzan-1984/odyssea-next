@@ -100,6 +100,7 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 				page,
 				limit: ITEMS_PER_PAGE,
 				status: "ACTIVE", // Only show active users for contacts
+				contactsOnly: true,
 				...(search && { search }),
 			};
 

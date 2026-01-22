@@ -353,6 +353,7 @@ export interface GetAllUsersParams {
 	limit?: number;
 	roles?: string | string[]; // Can be string (comma-separated) or array
 	status?: string;
+	contactsOnly?: boolean; // When true, backend returns only ACTIVE users (contact lists)
 	search?: string;
 	sort?: { [key: string]: 'asc' | 'desc' };
 }

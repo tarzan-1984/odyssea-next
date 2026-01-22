@@ -60,6 +60,7 @@ const chatRooms = {
 					page: 1,
 					limit: 100, // Get more users for selection
 					status: "ACTIVE", // Only show active users for chat creation
+					contactsOnly: true,
 				}),
 			});
 

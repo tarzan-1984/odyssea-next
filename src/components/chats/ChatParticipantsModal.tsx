@@ -103,7 +103,7 @@ export default function ChatParticipantsModal({
 		}
 
 		try {
-			const params: Record<string, any> = { page, limit: 20 };
+			const params: Record<string, any> = { page, limit: 20, status: "ACTIVE", contactsOnly: true };
 			if (search) params.search = search;
 			const response = await usersApi.getAllUsers(params);
 			if (response.success && response.data) {
@@ -111,7 +111,10 @@ export default function ChatParticipantsModal({
 				const existingParticipantIds = (localParticipants || []).map(p => p.userId);
 				const allUsers = response.data.data?.users || [];
 				const newUsers: UserListItem[] = allUsers.filter(
-					(u: UserListItem) => u.id !== currentUser?.id && !existingParticipantIds.includes(u.id)
+					(u: UserListItem) =>
+						String(u.status || "").toUpperCase() === "ACTIVE" &&
+						u.id !== currentUser?.id &&
+						!existingParticipantIds.includes(u.id)
 				);
 
 				setUsers(prev => (append ? [...prev, ...newUsers] : newUsers));

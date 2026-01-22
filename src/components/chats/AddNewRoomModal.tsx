@@ -99,7 +99,8 @@ const fetchUsers = async (page: number = 1, search: string = "", append: boolean
 		const params: Record<string, any> = { 
 			page, 
 			limit: 20,
-			status: "ACTIVE" // Only show active users for chat creation
+			status: "ACTIVE", // Only show active users for chat creation
+			contactsOnly: true,
 		};
 		if (search) params.search = search;
 
@@ -288,7 +289,20 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 							) : (
 								<div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-800" />)
 							}
-							<input id="roomAvatar" type="file" accept="image/*" onChange={handleAvatarPick} />
+							{/* Custom file picker UI to avoid OS-localized text like "Файл не выбран" */}
+							<label className="relative inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90 dark:hover:bg-white/[0.03] cursor-pointer">
+								<input
+									id="roomAvatar"
+									type="file"
+									accept="image/*"
+									onChange={handleAvatarPick}
+									className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+								/>
+								<span>Choose file</span>
+								<span className="text-gray-500 dark:text-white/60">
+									{avatarFile ? avatarFile.name : 'No file chosen'}
+								</span>
+							</label>
 						</div>
 					</div>
 
