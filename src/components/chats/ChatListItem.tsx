@@ -211,9 +211,9 @@ export default function ChatListItem({
 						className="flex items-center gap-2 w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 cursor-pointer"
 					>
 						{isMuted ? (
-							<SoundOffIcon className="w-4 h-4 pointer-events-none" />
+							<SoundOffIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
 						) : (
-							<SoundOnIcon className="w-4 h-4 pointer-events-none" />
+							<SoundOnIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
 						)}
 						<span className="text-sm">{isMuted ? "Unmute" : "Mute"}</span>
 					</DropdownItem>
@@ -227,9 +227,9 @@ export default function ChatListItem({
 						className="flex items-center gap-2 w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 cursor-pointer"
 					>
 						{isPinned ? (
-							<PushPinIcon className="w-4 h-4 pointer-events-none" />
+							<PushPinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
 						) : (
-							<PinIcon className="w-4 h-4 pointer-events-none" />
+							<PinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
 						)}
 						<span className="text-sm">{isPinned ? "Unpin" : "Pin"}</span>
 					</DropdownItem>

@@ -1,11 +1,10 @@
 "use client";
 
-import UserVehicleCard from "@/components/user-profile/UserVehicleCard";
 import UserMetaCard from "@/components/user-profile/UserMetaCard";
-import React, {useEffect} from "react";
-import ProfileClient from "@/app/(admin)/(others-pages)/profile/ProfileClient";
+import React from "react";
 import { useUserInit } from "@/hooks/useUserInit";
 import UserContactCard from "@/components/user-profile/UserContactCard";
+import Link from "next/link";
 
 export default function Profile() {
 	// This hook loads user data from cookies into Zustand store
@@ -25,9 +24,17 @@ export default function Profile() {
 	return (
 		<div>
 			<div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-				<h3 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90 lg:mb-7">
-					Profile
-				</h3>
+				<div className="mb-5 flex items-center justify-between gap-3 lg:mb-7">
+					<h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+						Profile
+					</h3>
+					<Link
+						href="/profile/change-password"
+						className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600"
+					>
+						Change password
+					</Link>
+				</div>
 				<div className="space-y-6">
 					<UserMetaCard user={currentUser} />
 					<UserContactCard user={currentUser} />

@@ -5,6 +5,7 @@ import {
 	LogoutResponse,
 	ForgotPasswordResponse,
 	ResetPasswordResponse,
+	ChangePasswordData,
 	RefreshTokenResponse,
 	OtpVerificationData,
 	LogoutData,
@@ -246,6 +247,44 @@ const authentication = {
 			return {
 				success: true,
 				message: data.message || "Password successfully reset",
+			};
+		} catch {
+			return {
+				success: false,
+				error: "Network error occurred",
+			};
+		}
+	},
+
+	/**
+	 * Changes password for an authenticated user
+	 * @param changePasswordData - Object containing new password
+	 * @returns Promise with change password result
+	 */
+	async changePassword(
+		changePasswordData: ChangePasswordData
+	): Promise<ResetPasswordResponse> {
+		try {
+			const response = await fetch("/api/authentication/change-password", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(changePasswordData),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				return {
+					success: false,
+					error: data.error || "Failed to change password",
+				};
+			}
+
+			return {
+				success: true,
+				message: data.message || "Password successfully changed",
 			};
 		} catch {
 			return {

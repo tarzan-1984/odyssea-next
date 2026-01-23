@@ -279,6 +279,10 @@ export interface ResetPasswordData {
     newPassword: string;
 }
 
+export interface ChangePasswordData {
+	newPassword: string;
+}
+
 export interface RefreshTokenData {
     refreshToken: string;
 }

@@ -1,8 +1,9 @@
-
+import React from "react";
+import TestUserList from "@/components/tables/DataTables/UserListTable/TestUserList";
 
 const test = () => {
 	return (
-		<>test</>
+		<TestUserList />
 	)
 }
 
