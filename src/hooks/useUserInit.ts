@@ -2,15 +2,13 @@ import { useEffect, useState } from "react";
 import { useCurrentUser, useSetCurrentUser } from "@/stores/userStore";
 import { clientAuth } from "@/utils/auth";
 import { useChatStore } from "@/stores/chatStore";
-import { chatApi } from "@/app-api/chatApi";
 
 // Hook to initialize user data from cookies into Zustand store
 export const useUserInit = () => {
 	const currentUser = useCurrentUser();
 	const setCurrentUser = useSetCurrentUser();
-	const { setChatRooms, setCurrentChatRoom } = useChatStore();
+	const { setCurrentChatRoom } = useChatStore();
 	const [isInitializing, setIsInitializing] = useState(!currentUser);
-	const userData = clientAuth.getUserData();
 
 	useEffect(() => {
 		// Only initialize if user is not already loaded
@@ -49,7 +47,7 @@ export const useUserInit = () => {
 			// User already loaded
 			setIsInitializing(false);
 		}
-	}, [currentUser, setCurrentUser, setChatRooms, setCurrentChatRoom]);
+	}, [currentUser, setCurrentUser, setCurrentChatRoom]);
 
 	return { currentUser, isInitializing };
 };
