@@ -11,7 +11,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
-import {useQuery} from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 // Define all available roles
 const roleOptions = [
@@ -36,13 +36,7 @@ const roleOptions = [
 ];
 
 // VIN column visibility is permission-based: show only for allowed viewer roles.
-const vinVisibleRoles = [
-	"MODERATOR",
-	"ADMINISTRATOR",
-	"RECRUITER",
-	"RECRUITER_TL",
-	"HR_MANAGER",
-];
+const vinVisibleRoles = ["MODERATOR", "ADMINISTRATOR", "RECRUITER", "RECRUITER_TL", "HR_MANAGER"];
 
 export default function UserListTable() {
 	const currentUser = useCurrentUser();
@@ -60,16 +54,27 @@ export default function UserListTable() {
 	const [sortState, setSortState] = useState<{ [key: string]: "asc" | "desc" }>({ role: "asc" });
 
 	// Fetch users data when dependencies change
-	const { data: userList, isLoading, error } = useQuery({
-		queryKey: ['users-list', {currentPage, itemsPerPage, searchTerm, sortState, selectedRoles}],
-		queryFn: () => users.getAllUsers({
-			page: currentPage,
-			limit: itemsPerPage,
-			search: searchTerm,
-			sort: sortState,
-			roles: selectedRoles.length > 0 ? selectedRoles : undefined,
-		})
-	})
+	const {
+		data: userList,
+		isPending,
+		error,
+		isPlaceholderData,
+	} = useQuery({
+		queryKey: [
+			"users-list",
+			{ currentPage, itemsPerPage, searchTerm, sortState, selectedRoles },
+		],
+		queryFn: () =>
+			users.getAllUsers({
+				page: currentPage,
+				limit: itemsPerPage,
+				search: searchTerm,
+				sort: sortState,
+				roles: selectedRoles.length > 0 ? selectedRoles : undefined,
+			}),
+		staleTime: 10 * 60 * 1000,
+		placeholderData: keepPreviousData,
+	});
 
 	// Calculate total pages for pagination
 	const totalItems = userList?.data?.data?.pagination?.total_count || 0;
@@ -188,8 +193,8 @@ export default function UserListTable() {
 									{ key: "location", label: "Home location", sortable: true },
 									{ key: "type", label: "Vehicle", sortable: true },
 									...(showVinColumn
-									    ? [{ key: "vin", label: "VIN", sortable: false }]
-									    : []),
+										? [{ key: "vin", label: "VIN", sortable: false }]
+										: []),
 								].map(({ key, label, sortable }) => (
 									<TableCell
 										key={key}
@@ -200,11 +205,11 @@ export default function UserListTable() {
 											className={`flex items-center justify-between ${sortable ? "cursor-pointer" : ""}`}
 											onClick={
 												sortable
-												? () =>
-													handleSort(
-														key as "role" | "location" | "type"
-													)
-												: undefined
+													? () =>
+															handleSort(
+																key as "role" | "location" | "type"
+															)
+													: undefined
 											}
 										>
 											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
@@ -217,28 +222,28 @@ export default function UserListTable() {
 														className={`${
 															key === "role" &&
 															sortState.role === "asc"
-															? "text-brand-500"
-															: key === "location" &&
-															  sortState.location === "asc"
-															  ? "text-brand-500"
-															  : key === "type" &&
-															    sortState.type === "asc"
-															    ? "text-brand-500"
-															    : "text-gray-300 dark:text-gray-700"
+																? "text-brand-500"
+																: key === "location" &&
+																	  sortState.location === "asc"
+																	? "text-brand-500"
+																	: key === "type" &&
+																		  sortState.type === "asc"
+																		? "text-brand-500"
+																		: "text-gray-300 dark:text-gray-700"
 														}`}
 													/>
 													<AngleDownIcon
 														className={`${
 															key === "role" &&
 															sortState.role === "desc"
-															? "text-brand-500"
-															: key === "location" &&
-															  sortState.location === "desc"
-															  ? "text-brand-500"
-															  : key === "type" &&
-															    sortState.type === "desc"
-															    ? "text-brand-500"
-															    : "text-gray-300 dark:text-gray-700"
+																? "text-brand-500"
+																: key === "location" &&
+																	  sortState.location === "desc"
+																	? "text-brand-500"
+																	: key === "type" &&
+																		  sortState.type === "desc"
+																		? "text-brand-500"
+																		: "text-gray-300 dark:text-gray-700"
 														}`}
 													/>
 												</button>
@@ -250,7 +255,7 @@ export default function UserListTable() {
 						</TableHeader>
 						{/* Table body with user data */}
 						<TableBody>
-							{isLoading ? (
+							{isPending ? (
 								// Loading spinner
 								<tr>
 									<td colSpan={columnCount} className="p-2">
@@ -258,58 +263,58 @@ export default function UserListTable() {
 									</td>
 								</tr>
 							) : (
-								 // User rows
-								 userList?.data?.data?.users?.map((item, i) => (
-									 <TableRow key={i + 1}>
-										 {/* User name with avatar */}
-										 <TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
-											 <Link
-												 href={`users/${item?.id}`}
-												 className="flex items-center gap-3"
-											 >
-												 {item && renderAvatar(item, "w-[50px] h-[50px]")}
-												 <div>
+								// User rows
+								userList?.data?.data?.users?.map((item, i) => (
+									<TableRow key={i + 1}>
+										{/* User name with avatar */}
+										<TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
+											<Link
+												href={`users/${item?.id}`}
+												className="flex items-center gap-3"
+											>
+												{item && renderAvatar(item, "w-[50px] h-[50px]")}
+												<div>
 													<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
 														{item?.firstName && item?.lastName
-														 ? `${item.firstName} ${item.lastName}`
-														 : item?.firstName ||
-															 item?.lastName ||
-															 "-"}
+															? `${item.firstName} ${item.lastName}`
+															: item?.firstName ||
+																item?.lastName ||
+																"-"}
 													</span>
-												 </div>
-											 </Link>
-										 </TableCell>
-										 {/* User role */}
-										 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											 {item?.role ? item.role : "-"}
-										 </TableCell>
-										 {/* User email */}
-										 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											 {item?.email ? item.email : "-"}
-										 </TableCell>
-										 {/* User phone */}
-										 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											 {item?.phone ? item.phone : "-"}
-										 </TableCell>
-										 {/* User location */}
-										 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											 {item?.location ? item.location : "-"}
-										 </TableCell>
-										 {/* Vehicle type */}
-										 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+												</div>
+											</Link>
+										</TableCell>
+										{/* User role */}
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+											{item?.role ? item.role : "-"}
+										</TableCell>
+										{/* User email */}
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+											{item?.email ? item.email : "-"}
+										</TableCell>
+										{/* User phone */}
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+											{item?.phone ? item.phone : "-"}
+										</TableCell>
+										{/* User location */}
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+											{item?.location ? item.location : "-"}
+										</TableCell>
+										{/* Vehicle type */}
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
 											<span className="block">
 												{item?.type ? item.type : "-"}
 											</span>
-										 </TableCell>
-										 {/* Vehicle VIN */}
-										 {showVinColumn ? (
-											 <TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-												 {item?.vin ? item.vin : "-"}
-											 </TableCell>
-										 ) : null}
-									 </TableRow>
-								 ))
-							 )}
+										</TableCell>
+										{/* Vehicle VIN */}
+										{showVinColumn ? (
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+												{item?.vin ? item.vin : "-"}
+											</TableCell>
+										) : null}
+									</TableRow>
+								))
+							)}
 						</TableBody>
 					</Table>
 				</div>
@@ -322,11 +327,11 @@ export default function UserListTable() {
 					<div className="pb-3 xl:pb-0">
 						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
 							{totalItems === 0
-							 ? "Showing 0 entries"
-							 : `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
-									currentPage * itemsPerPage,
-									totalItems
-								)} of ${totalItems} entries`}
+								? "Showing 0 entries"
+								: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
+										currentPage * itemsPerPage,
+										totalItems
+									)} of ${totalItems} entries`}
 						</p>
 					</div>
 

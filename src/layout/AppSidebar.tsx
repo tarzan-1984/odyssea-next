@@ -24,6 +24,7 @@ import {
 	// TableIcon,
 	// TaskIcon,
 	UserCircleIcon,
+	DriversMapIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
@@ -63,6 +64,11 @@ const navItems: NavItem[] = [
 		icon: <MessageCircle />,
 		name: "Chat",
 		path: "/chat",
+	},
+	{
+		icon: <DriversMapIcon className="h-5 w-5" />,
+		name: "Drivers Map",
+		path: "/drivers-map",
 	},
 	// {
 	//   name: "AI Assistant",
@@ -358,9 +364,10 @@ const AppSidebar: React.FC = () => {
 									<span className={`menu-item-text`}>{nav.name}</span>
 								)}
 								{/* Show unread count badge for Chat link */}
-								{nav.path === "/chat" && (isExpanded || isHovered || isMobileOpen) && (
-									<UnreadCountBadge className="ml-auto" />
-								)}
+								{nav.path === "/chat" &&
+									(isExpanded || isHovered || isMobileOpen) && (
+										<UnreadCountBadge className="ml-auto" />
+									)}
 							</Link>
 						)
 					)}
@@ -495,7 +502,7 @@ const AppSidebar: React.FC = () => {
 	return (
 		<aside
 			className={`fixed  flex flex-col xl:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-full transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
-        ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"}
+        ${isExpanded || isMobileOpen ? "w-[240px]" : isHovered ? "w-[240px]" : "w-[90px]"}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         xl:translate-x-0`}
 			onMouseEnter={() => !isExpanded && setIsHovered(true)}

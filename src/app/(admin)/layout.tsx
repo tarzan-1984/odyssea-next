@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 	const mainContentMargin = isMobileOpen
 		? "ml-0"
 		: isExpanded || isHovered
-			? "xl:ml-[290px]"
+			? "xl:ml-[240px]"
 			: "xl:ml-[90px]";
 
 	return (

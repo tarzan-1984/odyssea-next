@@ -64,6 +64,7 @@ import PinIcon from "./pin.svg";
 import PushPinIcon from "./push-pin.svg";
 import AttachmentIcon from "./attachment.svg";
 import UnreadIcon from "./unread.svg";
+import DriversMapIcon from "./drivers-map.svg";
 
 export {
 	BoxTapped,
@@ -132,4 +133,5 @@ export {
 	PushPinIcon,
 	AttachmentIcon,
 	UnreadIcon,
+	DriversMapIcon,
 };

@@ -32,7 +32,7 @@ export default function TrackingLayout({ children }: { children: React.ReactNode
 	const mainContentMargin = isMobileOpen
 		? "ml-0"
 		: isExpanded || isHovered
-			? "xl:ml-[290px]"
+			? "xl:ml-[240px]"
 			: "xl:ml-[90px]";
 
 	// If not authenticated, render without layout (just the content)
