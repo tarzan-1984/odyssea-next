@@ -16,7 +16,11 @@ interface DriversMapFiltersProps {
 	driverStatusOptions: string[];
 	zipFilter: string;
 	setZipFilter: Dispatch<SetStateAction<string>>;
-	onFilterApply?: (params: { latitude: number; longitude: number; radiusMiles: number }) => void;
+	onFilterApply?: (params: {
+		latitude: number;
+		longitude: number;
+		radiusMiles: number;
+	}) => void;
 	onRadiusChange?: (radiusMiles: number) => void;
 	onClearFilter?: () => void;
 	onReset?: () => void;
@@ -154,11 +158,11 @@ export function DriversMapFilters({
 				<select
 					id="driver-status-filter"
 					value={driverStatusFilter}
-					onChange={e => setDriverStatusFilter(e.target.value)}
+					onChange={(e) => setDriverStatusFilter(e.target.value)}
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[160px] md:w-auto"
 				>
 					<option value="all">{DRIVER_STATUS_LABELS.all}</option>
-					{driverStatusOptions.map(status => (
+					{driverStatusOptions.map((status) => (
 						<option key={status} value={status}>
 							{DRIVER_STATUS_LABELS[status.toLowerCase()] ?? status}
 						</option>
@@ -179,7 +183,7 @@ export function DriversMapFilters({
 					id="address-filter"
 					type="text"
 					value={zipFilter}
-					onChange={e => setZipFilter(e.target.value)}
+					onChange={(e) => setZipFilter(e.target.value)}
 					placeholder="Enter address"
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400 md:w-40"
 				/>
@@ -197,7 +201,9 @@ export function DriversMapFilters({
 				<select
 					id="location-filter"
 					value={location}
-					onChange={e => setLocation(e.target.value === "Canada" ? "Canada" : "USA")}
+					onChange={(e) =>
+						setLocation(e.target.value === "Canada" ? "Canada" : "USA")
+					}
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
 				>
 					<option value="USA">USA</option>
@@ -217,7 +223,7 @@ export function DriversMapFilters({
 				<select
 					id="radius-filter"
 					value={radius}
-					onChange={e => setRadius(e.target.value)}
+					onChange={(e) => setRadius(e.target.value)}
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
 				>
 					<option value="50">50 miles</option>
@@ -238,7 +244,9 @@ export function DriversMapFilters({
 
 			<div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
 				{/* Invisible label so button aligns with other fields (same label + control height) */}
-				<label className="text-xs font-medium text-transparent select-none">Reset</label>
+				<label className="text-xs font-medium text-transparent select-none">
+					Reset
+				</label>
 				<button
 					type="button"
 					onClick={handleResetClick}
@@ -250,3 +258,4 @@ export function DriversMapFilters({
 		</div>
 	);
 }
+
