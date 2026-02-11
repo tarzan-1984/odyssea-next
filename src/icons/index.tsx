@@ -65,8 +65,61 @@ import PushPinIcon from "./push-pin.svg";
 import AttachmentIcon from "./attachment.svg";
 import UnreadIcon from "./unread.svg";
 import DriversMapIcon from "./drivers-map.svg";
+import DriverListIcon from "./driver-list-icon.svg";
+import TwicIcon from "./additional/twic.svg";
+import HazmatIcon from "./additional/hazmat.svg";
+import Hazmat2Icon from "./additional/hazmat2.svg";
+import Change9Icon from "./additional/change-9.svg";
+import TeamIcon from "./additional/team.svg";
+import CdlIcon from "./additional/cdl.svg";
+import TsaIcon from "./additional/tsa.svg";
+import TankerEndorsement from "./additional/tanker-endorsement.svg";
+import BackgroundCheck from "./additional/background-check.svg";
+import Liftgate from "./additional/liftgate.svg";
+import PalletJack from "./additional/pallet-jack.svg";
+import Dolly from "./additional/dolly.svg";
+import Ppe from "./additional/ppe.svg";
+import Etrack from "./additional/e-track.svg";
+import Ramp from "./additional/ramp.svg";
+import Printer from "./additional/printer.svg";
+import Sleeper from "./additional/sleeper.svg";
+import LoadBars from "./additional/load-bars.svg";
+import Mc from "./additional/mc.svg";
+import Dot from "./additional/dot.svg";
+import RealId from "./additional/real_id.svg";
+import Military from "./additional/military.svg";
+import DockHigh from "./additional/dock-high.svg";
+import Any from "./additional/any.svg";
+import Otr from "./additional/otr.svg";
+import Local from "./additional/local.svg";
+import Regional from "./additional/regional.svg";
+import Canada from "./additional/canada.svg";
+import Mexico from "./additional/mexico.svg";
 
 export {
+	Mexico,
+	Canada,
+	Regional,
+	Local,
+	Otr,
+	Any,
+	DockHigh,
+	Military,
+	RealId,
+	Dot,
+	Mc,
+	LoadBars,
+	Sleeper,
+	Printer,
+	Ramp,
+	Etrack,
+	Ppe,
+	Dolly,
+	PalletJack,
+	Liftgate,
+	BackgroundCheck,
+	TankerEndorsement,
+	DriverListIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,
@@ -134,4 +187,11 @@ export {
 	AttachmentIcon,
 	UnreadIcon,
 	DriversMapIcon,
+	TwicIcon,
+	HazmatIcon,
+	Hazmat2Icon,
+	Change9Icon,
+	TeamIcon,
+	CdlIcon,
+	TsaIcon,
 };

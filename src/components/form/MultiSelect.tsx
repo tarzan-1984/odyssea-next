@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, ReactNode } from "react";
 
 interface Option {
 	value: string;
 	text: string;
 	selected: boolean;
+	icon?: ReactNode;
 }
 
 interface MultiSelectProps {
@@ -61,6 +62,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		option.text.toLowerCase().includes(searchTerm.toLowerCase())
 	);
 
+	// Синхронизировать локальный стейт с defaultSelected (например, при Reset фильтров)
+	useEffect(() => {
+		setSelectedOptions(defaultSelected);
+	}, [defaultSelected]);
+
 	// Close dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -80,20 +86,20 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
 	return (
 		<div className="w-full" ref={containerRef}>
-			<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-white">
+			<label className="block text-xs font-medium text-gray-700 dark:text-white mb-1">
 				{label}
 			</label>
 
 			<div className="relative z-20 inline-block w-full">
 				<div className="relative flex flex-col items-center">
 					<div onClick={toggleDropdown} className="w-full">
-						<div className="mb-2 flex h-11 rounded-lg border border-gray-300 py-1.5 pl-3 pr-3 shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:focus:border-brand-300">
+						<div className="relative flex items-center rounded-lg border border-gray-300 bg-white px-[12px] py-[8px] text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-300 min-h-[38px]">
 							<div className="flex flex-wrap flex-auto gap-2">
 								{selectedValuesText.length > 0 ? (
 									selectedValuesText.map((text, index) => (
 										<div
 											key={index}
-											className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pl-2.5 pr-2 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white dark:hover:border-gray-800"
+											className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 pl-2.5 pr-2 text-sm  hover:border-gray-200 dark:bg-gray-800 dark:text-white text-gray-900 placeholder:text-gray-500"
 										>
 											<span className="flex-initial max-w-full">{text}</span>
 											<div className="flex flex-row-reverse flex-auto">
@@ -124,42 +130,37 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 								) : (
 									<input
 										placeholder="Select option"
-										className="w-full h-full p-1 pr-2 text-sm bg-transparent border-0 outline-hidden appearance-none placeholder:text-gray-800 focus:border-0 focus:outline-hidden focus:ring-0 dark:text-white dark:placeholder:text-white"
+										className="w-full h-full text-sm bg-transparent border-0 outline-hidden appearance-none focus:border-0 focus:outline-hidden focus:ring-0 dark:text-white dark:placeholder:text-white text-gray-900 placeholder:text-gray-500"
 										readOnly
 										value="Select option"
 									/>
 								)}
 							</div>
-							<div
-								className="flex items-center py-1 pl-1 pr-1 w-7"
-								onClick={e => e.stopPropagation()}
+							<button
+								type="button"
+								onClick={e => {
+									e.stopPropagation();
+									toggleDropdown();
+								}}
+								className="absolute inset-y-0 right-[1px] flex items-center justify-center text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-white"
 							>
-								<button
-									type="button"
-									onClick={e => {
-										e.stopPropagation();
-										toggleDropdown();
-									}}
-									className="w-5 h-5 text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-white"
+								<svg
+									className={`stroke-current pointer-events-none ${isOpen ? "rotate-180" : ""}`}
+									width="16"
+									height="16"
+									viewBox="0 0 20 20"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
 								>
-									<svg
-										className={`stroke-current pointer-events-none ${isOpen ? "rotate-180" : ""}`}
-										width="20"
-										height="20"
-										viewBox="0 0 20 20"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
-											stroke="currentColor"
-											strokeWidth="1.5"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
-								</button>
-							</div>
+									<path
+										d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
+										stroke="currentColor"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+								</svg>
+							</button>
 						</div>
 					</div>
 
@@ -193,8 +194,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 															: ""
 													}`}
 												>
-													<div className="mx-2 leading-6 text-gray-800 dark:text-white">
-														{option.text}
+													<div className="mx-2 flex items-center gap-2 leading-6 text-gray-800 dark:text-white">
+														{option.icon && (
+															<span className="inline-flex h-5 w-5 items-center justify-center">
+																{option.icon}
+															</span>
+														)}
+														<span>{option.text}</span>
 													</div>
 												</div>
 											</div>

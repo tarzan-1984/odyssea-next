@@ -2,7 +2,7 @@ import type React from "react";
 import type { ReactNode } from "react";
 
 type TooltipPosition = "top" | "right" | "bottom" | "left";
-type TooltipTheme = "light" | "dark";
+type TooltipTheme = "light" | "dark" | "inverse";
 
 interface TooltipProps {
 	children: ReactNode;
@@ -44,6 +44,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
 	};
 
 	const getThemeClasses = (themeType: TooltipTheme) => {
+		if (themeType === "inverse") {
+			// Inverse: в светлой теме — тёмный фон / светлый текст,
+			// в тёмной теме — белый фон / тёмный текст.
+			return "bg-[#1E2634] text-white dark:bg-white dark:text-gray-900";
+		}
+
 		return themeType === "light"
 			? "bg-white text-gray-700 dark:bg-[#1E2634] dark:text-white"
 			: "text-white bg-[#1E2634]";
@@ -61,7 +67,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 					<div
 						className={`${getThemeClasses(
 							theme
-						)} whitespace-nowrap rounded-lg  px-3 py-2 text-xs font-medium text-gray-700 drop-shadow-4xl dark:bg-[#1E2634] dark:text-white`}
+						)} whitespace-nowrap rounded-lg  px-3 py-2 text-xs font-medium drop-shadow-4xl`}
 					>
 						{content}
 					</div>
