@@ -18,17 +18,24 @@ import type { TMSDriverResponse } from "@/app-api/api-types";
 import DriverInfoModal from "./DriverInfoModal";
 import { DRIVER_STATUS_LABELS } from "./driversMapConstants";
 
-const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
-	ssr: false,
-});
+const MapContainer = dynamic(
+	() => import("react-leaflet").then((mod) => mod.MapContainer),
+	{ ssr: false }
+);
 
-const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
+const TileLayer = dynamic(
+	() => import("react-leaflet").then((mod) => mod.TileLayer),
+	{ ssr: false }
+);
 
-const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
+const Marker = dynamic(
+	() => import("react-leaflet").then((mod) => mod.Marker),
+	{ ssr: false }
+);
 
 const MapRefSetter = dynamic(
 	() =>
-		import("react-leaflet").then(mod => {
+		import("react-leaflet").then((mod) => {
 			const { useMap } = mod;
 			return function MapRefSetterComponent({
 				mapRef,
@@ -102,14 +109,21 @@ const DEFAULT_CENTER: [number, number] = [39.2904, -76.6122];
 const DEFAULT_ZOOM = 6;
 
 /** Distance between two points in miles (Haversine formula) */
-function getDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function getDistanceMiles(
+	lat1: number,
+	lon1: number,
+	lat2: number,
+	lon2: number
+): number {
 	const R = 3959; // Earth radius in miles
 	const toRad = (deg: number) => (deg * Math.PI) / 180;
 	const dLat = toRad(lat2 - lat1);
 	const dLon = toRad(lon2 - lon1);
 	const a =
 		Math.sin(dLat / 2) ** 2 +
-		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+		Math.cos(toRad(lat1)) *
+			Math.cos(toRad(lat2)) *
+			Math.sin(dLon / 2) ** 2;
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	return R * c;
 }
@@ -119,10 +133,10 @@ function findDirectChatWithUser(
 	myUserId: string,
 	otherUserId: string
 ): ChatRoom | undefined {
-	return rooms.find(r => {
+	return rooms.find((r) => {
 		if (r.type !== "DIRECT") return false;
-		const hasOther = r.participants?.some(p => p.user?.id === otherUserId);
-		const hasMe = r.participants?.some(p => p.user?.id === myUserId);
+		const hasOther = r.participants?.some((p) => p.user?.id === otherUserId);
+		const hasMe = r.participants?.some((p) => p.user?.id === myUserId);
 		return Boolean(hasOther && hasMe);
 	});
 }
@@ -174,9 +188,7 @@ export default function DriversMapWithMarkers({
 
 	const [selectedDriverUserId, setSelectedDriverUserId] = useState<string | null>(null);
 	const [selectedDriverStatus, setSelectedDriverStatus] = useState<string | null>(null); // users.status from our DB (ACTIVE/INACTIVE)
-	const [selectedDriverTMS, setSelectedDriverTMS] = useState<Record<string, unknown> | null>(
-		null
-	);
+	const [selectedDriverTMS, setSelectedDriverTMS] = useState<Record<string, unknown> | null>(null);
 	const [isPopupVisible, setIsPopupVisible] = useState(false);
 	const [isLoadingDriverData, setIsLoadingDriverData] = useState(false);
 	const [isChatActionLoading, setIsChatActionLoading] = useState(false);
@@ -188,29 +200,34 @@ export default function DriversMapWithMarkers({
 	const error = errorProp ?? queryResult.error;
 	const refetch = refetchProp ?? queryResult.refetch;
 	const currentUser = useCurrentUser();
-	const addChatRoom = useChatStore(s => s.addChatRoom);
-	const chatRooms = useChatStore(s => s.chatRooms);
+	const addChatRoom = useChatStore((s) => s.addChatRoom);
+	const chatRooms = useChatStore((s) => s.chatRooms);
 	const { loadChatRooms } = useWebSocketChatSync();
 
-	const handleMarkerClick = useCallback(async (driver: DriverForMap) => {
-		if (!driver.externalId) return;
-		setSelectedDriverUserId(driver.id);
-		setSelectedDriverStatus(driver.status ?? null); // From our backend drivers/map response (users.status)
-		setIsLoadingDriverData(true);
-		setIsPopupVisible(true);
-		setSelectedDriverTMS(null);
-		try {
-			const res = (await users.getDriverById(driver.externalId)) as
-				| TMSDriverResponse
-				| Record<string, unknown>;
-			const payload = (res as TMSDriverResponse)?.data ?? (res as Record<string, unknown>);
-			setSelectedDriverTMS(payload as Record<string, unknown>);
-		} catch {
+	const handleMarkerClick = useCallback(
+		async (driver: DriverForMap) => {
+			if (!driver.externalId) return;
+			setSelectedDriverUserId(driver.id);
+			setSelectedDriverStatus(driver.status ?? null); // From our backend drivers/map response (users.status)
+			setIsLoadingDriverData(true);
+			setIsPopupVisible(true);
 			setSelectedDriverTMS(null);
-		} finally {
-			setIsLoadingDriverData(false);
-		}
-	}, []);
+			try {
+				const res = (await users.getDriverById(
+					driver.externalId
+				)) as TMSDriverResponse | Record<string, unknown>;
+				const payload =
+					(res as TMSDriverResponse)?.data ??
+					(res as Record<string, unknown>);
+				setSelectedDriverTMS(payload as Record<string, unknown>);
+			} catch {
+				setSelectedDriverTMS(null);
+			} finally {
+				setIsLoadingDriverData(false);
+			}
+		},
+		[]
+	);
 
 	const handleGoToChat = useCallback(async () => {
 		const myUserId = currentUser?.id;
@@ -246,30 +263,30 @@ export default function DriversMapWithMarkers({
 					isArchived: false,
 					updatedAt: chatData.createdAt,
 					participants: (
-						(chatData.participants || []) as Array<{
+					(chatData.participants || []) as Array<{
+						id?: string;
+						user?: {
 							id?: string;
-							user?: {
-								id?: string;
-								firstName?: string;
-								lastName?: string;
-								profilePhoto?: string;
-								avatar?: string;
-								role?: string;
-							};
-						}>
-					).map(p => ({
-						id: `participant_${p.id ?? ""}_${chatData.id}`,
-						chatRoomId: chatData.id,
-						userId: p.user?.id ?? p.id ?? "",
-						joinedAt: chatData.createdAt,
-						user: {
-							id: p.user?.id ?? p.id ?? "",
-							firstName: p.user?.firstName ?? "",
-							lastName: p.user?.lastName ?? "",
-							avatar: p.user?.profilePhoto ?? p.user?.avatar ?? "",
-							role: p.user?.role ?? "USER",
-						},
-					})),
+							firstName?: string;
+							lastName?: string;
+							profilePhoto?: string;
+							avatar?: string;
+							role?: string;
+						};
+					}>
+				).map((p) => ({
+					id: `participant_${p.id ?? ""}_${chatData.id}`,
+					chatRoomId: chatData.id,
+					userId: p.user?.id ?? p.id ?? "",
+					joinedAt: chatData.createdAt,
+					user: {
+						id: p.user?.id ?? p.id ?? "",
+						firstName: p.user?.firstName ?? "",
+						lastName: p.user?.lastName ?? "",
+						avatar: p.user?.profilePhoto ?? p.user?.avatar ?? "",
+						role: p.user?.role ?? "USER",
+					},
+				})),
 				};
 				addChatRoom(chatRoom);
 				await indexedDBChatService.addChatRoom(chatRoom);
@@ -319,7 +336,7 @@ export default function DriversMapWithMarkers({
 		if (!mapRef.current || drivers.length === 0 || hasFitBoundsRef.current) return;
 
 		const valid = drivers.filter(
-			d =>
+			(d) =>
 				typeof d.latitude === "number" &&
 				typeof d.longitude === "number" &&
 				!Number.isNaN(d.latitude) &&
@@ -328,7 +345,7 @@ export default function DriversMapWithMarkers({
 		if (valid.length === 0) return;
 
 		const bounds = L.latLngBounds(
-			valid.map(d => [d.latitude, d.longitude] as [number, number])
+			valid.map((d) => [d.latitude, d.longitude] as [number, number])
 		);
 		mapRef.current.whenReady(() => {
 			if (mapRef.current && !hasFitBoundsRef.current) {
@@ -365,7 +382,7 @@ export default function DriversMapWithMarkers({
 	const driverStatusOptions = Array.from(
 		new Set(
 			drivers
-				.map(d => d.driverStatus)
+				.map((d) => d.driverStatus)
 				.filter((s): s is string => Boolean(s))
 				.sort()
 		)
@@ -375,13 +392,14 @@ export default function DriversMapWithMarkers({
 		driverStatusFilter === "all" || !driverStatusFilter
 			? drivers
 			: drivers.filter(
-					d => d.driverStatus?.toLowerCase() === driverStatusFilter.toLowerCase()
+					(d) =>
+						d.driverStatus?.toLowerCase() === driverStatusFilter.toLowerCase()
 				);
 
 	const filteredByZip =
 		!zipFilter || !zipFilter.trim()
 			? filteredByStatus
-			: filteredByStatus.filter(d => {
+			: filteredByStatus.filter((d) => {
 					const driverZip = (d.zip ?? "").toString().toLowerCase().trim();
 					const searchZip = zipFilter.toLowerCase().trim();
 					return driverZip.includes(searchZip);
@@ -389,8 +407,10 @@ export default function DriversMapWithMarkers({
 
 	// Filter by radius (miles) from center when address filter was applied
 	const filteredDrivers =
-		centerCoordinates && typeof radiusMilesProp === "number" && radiusMilesProp > 0
-			? filteredByZip.filter(d => {
+		centerCoordinates &&
+		typeof radiusMilesProp === "number" &&
+		radiusMilesProp > 0
+			? filteredByZip.filter((d) => {
 					if (
 						typeof d.latitude !== "number" ||
 						typeof d.longitude !== "number" ||
@@ -442,11 +462,11 @@ export default function DriversMapWithMarkers({
 					<select
 						id="driver-status-filter"
 						value={driverStatusFilter}
-						onChange={e => setDriverStatusFilter(e.target.value)}
+						onChange={(e) => setDriverStatusFilter(e.target.value)}
 						className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 					>
 						<option value="all">{DRIVER_STATUS_LABELS.all}</option>
-						{driverStatusOptions.map(status => (
+						{driverStatusOptions.map((status) => (
 							<option key={status} value={status}>
 								{DRIVER_STATUS_LABELS[status.toLowerCase()] ?? status}
 							</option>

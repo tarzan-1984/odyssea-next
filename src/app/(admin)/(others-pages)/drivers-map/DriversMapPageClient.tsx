@@ -24,7 +24,7 @@ export function DriversMapPageClient() {
 	const driverStatusOptions = Array.from(
 		new Set(
 			drivers
-				.map(d => d.driverStatus)
+				.map((d) => d.driverStatus)
 				.filter((s): s is string => Boolean(s))
 				.sort()
 		)
@@ -32,7 +32,9 @@ export function DriversMapPageClient() {
 
 	return (
 		<div className="flex flex-col gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 md:gap-3 md:px-0 md:py-0">
-			<PageBreadcrumb pageTitle="Drivers Map" />
+			<PageBreadcrumb
+				pageTitle="Drivers Map"
+			/>
 
 			<DriversMapFilters
 				driverStatusFilter={driverStatusFilter}
@@ -44,7 +46,7 @@ export function DriversMapPageClient() {
 					setCenterCoordinates({ lat: latitude, lng: longitude });
 					setRadiusMiles(miles);
 				}}
-				onRadiusChange={miles => setRadiusMiles(miles)}
+				onRadiusChange={(miles) => setRadiusMiles(miles)}
 				onClearFilter={() => {
 					setCenterCoordinates(null);
 					setRadiusMiles(null);

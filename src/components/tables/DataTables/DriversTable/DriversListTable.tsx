@@ -28,13 +28,7 @@ import {
 	Dot,
 	RealId,
 	Military,
-	DockHigh,
-	Any,
-	Otr,
-	Local,
-	Regional,
-	Canada,
-	Mexico,
+	DockHigh, Any, Otr, Local, Regional, Canada, Mexico
 } from "@/icons";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Link from "next/link";
@@ -51,44 +45,40 @@ import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { DriverForMap } from "@/hooks/useDriversForMap";
-import { DriversPage } from "./Types";
+import {DriversPage} from "./Types"
+
 
 export default function DriversListTable() {
 	const currentUser = useCurrentUser();
 
 	// State for pagination
-	const [currentPage, setCurrentPage] = useState(1);
-	const [itemsPerPage, setItemsPerPage] = useState(10);
+	const [currentPage, setCurrentPage]             = useState(1);
+	const [itemsPerPage, setItemsPerPage]           = useState(10);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
 
 	// Local filters (пока только в useState)
-	const [addressFilter, setAddressFilter] = useState<string>("");
-	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
-	const [radiusFilter, setRadiusFilter] = useState<string>("500");
+	const [addressFilter, setAddressFilter]           = useState<string>("");
+	const [locationFilter, setLocationFilter]         = useState<"USA" | "Canada">("USA");
+	const [radiusFilter, setRadiusFilter]             = useState<string>("500");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const toggleDriverSelection = (driverId: string) => {
 		setSelectedDriverIds(prev =>
-			prev.includes(driverId) ? prev.filter(id => id !== driverId) : [...prev, driverId]
+			prev.includes(driverId)
+				? prev.filter(id => id !== driverId)
+				: [...prev, driverId]
 		);
 	};
 
-	const fetchDriversPage = async (
-		page: number,
-		per_page: number,
-		capabilities: string[],
-		address: string,
-		radius: string,
-		country: string
-	): Promise<DriversPage> => {
+	const fetchDriversPage = async (page: number, per_page:number, capabilities: string[], address: string, radius: string, country: string): Promise<DriversPage> => {
 		const params = new URLSearchParams();
 		params.set("paged", String(page));
 		params.set("per_page_loads", String(per_page));
 
-		if (capabilities.length) {
-			params.set("capabilities", capabilities.join(","));
+		if(capabilities.length) {
+			params.set("capabilities", capabilities.join(','));
 		}
 
-		if (address && radius && country) {
+		if(address && radius && country) {
 			params.set("my_search", address);
 			params.set("radius", radius);
 			params.set("country", country);
@@ -105,7 +95,7 @@ export default function DriversListTable() {
 		}
 
 		return response.json();
-	};
+	}
 
 	// Fetch users data when dependencies change
 	const {
@@ -116,31 +106,17 @@ export default function DriversListTable() {
 	} = useQuery({
 		queryKey: [
 			"drivers-list",
-			{
-				currentPage,
-				itemsPerPage,
-				capabilitiesFilter,
-				addressFilter,
-				radiusFilter,
-				locationFilter,
-			},
+			{ currentPage, itemsPerPage, capabilitiesFilter, addressFilter, radiusFilter, locationFilter },
 		],
-		queryFn: () =>
-			fetchDriversPage(
-				currentPage,
-				itemsPerPage,
-				capabilitiesFilter,
-				addressFilter,
-				radiusFilter,
-				locationFilter
-			),
+		queryFn: () => fetchDriversPage(currentPage, itemsPerPage, capabilitiesFilter, addressFilter, radiusFilter, locationFilter),
 		staleTime: 10 * 60 * 1000,
 		placeholderData: keepPreviousData,
 	});
 
 	const visibleDriverIds: string[] = driverList?.data?.results?.map((d: any) => d.id) ?? [];
 	const allVisibleSelected =
-		visibleDriverIds.length > 0 && visibleDriverIds.every(id => selectedDriverIds.includes(id));
+		visibleDriverIds.length > 0 &&
+		visibleDriverIds.every(id => selectedDriverIds.includes(id));
 
 	const toggleAllVisible = () => {
 		setSelectedDriverIds(prev => {
@@ -298,25 +274,13 @@ export default function DriversListTable() {
 									value: "macropoint",
 									text: "MacroPoint",
 									selected: false,
-									icon: (
-										<Image
-											src={macroPointIcon}
-											alt="MacroPoint"
-											className="h-4 w-4"
-										/>
-									),
+									icon: <Image src={macroPointIcon} alt="MacroPoint" className="h-4 w-4" />,
 								},
 								{
 									value: "tucker-tools",
 									text: "Trucker Tools",
 									selected: false,
-									icon: (
-										<Image
-											src={tuckerTools}
-											alt="Trucker Tools"
-											className="h-4 w-4"
-										/>
-									),
+									icon: <Image src={tuckerTools} alt="Trucker Tools" className="h-4 w-4" />,
 								},
 								{
 									value: "change-9",
@@ -344,7 +308,7 @@ export default function DriversListTable() {
 								},
 							]}
 							defaultSelected={capabilitiesFilter}
-							onChange={values => setCapabilitiesFilter(values)}
+							onChange={(values) => setCapabilitiesFilter(values)}
 						/>
 					</div>
 
@@ -362,7 +326,7 @@ export default function DriversListTable() {
 							id="drivers-list-address-filter"
 							type="text"
 							value={addressFilter}
-							onChange={e => setAddressFilter(e.target.value)}
+							onChange={(e) => setAddressFilter(e.target.value)}
 							placeholder="Enter address"
 							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400 md:w-40"
 						/>
@@ -381,7 +345,7 @@ export default function DriversListTable() {
 						<select
 							id="drivers-list-location-filter"
 							value={locationFilter}
-							onChange={e =>
+							onChange={(e) =>
 								setLocationFilter(e.target.value === "Canada" ? "Canada" : "USA")
 							}
 							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
@@ -404,7 +368,7 @@ export default function DriversListTable() {
 						<select
 							id="drivers-list-radius-filter"
 							value={radiusFilter}
-							onChange={e => setRadiusFilter(e.target.value)}
+							onChange={(e) => setRadiusFilter(e.target.value)}
 							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
 						>
 							<option value="50">50 miles</option>
@@ -504,37 +468,34 @@ export default function DriversListTable() {
 								driverList?.data?.results?.map((item, i) => {
 									const preferred_distance = item?.meta_data?.preferred_distance;
 									const selected_distances = preferred_distance
-										.split(",")
+										.split(',')
 										.map(item => item.trim());
 
 									const cross_border = item?.meta_data?.cross_border;
 									const selected_cross_border = cross_border
-										.split(",")
+										.split(',')
 										.map(item => item.trim());
 
-									const legal_document_type =
-										item?.meta_data?.legal_document_type;
-									const legal_document_expiration =
-										item?.meta_data?.legal_document_expiration;
-									const legal_document_file = item?.meta_data?.legal_document;
-									const background_check = item?.meta_data?.background_check;
+
+									const legal_document_type      = item?.meta_data?.legal_document_type;
+									const legal_document_expiration= item?.meta_data?.legal_document_expiration;
+									const legal_document_file      = item?.meta_data?.legal_document;
+									const background_check         = item?.meta_data?.background_check;
 									const background_file = item?.meta_data?.background_file;
 									let legal_valid = false;
-									const ny_timezone = "America/New_York";
+									const ny_timezone = 'America/New_York';
 									const now_ny = new Date(
-										new Date().toLocaleString("en-US", {
-											timeZone: ny_timezone,
-										})
+										new Date().toLocaleString('en-US', { timeZone: ny_timezone })
 									);
 									const now_ts = Math.floor(now_ny.getTime() / 1000);
 
 									let background_valid = false;
-									if (background_check && background_file) {
+									if ( background_check && background_file ) {
 										background_valid = true;
 									}
 
 									if (
-										legal_document_type === "us-passport" &&
+										legal_document_type === 'us-passport' &&
 										legal_document_file &&
 										legal_document_expiration
 									) {
@@ -542,10 +503,7 @@ export default function DriversListTable() {
 											new Date(legal_document_expiration).getTime() / 1000
 										);
 
-										if (
-											!Number.isNaN($legal_exp_ts) &&
-											$legal_exp_ts >= now_ts
-										) {
+										if (!Number.isNaN($legal_exp_ts) && $legal_exp_ts >= now_ts) {
 											legal_valid = true;
 										}
 									}
@@ -559,12 +517,8 @@ export default function DriversListTable() {
 													<input
 														type="checkbox"
 														className="h-4 w-4 cursor-pointer"
-														checked={selectedDriverIds.includes(
-															item.id
-														)}
-														onChange={() =>
-															toggleDriverSelection(item.id)
-														}
+														checked={selectedDriverIds.includes(item.id)}
+														onChange={() => toggleDriverSelection(item.id)}
 													/>
 												</div>
 											</TableCell>
@@ -576,27 +530,14 @@ export default function DriversListTable() {
 
 											{/*location & date — light red background if datetime on second line is older than 12 hours */}
 											{(() => {
-												const dateStr =
-													item?.updated_zipcode ||
-													(item as any)?.date_updated ||
-													item?.meta_data?.status_date ||
-													"";
-												const locationDate = dateStr
-													? new Date(dateStr.replace(/\s+/, "T"))
-													: null;
-												const isOlderThan12h =
-													locationDate &&
-													!Number.isNaN(locationDate.getTime()) &&
-													Date.now() - locationDate.getTime() >
-														12 * 60 * 60 * 1000;
+												const dateStr = item?.updated_zipcode || (item as any)?.date_updated || item?.meta_data?.status_date || "";
+												const locationDate = dateStr ? new Date(dateStr.replace(/\s+/, "T")) : null;
+												const isOlderThan12h = locationDate && !Number.isNaN(locationDate.getTime()) && (Date.now() - locationDate.getTime() > 12 * 60 * 60 * 1000);
 												return (
 													<TableCell
 														className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
 													>
-														<p>
-															{item?.meta_data?.current_city}{" "}
-															{item?.meta_data?.current_location}
-														</p>
+														<p>{item?.meta_data?.current_city} {item?.meta_data?.current_location}</p>
 														<p>{item?.updated_zipcode}</p>
 													</TableCell>
 												);
@@ -623,11 +564,7 @@ export default function DriversListTable() {
 											{/*vehicle*/}
 											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
 												<p>{item?.meta_data?.vehicle_type}</p>
-												<p>
-													{item?.meta_data?.vehicle_make}{" "}
-													{item?.meta_data?.vehicle_model}{" "}
-													{item?.meta_data?.vehicle_year}
-												</p>
+												<p>{item?.meta_data?.vehicle_make} {item?.meta_data?.vehicle_model} {item?.meta_data?.vehicle_year}</p>
 											</TableCell>
 
 											{/*Dimensions*/}
@@ -639,146 +576,74 @@ export default function DriversListTable() {
 											{/*Equipment*/}
 											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 gap-[10px]">
 												{item?.meta_data?.twic === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="TWIC"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TwicIcon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="TWIC" position="top">
+														<span className="inline-flex"><TwicIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.hazmat_certificate === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Hazmat Certificate"
-														position="top"
-													>
-														<span className="inline-flex">
-															<HazmatIcon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Hazmat Certificate" position="top">
+														<span className="inline-flex"><HazmatIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.team_driver_enabled === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Team Driver"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TeamIcon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Team Driver" position="top">
+														<span className="inline-flex"><TeamIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.driver_licence_type === "cdl" && (
-													<Tooltip
-														theme="inverse"
-														content="CDL"
-														position="top"
-													>
-														<span className="inline-flex">
-															<CdlIcon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="CDL" position="top">
+														<span className="inline-flex"><CdlIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{item?.meta_data?.driver_licence_type ===
-													"tsa_approved" && (
-													<Tooltip
-														theme="inverse"
-														content="TSA"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TsaIcon className="h-5 w-5" />
-														</span>
+												{item?.meta_data?.driver_licence_type === "tsa_approved" && (
+													<Tooltip theme="inverse" content="TSA" position="top">
+														<span className="inline-flex"><TsaIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.hazmat_endorsement === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Hazmat Endorsement"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Hazmat2Icon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Hazmat Endorsement" position="top">
+														<span className="inline-flex"><Hazmat2Icon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.change_9_training === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Change 9"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Change9Icon className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Change 9" position="top">
+														<span className="inline-flex"><Change9Icon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.tanker_endorsement === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Tanker endorsement"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TankerEndorsement className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Tanker endorsement" position="top">
+														<span className="inline-flex"><TankerEndorsement className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.background_check === "on" && (
-													<Tooltip
-														content="Background Check"
-														position="top"
-													>
-														<span className="inline-flex">
-															<BackgroundCheck className="h-5 w-5" />
-														</span>
+													<Tooltip content="Background Check" position="top">
+														<span className="inline-flex"><BackgroundCheck className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.lift_gate === "on" && (
 													<Tooltip content="Liftgate" position="top">
-														<span className="inline-flex">
-															<Liftgate className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Liftgate className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.pallet_jack === "on" && (
 													<Tooltip content="Pallet jack" position="top">
-														<span className="inline-flex">
-															<PalletJack className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><PalletJack className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dolly === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Dolly"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Dolly className="h-5 w-5" />
-														</span>
+													<Tooltip theme="inverse" content="Dolly" position="top">
+														<span className="inline-flex"><Dolly className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.ppe === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="PPE"
-														position="top"
-													>
+													<Tooltip theme="inverse" content="PPE" position="top">
 														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
 															<Ppe className="h-3 w-3" />
 														</span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.e_tracks === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="E-tracks"
-														position="top"
-													>
+													<Tooltip theme="inverse" content="E-tracks" position="top">
 														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
 															<Etrack className="h-3 w-3" />
 														</span>
@@ -786,150 +651,103 @@ export default function DriversListTable() {
 												)}
 												{item?.meta_data?.ramp === "on" && (
 													<Tooltip content="Ramp" position="top">
-														<span className="inline-flex">
-															<Ramp className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Ramp className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.printer === "on" && (
 													<Tooltip content="Printer" position="top">
-														<span className="inline-flex">
-															<Printer className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Printer className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.sleeper === "on" && (
 													<Tooltip content="Sleeper" position="top">
-														<span className="inline-flex">
-															<Sleeper className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Sleeper className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.load_bars === "on" && (
 													<Tooltip content="Load bars" position="top">
-														<span className="inline-flex">
-															<LoadBars className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><LoadBars className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.mc_enabled === "on" && (
 													<Tooltip content="MC" position="top">
-														<span className="inline-flex">
-															<Mc className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Mc className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dot_enabled === "on" && (
 													<Tooltip content="DOT" position="top">
-														<span className="inline-flex">
-															<Dot className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Dot className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.real_id === "on" && (
 													<Tooltip content="Real ID" position="top">
-														<span className="inline-flex">
-															<RealId className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><RealId className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{military_capability && (
 													<Tooltip content="Military" position="top">
-														<span className="inline-flex">
-															<Military className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Military className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.macro_point === "on" && (
 													<Tooltip content="MacroPoint" position="top">
-														<span className="inline-flex">
-															<Image
-																src={macroPointIcon}
-																alt="MacroPoint"
-																className="h-5 w-5"
-															/>
-														</span>
+														<span className="inline-flex"><Image src={macroPointIcon} alt="MacroPoint" className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.trucker_tools === "on" && (
 													<Tooltip content="Trucker Tools" position="top">
-														<span className="inline-flex">
-															<Image
-																src={tuckerTools}
-																alt="Trucker Tools"
-																className="h-5 w-5"
-															/>
-														</span>
+														<span className="inline-flex"><Image src={tuckerTools} alt="Trucker Tools" className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dock_high === "on" && (
 													<Tooltip content="Dock High" position="top">
-														<span className="inline-flex">
-															<DockHigh className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><DockHigh className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{selected_distances.includes("any") && (
+												{selected_distances.includes('any') && (
 													<Tooltip content="Any" position="top">
-														<span className="inline-flex">
-															<Any className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Any className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{selected_distances.includes("otr") && (
+												{selected_distances.includes('otr') && (
 													<Tooltip content="OTR" position="top">
-														<span className="inline-flex">
-															<Otr className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Otr className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{selected_distances.includes("local") && (
+												{selected_distances.includes('local') && (
 													<Tooltip content="Local" position="top">
-														<span className="inline-flex">
-															<Local className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Local className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{selected_distances.includes("regional") && (
+												{selected_distances.includes('regional') && (
 													<Tooltip content="Regional" position="top">
-														<span className="inline-flex">
-															<Regional className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Regional className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{(item?.meta_data?.canada_transition_proof ===
-													"on" ||
-													selected_cross_border.includes("canada")) && (
+												{(item?.meta_data?.canada_transition_proof === "on" || selected_cross_border.includes('canada')) && (
 													<Tooltip content="Canada" position="top">
-														<span className="inline-flex">
-															<Canada className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Canada className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
-												{selected_cross_border.includes("mexico") && (
+												{selected_cross_border.includes('mexico') && (
 													<Tooltip content="Mexico" position="top">
-														<span className="inline-flex">
-															<Mexico className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><Mexico className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.alaska === "on" && (
 													<Tooltip content="Alaska" position="top">
-														<span className="inline-flex">
-															<AlaskaIcon className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><AlaskaIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.side_door === "on" && (
 													<Tooltip content="Side door" position="top">
-														<span className="inline-flex">
-															<SideDoorIcon className="h-5 w-5" />
-														</span>
+														<span className="inline-flex"><SideDoorIcon className="h-5 w-5" /></span>
 													</Tooltip>
 												)}
 											</TableCell>
+
 										</TableRow>
-									);
+									)
 								})
 							)}
 						</TableBody>
@@ -940,7 +758,7 @@ export default function DriversListTable() {
 			{/* Footer section with pagination info and controls */}
 			<div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
 				<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-					{/*Pagination info*/}
+					 {/*Pagination info*/}
 					<div className="pb-3 xl:pb-0">
 						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
 							{totalItems === 0
@@ -952,7 +770,7 @@ export default function DriversListTable() {
 						</p>
 					</div>
 
-					{/*Pagination controls*/}
+					 {/*Pagination controls*/}
 					{totalPages > 1 && (
 						<PaginationWithIcon
 							totalPages={totalPages}

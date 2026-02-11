@@ -15,7 +15,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 	children,
 	content,
 	position = "top",
-	theme = "light",
+	theme = "inverse",
 }) => {
 	const getPositionClasses = (pos: TooltipPosition) => {
 		switch (pos) {
