@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import axios from "axios";
 import { serverAuth } from "@/utils/auth";
 
 const TMS_DRIVER_SEARCH_URL = "https://www.endurance-tms.com/wp-json/tms/v1/driver/search";
@@ -49,20 +50,22 @@ export async function GET(request: NextRequest) {
 		}
 
 		const url = `${TMS_DRIVER_SEARCH_URL}?${query.toString()}`;
-		const response = await fetch(url, {
-			method: "GET",
+
+		const response = await axios.get(url, {
 			headers: {
 				"Content-Type": "application/json",
 				"X-API-Key": TMS_API_KEY,
 			},
+			// Не выбрасывать исключение для не-2xx, чтобы обработать статус вручную.
+			validateStatus: () => true,
 		});
 
-		const data = await response.json();
+		const { data, status } = response;
 
-		if (!response.ok) {
+		if (status < 200 || status >= 300) {
 			return NextResponse.json(
-				{ error: data.message || "TMS driver search failed" },
-				{ status: response.status }
+				{ error: (data as any)?.message || "TMS driver search failed" },
+				{ status }
 			);
 		}
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import axios from "axios";
 import { serverAuth } from "@/utils/auth";
 
 const PAGE_SIZE = 100;
@@ -50,28 +51,27 @@ export async function GET(request: NextRequest) {
 		queryParams.set("limit", String(limit));
 		if (company) queryParams.set("company", company);
 
-		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/drivers/map?${queryParams.toString()}`,
-			{
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
-				},
-			}
-		);
+		const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/drivers/map?${queryParams.toString()}`;
 
-		const data = await response.json();
+		const response = await axios.get(url, {
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			validateStatus: () => true,
+		});
 
-		if (!response.ok) {
+		const { data, status } = response;
+
+		if (status < 200 || status >= 300) {
 			return NextResponse.json(
-				{ error: data.message || "Failed to fetch drivers for map" },
-				{ status: response.status }
+				{ error: (data as any)?.message || "Failed to fetch drivers for map" },
+				{ status }
 			);
 		}
 
 		// Backend may wrap response in { data: {...} }
-		const payload = data.data ?? data;
+		const payload = (data as any)?.data ?? data;
 		const drivers = Array.isArray(payload?.drivers) ? payload.drivers : [];
 		const pagination = payload?.pagination ?? {
 			current_page: page,

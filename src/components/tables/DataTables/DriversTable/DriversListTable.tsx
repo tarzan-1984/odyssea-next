@@ -40,13 +40,26 @@ import SideDoorIcon from "@/icons/additional/side_door.svg";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
+import Select from "@/components/form/Select";
+import Label from "@/components/form/Label";
+import Button from "@/components/ui/button/Button";
+import axios from "axios";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { DriverForMap } from "@/hooks/useDriversForMap";
 import {DriversPage} from "./Types"
+import CreateOfferModal from "./CreateOfferModal";
 
+// Roles that can see drivers list without entering Address filter
+const ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS = [
+	"ADMINISTRATOR",
+	"RECRUITER",
+	"RECRUITER_TL",
+	"HR_MANAGER",
+	"DRIVER_UPDATES",
+] as const;
 
 export default function DriversListTable() {
 	const currentUser = useCurrentUser();
@@ -55,6 +68,10 @@ export default function DriversListTable() {
 	const [currentPage, setCurrentPage]             = useState(1);
 	const [itemsPerPage, setItemsPerPage]           = useState(10);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+
+	// Actions: selected action and create-offer modal
+	const [selectedAction, setSelectedAction]         = useState<string>("");
+	const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
 
 	// Local filters (пока только в useState)
 	const [addressFilter, setAddressFilter]           = useState<string>("");
@@ -69,33 +86,54 @@ export default function DriversListTable() {
 		);
 	};
 
-	const fetchDriversPage = async (page: number, per_page:number, capabilities: string[], address: string, radius: string, country: string): Promise<DriversPage> => {
+	const fetchDriversPage = async (
+		page: number,
+		per_page: number,
+		capabilities: string[],
+		address: string,
+		radius: string,
+		country: string
+	): Promise<DriversPage> => {
 		const params = new URLSearchParams();
 		params.set("paged", String(page));
 		params.set("per_page_loads", String(per_page));
 
-		if(capabilities.length) {
-			params.set("capabilities", capabilities.join(','));
+		if (capabilities.length) {
+			params.set("capabilities", capabilities.join(","));
 		}
 
-		if(address && radius && country) {
+		if (address && radius && country) {
 			params.set("my_search", address);
 			params.set("radius", radius);
 			params.set("country", country);
 		}
 
-		const response = await fetch(`/api/users/drivers/search?${params.toString()}`, {
-			method: "GET",
-			credentials: "include",
-		});
+		try {
+			const { data } = await axios.get<DriversPage>(
+				`/api/users/drivers/search?${params.toString()}`,
+				{
+					withCredentials: true,
+				}
+			);
 
-		if (!response.ok) {
-			const err = await response.json().catch(() => ({}));
-			throw new Error(err.error || "Failed to fetch drivers");
+			return data;
+		} catch (error: any) {
+			const message =
+				error?.response?.data?.error ||
+				error?.message ||
+				"Failed to fetch drivers";
+			throw new Error(message);
 		}
+	};
 
-		return response.json();
-	}
+	// Show drivers without address only for specific roles; others must enter Address
+	const canShowDriversWithoutAddress =
+		!!currentUser?.role &&
+		ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS.includes(
+			currentUser.role as (typeof ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS)[number]
+		);
+	const isAddressEmpty = addressFilter.trim() === "";
+	const isQueryEnabled = !isAddressEmpty || canShowDriversWithoutAddress;
 
 	// Fetch users data when dependencies change
 	const {
@@ -111,6 +149,7 @@ export default function DriversListTable() {
 		queryFn: () => fetchDriversPage(currentPage, itemsPerPage, capabilitiesFilter, addressFilter, radiusFilter, locationFilter),
 		staleTime: 10 * 60 * 1000,
 		placeholderData: keepPreviousData,
+		enabled: isQueryEnabled,
 	});
 
 	const visibleDriverIds: string[] = driverList?.data?.results?.map((d: any) => d.id) ?? [];
@@ -158,13 +197,48 @@ export default function DriversListTable() {
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
+
+				{/* Actions select */}
+				{/*<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[260px]">
+					<Label className="mb-0">Actions</Label>
+					<Select
+						options={[{ value: "create-offers", label: "Create Offers" }]}
+						placeholder="Choise Action"
+						onChange={(value) => setSelectedAction(value)}
+						defaultValue=""
+						className="dark:bg-gray-900"
+					/>
+					<Button
+						size="sm"
+						variant="primary"
+						disabled={selectedDriverIds.length === 0}
+						onClick={() => {
+							if (selectedAction === "create-offers") {
+								setCreateOfferModalOpen(true);
+							}
+						}}
+					>
+						Apply
+					</Button>
+				</div>*/}
 			</div>
 
-			{/* Фильтры (перенесены с Drivers Map, пока только локальный state) */}
+			{/* Create Offer modal */}
+			<CreateOfferModal
+				isOpen={createOfferModalOpen}
+				onClose={() => setCreateOfferModalOpen(false)}
+				externalId={currentUser?.externalId ?? ""}
+				selectedDriverIds={selectedDriverIds}
+				onSubmit={(values) => {
+					// TODO: send to API
+					console.log("Create offer form submitted:", values);
+				}}
+			/>
+
 			<div className="px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
 					{/* Capabilities (multiselect) */}
-					<div className="flex min-w-0 flex-col gap-1 md:min-w-[220px]">
+					<div className="flex min-w-0 flex-col md:min-w-[220px]">
 						<MultiSelect
 							label="Capabilities"
 							options={[
@@ -196,13 +270,21 @@ export default function DriversListTable() {
 									value: "tanker-endorsement",
 									text: "Tanker endorsement",
 									selected: false,
-									icon: <TankerEndorsement className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<TankerEndorsement className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "ppe",
 									text: "PPE",
 									selected: false,
-									icon: <Ppe className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Ppe className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "dock-high",
@@ -214,31 +296,51 @@ export default function DriversListTable() {
 									value: "e-track",
 									text: "E-tracks",
 									selected: false,
-									icon: <Etrack className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Etrack className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "pallet-jack",
 									text: "Pallet jack",
 									selected: false,
-									icon: <PalletJack className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<PalletJack className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "ramp",
 									text: "Ramp",
 									selected: false,
-									icon: <Ramp className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Ramp className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "load-bars",
 									text: "Load bars",
 									selected: false,
-									icon: <LoadBars className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<LoadBars className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "liftgate",
 									text: "Liftgate",
 									selected: false,
-									icon: <Liftgate className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Liftgate className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "team",
@@ -292,63 +394,66 @@ export default function DriversListTable() {
 									value: "sleeper",
 									text: "Sleeper",
 									selected: false,
-									icon: <Sleeper className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Sleeper className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "printer",
 									text: "Printer",
 									selected: false,
-									icon: <Printer className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<Printer className="h-3 w-3" />
+										</span>
+									),
 								},
 								{
 									value: "side_door",
 									text: "Side door",
 									selected: false,
-									icon: <SideDoorIcon className="h-4 w-4" />,
+									icon: (
+										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+											<SideDoorIcon className="h-3 w-3" />
+										</span>
+									),
 								},
 							]}
 							defaultSelected={capabilitiesFilter}
 							onChange={(values) => setCapabilitiesFilter(values)}
+							triggerClassName="h-11"
 						/>
 					</div>
 
 					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Address */}
-					<div className="flex min-w-0 flex-col gap-1">
-						<label
-							htmlFor="drivers-list-address-filter"
-							className="text-xs font-medium text-gray-700 dark:text-gray-300"
-						>
-							Address
-						</label>
+					<div className="flex min-w-0 flex-col">
+						<Label htmlFor="drivers-list-address-filter">Address</Label>
 						<input
 							id="drivers-list-address-filter"
 							type="text"
 							value={addressFilter}
 							onChange={(e) => setAddressFilter(e.target.value)}
 							placeholder="Enter address"
-							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400 md:w-40"
+							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
 						/>
 					</div>
 
 					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Location */}
-					<div className="flex min-w-0 flex-col gap-1">
-						<label
-							htmlFor="drivers-list-location-filter"
-							className="text-xs font-medium text-gray-700 dark:text-gray-300"
-						>
-							Location
-						</label>
+					<div className="flex min-w-0 flex-col">
+						<Label htmlFor="drivers-list-location-filter">Location</Label>
 						<select
 							id="drivers-list-location-filter"
 							value={locationFilter}
 							onChange={(e) =>
 								setLocationFilter(e.target.value === "Canada" ? "Canada" : "USA")
 							}
-							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
+							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[140px] md:w-auto"
 						>
 							<option value="USA">USA</option>
 							<option value="Canada">Canada</option>
@@ -358,18 +463,13 @@ export default function DriversListTable() {
 					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Radius */}
-					<div className="flex min-w-0 flex-col gap-1">
-						<label
-							htmlFor="drivers-list-radius-filter"
-							className="text-xs font-medium text-gray-700 dark:text-gray-300"
-						>
-							Radius
-						</label>
+					<div className="flex min-w-0 flex-col">
+						<Label htmlFor="drivers-list-radius-filter">Radius</Label>
 						<select
 							id="drivers-list-radius-filter"
 							value={radiusFilter}
 							onChange={(e) => setRadiusFilter(e.target.value)}
-							className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
+							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[140px] md:w-auto"
 						>
 							<option value="50">50 miles</option>
 							<option value="100">100 miles</option>
@@ -388,10 +488,8 @@ export default function DriversListTable() {
 					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Reset (сбрасывает только локальные фильтры на этой странице) */}
-					<div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
-						<label className="text-xs font-medium text-transparent select-none">
-							Reset
-						</label>
+					<div className="col-span-2 flex min-w-0 flex-col md:col-span-1">
+						<Label className="select-none text-transparent">{""}</Label>
 						<button
 							type="button"
 							onClick={() => {
@@ -400,7 +498,7 @@ export default function DriversListTable() {
 								setRadiusFilter("500");
 								setCapabilitiesFilter([]);
 							}}
-							className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 md:w-auto"
+							className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus:border-brand-800 md:w-auto"
 						>
 							Reset
 						</button>
@@ -456,7 +554,14 @@ export default function DriversListTable() {
 						</TableHeader>
 						{/* Table body with user data */}
 						<TableBody>
-							{isPending ? (
+							{!isQueryEnabled ? (
+								// Address required for current role
+								<tr>
+									<td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+										Enter address to view drivers.
+									</td>
+								</tr>
+							) : isPending ? (
 								// Loading spinner
 								<tr>
 									<td colSpan={7} className="p-2">
@@ -545,15 +650,15 @@ export default function DriversListTable() {
 
 											{/*Driver*/}
 											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[220px] max-w-[220px]">
-												<div className="space-y-0.5">
+												<div className="space-y-0.5 break-words">
 													<p
-														className="truncate"
+														className="break-words"
 														title={`(${item?.id}) ${item?.meta_data?.driver_name || ""}`}
 													>
 														({item?.id}) {item?.meta_data?.driver_name}
 													</p>
 													<p
-														className="truncate"
+														className="break-words"
 														title={item?.meta_data?.driver_phone || ""}
 													>
 														{item?.meta_data?.driver_phone}
@@ -661,7 +766,9 @@ export default function DriversListTable() {
 												)}
 												{item?.meta_data?.sleeper === "on" && (
 													<Tooltip content="Sleeper" position="top">
-														<span className="inline-flex"><Sleeper className="h-5 w-5" /></span>
+														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
+															<Sleeper className="h-3 w-3" />
+														</span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.load_bars === "on" && (
@@ -761,7 +868,7 @@ export default function DriversListTable() {
 					 {/*Pagination info*/}
 					<div className="pb-3 xl:pb-0">
 						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-							{totalItems === 0
+							{(isQueryEnabled ? totalItems : 0) === 0
 								? "Showing 0 entries"
 								: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
 										currentPage * itemsPerPage,
@@ -771,7 +878,7 @@ export default function DriversListTable() {
 					</div>
 
 					 {/*Pagination controls*/}
-					{totalPages > 1 && (
+					{isQueryEnabled && totalPages > 1 && (
 						<PaginationWithIcon
 							totalPages={totalPages}
 							initialPage={currentPage}

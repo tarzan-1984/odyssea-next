@@ -13,6 +13,8 @@ interface MultiSelectProps {
 	defaultSelected?: string[];
 	onChange?: (selected: string[]) => void;
 	disabled?: boolean;
+	/** Optional class for the trigger (dropdown button) to match other form fields e.g. h-11 */
+	triggerClassName?: string;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -21,6 +23,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 	defaultSelected = [],
 	onChange,
 	disabled = false,
+	triggerClassName = "",
 }) => {
 	const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultSelected);
 	const [isOpen, setIsOpen] = useState(false);
@@ -86,14 +89,14 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
 	return (
 		<div className="w-full" ref={containerRef}>
-			<label className="block text-xs font-medium text-gray-700 dark:text-white mb-1">
+			<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-white">
 				{label}
 			</label>
 
 			<div className="relative z-20 inline-block w-full">
 				<div className="relative flex flex-col items-center">
 					<div onClick={toggleDropdown} className="w-full">
-						<div className="relative flex items-center rounded-lg border border-gray-300 bg-white px-[12px] py-[8px] text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-300 min-h-[38px]">
+						<div className={`relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[38px] ${triggerClassName}`.trim()}>
 							<div className="flex flex-wrap flex-auto gap-2">
 								{selectedValuesText.length > 0 ? (
 									selectedValuesText.map((text, index) => (
@@ -130,7 +133,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 								) : (
 									<input
 										placeholder="Select option"
-										className="w-full h-full text-sm bg-transparent border-0 outline-hidden appearance-none focus:border-0 focus:outline-hidden focus:ring-0 dark:text-white dark:placeholder:text-white text-gray-900 placeholder:text-gray-500"
+										className="w-full h-full text-sm bg-transparent border-0 outline-hidden appearance-none focus:border-0 focus:outline-hidden focus:ring-0 text-gray-800 placeholder:text-gray-400 dark:text-white/90 dark:placeholder:text-white/30"
 										readOnly
 										value="Select option"
 									/>
@@ -166,7 +169,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
 					{isOpen && (
 						<div
-							className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-60 dark:bg-gray-900"
+							className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-60 dark:bg-gray-800"
 							onClick={e => e.stopPropagation()}
 						>
 							{/* Search input */}
