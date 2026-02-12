@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import users from "@/app-api/users";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import {
-	AngleDownIcon,
-	AngleUpIcon,
 	Mc,
 	TankerEndorsement,
 	TwicIcon,
@@ -31,7 +28,6 @@ import {
 	DockHigh, Any, Otr, Local, Regional, Canada, Mexico
 } from "@/icons";
 import PaginationWithIcon from "./PaginationWithIcon";
-import Link from "next/link";
 import Image from "next/image";
 import macroPointIcon from "@/icons/additional/macropoint.png";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
@@ -45,10 +41,8 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import axios from "axios";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
-import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { DriverForMap } from "@/hooks/useDriversForMap";
 import {DriversPage} from "./Types"
 import CreateOfferModal from "./CreateOfferModal";
 
@@ -60,6 +54,28 @@ const ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS = [
 	"HR_MANAGER",
 	"DRIVER_UPDATES",
 ] as const;
+
+// Same status colors as on Drivers Map markers
+const STATUS_COLORS: Record<string, string> = {
+	available: "#8fbf8f",
+	available_on: "#dcecdc",
+	loaded_enroute: "#dcecdc",
+	available_off: "#d4a5a5",
+	banned: "#ffb261",
+	no_interview: "#d60000",
+	expired_documents: "#d60000",
+	blocked: "#d60000",
+	on_vocation: "#e0b0c4",
+	on_hold: "#b2b2b2",
+	need_update: "#f1cfcf",
+	no_updates: "#ff3939",
+	unknown: "#808080",
+};
+
+function getStatusColor(status: string | null | undefined): string {
+	if (!status) return STATUS_COLORS.unknown;
+	return STATUS_COLORS[status.toLowerCase()] ?? STATUS_COLORS.unknown;
+}
 
 export default function DriversListTable() {
 	const currentUser = useCurrentUser();
@@ -175,9 +191,9 @@ export default function DriversListTable() {
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
 	return (
-		<div className="overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
+		<div className="bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section with pagination controls and search */}
-			<div className="flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
+			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
 				{/* Items per page selector */}
 				<div className="flex items-center gap-3">
 					<span className="text-gray-500 dark:text-gray-400"> Show </span>
@@ -188,6 +204,9 @@ export default function DriversListTable() {
 							{ value: "8", label: "8" },
 							{ value: "10", label: "10" },
 							{ value: "20", label: "20" },
+							{ value: "50", label: "50" },
+							{ value: "80", label: "80" },
+							{ value: "100", label: "100" },
 						]}
 						value={itemsPerPage.toString()}
 						onChangeAction={val => {
@@ -211,7 +230,7 @@ export default function DriversListTable() {
 					<Button
 						size="sm"
 						variant="primary"
-						disabled={selectedDriverIds.length === 0}
+						disabled={selectedDriverIds.length === 0 || !selectedAction}
 						onClick={() => {
 							if (selectedAction === "create-offers") {
 								setCreateOfferModalOpen(true);
@@ -235,7 +254,7 @@ export default function DriversListTable() {
 				}}
 			/>
 
-			<div className="px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
+			<div className="relative z-0 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
 					{/* Capabilities (multiselect) */}
 					<div className="flex min-w-0 flex-col md:min-w-[220px]">
@@ -514,6 +533,15 @@ export default function DriversListTable() {
 					}`}
 				>
 					<Table>
+						<colgroup>
+							<col className="w-12" />
+							<col style={{ width: "120px" }} />
+							<col />
+							<col />
+							<col />
+							<col />
+							<col />
+						</colgroup>
 						{/* Table header with sortable columns*/}
 						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
 							<TableRow>
@@ -541,7 +569,10 @@ export default function DriversListTable() {
 									<TableCell
 										key={key}
 										isHeader
-										className="px-4 py-3 border border-gray-100 dark:border-white/[0.05]"
+										className={`px-4 py-3 border border-gray-100 dark:border-white/[0.05] ${
+											key === "status" ? "text-center align-middle" : ""
+										} ${key === "driver" ? "w-[260px] min-w-[260px] max-w-[300px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none" : ""
+										} ${key === "vehicle" ? "w-[200px] min-w-[180px] max-w-[240px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none" : ""}`}
 									>
 										<div className="flex items-center justify-between">
 											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
@@ -629,9 +660,18 @@ export default function DriversListTable() {
 											</TableCell>
 
 											{/*Status*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-												{item?.meta_data?.driver_status}
-											</TableCell>
+											{(() => {
+												const status = item?.meta_data?.driver_status as string | null | undefined;
+												const statusColor = getStatusColor(status);
+												return (
+													<TableCell
+														className="px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle"
+														style={{ backgroundColor: statusColor }}
+													>
+														{status}
+													</TableCell>
+												);
+											})()}
 
 											{/*location & date — light red background if datetime on second line is older than 12 hours */}
 											{(() => {
@@ -649,7 +689,7 @@ export default function DriversListTable() {
 											})()}
 
 											{/*Driver*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[220px] max-w-[220px]">
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[260px] min-w-[260px] max-w-[300px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none">
 												<div className="space-y-0.5 break-words">
 													<p
 														className="break-words"
@@ -667,9 +707,10 @@ export default function DriversListTable() {
 											</TableCell>
 
 											{/*vehicle*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-												<p>{item?.meta_data?.vehicle_type}</p>
-												<p>{item?.meta_data?.vehicle_make} {item?.meta_data?.vehicle_model} {item?.meta_data?.vehicle_year}</p>
+											{/*Vehicle*/}
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[200px] min-w-[180px] max-w-[240px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none break-words">
+												<p className="break-words">{item?.meta_data?.vehicle_type}</p>
+												<p className="break-words">{item?.meta_data?.vehicle_make} {item?.meta_data?.vehicle_model} {item?.meta_data?.vehicle_year}</p>
 											</TableCell>
 
 											{/*Dimensions*/}
@@ -679,7 +720,7 @@ export default function DriversListTable() {
 											</TableCell>
 
 											{/*Equipment*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 gap-[10px]">
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]">
 												{item?.meta_data?.twic === "on" && (
 													<Tooltip theme="inverse" content="TWIC" position="top">
 														<span className="inline-flex"><TwicIcon className="h-5 w-5" /></span>

@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 			case "/video-generator":
 				return "";
 			default:
-				return "p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6";
+				return "p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 fullhd:max-w-none";
 		}
 	};
 

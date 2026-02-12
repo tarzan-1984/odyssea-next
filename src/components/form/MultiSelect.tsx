@@ -96,7 +96,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 			<div className="relative z-20 inline-block w-full">
 				<div className="relative flex flex-col items-center">
 					<div onClick={toggleDropdown} className="w-full">
-						<div className={`relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[38px] ${triggerClassName}`.trim()}>
+						<div className={`relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[44px] ${triggerClassName}`.trim()}>
 							<div className="flex flex-wrap flex-auto gap-2">
 								{selectedValuesText.length > 0 ? (
 									selectedValuesText.map((text, index) => (
@@ -184,18 +184,17 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 							</div>
 							<div className="flex flex-col">
 								{filteredOptions.length > 0 ? (
-									filteredOptions.map((option, index) => (
-										<div key={index}>
-											<div
-												className={`hover:bg-primary/5 w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-800`}
-												onClick={() => handleSelect(option.value)}
-											>
+									filteredOptions.map((option, index) => {
+										const isSelected = selectedOptions.includes(option.value);
+										return (
+											<div key={index}>
 												<div
-													className={`relative flex w-full items-center p-2 pl-2 ${
-														selectedOptions.includes(option.value)
-															? "bg-primary/10"
-															: ""
+													className={`w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-700 p-2 pl-2 flex items-center ${
+														isSelected
+															? "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+															: "hover:bg-gray-50 dark:hover:bg-gray-600"
 													}`}
+													onClick={() => handleSelect(option.value)}
 												>
 													<div className="mx-2 flex items-center gap-2 leading-6 text-gray-800 dark:text-white">
 														{option.icon && (
@@ -207,8 +206,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 													</div>
 												</div>
 											</div>
-										</div>
-									))
+										);
+									})
 								) : (
 									<div className="p-3 text-sm text-gray-500 dark:text-white text-center">
 										No participants found

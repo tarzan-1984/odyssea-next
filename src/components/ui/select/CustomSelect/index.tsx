@@ -38,7 +38,7 @@ export default function CustomStaticSelect({
 			</button>
 
 			{open && (
-				<div className="absolute z-10 w-full bg-white border-r border-l border-b border-gray-300 rounded-b-md">
+				<div className="absolute z-[100] w-full bg-white border border-gray-300 border-t-0 rounded-b-md shadow-lg dark:bg-gray-800 dark:border-gray-700">
 					{options.map(option => {
 						const isSelected = option.value === value;
 
@@ -46,7 +46,7 @@ export default function CustomStaticSelect({
 							<div
 								key={option.value}
 								onClick={() => handleSelect(option.value)}
-								className={`px-2 py-1 w-full text-left cursor-pointer
+								className={`px-2 py-1 w-full text-left cursor-pointer text-gray-900 dark:text-white
 									${isSelected ? "bg-brand-500 text-white" : "hover:bg-brand-500 hover:text-white"}
 								`}
 							>

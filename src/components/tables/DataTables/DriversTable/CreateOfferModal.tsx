@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
+import Select from "@/components/form/Select";
+import offers from "@/app-api/offers";
+import createOfferIcon from "@/icons/create_offer_icon.png";
 
 export interface CreateOfferModalProps {
 	isOpen: boolean;
@@ -27,6 +31,7 @@ export interface CreateOfferFormValues {
 	emptyMiles: string;
 	totalMiles: string;
 	weight: string;
+	actionTime: string;
 	commodity: string;
 	specialRequirements: string[];
 }
@@ -40,9 +45,20 @@ const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> 
 	emptyMiles: "",
 	totalMiles: "",
 	weight: "",
+	actionTime: "15",
 	commodity: "",
 	specialRequirements: [],
 };
+
+const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
+	"pickUpLocation",
+	"deliveryLocation",
+	"pickUpTime",
+	"deliveryTime",
+	"loadedMiles",
+	"emptyMiles",
+	"weight",
+];
 
 export default function CreateOfferModal({
 	isOpen,
@@ -52,13 +68,32 @@ export default function CreateOfferModal({
 	onSubmit,
 }: CreateOfferModalProps) {
 	const [formValues, setFormValues] = useState(initialFormState);
+	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>({});
+	const [submitError, setSubmitError] = useState<string>("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [formKey, setFormKey] = useState(0);
 
-	// Reset form when modal opens
+	// Reset form, errors and submit state when modal opens
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
+			setErrors({});
+			setSubmitError("");
+			setFormKey(k => k + 1);
 		}
 	}, [isOpen]);
+
+	const validate = (): Partial<Record<keyof typeof initialFormState, string>> => {
+		const next: Partial<Record<keyof typeof initialFormState, string>> = {};
+		for (const field of REQUIRED_FIELDS) {
+			const value = formValues[field];
+			const str = typeof value === "string" ? value.trim() : "";
+			if (str === "") {
+				next[field] = "This field is required";
+			}
+		}
+		return next;
+	};
 
 	const driverIdsValue = selectedDriverIds.join(",");
 
@@ -77,16 +112,59 @@ export default function CreateOfferModal({
 			}
 			return next;
 		});
+		if (errors[field]) {
+			setErrors(prev => ({ ...prev, [field]: undefined }));
+		}
 	};
 
-	const handleSubmit = (e: React.FormEvent) => {
+	const parseWeight = (v: string): number | undefined => {
+		const n = parseFloat(String(v).replace(/,/g, "").trim());
+		return Number.isNaN(n) ? undefined : n;
+	};
+
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		onSubmit?.({
-			externalId,
-			driverIds: driverIdsValue,
-			...formValues,
-		});
-		onClose();
+		const validationErrors = validate();
+		if (Object.keys(validationErrors).length > 0) {
+			setErrors(validationErrors);
+			return;
+		}
+		setErrors({});
+		setSubmitError("");
+		setIsSubmitting(true);
+		try {
+			const payload = {
+				externalId,
+				driverIds: selectedDriverIds,
+				pickUpLocation: formValues.pickUpLocation.trim(),
+				pickUpTime: formValues.pickUpTime.trim(),
+				deliveryLocation: formValues.deliveryLocation.trim(),
+				deliveryTime: formValues.deliveryTime.trim(),
+				loadedMiles: parseMiles(formValues.loadedMiles) || undefined,
+				emptyMiles: parseMiles(formValues.emptyMiles) || undefined,
+				totalMiles: parseMiles(formValues.totalMiles) || undefined,
+				weight: parseWeight(formValues.weight),
+				actionTime: formValues.actionTime || "15",
+				commodity: formValues.commodity.trim() || undefined,
+				specialRequirements:
+					formValues.specialRequirements.length > 0
+						? formValues.specialRequirements
+						: undefined,
+			};
+			const result = await offers.createOffer(payload);
+			if (result.success) {
+				onSubmit?.({
+					externalId,
+					driverIds: driverIdsValue,
+					...formValues,
+				});
+				onClose();
+			} else {
+				setSubmitError(result.error ?? "Failed to create offer");
+			}
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	return (
@@ -108,7 +186,7 @@ export default function CreateOfferModal({
 
 				{/* Row 1: Pick up location, Delivery location */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Pick up location</Label>
 						<Input
 							type="text"
@@ -116,9 +194,11 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("pickUpLocation", e.target.value)}
 							placeholder="Enter pick up location"
 							className="dark:bg-gray-900"
+							error={!!errors.pickUpLocation}
+							hint={errors.pickUpLocation}
 						/>
 					</div>
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Delivery location</Label>
 						<Input
 							type="text"
@@ -126,13 +206,15 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("deliveryLocation", e.target.value)}
 							placeholder="Enter delivery location"
 							className="dark:bg-gray-900"
+							error={!!errors.deliveryLocation}
+							hint={errors.deliveryLocation}
 						/>
 					</div>
 				</div>
 
 				{/* Row 2: Pick up time, Delivery time */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Pick up time</Label>
 						<Input
 							type="text"
@@ -140,9 +222,11 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("pickUpTime", e.target.value)}
 							placeholder="Enter pick up time"
 							className="dark:bg-gray-900"
+							error={!!errors.pickUpTime}
+							hint={errors.pickUpTime}
 						/>
 					</div>
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Delivery time</Label>
 						<Input
 							type="text"
@@ -150,13 +234,15 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("deliveryTime", e.target.value)}
 							placeholder="Enter delivery time"
 							className="dark:bg-gray-900"
+							error={!!errors.deliveryTime}
+							hint={errors.deliveryTime}
 						/>
 					</div>
 				</div>
 
 				{/* Row 3: Loaded miles, Empty miles, Total miles */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Loaded miles</Label>
 						<Input
 							type="number"
@@ -164,9 +250,11 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("loadedMiles", e.target.value)}
 							placeholder="0"
 							className="dark:bg-gray-900"
+							error={!!errors.loadedMiles}
+							hint={errors.loadedMiles}
 						/>
 					</div>
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Empty miles</Label>
 						<Input
 							type="number"
@@ -174,23 +262,25 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("emptyMiles", e.target.value)}
 							placeholder="0"
 							className="dark:bg-gray-900"
+							error={!!errors.emptyMiles}
+							hint={errors.emptyMiles}
 						/>
 					</div>
-					<div className="flex flex-col gap-1">
-						<Label>Total miles</Label>
+					<div>
+						<Label>Total miles (auto-calculated)</Label>
 						<Input
 							type="number"
 							value={formValues.totalMiles}
 							disabled
 							placeholder="0"
-							className="dark:bg-gray-900"
+							className="!opacity-100 !bg-transparent !text-gray-800 !border-gray-300 dark:!bg-gray-900 dark:!text-white/90 dark:!border-gray-700"
 						/>
 					</div>
 				</div>
 
-				{/* Row 4: Weight, Special requirements */}
+				{/* Row 4: Weight, Action time */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div className="flex flex-col gap-1">
+					<div>
 						<Label>Weight</Label>
 						<Input
 							type="text"
@@ -198,12 +288,31 @@ export default function CreateOfferModal({
 							onChange={e => handleChange("weight", e.target.value)}
 							placeholder="e.g. 1,000 lbs"
 							className="dark:bg-gray-900"
+							error={!!errors.weight}
+							hint={errors.weight}
 						/>
 					</div>
-					<div className="flex flex-col gap-1">
-						<MultiSelect
-							label="Special requirements"
+					<div key={`action-time-${formKey}`}>
+						<Label>Action time (minutes)</Label>
+						<Select
 							options={[
+								{ value: "15", label: "15" },
+								{ value: "30", label: "30" },
+								{ value: "45", label: "45" },
+								{ value: "60", label: "60" },
+							]}
+							defaultValue={formValues.actionTime}
+							onChange={value => handleChange("actionTime", value)}
+							className="dark:bg-gray-900"
+						/>
+					</div>
+				</div>
+
+				{/* Row 5: Special requirements (full width) */}
+				<div className="flex flex-col gap-1 w-full">
+					<MultiSelect
+						label="Special requirements"
+						options={[
 								{ value: "hazmat", text: "Hazmat", selected: false },
 								{ value: "tanker-end", text: "Tanker End.", selected: false },
 								{ value: "driver-assist", text: "Driver assist", selected: false },
@@ -243,29 +352,48 @@ export default function CreateOfferModal({
 							]}
 							defaultSelected={formValues.specialRequirements}
 							onChange={values => handleChange("specialRequirements", values)}
-							triggerClassName="h-11"
+							triggerClassName="min-h-11 py-2"
 						/>
-					</div>
 				</div>
 
-				{/* Row 5: Commodity (full width) */}
-				<div className="flex flex-col gap-1">
+				{/* Row 6: Commodity (full width, bottom row) */}
+				<div className="w-full">
 					<Label>Commodity</Label>
 					<TextArea
 						rows={3}
 						value={formValues.commodity}
 						onChange={v => handleChange("commodity", v)}
 						placeholder="Enter commodity"
-						className="dark:bg-gray-900"
+						className="w-full dark:bg-gray-900"
 					/>
 				</div>
 
-				<div className="flex items-center justify-end gap-3 pt-4">
-					<Button type="button" size="sm" variant="outline" onClick={onClose}>
+				{submitError && (
+					<p className="text-sm text-red-500 dark:text-red-400">{submitError}</p>
+				)}
+				<div className="relative flex items-center justify-end gap-3 pt-4">
+					{isSubmitting && (
+						<div className="animate-create-offer-drive absolute left-0 top-1/2 -translate-y-1/2 flex items-center">
+							<Image
+								src={createOfferIcon}
+								alt=""
+								width={127}
+								height={99}
+								className="object-contain"
+							/>
+						</div>
+					)}
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={onClose}
+						disabled={isSubmitting}
+					>
 						Cancel
 					</Button>
-					<Button type="submit" size="sm">
-						Create
+					<Button type="submit" size="sm" disabled={isSubmitting}>
+						{isSubmitting ? "Creating…" : "Create"}
 					</Button>
 				</div>
 			</form>

@@ -29,6 +29,7 @@ interface TableCellProps {
 	children: ReactNode; // Cell content
 	isHeader?: boolean; // If true, renders as <th>, otherwise <td>
 	className?: string; // Optional className for styling
+	style?: React.CSSProperties; // Optional inline style
 }
 
 // Table Component
@@ -52,9 +53,13 @@ const TableRow: React.FC<TableRowProps> = ({ children, className }) => {
 };
 
 // TableCell Component
-const TableCell: React.FC<TableCellProps> = ({ children, isHeader = false, className }) => {
+const TableCell: React.FC<TableCellProps> = ({ children, isHeader = false, className, style }) => {
 	const CellTag = isHeader ? "th" : "td";
-	return <CellTag className={` ${className}`}>{children}</CellTag>;
+	return (
+		<CellTag className={` ${className}`} style={style}>
+			{children}
+		</CellTag>
+	);
 };
 
 export { Table, TableHeader, TableBody, TableRow, TableCell };

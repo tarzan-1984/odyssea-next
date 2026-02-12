@@ -16,6 +16,7 @@ import {
 	UserCircleIcon,
 	DriversMapIcon,
 	DriverListIcon,
+	OffersIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
@@ -65,6 +66,11 @@ const navItems: NavItem[] = [
 		icon: <DriverListIcon className="h-5 w-5" />,
 		name: "Drivers list",
 		path: "/drivers-list",
+	},
+	{
+		icon: <OffersIcon className="h-5 w-5" />,
+		name: "My offers",
+		path: "/offers",
 	},
 	// {
 	//   name: "AI Assistant",

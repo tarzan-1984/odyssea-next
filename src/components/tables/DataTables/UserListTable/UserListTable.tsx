@@ -253,6 +253,7 @@ export default function UserListTable() {
 								))}
 							</TableRow>
 						</TableHeader>
+
 						{/* Table body with user data */}
 						<TableBody>
 							{isPending ? (

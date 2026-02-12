@@ -15,6 +15,8 @@
 	--breakpoint-lg: 1024px;
 	--breakpoint-xl: 1280px;
 	--breakpoint-2xl: 1536px;
+	/* 32" and larger (e.g. 1920px) — allow content to use full width */
+	--breakpoint-fullhd: 1920px;
 
 	--text-title-2xl: 72px;
 	--text-title-2xl--line-height: 90px;
@@ -867,6 +869,21 @@ span.flatpickr-weekday,
 
 .animate-fadeOut {
 	animation: fadeOut 3s ease-in-out forwards;
+}
+
+/* Create offer icon: minimal up-down motion (car driving) */
+@keyframes createOfferDrive {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+.animate-create-offer-drive {
+	animation: createOfferDrive 0.5s ease-in-out infinite;
 }
 
 /* Code Editor */
