@@ -158,6 +158,7 @@ const OffersListTable = () => {
 										</TableCell>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
 											{/* Actions — empty for now */}
+											{null}
 										</TableCell>
 									</TableRow>
 								))
