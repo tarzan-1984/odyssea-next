@@ -67,11 +67,11 @@ const navItems: NavItem[] = [
 		name: "Drivers list",
 		path: "/drivers-list",
 	},
-	{
-		icon: <OffersIcon className="h-5 w-5" />,
-		name: "My offers",
-		path: "/offers",
-	},
+	// {
+	// 	icon: <OffersIcon className="h-5 w-5" />,
+	// 	name: "My offers",
+	// 	path: "/offers",
+	// },
 	// {
 	//   name: "AI Assistant",
 	//   icon: <AiIcon />,

@@ -107,13 +107,13 @@ function getStatusLabel(status: string | null | undefined): string {
 	return STATUS_LABELS[key] ?? STATUS_LABELS[key.toLowerCase()] ?? status;
 }
 
-/** Format date as dd/mm/YY for Location & Date column */
-function formatDateDdMmYy(date: Date | null): string {
+/** Format date as mm/dd/YY for Location & Date column */
+function formatDateMmDdYy(date: Date | null): string {
 	if (!date || Number.isNaN(date.getTime())) return "";
-	const d = date.getDate().toString().padStart(2, "0");
 	const m = (date.getMonth() + 1).toString().padStart(2, "0");
+	const d = date.getDate().toString().padStart(2, "0");
 	const y = date.getFullYear().toString().slice(-2);
-	return `${d}/${m}/${y}`;
+	return `${m}/${d}/${y}`;
 }
 
 export default function DriversListTable() {
@@ -766,7 +766,7 @@ export default function DriversListTable() {
 													Date.now() - locationDate.getTime() >
 														12 * 60 * 60 * 1000;
 												const dateDisplay = locationDate
-													? formatDateDdMmYy(locationDate)
+													? formatDateMmDdYy(locationDate)
 													: dateStr || "";
 												return (
 													<TableCell
