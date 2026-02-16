@@ -72,9 +72,42 @@ const STATUS_COLORS: Record<string, string> = {
 	unknown: "#808080",
 };
 
+// Human-readable labels for status (underscore format -> display text)
+const STATUS_LABELS: Record<string, string> = {
+	available: "Available",
+	available_on: "Available on",
+	available_off: "Not available",
+	loaded_enroute: "Loaded & Enroute",
+	banned: "Out of service",
+	on_vocation: "On vacation",
+	no_updates: "No updates",
+	blocked: "Blocked",
+	expired_documents: "Expired documents",
+	no_interview: "No Interview",
+	no_Interview: "No Interview",
+	on_hold: "On hold",
+	need_update: "Need update",
+	unknown: "Unknown",
+};
+
 function getStatusColor(status: string | null | undefined): string {
 	if (!status) return STATUS_COLORS.unknown;
 	return STATUS_COLORS[status.toLowerCase()] ?? STATUS_COLORS.unknown;
+}
+
+function getStatusLabel(status: string | null | undefined): string {
+	if (!status) return STATUS_LABELS.unknown;
+	const key = status.toString();
+	return STATUS_LABELS[key] ?? STATUS_LABELS[key.toLowerCase()] ?? status;
+}
+
+/** Format date as dd/mm/YY for Location & Date column */
+function formatDateDdMmYy(date: Date | null): string {
+	if (!date || Number.isNaN(date.getTime())) return "";
+	const d = date.getDate().toString().padStart(2, "0");
+	const m = (date.getMonth() + 1).toString().padStart(2, "0");
+	const y = date.getFullYear().toString().slice(-2);
+	return `${d}/${m}/${y}`;
 }
 
 export default function DriversListTable() {
@@ -191,7 +224,7 @@ export default function DriversListTable() {
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
 	return (
-		<div className="bg-white dark:bg-white/[0.03] rounded-xl">
+		<div className="min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section with pagination controls and search */}
 			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
 				{/* Items per page selector */}
@@ -290,8 +323,8 @@ export default function DriversListTable() {
 									text: "Tanker endorsement",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<TankerEndorsement className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<TankerEndorsement className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -300,8 +333,8 @@ export default function DriversListTable() {
 									text: "PPE",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Ppe className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Ppe className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -316,8 +349,8 @@ export default function DriversListTable() {
 									text: "E-tracks",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Etrack className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Etrack className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -326,8 +359,8 @@ export default function DriversListTable() {
 									text: "Pallet jack",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<PalletJack className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<PalletJack className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -336,8 +369,8 @@ export default function DriversListTable() {
 									text: "Ramp",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Ramp className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Ramp className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -346,8 +379,8 @@ export default function DriversListTable() {
 									text: "Load bars",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<LoadBars className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<LoadBars className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -356,8 +389,8 @@ export default function DriversListTable() {
 									text: "Liftgate",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Liftgate className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Liftgate className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -414,8 +447,8 @@ export default function DriversListTable() {
 									text: "Sleeper",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Sleeper className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Sleeper className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -424,8 +457,8 @@ export default function DriversListTable() {
 									text: "Printer",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<Printer className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<Printer className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -434,8 +467,8 @@ export default function DriversListTable() {
 									text: "Side door",
 									selected: false,
 									icon: (
-										<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-											<SideDoorIcon className="h-3 w-3" />
+										<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+											<SideDoorIcon className="h-5 w-5" />
 										</span>
 									),
 								},
@@ -525,22 +558,22 @@ export default function DriversListTable() {
 				</div>
 			</div>
 
-			{/* Table section */}
-			<div className="overflow-x-auto custom-scrollbar border-l border-gray-100 dark:border-white/[0.05]">
+			{/* Table section — min-w-0 so container can shrink; table width controlled by colgroup so no horizontal scrollbar */}
+			<div className="min-w-0 overflow-x-hidden border-l border-gray-100 dark:border-white/[0.05]">
 				<div
-					className={`min-w-max transition-opacity ${
+					className={`w-full min-w-0 transition-opacity ${
 						isPlaceholderData ? "opacity-60" : "opacity-100"
 					}`}
 				>
-					<Table>
+					<Table className="w-full max-w-full table-fixed">
 						<colgroup>
-							<col className="w-12" />
+							<col style={{ width: "48px" }} />
 							<col style={{ width: "120px" }} />
-							<col />
-							<col />
-							<col />
-							<col />
-							<col />
+							<col style={{ width: "18%" }} />
+							<col style={{ width: "22%" }} />
+							<col style={{ width: "18%" }} />
+							<col style={{ width: "12%" }} />
+							<col style={{ width: "12%" }} />
 						</colgroup>
 						{/* Table header with sortable columns*/}
 						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
@@ -571,8 +604,7 @@ export default function DriversListTable() {
 										isHeader
 										className={`px-4 py-3 border border-gray-100 dark:border-white/[0.05] ${
 											key === "status" ? "text-center align-middle" : ""
-										} ${key === "driver" ? "w-[260px] min-w-[260px] max-w-[300px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none" : ""
-										} ${key === "vehicle" ? "w-[200px] min-w-[180px] max-w-[240px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none" : ""}`}
+										}`}
 									>
 										<div className="flex items-center justify-between">
 											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
@@ -663,12 +695,13 @@ export default function DriversListTable() {
 											{(() => {
 												const status = item?.meta_data?.driver_status as string | null | undefined;
 												const statusColor = getStatusColor(status);
+												const statusLabel = getStatusLabel(status);
 												return (
 													<TableCell
 														className="px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle"
 														style={{ backgroundColor: statusColor }}
 													>
-														{status}
+														{statusLabel}
 													</TableCell>
 												);
 											})()}
@@ -678,18 +711,19 @@ export default function DriversListTable() {
 												const dateStr = item?.updated_zipcode || (item as any)?.date_updated || item?.meta_data?.status_date || "";
 												const locationDate = dateStr ? new Date(dateStr.replace(/\s+/, "T")) : null;
 												const isOlderThan12h = locationDate && !Number.isNaN(locationDate.getTime()) && (Date.now() - locationDate.getTime() > 12 * 60 * 60 * 1000);
+												const dateDisplay = locationDate ? formatDateDdMmYy(locationDate) : dateStr || "";
 												return (
 													<TableCell
 														className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
 													>
 														<p>{item?.meta_data?.current_city} {item?.meta_data?.current_location}</p>
-														<p>{item?.updated_zipcode}</p>
+														<p>{dateDisplay}</p>
 													</TableCell>
 												);
 											})()}
 
 											{/*Driver*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[260px] min-w-[260px] max-w-[300px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none">
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
 												<div className="space-y-0.5 break-words">
 													<p
 														className="break-words"
@@ -706,9 +740,8 @@ export default function DriversListTable() {
 												</div>
 											</TableCell>
 
-											{/*vehicle*/}
 											{/*Vehicle*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm w-[200px] min-w-[180px] max-w-[240px] fullhd:w-auto fullhd:min-w-0 fullhd:max-w-none break-words">
+											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
 												<p className="break-words">{item?.meta_data?.vehicle_type}</p>
 												<p className="break-words">{item?.meta_data?.vehicle_make} {item?.meta_data?.vehicle_model} {item?.meta_data?.vehicle_year}</p>
 											</TableCell>
@@ -723,173 +756,173 @@ export default function DriversListTable() {
 											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]">
 												{item?.meta_data?.twic === "on" && (
 													<Tooltip theme="inverse" content="TWIC" position="top">
-														<span className="inline-flex"><TwicIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><TwicIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.hazmat_certificate === "on" && (
 													<Tooltip theme="inverse" content="Hazmat Certificate" position="top">
-														<span className="inline-flex"><HazmatIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><HazmatIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.team_driver_enabled === "on" && (
 													<Tooltip theme="inverse" content="Team Driver" position="top">
-														<span className="inline-flex"><TeamIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><TeamIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.driver_licence_type === "cdl" && (
 													<Tooltip theme="inverse" content="CDL" position="top">
-														<span className="inline-flex"><CdlIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><CdlIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.driver_licence_type === "tsa_approved" && (
 													<Tooltip theme="inverse" content="TSA" position="top">
-														<span className="inline-flex"><TsaIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><TsaIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.hazmat_endorsement === "on" && (
 													<Tooltip theme="inverse" content="Hazmat Endorsement" position="top">
-														<span className="inline-flex"><Hazmat2Icon className="h-5 w-5" /></span>
+														<span className="inline-flex"><Hazmat2Icon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.change_9_training === "on" && (
 													<Tooltip theme="inverse" content="Change 9" position="top">
-														<span className="inline-flex"><Change9Icon className="h-5 w-5" /></span>
+														<span className="inline-flex"><Change9Icon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.tanker_endorsement === "on" && (
 													<Tooltip theme="inverse" content="Tanker endorsement" position="top">
-														<span className="inline-flex"><TankerEndorsement className="h-5 w-5" /></span>
+														<span className="inline-flex"><TankerEndorsement className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.background_check === "on" && (
 													<Tooltip content="Background Check" position="top">
-														<span className="inline-flex"><BackgroundCheck className="h-5 w-5" /></span>
+														<span className="inline-flex"><BackgroundCheck className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.lift_gate === "on" && (
 													<Tooltip content="Liftgate" position="top">
-														<span className="inline-flex"><Liftgate className="h-5 w-5" /></span>
+														<span className="inline-flex"><Liftgate className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.pallet_jack === "on" && (
 													<Tooltip content="Pallet jack" position="top">
-														<span className="inline-flex"><PalletJack className="h-5 w-5" /></span>
+														<span className="inline-flex"><PalletJack className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dolly === "on" && (
 													<Tooltip theme="inverse" content="Dolly" position="top">
-														<span className="inline-flex"><Dolly className="h-5 w-5" /></span>
+														<span className="inline-flex"><Dolly className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.ppe === "on" && (
 													<Tooltip theme="inverse" content="PPE" position="top">
-														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-															<Ppe className="h-3 w-3" />
+														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+															<Ppe className="h-5 w-5" />
 														</span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.e_tracks === "on" && (
 													<Tooltip theme="inverse" content="E-tracks" position="top">
-														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-															<Etrack className="h-3 w-3" />
+														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+															<Etrack className="h-5 w-5" />
 														</span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.ramp === "on" && (
 													<Tooltip content="Ramp" position="top">
-														<span className="inline-flex"><Ramp className="h-5 w-5" /></span>
+														<span className="inline-flex"><Ramp className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.printer === "on" && (
 													<Tooltip content="Printer" position="top">
-														<span className="inline-flex"><Printer className="h-5 w-5" /></span>
+														<span className="inline-flex"><Printer className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.sleeper === "on" && (
 													<Tooltip content="Sleeper" position="top">
-														<span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white dark:bg-white">
-															<Sleeper className="h-3 w-3" />
+														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+															<Sleeper className="h-5 w-5" />
 														</span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.load_bars === "on" && (
 													<Tooltip content="Load bars" position="top">
-														<span className="inline-flex"><LoadBars className="h-5 w-5" /></span>
+														<span className="inline-flex"><LoadBars className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.mc_enabled === "on" && (
 													<Tooltip content="MC" position="top">
-														<span className="inline-flex"><Mc className="h-5 w-5" /></span>
+														<span className="inline-flex"><Mc className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dot_enabled === "on" && (
 													<Tooltip content="DOT" position="top">
-														<span className="inline-flex"><Dot className="h-5 w-5" /></span>
+														<span className="inline-flex"><Dot className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.real_id === "on" && (
 													<Tooltip content="Real ID" position="top">
-														<span className="inline-flex"><RealId className="h-5 w-5" /></span>
+														<span className="inline-flex"><RealId className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{military_capability && (
 													<Tooltip content="Military" position="top">
-														<span className="inline-flex"><Military className="h-5 w-5" /></span>
+														<span className="inline-flex"><Military className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.macro_point === "on" && (
 													<Tooltip content="MacroPoint" position="top">
-														<span className="inline-flex"><Image src={macroPointIcon} alt="MacroPoint" className="h-5 w-5" /></span>
+														<span className="inline-flex"><Image src={macroPointIcon} alt="MacroPoint" className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.trucker_tools === "on" && (
 													<Tooltip content="Trucker Tools" position="top">
-														<span className="inline-flex"><Image src={tuckerTools} alt="Trucker Tools" className="h-5 w-5" /></span>
+														<span className="inline-flex"><Image src={tuckerTools} alt="Trucker Tools" className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.dock_high === "on" && (
 													<Tooltip content="Dock High" position="top">
-														<span className="inline-flex"><DockHigh className="h-5 w-5" /></span>
+														<span className="inline-flex"><DockHigh className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{selected_distances.includes('any') && (
 													<Tooltip content="Any" position="top">
-														<span className="inline-flex"><Any className="h-5 w-5" /></span>
+														<span className="inline-flex"><Any className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{selected_distances.includes('otr') && (
 													<Tooltip content="OTR" position="top">
-														<span className="inline-flex"><Otr className="h-5 w-5" /></span>
+														<span className="inline-flex"><Otr className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{selected_distances.includes('local') && (
 													<Tooltip content="Local" position="top">
-														<span className="inline-flex"><Local className="h-5 w-5" /></span>
+														<span className="inline-flex"><Local className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{selected_distances.includes('regional') && (
 													<Tooltip content="Regional" position="top">
-														<span className="inline-flex"><Regional className="h-5 w-5" /></span>
+														<span className="inline-flex"><Regional className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{(item?.meta_data?.canada_transition_proof === "on" || selected_cross_border.includes('canada')) && (
 													<Tooltip content="Canada" position="top">
-														<span className="inline-flex"><Canada className="h-5 w-5" /></span>
+														<span className="inline-flex"><Canada className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{selected_cross_border.includes('mexico') && (
 													<Tooltip content="Mexico" position="top">
-														<span className="inline-flex"><Mexico className="h-5 w-5" /></span>
+														<span className="inline-flex"><Mexico className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.alaska === "on" && (
 													<Tooltip content="Alaska" position="top">
-														<span className="inline-flex"><AlaskaIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><AlaskaIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 												{item?.meta_data?.side_door === "on" && (
 													<Tooltip content="Side door" position="top">
-														<span className="inline-flex"><SideDoorIcon className="h-5 w-5" /></span>
+														<span className="inline-flex"><SideDoorIcon className="h-7 w-7" /></span>
 													</Tooltip>
 												)}
 											</TableCell>
