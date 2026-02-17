@@ -8,7 +8,6 @@ import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
-import Select from "@/components/form/Select";
 import offers from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
 
@@ -31,7 +30,6 @@ export interface CreateOfferFormValues {
 	emptyMiles: string;
 	totalMiles: string;
 	weight: string;
-	actionTime: string;
 	commodity: string;
 	specialRequirements: string[];
 }
@@ -45,7 +43,6 @@ const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> 
 	emptyMiles: "",
 	totalMiles: "",
 	weight: "",
-	actionTime: "15",
 	commodity: "",
 	specialRequirements: [],
 };
@@ -71,15 +68,13 @@ export default function CreateOfferModal({
 	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>({});
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [formKey, setFormKey] = useState(0);
 
-	// Reset form, errors and submit state when modal opens
+	// Reset form and errors when modal opens
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
 			setErrors({});
 			setSubmitError("");
-			setFormKey(k => k + 1);
 		}
 	}, [isOpen]);
 
@@ -144,7 +139,6 @@ export default function CreateOfferModal({
 				emptyMiles: parseMiles(formValues.emptyMiles) || undefined,
 				totalMiles: parseMiles(formValues.totalMiles) || undefined,
 				weight: parseWeight(formValues.weight),
-				actionTime: formValues.actionTime || "15",
 				commodity: formValues.commodity.trim() || undefined,
 				specialRequirements:
 					formValues.specialRequirements.length > 0
@@ -278,7 +272,7 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Row 4: Weight, Action time */}
+				{/* Row 4: Weight, Special requirements */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<div>
 						<Label>Weight</Label>
@@ -292,27 +286,10 @@ export default function CreateOfferModal({
 							hint={errors.weight}
 						/>
 					</div>
-					<div key={`action-time-${formKey}`}>
-						<Label>Action time (minutes)</Label>
-						<Select
+					<div className="flex flex-col gap-1">
+						<MultiSelect
+							label="Special requirements"
 							options={[
-								{ value: "15", label: "15" },
-								{ value: "30", label: "30" },
-								{ value: "45", label: "45" },
-								{ value: "60", label: "60" },
-							]}
-							defaultValue={formValues.actionTime}
-							onChange={value => handleChange("actionTime", value)}
-							className="dark:bg-gray-900"
-						/>
-					</div>
-				</div>
-
-				{/* Row 5: Special requirements (full width) */}
-				<div className="flex flex-col gap-1 w-full">
-					<MultiSelect
-						label="Special requirements"
-						options={[
 								{ value: "hazmat", text: "Hazmat", selected: false },
 								{ value: "tanker-end", text: "Tanker End.", selected: false },
 								{ value: "driver-assist", text: "Driver assist", selected: false },
@@ -354,6 +331,7 @@ export default function CreateOfferModal({
 							onChange={values => handleChange("specialRequirements", values)}
 							triggerClassName="min-h-11 py-2"
 						/>
+					</div>
 				</div>
 
 				{/* Row 6: Commodity (full width, bottom row) */}

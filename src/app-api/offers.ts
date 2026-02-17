@@ -4,7 +4,11 @@ export interface OfferDriver {
 	externalId: string | null;
 	firstName: string;
 	lastName: string;
+	email: string;
+	phone: string | null;
+	status: string;
 	rate: number | null;
+	action_time?: string | null;
 }
 
 export interface OfferRow {
@@ -35,14 +39,16 @@ export interface GetOffersParams {
 }
 
 export interface GetOffersResponse {
-	results: OfferRow[];
-	pagination: {
-		current_page: number;
-		per_page: number;
-		total_count: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_prev_page: boolean;
+	data: {
+		results: OfferRow[];
+		pagination: {
+			current_page: number;
+			per_page: number;
+			total_count: number;
+			total_pages: number;
+			has_next_page: boolean;
+			has_prev_page: boolean;
+		};
 	};
 }
 
@@ -57,7 +63,6 @@ export interface CreateOfferPayload {
 	emptyMiles?: number;
 	totalMiles?: number;
 	weight?: number;
-	actionTime?: string;
 	commodity?: string;
 	specialRequirements?: string[];
 }
@@ -85,7 +90,7 @@ const offers = {
 		if (params.sort_order != null) searchParams.set("sort_order", params.sort_order);
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
-		return response.data;
+		return response?.data;
 	},
 
 	/**

@@ -6,7 +6,7 @@ import OffersListTable from "@/components/tables/DataTables/OffersTable/OffersLi
 
 const Offers = () => {
 	return (
-		<ComponentCard title="Driver List">
+		<ComponentCard title="My Offers">
 			<OffersListTable />
 		</ComponentCard>
 	);

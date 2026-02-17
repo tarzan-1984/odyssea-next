@@ -52,15 +52,6 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { DriversPage } from "./Types";
 import CreateOfferModal from "./CreateOfferModal";
 
-// Roles that can see drivers list without entering Address filter
-const ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS = [
-	"ADMINISTRATOR",
-	"RECRUITER",
-	"RECRUITER_TL",
-	"HR_MANAGER",
-	"DRIVER_UPDATES",
-] as const;
-
 // Same status colors as on Drivers Map markers
 const STATUS_COLORS: Record<string, string> = {
 	available: "#8fbf8f",
@@ -132,6 +123,7 @@ export default function DriversListTable() {
 	const [addressFilter, setAddressFilter] = useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
+	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const toggleDriverSelection = (driverId: string) => {
 		setSelectedDriverIds(prev =>
@@ -145,7 +137,8 @@ export default function DriversListTable() {
 		capabilities: string[],
 		address: string,
 		radius: string,
-		country: string
+		country: string,
+		status: string,
 	): Promise<DriversPage> => {
 		const params = new URLSearchParams();
 		params.set("paged", String(page));
@@ -159,6 +152,9 @@ export default function DriversListTable() {
 			params.set("my_search", address);
 			params.set("radius", radius);
 			params.set("country", country);
+		} else if (!address && status) {
+			// When filtering only by status (no address), use extended_search parameter
+			params.set("extended_search", status);
 		}
 
 		try {
@@ -177,14 +173,8 @@ export default function DriversListTable() {
 		}
 	};
 
-	// Show drivers without address only for specific roles; others must enter Address
-	const canShowDriversWithoutAddress =
-		!!currentUser?.role &&
-		ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS.includes(
-			currentUser.role as (typeof ROLES_CAN_SEE_DRIVERS_WITHOUT_ADDRESS)[number]
-		);
-	const isAddressEmpty = addressFilter.trim() === "";
-	const isQueryEnabled = !isAddressEmpty || canShowDriversWithoutAddress;
+	// Page access is already restricted by role (middleware/sidebar). Always fetch drivers.
+	const isQueryEnabled = true;
 
 	// Fetch users data when dependencies change
 	const {
@@ -202,6 +192,7 @@ export default function DriversListTable() {
 				addressFilter,
 				radiusFilter,
 				locationFilter,
+				statusFilter,
 			},
 		],
 		queryFn: () =>
@@ -211,14 +202,29 @@ export default function DriversListTable() {
 				capabilitiesFilter,
 				addressFilter,
 				radiusFilter,
-				locationFilter
+				locationFilter,
+				statusFilter,
 			),
 		staleTime: 10 * 60 * 1000,
 		placeholderData: keepPreviousData,
 		enabled: isQueryEnabled,
 	});
 
-	const visibleDriverIds: string[] = driverList?.data?.results?.map((d: any) => d.id) ?? [];
+
+	console.log('driverList', driverList)
+
+	const filteredResults =
+		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
+			if (!statusFilter) return true;
+			const status = item?.meta_data?.driver_status as
+				| string
+				| null
+				| undefined;
+			const statusLabel = getStatusLabel(status);
+			return statusLabel === statusFilter;
+		}) ?? [];
+
+	const visibleDriverIds: string[] = filteredResults.map((d: any) => d.id);
 	const allVisibleSelected =
 		visibleDriverIds.length > 0 && visibleDriverIds.every(id => selectedDriverIds.includes(id));
 
@@ -267,7 +273,7 @@ export default function DriversListTable() {
 				</div>
 
 				{/* Actions select */}
-				{/*<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[260px]">
+				<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[260px]">
 					<Label className="mb-0">Actions</Label>
 					<Select
 						options={[{ value: "create-offers", label: "Create Offers" }]}
@@ -288,7 +294,7 @@ export default function DriversListTable() {
 					>
 						Apply
 					</Button>
-				</div>*/}
+				</div>
 			</div>
 
 			{/* Create Offer modal */}
@@ -507,7 +513,7 @@ export default function DriversListTable() {
 						/>
 					</div>
 
-					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Address */}
 					<div className="flex min-w-0 flex-col">
@@ -522,7 +528,7 @@ export default function DriversListTable() {
 						/>
 					</div>
 
-					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Location */}
 					<div className="flex min-w-0 flex-col">
@@ -540,7 +546,7 @@ export default function DriversListTable() {
 						</select>
 					</div>
 
-					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Radius */}
 					<div className="flex min-w-0 flex-col">
@@ -565,6 +571,34 @@ export default function DriversListTable() {
 						</select>
 					</div>
 
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+					{/* Status */}
+					<div className="flex min-w-0 flex-col">
+						<Label htmlFor="drivers-list-status-filter">Status</Label>
+						<select
+							id="drivers-list-status-filter"
+							value={statusFilter}
+							onChange={e => setStatusFilter(e.target.value)}
+							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[160px] md:w-auto"
+						>
+							<option value="">All statuses</option>
+							<option value="Available">Available</option>
+							<option value="Available on">Available on</option>
+							<option value="Not available">Not available</option>
+							<option value="Loaded & Enroute">Loaded & Enroute</option>
+							<option value="Out of service">Out of service</option>
+							<option value="On vacation">On vacation</option>
+							<option value="No updates">No updates</option>
+							<option value="Blocked">Blocked</option>
+							<option value="Expired documents">Expired documents</option>
+							<option value="No Interview">No Interview</option>
+							<option value="On hold">On hold</option>
+							<option value="Need update">Need update</option>
+							<option value="Unknown">Unknown</option>
+						</select>
+					</div>
+
 					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Reset (сбрасывает только локальные фильтры на этой странице) */}
@@ -576,6 +610,7 @@ export default function DriversListTable() {
 								setAddressFilter("");
 								setLocationFilter("USA");
 								setRadiusFilter("500");
+								setStatusFilter("");
 								setCapabilitiesFilter([]);
 							}}
 							className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus:border-brand-800 md:w-auto"
@@ -603,6 +638,7 @@ export default function DriversListTable() {
 							<col style={{ width: "12%" }} />
 							<col style={{ width: "12%" }} />
 						</colgroup>
+
 						{/* Table header with sortable columns*/}
 						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
 							<TableRow>
@@ -643,19 +679,10 @@ export default function DriversListTable() {
 								))}
 							</TableRow>
 						</TableHeader>
+
 						{/* Table body with user data */}
 						<TableBody>
-							{!isQueryEnabled ? (
-								// Address required for current role
-								<tr>
-									<td
-										colSpan={7}
-										className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
-									>
-										Enter address to view drivers.
-									</td>
-								</tr>
-							) : isPending ? (
+							{isPending ? (
 								// Loading spinner
 								<tr>
 									<td colSpan={7} className="p-2">
@@ -664,16 +691,16 @@ export default function DriversListTable() {
 								</tr>
 							) : (
 								// Driver rows
-								driverList?.data?.results?.map((item, i) => {
+								filteredResults.map((item: any, i: number) => {
 									const preferred_distance = item?.meta_data?.preferred_distance;
 									const selected_distances = preferred_distance
 										.split(",")
-										.map(item => item.trim());
+										.map((item: string) => item.trim());
 
 									const cross_border = item?.meta_data?.cross_border;
 									const selected_cross_border = cross_border
 										.split(",")
-										.map(item => item.trim());
+										.map((item: string) => item.trim());
 
 									const legal_document_type =
 										item?.meta_data?.legal_document_type;

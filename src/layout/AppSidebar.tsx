@@ -5,6 +5,8 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { clientAuth } from "@/utils/auth";
+import { canAccessDriversAndOffers } from "@/utils/roleAccess";
+import { useCurrentUser } from "@/stores/userStore";
 import authentication from "@/app-api/authentication";
 import {
 	BoxCubeIcon,
@@ -67,11 +69,11 @@ const navItems: NavItem[] = [
 		name: "Drivers list",
 		path: "/drivers-list",
 	},
-	// {
-	// 	icon: <OffersIcon className="h-5 w-5" />,
-	// 	name: "My offers",
-	// 	path: "/offers",
-	// },
+	{
+		icon: <OffersIcon className="h-5 w-5" />,
+		name: "My offers",
+		path: "/offers",
+	},
 	// {
 	//   name: "AI Assistant",
 	//   icon: <AiIcon />,
@@ -254,10 +256,20 @@ const supportItems: NavItem[] = [
 	},
 ];
 
+const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
+
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
 	const pathname = usePathname();
 	const router = useRouter();
+	const currentUser = useCurrentUser();
+	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
+	const menuNavItems = navItems.filter(
+		(item) =>
+			!item.path ||
+			!DRIVERS_OFFERS_PATHS.includes(item.path) ||
+			canAccessDriversOffers
+	);
 
 	const handleSignOut = async () => {
 		try {
@@ -557,7 +569,7 @@ const AppSidebar: React.FC = () => {
 									<HorizontaLDots />
 								)}
 							</h2>
-							{renderMenuItems(navItems, "main")}
+							{renderMenuItems(menuNavItems, "main")}
 						</div>
 						<div>
 							<h2

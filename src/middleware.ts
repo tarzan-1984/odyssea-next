@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { tokenEncoder } from "@/utils/tokenEncoder";
+import { canAccessDriversAndOffers } from "@/utils/roleAccess";
+
+const USER_DATA_COOKIE = "userData";
 
 // Public pages that don't require authentication
 const publicPages = [
@@ -69,6 +73,28 @@ export function middleware(request: NextRequest) {
 	// If it's not a public page and user is not authenticated, redirect to signin
 	if (!isPublicPage && !hasToken) {
 		return NextResponse.redirect(new URL("/signin", request.url));
+	}
+
+	// Drivers list and My offers: only for DISPATCHER, DISPATCHER_TL, EXPEDITE_MANAGER, ADMINISTRATOR, MORNING_TRACKING, NIGHTSHIFT_TRACKING
+	const isDriversOrOffersPage =
+		pathname === "/drivers-list" || pathname.startsWith("/drivers-list/") ||
+		pathname === "/offers" || pathname.startsWith("/offers/");
+	if (isDriversOrOffersPage && hasToken) {
+		const userDataCookie = request.cookies.get(USER_DATA_COOKIE)?.value;
+		if (userDataCookie) {
+			try {
+				const decoded = tokenEncoder.decode(userDataCookie);
+				const userData = JSON.parse(decoded) as { role?: string };
+				if (!canAccessDriversAndOffers(userData.role)) {
+					return NextResponse.redirect(new URL("/", request.url));
+				}
+			} catch {
+				// If we can't decode user data, deny access to these pages
+				return NextResponse.redirect(new URL("/", request.url));
+			}
+		} else {
+			return NextResponse.redirect(new URL("/", request.url));
+		}
 	}
 
 	return NextResponse.next();

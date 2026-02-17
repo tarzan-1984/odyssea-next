@@ -28,6 +28,29 @@ function formatDrivers(drivers: OfferRow["drivers"]): string {
 		.join("\n");
 }
 
+/** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
+function formatDateMmDdYy(dateStr: string | null | undefined): string {
+	if (!dateStr || typeof dateStr !== "string") return "";
+	const trimmed = dateStr.trim();
+	// Backend NY format: "MM/DD/YYYY, HH:mm:ss"
+	const comma = trimmed.indexOf(", ");
+	if (comma !== -1) {
+		const datePart = trimmed.slice(0, comma);
+		const [m, d, y] = datePart.split("/");
+		if (m && d && y) {
+			const yy = y.length >= 4 ? y.slice(-2) : y;
+			return `${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}/${yy}`;
+		}
+	}
+	// ISO or other: try Date parse
+	const date = new Date(trimmed.replace(/\s+/, "T"));
+	if (Number.isNaN(date.getTime())) return dateStr;
+	const mm = (date.getMonth() + 1).toString().padStart(2, "0");
+	const dd = date.getDate().toString().padStart(2, "0");
+	const yy = date.getFullYear().toString().slice(-2);
+	return `${mm}/${dd}/${yy}`;
+}
+
 const OffersListTable = () => {
 	const currentUser = useCurrentUser();
 	const [currentPage, setCurrentPage] = useState(1);
@@ -48,11 +71,11 @@ const OffersListTable = () => {
 	} = useQuery({
 		queryKey: ["offers-list", queryParams],
 		queryFn: () => offersApi.getOffers(queryParams),
-		placeholderData: keepPreviousData,
+		//placeholderData: keepPreviousData,
 	});
 
-	const results: OfferRow[] = data?.results ?? [];
-	const pagination = data?.pagination;
+	const results: OfferRow[] = data?.data?.results ?? [];
+	const pagination = data?.data?.pagination;
 	const totalItems = pagination?.total_count ?? 0;
 	const totalPages = pagination?.total_pages ?? 1;
 
@@ -127,8 +150,8 @@ const OffersListTable = () => {
 								results.map((row) => (
 									<TableRow key={row.id}>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
-											<p>{row.create_time}</p>
-											<p>{row.update_time}</p>
+											<p>Create: {formatDateMmDdYy(row.create_time)}</p>
+											<p>Update: {formatDateMmDdYy(row.update_time)}</p>
 										</TableCell>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
 											<p>{row.pick_up_location}</p>
