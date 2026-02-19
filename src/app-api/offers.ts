@@ -108,9 +108,10 @@ const offers = {
 		if (params.page != null) searchParams.set("page", String(params.page));
 		if (params.limit != null) searchParams.set("limit", String(params.limit));
 		if (params.is_expired != null) searchParams.set("is_expired", String(params.is_expired));
-		if (params.user_id != null && params.user_id !== "") searchParams.set("user_id", params.user_id);
+		if (params.user_id != null && params.user_id !== "")
+			searchParams.set("user_id", params.user_id);
 		if (params.sort_order != null) searchParams.set("sort_order", params.sort_order);
-		if (params.status != null && params.status !== "") searchParams.set("status", params.status);
+		if (params.status != null) searchParams.set("status", params.status);
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
@@ -143,7 +144,10 @@ const offers = {
 
 			return {
 				success: false,
-				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to create offer",
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to create offer",
 			};
 		} catch (error) {
 			console.error("Error in createOffer:", error);
@@ -177,7 +181,10 @@ const offers = {
 			}
 			return {
 				success: false,
-				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to add drivers",
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to add drivers",
 			};
 		} catch (error) {
 			console.error("Error in addDriversToOffer:", error);
@@ -211,7 +218,10 @@ const offers = {
 			}
 			return {
 				success: false,
-				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to remove driver",
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to remove driver",
 			};
 		} catch (error) {
 			console.error("Error in removeDriverFromOffer:", error);
@@ -238,7 +248,10 @@ const offers = {
 			}
 			return {
 				success: false,
-				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to deactivate offer",
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to deactivate offer",
 			};
 		} catch (error) {
 			console.error("Error in deactivateOffer:", error);
