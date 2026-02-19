@@ -2,12 +2,12 @@
 
 import ComponentCard from "@/components/common/ComponentCard";
 import React from "react";
-import OffersListTable from "@/components/tables/DataTables/OffersTable/OffersListTable";
+import OffersList from "@/components/OffersList/OffersList";
 
 const Offers = () => {
 	return (
 		<ComponentCard title="My Offers">
-			<OffersListTable />
+			<OffersList />
 		</ComponentCard>
 	);
 };

@@ -39,18 +39,20 @@ import macroPointIcon from "@/icons/additional/macropoint.png";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
 import AlaskaIcon from "@/icons/additional/usa-alaska.svg";
 import SideDoorIcon from "@/icons/additional/side_door.svg";
-import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
+import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import Select from "@/components/form/Select";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import axios from "axios";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { DriversPage } from "./Types";
 import CreateOfferModal from "./CreateOfferModal";
+import {
+	driversListQueryOptions,
+	type DriversListQueryParams,
+} from "./driversListQueryOptions";
 
 // Same status colors as on Drivers Map markers
 const STATUS_COLORS: Record<string, string> = {
@@ -107,7 +109,28 @@ function formatDateMmDdYy(date: Date | null): string {
 	return `${m}/${d}/${y}`;
 }
 
-export default function DriversListTable() {
+export interface DriversListTableProps {
+	/** When false, hides the "Actions" dropdown and Apply button (e.g. in Add drivers modal). Default true. */
+	showActionsInHeader?: boolean;
+	/** Optional footer button (e.g. "Add drivers" in modal). When set, shown in the footer. onClick receives selected driver IDs. */
+	footerButton?: {
+		label: string;
+		onClick: (selectedDriverIds: string[]) => void | Promise<void>;
+		icon?: React.ReactNode;
+		isLoading?: boolean;
+	} | null;
+	/** Driver IDs that are already in the offer (e.g. when adding drivers to offer). These rows are disabled and styled as already added. */
+	existingDriverIds?: string[];
+}
+
+export default function DriversListTable({
+	showActionsInHeader = true,
+	footerButton = null,
+	existingDriverIds = [],
+}: DriversListTableProps = {}) {
+	const existingDriverIdsSet = new Set(
+		existingDriverIds.map(id => String(id))
+	);
 	const currentUser = useCurrentUser();
 
 	// State for pagination
@@ -115,11 +138,11 @@ export default function DriversListTable() {
 	const [itemsPerPage, setItemsPerPage] = useState(10);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
 
-	// Actions: selected action and create-offer modal
+	// Actions: selected action and create-offer modal (only used when showActionsInHeader)
 	const [selectedAction, setSelectedAction] = useState<string>("");
 	const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
 
-	// Local filters (пока только в useState)
+	// Local filters
 	const [addressFilter, setAddressFilter] = useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
@@ -131,87 +154,27 @@ export default function DriversListTable() {
 		);
 	};
 
-	const fetchDriversPage = async (
-		page: number,
-		per_page: number,
-		capabilities: string[],
-		address: string,
-		radius: string,
-		country: string,
-		status: string,
-	): Promise<DriversPage> => {
-		const params = new URLSearchParams();
-		params.set("paged", String(page));
-		params.set("per_page_loads", String(per_page));
-
-		if (capabilities.length) {
-			params.set("capabilities", capabilities.join(","));
-		}
-
-		if (address && radius && country) {
-			params.set("my_search", address);
-			params.set("radius", radius);
-			params.set("country", country);
-		} else if (!address && status) {
-			// When filtering only by status (no address), use extended_search parameter
-			params.set("extended_search", status);
-		}
-
-		try {
-			const { data } = await axios.get<DriversPage>(
-				`/api/users/drivers/search?${params.toString()}`,
-				{
-					withCredentials: true,
-				}
-			);
-
-			return data;
-		} catch (error: any) {
-			const message =
-				error?.response?.data?.error || error?.message || "Failed to fetch drivers";
-			throw new Error(message);
-		}
+	const queryParams: DriversListQueryParams = {
+		currentPage,
+		itemsPerPage,
+		capabilitiesFilter,
+		addressFilter,
+		radiusFilter,
+		locationFilter,
+		statusFilter,
 	};
 
-	// Page access is already restricted by role (middleware/sidebar). Always fetch drivers.
-	const isQueryEnabled = true;
-
-	// Fetch users data when dependencies change
 	const {
 		data: driverList,
 		isPending,
+		isFetching,
 		error,
 		isPlaceholderData,
 	} = useQuery({
-		queryKey: [
-			"drivers-list",
-			{
-				currentPage,
-				itemsPerPage,
-				capabilitiesFilter,
-				addressFilter,
-				radiusFilter,
-				locationFilter,
-				statusFilter,
-			},
-		],
-		queryFn: () =>
-			fetchDriversPage(
-				currentPage,
-				itemsPerPage,
-				capabilitiesFilter,
-				addressFilter,
-				radiusFilter,
-				locationFilter,
-				statusFilter,
-			),
-		staleTime: 10 * 60 * 1000,
+		...driversListQueryOptions(queryParams),
 		placeholderData: keepPreviousData,
-		enabled: isQueryEnabled,
+		enabled: true,
 	});
-
-
-	console.log('driverList', driverList)
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
@@ -224,19 +187,23 @@ export default function DriversListTable() {
 			return statusLabel === statusFilter;
 		}) ?? [];
 
-	const visibleDriverIds: string[] = filteredResults.map((d: any) => d.id);
+	const visibleDriverIds: string[] = filteredResults.map((d: any) =>
+		String(d.id)
+	);
+	const selectableVisibleDriverIds = visibleDriverIds.filter(
+		id => !existingDriverIdsSet.has(id)
+	);
 	const allVisibleSelected =
-		visibleDriverIds.length > 0 && visibleDriverIds.every(id => selectedDriverIds.includes(id));
+		selectableVisibleDriverIds.length > 0 &&
+		selectableVisibleDriverIds.every(id => selectedDriverIds.includes(id));
 
 	const toggleAllVisible = () => {
 		setSelectedDriverIds(prev => {
 			if (allVisibleSelected) {
-				// Unselect all visible
-				return prev.filter(id => !visibleDriverIds.includes(id));
+				return prev.filter(id => !selectableVisibleDriverIds.includes(id));
 			}
-			// Select all visible (merge with previous)
 			const set = new Set(prev);
-			visibleDriverIds.forEach(id => set.add(id));
+			selectableVisibleDriverIds.forEach(id => set.add(id));
 			return Array.from(set);
 		});
 	};
@@ -246,7 +213,7 @@ export default function DriversListTable() {
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
 	return (
-		<div className="min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
+		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section with pagination controls and search */}
 			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
 				{/* Items per page selector */}
@@ -272,42 +239,61 @@ export default function DriversListTable() {
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
 
-				{/* Actions select */}
+				{/* Right side: Actions select (main page) or Add drivers button (modal) */}
 				<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[260px]">
-					<Label className="mb-0">Actions</Label>
-					<Select
-						options={[{ value: "create-offers", label: "Create Offers" }]}
-						placeholder="Choise Action"
-						onChange={(value) => setSelectedAction(value)}
-						defaultValue=""
-						className="dark:bg-gray-900"
-					/>
-					<Button
-						size="sm"
-						variant="primary"
-						disabled={selectedDriverIds.length === 0 || !selectedAction}
-						onClick={() => {
-							if (selectedAction === "create-offers") {
-								setCreateOfferModalOpen(true);
-							}
-						}}
-					>
-						Apply
-					</Button>
+					{showActionsInHeader ? (
+						<>
+							<Label className="mb-0">Actions</Label>
+							<Select
+								options={[{ value: "create-offers", label: "Create Offers" }]}
+								placeholder="Choise Action"
+								onChange={(value) => setSelectedAction(value)}
+								defaultValue=""
+								className="dark:bg-gray-900"
+							/>
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={selectedDriverIds.length === 0 || !selectedAction}
+								onClick={() => {
+									if (selectedAction === "create-offers") {
+										setCreateOfferModalOpen(true);
+									}
+								}}
+							>
+								Apply
+							</Button>
+						</>
+					) : (
+						footerButton && (
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={selectedDriverIds.length === 0 || footerButton.isLoading}
+								onClick={() => footerButton.onClick(selectedDriverIds)}
+								className="inline-flex items-center gap-2"
+							>
+								{footerButton.label}
+								{footerButton.icon}
+							</Button>
+						)
+					)}
 				</div>
 			</div>
 
-			{/* Create Offer modal */}
-			<CreateOfferModal
-				isOpen={createOfferModalOpen}
-				onClose={() => setCreateOfferModalOpen(false)}
-				externalId={currentUser?.externalId ?? ""}
-				selectedDriverIds={selectedDriverIds}
-				onSubmit={values => {
-					// TODO: send to API
-					console.log("Create offer form submitted:", values);
-				}}
-			/>
+			{/* Create Offer modal (only on main drivers-list page) */}
+			{showActionsInHeader && (
+				<CreateOfferModal
+					isOpen={createOfferModalOpen}
+					onClose={() => setCreateOfferModalOpen(false)}
+					externalId={currentUser?.externalId ?? ""}
+					selectedDriverIds={selectedDriverIds}
+					onSubmit={values => {
+						// TODO: send to API
+						console.log("Create offer form submitted:", values);
+					}}
+				/>
+			)}
 
 			<div className="relative z-0 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
@@ -649,8 +635,9 @@ export default function DriversListTable() {
 									<div className="inline-flex items-center justify-center">
 										<input
 											type="checkbox"
-											className="h-4 w-4 cursor-pointer"
+											className={`h-4 w-4 ${selectableVisibleDriverIds.length === 0 ? "cursor-not-allowed" : "cursor-pointer"}`}
 											checked={allVisibleSelected}
+											disabled={selectableVisibleDriverIds.length === 0}
 											onChange={toggleAllVisible}
 										/>
 									</div>
@@ -683,11 +670,8 @@ export default function DriversListTable() {
 						{/* Table body with user data */}
 						<TableBody>
 							{isPending ? (
-								// Loading spinner
 								<tr>
-									<td colSpan={7} className="p-2">
-										<SpinnerOne />
-									</td>
+									<td colSpan={7} className="p-4" aria-hidden />
 								</tr>
 							) : (
 								// Driver rows
@@ -741,18 +725,31 @@ export default function DriversListTable() {
 									}
 
 									const military_capability = legal_valid && background_valid;
+									const isAlreadyInOffer = existingDriverIdsSet.has(
+										String(item.id)
+									);
 
 									return (
-										<TableRow key={i + 1}>
+										<TableRow
+											key={i + 1}
+											className={
+												isAlreadyInOffer
+													? "bg-gray-200/70 dark:bg-gray-700/50 opacity-90"
+													: undefined
+											}
+										>
 											<TableCell className="w-12 min-w-12 px-4 py-3 border border-gray-100 dark:border-white/[0.05] text-center align-middle">
 												<div className="inline-flex items-center justify-center">
 													<input
 														type="checkbox"
-														className="h-4 w-4 cursor-pointer"
-														checked={selectedDriverIds.includes(
-															item.id
-														)}
+														className={`h-4 w-4 ${isAlreadyInOffer ? "cursor-not-allowed" : "cursor-pointer"}`}
+														checked={
+															!isAlreadyInOffer &&
+															selectedDriverIds.includes(item.id)
+														}
+														disabled={isAlreadyInOffer}
 														onChange={() =>
+															!isAlreadyInOffer &&
 															toggleDriverSelection(item.id)
 														}
 													/>
@@ -1151,7 +1148,7 @@ export default function DriversListTable() {
 					{/*Pagination info*/}
 					<div className="pb-3 xl:pb-0">
 						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-							{(isQueryEnabled ? totalItems : 0) === 0
+							{totalItems === 0
 								? "Showing 0 entries"
 								: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
 										currentPage * itemsPerPage,
@@ -1160,18 +1157,40 @@ export default function DriversListTable() {
 						</p>
 					</div>
 
-					{/*Pagination controls*/}
-					{isQueryEnabled && totalPages > 1 && (
-						<PaginationWithIcon
-							totalPages={totalPages}
-							initialPage={currentPage}
-							onPageChange={(page: number) => {
-								setCurrentPage(page);
-							}}
-						/>
-					)}
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+						{/*Pagination controls*/}
+						{totalPages > 1 && (
+							<PaginationWithIcon
+								totalPages={totalPages}
+								initialPage={currentPage}
+								onPageChange={(page: number) => {
+									setCurrentPage(page);
+								}}
+							/>
+						)}
+						{footerButton && (
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={selectedDriverIds.length === 0 || footerButton.isLoading}
+								onClick={() => footerButton.onClick(selectedDriverIds)}
+								className="inline-flex items-center gap-2"
+							>
+								{footerButton.label}
+								{footerButton.icon}
+							</Button>
+						)}
+					</div>
 				</div>
 			</div>
+			{(isPending || isFetching) && (
+				<div
+					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
+					aria-hidden
+				>
+					<WheelLoader size={107} />
+				</div>
+			)}
 		</div>
 	);
 }

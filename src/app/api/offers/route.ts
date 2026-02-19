@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 
-const OFFERS_QUERY_PARAMS = ["page", "limit", "is_expired", "user_id", "sort_order"] as const;
+const OFFERS_QUERY_PARAMS = ["page", "limit", "is_expired", "user_id", "sort_order", "status"] as const;
 
 /**
  * GET /api/offers

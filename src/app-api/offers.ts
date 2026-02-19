@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export interface OfferDriver {
+	driver_id: string;
 	externalId: string | null;
 	firstName: string;
 	lastName: string;
@@ -13,6 +14,7 @@ export interface OfferDriver {
 
 export interface OfferRow {
 	id: string;
+	active?: boolean;
 	external_user_id: string | null;
 	create_time: string;
 	update_time: string;
@@ -36,6 +38,7 @@ export interface GetOffersParams {
 	is_expired?: boolean;
 	user_id?: string;
 	sort_order?: "action_time_asc" | "action_time_desc";
+	status?: "active" | "inactive";
 }
 
 export interface GetOffersResponse {
@@ -73,6 +76,25 @@ export interface CreateOfferResponse {
 	error?: string;
 }
 
+export interface AddDriversToOfferResponse {
+	success: boolean;
+	addedCount?: number;
+	message?: string;
+	error?: string;
+}
+
+export interface RemoveDriverFromOfferResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+export interface DeactivateOfferResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
 /**
  * Offers API – create offer and rate_offers via backend.
  * Uses axios with credentials (cookies) for auth.
@@ -88,6 +110,7 @@ const offers = {
 		if (params.is_expired != null) searchParams.set("is_expired", String(params.is_expired));
 		if (params.user_id != null && params.user_id !== "") searchParams.set("user_id", params.user_id);
 		if (params.sort_order != null) searchParams.set("sort_order", params.sort_order);
+		if (params.status != null && params.status !== "") searchParams.set("status", params.status);
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
@@ -124,6 +147,101 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in createOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Add drivers to an existing offer. Calls PATCH /api/offers/:offerId/drivers.
+	 */
+	async addDriversToOffer(
+		offerId: string,
+		driverIds: string[]
+	): Promise<AddDriversToOfferResponse> {
+		try {
+			const response = await axios.patch<AddDriversToOfferResponse>(
+				`/api/offers/${encodeURIComponent(offerId)}/drivers`,
+				{ driverIds },
+				{
+					headers: { "Content-Type": "application/json" },
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, addedCount: data.addedCount, message: data.message };
+			}
+			return {
+				success: false,
+				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to add drivers",
+			};
+		} catch (error) {
+			console.error("Error in addDriversToOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Remove driver from offer (sets active=false in rate_offers).
+	 * Refreshes offers list after success.
+	 */
+	async removeDriverFromOffer(
+		offerId: string,
+		driverExternalId: string
+	): Promise<RemoveDriverFromOfferResponse> {
+		try {
+			const response = await axios.patch<RemoveDriverFromOfferResponse>(
+				`/api/offers/${encodeURIComponent(offerId)}/drivers/${encodeURIComponent(driverExternalId)}`,
+				{},
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, message: data.message };
+			}
+			return {
+				success: false,
+				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to remove driver",
+			};
+		} catch (error) {
+			console.error("Error in removeDriverFromOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Deactivate an offer (sets active=false in offers table).
+	 */
+	async deactivateOffer(offerId: string): Promise<DeactivateOfferResponse> {
+		try {
+			const response = await axios.patch<DeactivateOfferResponse>(
+				`/api/offers/${encodeURIComponent(offerId)}/deactivate-offer`,
+				{},
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, message: data.message };
+			}
+			return {
+				success: false,
+				error: (data as { error?: string; message?: string })?.error ?? (data as { message?: string })?.message ?? "Failed to deactivate offer",
+			};
+		} catch (error) {
+			console.error("Error in deactivateOffer:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

@@ -7,6 +7,7 @@ import { AngleDownIcon, AngleUpIcon } from "@/icons";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Link from "next/link";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
+import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
@@ -57,6 +58,7 @@ export default function UserListTable() {
 	const {
 		data: userList,
 		isPending,
+		isFetching,
 		error,
 		isPlaceholderData,
 	} = useQuery({
@@ -103,7 +105,7 @@ export default function UserListTable() {
 	const columnCount = showVinColumn ? 7 : 6;
 
 	return (
-		<div className="overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
+		<div className="relative overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section with pagination controls and search */}
 			<div className="flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
 				{/* Items per page selector */}
@@ -348,6 +350,14 @@ export default function UserListTable() {
 					)}
 				</div>
 			</div>
+			{(isPending || isFetching) && (
+				<div
+					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
+					aria-hidden
+				>
+					<WheelLoader size={107} />
+				</div>
+			)}
 		</div>
 	);
 }
