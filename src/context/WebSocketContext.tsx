@@ -794,14 +794,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				};
 				addChatRoom(normalized);
 
-				// Save to IndexedDB
+				// Save to IndexedDB (use addChatRoom to avoid race when multiple chats created in quick succession)
 				try {
 					const { indexedDBChatService } = await import(
 						"@/services/IndexedDBChatService"
 					);
-					const currentChatRooms = await indexedDBChatService.getChatRooms();
-					const updatedChatRooms = [...currentChatRooms, normalized];
-					await indexedDBChatService.saveChatRooms(updatedChatRooms);
+					await indexedDBChatService.addChatRoom(normalized);
 				} catch (dbError) {
 					console.error("Failed to save new chat room to IndexedDB:", dbError);
 				}

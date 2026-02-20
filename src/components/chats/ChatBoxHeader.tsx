@@ -44,6 +44,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		if (!chatRoom) return "Select a chat";
 
 		// For direct chats, ALWAYS show the other participant's name (ignore chatRoom.name)
+		// For OFFER chats, use chat name (offer card title)
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
@@ -70,7 +71,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
 
-		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
 				return {
@@ -104,21 +105,21 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								return renderAvatar(null, "w-12 h-12");
 							}
 
-							if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-								const otherParticipant = chatRoom.participants.find(
-									p => p.user.id !== currentUser?.id
-								);
-								if (otherParticipant) {
-									const userData = {
-										firstName: otherParticipant.user.firstName,
-										lastName: otherParticipant.user.lastName,
-										avatar:
-											otherParticipant.user.avatar ||
-											(otherParticipant.user as any).profilePhoto,
-									};
-									return renderAvatar(userData, "w-12 h-12");
-								}
-							}
+		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
+			const otherParticipant = chatRoom.participants.find(
+				p => p.user.id !== currentUser?.id
+			);
+			if (otherParticipant) {
+				const userData = {
+					firstName: otherParticipant.user.firstName,
+					lastName: otherParticipant.user.lastName,
+					avatar:
+						otherParticipant.user.avatar ||
+						(otherParticipant.user as any).profilePhoto,
+				};
+				return renderAvatar(userData, "w-12 h-12");
+			}
+		}
 
 							// For GROUP/LOAD chats, prefer chat avatar when present
 							if (
@@ -157,10 +158,10 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								let showOnlineIndicator = false;
 
 								if (
-									chatRoom.type === "DIRECT" &&
+									(chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") &&
 									chatRoom.participants.length === 2
 								) {
-									// For direct chats, show if the other participant is online
+									// For direct and offer chats, show if the other participant is online
 									const otherParticipant = chatRoom.participants.find(
 										p => p.user.id !== currentUser?.id
 									);
@@ -178,7 +179,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 					<button
 						onClick={() => setIsParticipantsModalOpen(true)}
-						className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer z-10 relative"
+						className={`text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer z-10 relative text-left ${
+							chatRoom?.type === "OFFER" ? "whitespace-pre-line" : ""
+						}`}
 						type="button"
 					>
 						{getChatDisplayName()}

@@ -27,6 +27,7 @@ export interface OfferRow {
 	weight: number | null;
 	commodity: string | null;
 	special_requirements: unknown;
+	notes: string | null;
 	total_miles: number | null;
 	action_time: string | null;
 	drivers: OfferDriver[];
@@ -68,6 +69,7 @@ export interface CreateOfferPayload {
 	weight?: number;
 	commodity?: string;
 	specialRequirements?: string[];
+	notes?: string;
 }
 
 export interface CreateOfferResponse {

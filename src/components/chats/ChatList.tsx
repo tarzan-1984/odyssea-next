@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
-import { MoreDotIcon, SoundOffIcon, UnreadIcon, PushPinIcon } from "@/icons";
+import { MoreDotIcon, SoundOffIcon, UnreadIcon, PushPinIcon, ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import ChatListItem from "./ChatListItem";
 import { useChatModal } from "@/context/ChatModalContext";
@@ -20,7 +20,7 @@ interface ChatListProps {
 }
 
 type FilterType = "all" | "muted" | "unread" | "favorite";
-type ChatTab = "chats" | "shipments";
+type ChatTab = "chats" | "shipments" | "offers";
 
 interface FilterOption {
 	value: FilterType;
@@ -52,17 +52,22 @@ export default function ChatList({
 	// Track which chat menu is open (only one at a time)
 	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
 
-	// Filter options
+	// Filter options (hide Favorite on Offers tab)
 	const filterOptions: FilterOption[] = [
 		{ value: "all", label: "All", icon: null },
 		{ value: "muted", label: "Muted", icon: <SoundOffIcon className="w-3 h-3" /> },
 		{ value: "unread", label: "Unread", icon: <UnreadIcon className="w-3 h-3" /> },
 		{ value: "favorite", label: "Favorite", icon: <PushPinIcon className="w-3 h-3" /> },
 	];
+	const visibleFilterOptions =
+		activeTab === "offers"
+			? filterOptions.filter(option => option.value !== "favorite")
+			: filterOptions;
 
 	// Get current filter option
 	const getCurrentFilterOption = () => {
-		return filterOptions.find(option => option.value === selectedFilter) || filterOptions[0];
+		const opts = activeTab === "offers" ? visibleFilterOptions : filterOptions;
+		return opts.find(option => option.value === selectedFilter) || opts[0];
 	};
 
 	// Handle filter change
@@ -70,6 +75,13 @@ export default function ChatList({
 		setSelectedFilter(filter);
 		setIsFilterDropdownOpen(false);
 	};
+
+	// Reset to "all" when switching to offers tab with favorite selected
+	useEffect(() => {
+		if (activeTab === "offers" && selectedFilter === "favorite") {
+			setSelectedFilter("all");
+		}
+	}, [activeTab, selectedFilter]);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT chats, always show the other participant's name
@@ -97,6 +109,24 @@ export default function ChatList({
 		return "Unknown Chat";
 	};
 
+	// Extract offerId from OFFER chat (from room.offerId or parse from name)
+	const getOfferId = (chatRoom: ChatRoom): string | null => {
+		if (chatRoom.offerId) return chatRoom.offerId;
+		if (chatRoom.type !== "OFFER" || !chatRoom.name) return null;
+		const match = chatRoom.name.match(/\(id:\s*([^)]+)\)/);
+		return match ? match[1].trim() : null;
+	};
+
+	// Get accordion header: "Pick up - Delivery" and "(id: xxx)"
+	// Name format: "firstName lastName (id: offerId)\npickUp - delivery"
+	const getOfferAccordionTitle = (chatRoom: ChatRoom): { route: string; id: string } => {
+		const offerId = getOfferId(chatRoom) ?? chatRoom.id;
+		if (!chatRoom.name) return { route: "Unknown route", id: offerId };
+		const lines = chatRoom.name.split("\n");
+		const route = lines[1]?.trim() || lines[0]?.replace(/\(id:\s*[^)]+\)/, "").trim() || "Unknown route";
+		return { route, id: offerId };
+	};
+
 	function toggleDropdownTwo() {
 		setIsOpenTwo(!isOpenTwo);
 	}
@@ -111,11 +141,15 @@ export default function ChatList({
 	};
 
 	// Tab filtering:
-	// - Chats tab: show all chats except LOAD
+	// - Chats tab: show DIRECT and GROUP (exclude LOAD and OFFER)
 	// - Shipments tab: show only LOAD chats
-	const tabScopedChatRooms = chatRooms.filter((room) =>
-		activeTab === "chats" ? room.type !== "LOAD" : room.type === "LOAD",
-	);
+	// - Offers tab: show only OFFER chats
+	const tabScopedChatRooms = chatRooms.filter((room) => {
+		if (activeTab === "chats") return room.type !== "LOAD" && room.type !== "OFFER";
+		if (activeTab === "shipments") return room.type === "LOAD";
+		if (activeTab === "offers") return room.type === "OFFER";
+		return false;
+	});
 
 	// Determine if all chats are muted
 	const allChatsMuted =
@@ -254,6 +288,31 @@ export default function ChatList({
 
 		return matchesSearch && matchesFilter;
 	});
+
+	// Group offer chats by offerId (must be after filteredChatRooms)
+	const groupedOfferChats = React.useMemo(() => {
+		if (activeTab !== "offers") return new Map<string, ChatRoom[]>();
+		const map = new Map<string, ChatRoom[]>();
+		for (const room of filteredChatRooms) {
+			const key = getOfferId(room) ?? room.id;
+			const list = map.get(key) ?? [];
+			list.push(room);
+			map.set(key, list);
+		}
+		return map;
+	}, [activeTab, filteredChatRooms]);
+
+	// Accordion expansion state (offerId -> expanded). All closed by default.
+	const [expandedOfferIds, setExpandedOfferIds] = useState<Set<string>>(new Set());
+
+	const toggleOfferAccordion = (offerId: string) => {
+		setExpandedOfferIds(prev => {
+			const next = new Set(prev);
+			if (next.has(offerId)) next.delete(offerId);
+			else next.add(offerId);
+			return next;
+		});
+	};
 
 	useEffect(() => {
 		loadChatRooms();
@@ -395,6 +454,17 @@ export default function ChatList({
 					>
 						Shipments
 					</button>
+					<button
+						type="button"
+						onClick={() => setActiveTab("offers")}
+						className={`flex-1 flex items-center justify-center h-8 rounded-lg text-sm font-medium transition-colors ${
+							activeTab === "offers"
+								? "bg-brand-500 text-white"
+								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
+						}`}
+					>
+						Offers
+					</button>
 				</div>
 			</div>
 
@@ -451,7 +521,7 @@ export default function ChatList({
 						{/* Dropdown Menu */}
 						{isFilterDropdownOpen && (
 							<div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg z-10">
-								{filterOptions.map(option => (
+								{visibleFilterOptions.map(option => (
 									<button
 										key={option.value}
 										onClick={() => handleFilterChange(option.value)}
@@ -490,6 +560,76 @@ export default function ChatList({
 								</>
 							)}
 						</div>
+					</div>
+				) : activeTab === "offers" && groupedOfferChats.size > 0 ? (
+					<div className="space-y-1 py-2">
+						{Array.from(groupedOfferChats.entries()).map(([offerId, rooms]) => {
+							const firstRoom = rooms[0];
+							const { route, id } = getOfferAccordionTitle(firstRoom);
+							const isExpanded = expandedOfferIds.has(offerId);
+							return (
+								<div
+									key={offerId}
+									className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 overflow-hidden"
+								>
+									<button
+										type="button"
+										onClick={() => toggleOfferAccordion(offerId)}
+										className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-100/80 dark:hover:bg-white/5 transition-colors"
+									>
+										<div className="min-w-0 flex-1">
+											<div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+												{route}
+											</div>
+											<div className="text-xs text-gray-500 dark:text-gray-400">
+												(id: {id})
+											</div>
+										</div>
+										{isExpanded ? (
+											<ChevronUpIcon className="h-4 w-4 flex-shrink-0 text-gray-500" />
+										) : (
+											<ChevronDownIcon className="h-4 w-4 flex-shrink-0 text-gray-500" />
+										)}
+									</button>
+									{isExpanded && (
+										<div className="border-t border-gray-200 dark:border-white/10">
+											{rooms.map(chatRoom => {
+												const isSelected = selectedChatId === chatRoom.id;
+												const status =
+													chatRoom.type === "DIRECT" && chatRoom.participants.length === 2
+														? (() => {
+																const otherParticipant = chatRoom.participants.find(
+																	p => p.user.id !== currentUser?.id
+																);
+																if (otherParticipant && webSocketChatSync.isUserOnline) {
+																	return webSocketChatSync.isUserOnline(otherParticipant.user.id)
+																		? "online"
+																		: "offline";
+																}
+																return "offline";
+															})()
+														: "offline";
+												return (
+													<ChatListItem
+														key={chatRoom.id}
+														chatRoom={chatRoom}
+														isSelected={isSelected}
+														status={status}
+														onChatSelect={onChatSelect}
+														isUserOnline={webSocketChatSync.isUserOnline}
+														onChatRoomUpdate={loadChatRooms}
+														isMenuOpen={openMenuChatId === chatRoom.id}
+														onMenuToggle={isOpen => {
+															setOpenMenuChatId(isOpen ? chatRoom.id : null);
+														}}
+													/>
+												);
+											})}
+										</div>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				) : (
 					<div className="space-y-1 py-2">

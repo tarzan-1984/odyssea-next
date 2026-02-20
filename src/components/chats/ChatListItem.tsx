@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { renderAvatar } from "@/helpers";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
@@ -35,10 +35,11 @@ export default function ChatListItem({
 	const { updateChatRoom } = useChatStore();
 	const [isMuted, setIsMuted] = useState(chatRoom.isMuted || false);
 	const [isPinned, setIsPinned] = useState(chatRoom.isPinned || false);
+	const menuTriggerRef = useRef<HTMLDivElement>(null);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
-		// For DIRECT chats, always show the other participant's name
-		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+		// For DIRECT and OFFER chats, show only the other participant's firstName + lastName
+		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
 				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
@@ -182,6 +183,7 @@ export default function ChatListItem({
 			{/* Menu Icon - positioned before avatar */}
 			<div className="relative flex-shrink-0 mr-2">
 				<div
+					ref={menuTriggerRef}
 					onClick={e => {
 						e.stopPropagation(); // Prevent chat selection when clicking menu
 						e.preventDefault();
@@ -198,7 +200,8 @@ export default function ChatListItem({
 					onClose={() => {
 						closeDropdown();
 					}}
-					className="w-32 p-2 left-4 top-full mt-1"
+					anchorRef={menuTriggerRef}
+					className="w-32 p-2"
 					data-dropdown
 				>
 					<DropdownItem
@@ -217,22 +220,24 @@ export default function ChatListItem({
 						)}
 						<span className="text-sm">{isMuted ? "Unmute" : "Mute"}</span>
 					</DropdownItem>
-					<DropdownItem
-						tag="div"
-						onItemClick={e => {
-							// Make TS happy if event can be undefined
-							e?.stopPropagation(); // Prevent event bubbling to parent button
-							handleTogglePin();
-						}}
-						className="flex items-center gap-2 w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 cursor-pointer"
-					>
-						{isPinned ? (
-							<PushPinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
-						) : (
-							<PinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
-						)}
-						<span className="text-sm">{isPinned ? "Unpin" : "Pin"}</span>
-					</DropdownItem>
+					{chatRoom.type !== "OFFER" && (
+						<DropdownItem
+							tag="div"
+							onItemClick={e => {
+								// Make TS happy if event can be undefined
+								e?.stopPropagation(); // Prevent event bubbling to parent button
+								handleTogglePin();
+							}}
+							className="flex items-center gap-2 w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 cursor-pointer"
+						>
+							{isPinned ? (
+								<PushPinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
+							) : (
+								<PinIcon className="w-4 h-4 pointer-events-none text-gray-500 dark:text-white" />
+							)}
+							<span className="text-sm">{isPinned ? "Unpin" : "Pin"}</span>
+						</DropdownItem>
+					)}
 				</Dropdown>
 			</div>
 
@@ -250,9 +255,9 @@ export default function ChatListItem({
 						})()}
 					</div>
 				) : (
-					// Use renderAvatar for DIRECT chats
+					// Use renderAvatar for DIRECT and OFFER chats (other participant)
 					(() => {
-						if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+						if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 							const otherParticipant = chatRoom.participants.find(
 								p => p.user.id !== currentUser?.id
 							);
@@ -284,7 +289,7 @@ export default function ChatListItem({
 						return renderAvatar(null, "w-12 h-12");
 					})()
 				)}
-				{chatRoom.type === "DIRECT" && status === "online" && (
+				{(chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && status === "online" && (
 					<div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
 				)}
 			</div>

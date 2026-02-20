@@ -32,6 +32,7 @@ export interface CreateOfferFormValues {
 	weight: string;
 	commodity: string;
 	specialRequirements: string[];
+	notes: string;
 }
 
 const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> = {
@@ -45,6 +46,7 @@ const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> 
 	weight: "",
 	commodity: "",
 	specialRequirements: [],
+	notes: "",
 };
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
@@ -144,6 +146,7 @@ export default function CreateOfferModal({
 					formValues.specialRequirements.length > 0
 						? formValues.specialRequirements
 						: undefined,
+				notes: formValues.notes.trim() || undefined,
 			};
 			const result = await offers.createOffer(payload);
 			if (result.success) {
@@ -272,7 +275,7 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Row 4: Weight, Special requirements */}
+				{/* Row 4: Weight, Commodity */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<div>
 						<Label>Weight</Label>
@@ -286,6 +289,20 @@ export default function CreateOfferModal({
 							hint={errors.weight}
 						/>
 					</div>
+					<div>
+						<Label>Commodity</Label>
+						<Input
+							type="text"
+							value={formValues.commodity}
+							onChange={e => handleChange("commodity", e.target.value)}
+							placeholder="Enter commodity"
+							className="dark:bg-gray-900"
+						/>
+					</div>
+				</div>
+
+				{/* Row 5: Special requirements (full width) */}
+				<div className="w-full">
 					<div className="flex flex-col gap-1">
 						<MultiSelect
 							label="Special requirements"
@@ -334,14 +351,14 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Row 6: Commodity (full width, bottom row) */}
+				{/* Notes */}
 				<div className="w-full">
-					<Label>Commodity</Label>
+					<Label>Notes</Label>
 					<TextArea
-						rows={3}
-						value={formValues.commodity}
-						onChange={v => handleChange("commodity", v)}
-						placeholder="Enter commodity"
+						rows={2}
+						value={formValues.notes}
+						onChange={v => handleChange("notes", v)}
+						placeholder="Enter notes"
 						className="w-full dark:bg-gray-900"
 					/>
 				</div>

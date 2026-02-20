@@ -252,6 +252,12 @@ const OffersList = () => {
 											</Table>
 											</div>
 
+											{row.notes && String(row.notes).trim() && (
+												<p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+													Notes: {row.notes}
+												</p>
+											)}
+
 											{/* Drivers table */}
 											{row.drivers && row.drivers.length > 0 && (
 												<div className="mt-4">

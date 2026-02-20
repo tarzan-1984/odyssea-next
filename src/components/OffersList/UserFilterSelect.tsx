@@ -17,6 +17,15 @@ const OFFERS_USER_ROLES = [
 	"NIGHTSHIFT_TRACKING",
 ] as const;
 
+const ROLE_LABELS: Record<string, string> = {
+	ADMINISTRATOR: "Administrator",
+	DISPATCHER: "Dispatcher",
+	DISPATCHER_TL: "Dispatcher TL",
+	EXPEDITE_MANAGER: "Expedite Manager",
+	MORNING_TRACKING: "Morning Tracking",
+	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
+};
+
 const STALE_TIME_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 export interface UserFilterSelectProps {
@@ -27,6 +36,10 @@ export interface UserFilterSelectProps {
 function getUserDisplayName(item: UserListItem): string {
 	const name = [item.firstName, item.lastName].filter(Boolean).join(" ").trim();
 	return name || "-";
+}
+
+function getRoleLabel(role: string): string {
+	return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
 }
 
 export default function UserFilterSelect({ value, onChangeAction }: UserFilterSelectProps) {
@@ -97,7 +110,14 @@ export default function UserFilterSelect({ value, onChangeAction }: UserFilterSe
 								`}
 							>
 								{renderAvatar(user, `w-6 h-6 flex-shrink-0 ${isSelected ? "!bg-white !text-brand-600" : "group-hover:!bg-white group-hover:!text-brand-600"}`)}
-								<span className="text-xs truncate">{getUserDisplayName(user)}</span>
+								<div className="min-w-0 flex-1">
+									<div className="text-xs truncate">{getUserDisplayName(user)}</div>
+									{user.role && (
+										<div className={`text-[10px] truncate ${isSelected ? "text-white/80" : "text-gray-500 dark:text-gray-400 group-hover:text-white/80"}`}>
+											{getRoleLabel(user.role)}
+										</div>
+									)}
+								</div>
 							</div>
 						);
 					})}
