@@ -9,6 +9,7 @@ export interface DriversListQueryParams {
 	radiusFilter: string;
 	locationFilter: "USA" | "Canada";
 	statusFilter: string;
+	role: string;
 }
 
 const STALE_TIME_MS = 10 * 60 * 1000;
@@ -24,6 +25,7 @@ export async function fetchDriversPage(
 		radiusFilter,
 		locationFilter,
 		statusFilter,
+		role,
 	} = params;
 
 	const searchParams = new URLSearchParams();
@@ -34,7 +36,11 @@ export async function fetchDriversPage(
 		searchParams.set("capabilities", capabilitiesFilter.join(","));
 	}
 
-	if (addressFilter && radiusFilter && locationFilter) {
+	if(role) {
+		searchParams.set("role", "administrator");
+	}
+
+	 if (addressFilter && radiusFilter && locationFilter) {
 		searchParams.set("my_search", addressFilter);
 		searchParams.set("radius", radiusFilter);
 		searchParams.set("country", locationFilter);
@@ -69,6 +75,7 @@ export function driversListQueryKey(params: DriversListQueryParams) {
 			radiusFilter: params.radiusFilter,
 			locationFilter: params.locationFilter,
 			statusFilter: params.statusFilter,
+			role: params.role,
 		},
 	] as const;
 }

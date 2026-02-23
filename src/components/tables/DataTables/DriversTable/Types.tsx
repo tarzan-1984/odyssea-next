@@ -213,5 +213,9 @@ export interface DriversPage {
 			total_pages: number;
 			total_posts: number;
 		};
+		/** Present when Address filter is used; indicates distance data is available */
+		has_distance_data?: boolean;
+		/** Distance by driver externalId when has_distance_data is true. Key = externalId (driver id), value.distance = distance value */
+		id_posts?: Record<string, { distance?: string | number }>;
 	};
 }

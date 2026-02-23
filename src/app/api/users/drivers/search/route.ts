@@ -14,6 +14,7 @@ const SEARCH_PARAMS = [
 	"capabilities",
 	"paged",
 	"per_page_loads",
+	"role",
 ] as const;
 
 /**
@@ -56,7 +57,6 @@ export async function GET(request: NextRequest) {
 				"Content-Type": "application/json",
 				"X-API-Key": TMS_API_KEY,
 			},
-			// Не выбрасывать исключение для не-2xx, чтобы обработать статус вручную.
 			validateStatus: () => true,
 		});
 

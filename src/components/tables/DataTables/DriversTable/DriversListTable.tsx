@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import {
 	Mc,
@@ -42,7 +42,6 @@ import SideDoorIcon from "@/icons/additional/side_door.svg";
 import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
-import Select from "@/components/form/Select";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
@@ -138,30 +137,54 @@ export default function DriversListTable({
 	const [itemsPerPage, setItemsPerPage] = useState(10);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
 
-	// Actions: selected action and create-offer modal (only used when showActionsInHeader)
-	const [selectedAction, setSelectedAction] = useState<string>("");
+	// Create offer modal (only used when showActionsInHeader)
 	const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
 
 	// Local filters
 	const [addressFilter, setAddressFilter] = useState<string>("");
+	const [debouncedAddressFilter, setDebouncedAddressFilter] = useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
+
+	// Debounce address filter (1.5 second delay)
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedAddressFilter(addressFilter);
+		}, 1500);
+		return () => clearTimeout(timer);
+	}, [addressFilter]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
+	const [hoveredStatusRowIndex, setHoveredStatusRowIndex] = useState<number | null>(null);
+	const dragSelectRef = useRef({
+		isActive: false,
+		startIndex: -1,
+		hasAddedAny: false,
+	});
+
 	const toggleDriverSelection = (driverId: string) => {
 		setSelectedDriverIds(prev =>
 			prev.includes(driverId) ? prev.filter(id => id !== driverId) : [...prev, driverId]
 		);
 	};
 
+	const isAdmin =
+		currentUser?.role?.toLowerCase() === "administrator";
+	const requiresAddressToSearch = !isAdmin;
+	const queryEnabled =
+		isAdmin || Boolean(debouncedAddressFilter?.trim());
+	const showTablePlaceholder =
+		requiresAddressToSearch && !debouncedAddressFilter?.trim();
+
 	const queryParams: DriversListQueryParams = {
 		currentPage,
 		itemsPerPage,
 		capabilitiesFilter,
-		addressFilter,
+		addressFilter: debouncedAddressFilter,
 		radiusFilter,
 		locationFilter,
 		statusFilter,
+		role: currentUser?.role?.toLowerCase() ?? "",
 	};
 
 	const {
@@ -173,7 +196,7 @@ export default function DriversListTable({
 	} = useQuery({
 		...driversListQueryOptions(queryParams),
 		placeholderData: keepPreviousData,
-		enabled: true,
+		enabled: queryEnabled,
 	});
 
 	const filteredResults =
@@ -202,21 +225,47 @@ export default function DriversListTable({
 			if (allVisibleSelected) {
 				return prev.filter(id => !selectableVisibleDriverIds.includes(id));
 			}
-			const set = new Set(prev);
-			selectableVisibleDriverIds.forEach(id => set.add(id));
-			return Array.from(set);
+			const next = new Set(prev);
+			selectableVisibleDriverIds.forEach(id => next.add(id));
+			return Array.from(next);
 		});
 	};
+
+	useEffect(() => {
+		const handleMouseUp = () => {
+			const { isActive, startIndex, hasAddedAny } = dragSelectRef.current;
+			if (isActive && !hasAddedAny && startIndex >= 0) {
+				const item = filteredResults[startIndex];
+				if (item && !existingDriverIdsSet.has(String(item.id))) {
+					const id = String(item.id);
+					setSelectedDriverIds(prev =>
+						prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+					);
+				}
+			}
+			dragSelectRef.current = { isActive: false, startIndex: -1, hasAddedAny: false };
+		};
+		document.addEventListener("mouseup", handleMouseUp);
+		return () => document.removeEventListener("mouseup", handleMouseUp);
+	}, [filteredResults, existingDriverIdsSet]);
 
 	// Calculate total pages for pagination
 	const totalItems = driverList?.data?.pagination?.total_posts || 0;
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
+	const showDistanceColumn =
+		Boolean(debouncedAddressFilter) &&
+		Boolean(driverList?.data?.has_distance_data);
+	const idPosts = driverList?.data?.id_posts ?? {};
+	const colCount = showDistanceColumn ? 7 : 6;
+
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
-			{/* Header section with pagination controls and search */}
-			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
-				{/* Items per page selector */}
+			{/* Header section — hidden for non-admin when Address is empty */}
+			{!showTablePlaceholder && (
+			<>
+			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+				{/* Left: Items per page selector + Select all */}
 				<div className="flex items-center gap-3">
 					<span className="text-gray-500 dark:text-gray-400"> Show </span>
 
@@ -237,33 +286,31 @@ export default function DriversListTable({
 						}}
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
+					{showActionsInHeader && (
+						<Button
+							size="sm"
+							variant="primary"
+							disabled={selectableVisibleDriverIds.length === 0}
+							onClick={toggleAllVisible}
+							className="ml-2 h-9"
+						>
+							{allVisibleSelected ? "Deselect all" : "Select all"}
+						</Button>
+					)}
 				</div>
 
-				{/* Right side: Actions select (main page) or Add drivers button (modal) */}
-				<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[260px]">
+				{/* Right side: Create Offers (main page) or Add drivers button (modal) */}
+				<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[140px]">
 					{showActionsInHeader ? (
-						<>
-							<Label className="mb-0">Actions</Label>
-							<Select
-								options={[{ value: "create-offers", label: "Create Offers" }]}
-								placeholder="Choise Action"
-								onChange={(value) => setSelectedAction(value)}
-								defaultValue=""
-								className="dark:bg-gray-900"
-							/>
-							<Button
-								size="sm"
-								variant="primary"
-								disabled={selectedDriverIds.length === 0 || !selectedAction}
-								onClick={() => {
-									if (selectedAction === "create-offers") {
-										setCreateOfferModalOpen(true);
-									}
-								}}
-							>
-								Apply
-							</Button>
-						</>
+						<Button
+							size="sm"
+							variant="primary"
+							disabled={selectedDriverIds.length === 0}
+							onClick={() => setCreateOfferModalOpen(true)}
+							className="h-9"
+						>
+							Create Offers
+						</Button>
 					) : (
 						footerButton && (
 							<Button
@@ -271,7 +318,7 @@ export default function DriversListTable({
 								variant="primary"
 								disabled={selectedDriverIds.length === 0 || footerButton.isLoading}
 								onClick={() => footerButton.onClick(selectedDriverIds)}
-								className="inline-flex items-center gap-2"
+								className="inline-flex h-9 items-center gap-2"
 							>
 								{footerButton.label}
 								{footerButton.icon}
@@ -293,6 +340,8 @@ export default function DriversListTable({
 						console.log("Create offer form submitted:", values);
 					}}
 				/>
+			)}
+			</>
 			)}
 
 			<div className="relative z-0 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
@@ -577,15 +626,10 @@ export default function DriversListTable({
 							<option value="On vacation">On vacation</option>
 							<option value="No updates">No updates</option>
 							<option value="Blocked">Blocked</option>
-							<option value="Expired documents">Expired documents</option>
-							<option value="No Interview">No Interview</option>
-							<option value="On hold">On hold</option>
-							<option value="Need update">Need update</option>
-							<option value="Unknown">Unknown</option>
 						</select>
 					</div>
 
-					<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 					{/* Reset (сбрасывает только локальные фильтры на этой странице) */}
 					<div className="col-span-2 flex min-w-0 flex-col md:col-span-1">
@@ -594,6 +638,7 @@ export default function DriversListTable({
 							type="button"
 							onClick={() => {
 								setAddressFilter("");
+								setDebouncedAddressFilter("");
 								setLocationFilter("USA");
 								setRadiusFilter("500");
 								setStatusFilter("");
@@ -607,44 +652,74 @@ export default function DriversListTable({
 				</div>
 			</div>
 
+			{showTablePlaceholder ? (
+				<div className="flex min-h-[200px] items-center justify-center border border-t-0 rounded-b-xl border-gray-100 px-4 py-12 dark:border-white/[0.05]">
+					<p className="text-center text-gray-500 dark:text-gray-400">
+						Enter address to search for drivers
+					</p>
+				</div>
+			) : (
+			<>
 			{/* Table section — min-w-0 so container can shrink; table width controlled by colgroup so no horizontal scrollbar */}
-			<div className="min-w-0 overflow-x-hidden border-l border-gray-100 dark:border-white/[0.05]">
+			<div className="min-w-0 overflow-x-hidden">
 				<div
 					className={`w-full min-w-0 transition-opacity ${
 						isPlaceholderData ? "opacity-60" : "opacity-100"
 					}`}
 				>
 					<Table className="w-full max-w-full table-fixed">
+						{/* Order: Status, Location, Distance (only when Address filter), Driver, Vehicle, Dimensions, Equipment */}
 						<colgroup>
-							<col style={{ width: "48px" }} />
-							<col style={{ width: "120px" }} />
-							<col style={{ width: "18%" }} />
-							<col style={{ width: "22%" }} />
-							<col style={{ width: "18%" }} />
-							<col style={{ width: "12%" }} />
-							<col style={{ width: "12%" }} />
+							<col style={{ width: "140px", minWidth: "140px", maxWidth: "140px" }} />
+							<col
+								style={{
+									width: showDistanceColumn
+										? "calc((100% - 140px - 68px) * 35 / 107)"
+										: "calc((100% - 140px) * 19 / 87)",
+								}}
+							/>
+							{showDistanceColumn && (
+								<col style={{ width: "68px", minWidth: "68px", maxWidth: "68px" }} />
+							)}
+							<col
+								style={{
+									width: showDistanceColumn
+										? "calc((100% - 140px - 68px) * 30 / 107)"
+										: "calc((100% - 140px) * 23 / 87)",
+								}}
+							/>
+							<col
+								style={{
+									width: showDistanceColumn
+										? "calc((100% - 140px - 68px) * 19 / 107)"
+										: "calc((100% - 140px) * 19 / 87)",
+								}}
+							/>
+							<col
+								style={{
+									width: showDistanceColumn
+										? "calc((100% - 140px - 68px) * 10 / 107)"
+										: "calc((100% - 140px) * 13 / 87)",
+								}}
+							/>
+							<col
+								style={{
+									width: showDistanceColumn
+										? "calc((100% - 140px - 68px) * 13 / 107)"
+										: "calc((100% - 140px) * 13 / 87)",
+								}}
+							/>
 						</colgroup>
 
 						{/* Table header with sortable columns*/}
 						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
 							<TableRow>
-								<TableCell
-									isHeader
-									className="w-12 min-w-12 px-4 py-3 border border-gray-100 dark:border-white/[0.05] text-center align-middle"
-								>
-									<div className="inline-flex items-center justify-center">
-										<input
-											type="checkbox"
-											className={`h-4 w-4 ${selectableVisibleDriverIds.length === 0 ? "cursor-not-allowed" : "cursor-pointer"}`}
-											checked={allVisibleSelected}
-											disabled={selectableVisibleDriverIds.length === 0}
-											onChange={toggleAllVisible}
-										/>
-									</div>
-								</TableCell>
 								{[
 									{ key: "status", label: "Status", sortable: true },
 									{ key: "location", label: "Location & Date", sortable: false },
+									...(showDistanceColumn
+										? [{ key: "distance", label: "Distance", sortable: false }]
+										: []),
 									{ key: "driver", label: "Driver", sortable: false },
 									{ key: "vehicle", label: "Vehicle", sortable: false },
 									{ key: "dimensions", label: "Dimensions", sortable: false },
@@ -653,9 +728,18 @@ export default function DriversListTable({
 									<TableCell
 										key={key}
 										isHeader
-										className={`px-4 py-3 border border-gray-100 dark:border-white/[0.05] ${
-											key === "status" ? "text-center align-middle" : ""
+										className={`py-3 border border-gray-100 dark:border-white/[0.05] ${
+											key === "status"
+												? "px-4 text-center align-middle"
+												: key === "distance"
+													? "px-2 text-right"
+													: "px-4"
 										}`}
+										style={
+											key === "distance"
+												? { width: 68, minWidth: 68, maxWidth: 68 }
+												: undefined
+										}
 									>
 										<div className="flex items-center justify-between">
 											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
@@ -671,7 +755,7 @@ export default function DriversListTable({
 						<TableBody>
 							{isPending ? (
 								<tr>
-									<td colSpan={7} className="p-4" aria-hidden />
+									<td colSpan={colCount} className="p-4" aria-hidden />
 								</tr>
 							) : (
 								// Driver rows
@@ -728,35 +812,24 @@ export default function DriversListTable({
 									const isAlreadyInOffer = existingDriverIdsSet.has(
 										String(item.id)
 									);
+									const isStatusHovered = hoveredStatusRowIndex === i;
+									const isSelected = selectedDriverIds.includes(String(item.id));
+									const showHighlight = isSelected || isStatusHovered;
 
 									return (
 										<TableRow
 											key={i + 1}
-											className={
+											className={`transition-none ${
 												isAlreadyInOffer
 													? "bg-gray-200/70 dark:bg-gray-700/50 opacity-90"
-													: undefined
-											}
+													: isSelected
+														? "bg-gray-100 dark:bg-white/[0.08]"
+														: isStatusHovered
+															? "bg-gray-50 dark:bg-white/[0.04]"
+															: ""
+											}`}
 										>
-											<TableCell className="w-12 min-w-12 px-4 py-3 border border-gray-100 dark:border-white/[0.05] text-center align-middle">
-												<div className="inline-flex items-center justify-center">
-													<input
-														type="checkbox"
-														className={`h-4 w-4 ${isAlreadyInOffer ? "cursor-not-allowed" : "cursor-pointer"}`}
-														checked={
-															!isAlreadyInOffer &&
-															selectedDriverIds.includes(item.id)
-														}
-														disabled={isAlreadyInOffer}
-														onChange={() =>
-															!isAlreadyInOffer &&
-															toggleDriverSelection(item.id)
-														}
-													/>
-												</div>
-											</TableCell>
-
-											{/*Status*/}
+											{/*Status - first column, clickable to select driver*/}
 											{(() => {
 												const status = item?.meta_data?.driver_status as
 													| string
@@ -766,9 +839,45 @@ export default function DriversListTable({
 												const statusLabel = getStatusLabel(status);
 												return (
 													<TableCell
-														className="px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle"
+														className={`relative px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle select-none ${
+															isAlreadyInOffer ? "cursor-not-allowed" : "cursor-pointer"
+														}`}
 														style={{ backgroundColor: statusColor }}
+														onMouseEnter={() => {
+															setHoveredStatusRowIndex(i);
+															if (dragSelectRef.current.isActive && !isAlreadyInOffer) {
+																const { startIndex, hasAddedAny } = dragSelectRef.current;
+																dragSelectRef.current.hasAddedAny = true;
+																setSelectedDriverIds(prev => {
+																	const next = new Set(prev);
+																	if (!hasAddedAny && startIndex >= 0) {
+																		const startItem = filteredResults[startIndex];
+																		if (startItem && !existingDriverIdsSet.has(String(startItem.id))) {
+																			next.add(String(startItem.id));
+																		}
+																	}
+																	next.add(String(item.id));
+																	return Array.from(next);
+																});
+															}
+														}}
+														onMouseLeave={() => setHoveredStatusRowIndex(null)}
+														onMouseDown={() => {
+															if (!isAlreadyInOffer) {
+																dragSelectRef.current = {
+																	isActive: true,
+																	startIndex: i,
+																	hasAddedAny: false,
+																};
+															}
+														}}
 													>
+														{showHighlight && (
+															<div
+																className="absolute left-0 top-0 bottom-0 w-1 bg-blue-800 dark:bg-blue-600"
+																aria-hidden
+															/>
+														)}
 														{statusLabel}
 													</TableCell>
 												);
@@ -804,6 +913,21 @@ export default function DriversListTable({
 													</TableCell>
 												);
 											})()}
+
+											{/*Distance - only when Address filter is filled and API returns id_posts*/}
+											{showDistanceColumn && (
+												<TableCell
+													className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-right"
+													style={{ width: 68, minWidth: 68, maxWidth: 68 }}
+												>
+													{(() => {
+														const key =
+															item?.meta_data?.driver_id ?? String(item?.id ?? "");
+														const dist = idPosts[key]?.distance;
+														return dist != null ? String(dist) : "—";
+													})()}
+												</TableCell>
+											)}
 
 											{/*Driver*/}
 											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
@@ -1183,6 +1307,8 @@ export default function DriversListTable({
 					</div>
 				</div>
 			</div>
+			</>
+			)}
 			{(isPending || isFetching) && (
 				<div
 					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
