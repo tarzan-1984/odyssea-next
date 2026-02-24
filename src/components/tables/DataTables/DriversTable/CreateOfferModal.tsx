@@ -26,9 +26,6 @@ export interface CreateOfferFormValues {
 	deliveryLocation: string;
 	pickUpTime: string;
 	deliveryTime: string;
-	loadedMiles: string;
-	emptyMiles: string;
-	totalMiles: string;
 	weight: string;
 	commodity: string;
 	specialRequirements: string[];
@@ -40,22 +37,25 @@ const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> 
 	deliveryLocation: "",
 	pickUpTime: "",
 	deliveryTime: "",
-	loadedMiles: "",
-	emptyMiles: "",
-	totalMiles: "",
 	weight: "",
 	commodity: "",
 	specialRequirements: [],
 	notes: "",
 };
 
+/** Additional pick-up rows (location + time) added via "Add Pick Up" */
+type PickUpRow = { location: string; time: string };
+const initialPickUpRow = (): PickUpRow => ({ location: "", time: "" });
+
+/** Additional delivery rows (location + time) added via "Add Delivery" */
+type DeliveryRow = { location: string; time: string };
+const initialDeliveryRow = (): DeliveryRow => ({ location: "", time: "" });
+
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
 	"pickUpLocation",
 	"deliveryLocation",
 	"pickUpTime",
 	"deliveryTime",
-	"loadedMiles",
-	"emptyMiles",
 	"weight",
 ];
 
@@ -67,7 +67,11 @@ export default function CreateOfferModal({
 	onSubmit,
 }: CreateOfferModalProps) {
 	const [formValues, setFormValues] = useState(initialFormState);
-	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>({});
+	const [extraPickUps, setExtraPickUps] = useState<PickUpRow[]>([]);
+	const [extraDeliveries, setExtraDeliveries] = useState<DeliveryRow[]>([]);
+	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>(
+		{}
+	);
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -75,10 +79,44 @@ export default function CreateOfferModal({
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
+			setExtraPickUps([]);
+			setExtraDeliveries([]);
 			setErrors({});
 			setSubmitError("");
 		}
 	}, [isOpen]);
+
+	const addPickUpRow = () => {
+		setExtraPickUps(prev => [...prev, initialPickUpRow()]);
+	};
+
+	const updateExtraPickUp = (index: number, field: "location" | "time", value: string) => {
+		setExtraPickUps(prev => {
+			const next = [...prev];
+			next[index] = { ...next[index], [field]: value };
+			return next;
+		});
+	};
+
+	const removeExtraPickUp = (index: number) => {
+		setExtraPickUps(prev => prev.filter((_, i) => i !== index));
+	};
+
+	const addDeliveryRow = () => {
+		setExtraDeliveries(prev => [...prev, initialDeliveryRow()]);
+	};
+
+	const updateExtraDelivery = (index: number, field: "location" | "time", value: string) => {
+		setExtraDeliveries(prev => {
+			const next = [...prev];
+			next[index] = { ...next[index], [field]: value };
+			return next;
+		});
+	};
+
+	const removeExtraDelivery = (index: number) => {
+		setExtraDeliveries(prev => prev.filter((_, i) => i !== index));
+	};
 
 	const validate = (): Partial<Record<keyof typeof initialFormState, string>> => {
 		const next: Partial<Record<keyof typeof initialFormState, string>> = {};
@@ -94,21 +132,8 @@ export default function CreateOfferModal({
 
 	const driverIdsValue = selectedDriverIds.join(",");
 
-	const parseMiles = (v: string): number => {
-		const n = parseFloat(String(v).trim());
-		return Number.isNaN(n) ? 0 : n;
-	};
-
 	const handleChange = (field: keyof typeof formValues, value: string | string[]) => {
-		setFormValues(prev => {
-			const next = { ...prev, [field]: value };
-			if (field === "loadedMiles" || field === "emptyMiles") {
-				const loaded = field === "loadedMiles" ? parseMiles(value as string) : parseMiles(prev.loadedMiles);
-				const empty = field === "emptyMiles" ? parseMiles(value as string) : parseMiles(prev.emptyMiles);
-				next.totalMiles = String(loaded + empty);
-			}
-			return next;
-		});
+		setFormValues(prev => ({ ...prev, [field]: value }));
 		if (errors[field]) {
 			setErrors(prev => ({ ...prev, [field]: undefined }));
 		}
@@ -137,9 +162,6 @@ export default function CreateOfferModal({
 				pickUpTime: formValues.pickUpTime.trim(),
 				deliveryLocation: formValues.deliveryLocation.trim(),
 				deliveryTime: formValues.deliveryTime.trim(),
-				loadedMiles: parseMiles(formValues.loadedMiles) || undefined,
-				emptyMiles: parseMiles(formValues.emptyMiles) || undefined,
-				totalMiles: parseMiles(formValues.totalMiles) || undefined,
 				weight: parseWeight(formValues.weight),
 				commodity: formValues.commodity.trim() || undefined,
 				specialRequirements:
@@ -168,7 +190,7 @@ export default function CreateOfferModal({
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
-			className="relative w-full max-w-2xl p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
+			className="relative w-full max-w-2xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
 		>
 			<form onSubmit={handleSubmit} className="space-y-5">
 				<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -181,9 +203,9 @@ export default function CreateOfferModal({
 				{/* Hidden: selected driver IDs (comma-separated) */}
 				<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
 
-				{/* Row 1: Pick up location, Delivery location */}
+				{/* Row 1: Pick up location, Pick up time + Add Pick Up button below right */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
+					<div className="min-w-0">
 						<Label>Pick up location</Label>
 						<Input
 							type="text"
@@ -195,23 +217,7 @@ export default function CreateOfferModal({
 							hint={errors.pickUpLocation}
 						/>
 					</div>
-					<div>
-						<Label>Delivery location</Label>
-						<Input
-							type="text"
-							value={formValues.deliveryLocation}
-							onChange={e => handleChange("deliveryLocation", e.target.value)}
-							placeholder="Enter delivery location"
-							className="dark:bg-gray-900"
-							error={!!errors.deliveryLocation}
-							hint={errors.deliveryLocation}
-						/>
-					</div>
-				</div>
-
-				{/* Row 2: Pick up time, Delivery time */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
+					<div className="min-w-0">
 						<Label>Pick up time</Label>
 						<Input
 							type="text"
@@ -223,7 +229,76 @@ export default function CreateOfferModal({
 							hint={errors.pickUpTime}
 						/>
 					</div>
-					<div>
+				</div>
+
+				{/* Additional Pick up rows (added via Add Pick Up) — above the button */}
+				{extraPickUps.map((row, index) => (
+					<div
+						key={index}
+						className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2"
+					>
+						<div className="min-w-0">
+							<Label>Pick up location</Label>
+							<Input
+								type="text"
+								value={row.location}
+								onChange={e => updateExtraPickUp(index, "location", e.target.value)}
+								placeholder="Enter pick up location"
+								className="dark:bg-gray-900"
+							/>
+						</div>
+						<div className="min-w-0">
+							<Label>Pick up time</Label>
+							<Input
+								type="text"
+								value={row.time}
+								onChange={e => updateExtraPickUp(index, "time", e.target.value)}
+								placeholder="Enter pick up time"
+								className="dark:bg-gray-900"
+							/>
+						</div>
+						<div className="flex items-center self-end mt-1.5">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+								onClick={() => removeExtraPickUp(index)}
+								aria-label="Remove pick up row"
+							>
+								−
+							</Button>
+						</div>
+					</div>
+				))}
+
+				<div className="flex justify-end -mt-1">
+					<Button
+						type="button"
+						variant="primary"
+						size="sm"
+						className="!py-1.5 !px-3 text-xs"
+						onClick={addPickUpRow}
+					>
+						Add Pick Up
+					</Button>
+				</div>
+
+				{/* Row 2: Delivery location, Delivery time */}
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
+					<div className="min-w-0">
+						<Label>Delivery location</Label>
+						<Input
+							type="text"
+							value={formValues.deliveryLocation}
+							onChange={e => handleChange("deliveryLocation", e.target.value)}
+							placeholder="Enter delivery location"
+							className="dark:bg-gray-900"
+							error={!!errors.deliveryLocation}
+							hint={errors.deliveryLocation}
+						/>
+					</div>
+					<div className="min-w-0">
 						<Label>Delivery time</Label>
 						<Input
 							type="text"
@@ -237,42 +312,59 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Row 3: Loaded miles, Empty miles, Total miles */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-					<div>
-						<Label>Loaded miles</Label>
-						<Input
-							type="number"
-							value={formValues.loadedMiles}
-							onChange={e => handleChange("loadedMiles", e.target.value)}
-							placeholder="0"
-							className="dark:bg-gray-900"
-							error={!!errors.loadedMiles}
-							hint={errors.loadedMiles}
-						/>
+				{/* Additional Delivery rows (added via Add Delivery) — above the button */}
+				{extraDeliveries.map((row, index) => (
+					<div
+						key={index}
+						className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2"
+					>
+						<div className="min-w-0">
+							<Label>Delivery location</Label>
+							<Input
+								type="text"
+								value={row.location}
+								onChange={e =>
+									updateExtraDelivery(index, "location", e.target.value)
+								}
+								placeholder="Enter delivery location"
+								className="dark:bg-gray-900"
+							/>
+						</div>
+						<div className="min-w-0">
+							<Label>Delivery time</Label>
+							<Input
+								type="text"
+								value={row.time}
+								onChange={e => updateExtraDelivery(index, "time", e.target.value)}
+								placeholder="Enter delivery time"
+								className="dark:bg-gray-900"
+							/>
+						</div>
+						<div className="flex items-center self-end mt-1.5">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+								onClick={() => removeExtraDelivery(index)}
+								aria-label="Remove delivery row"
+							>
+								−
+							</Button>
+						</div>
 					</div>
-					<div>
-						<Label>Empty miles</Label>
-						<Input
-							type="number"
-							value={formValues.emptyMiles}
-							onChange={e => handleChange("emptyMiles", e.target.value)}
-							placeholder="0"
-							className="dark:bg-gray-900"
-							error={!!errors.emptyMiles}
-							hint={errors.emptyMiles}
-						/>
-					</div>
-					<div>
-						<Label>Total miles (auto-calculated)</Label>
-						<Input
-							type="number"
-							value={formValues.totalMiles}
-							disabled
-							placeholder="0"
-							className="!opacity-100 !bg-transparent !text-gray-800 !border-gray-300 dark:!bg-gray-900 dark:!text-white/90 dark:!border-gray-700"
-						/>
-					</div>
+				))}
+
+				<div className="flex justify-end -mt-1 mt-2">
+					<Button
+						type="button"
+						variant="primary"
+						size="sm"
+						className="!py-1.5 !px-3 text-xs"
+						onClick={addDeliveryRow}
+					>
+						Add Delivery
+					</Button>
 				</div>
 
 				{/* Row 4: Weight, Commodity */}
@@ -329,7 +421,11 @@ export default function CreateOfferModal({
 								{ value: "aci", text: "ACI", selected: false },
 								{ value: "mexico", text: "Mexico", selected: false },
 								{ value: "military-base", text: "Military base", selected: false },
-								{ value: "blind-shipment", text: "Blind shipment", selected: false },
+								{
+									value: "blind-shipment",
+									text: "Blind shipment",
+									selected: false,
+								},
 								{ value: "partial", text: "Partial", selected: false },
 								{
 									value: "white-glove-service",

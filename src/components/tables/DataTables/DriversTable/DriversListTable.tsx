@@ -48,10 +48,7 @@ import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
-import {
-	driversListQueryOptions,
-	type DriversListQueryParams,
-} from "./driversListQueryOptions";
+import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 
 // Same status colors as on Drivers Map markers
 const STATUS_COLORS: Record<string, string> = {
@@ -127,9 +124,7 @@ export default function DriversListTable({
 	footerButton = null,
 	existingDriverIds = [],
 }: DriversListTableProps = {}) {
-	const existingDriverIdsSet = new Set(
-		existingDriverIds.map(id => String(id))
-	);
+	const existingDriverIdsSet = new Set(existingDriverIds.map(id => String(id)));
 	const currentUser = useCurrentUser();
 
 	// State for pagination
@@ -168,13 +163,10 @@ export default function DriversListTable({
 		);
 	};
 
-	const isAdmin =
-		currentUser?.role?.toLowerCase() === "administrator";
+	const isAdmin = currentUser?.role?.toLowerCase() === "administrator";
 	const requiresAddressToSearch = !isAdmin;
-	const queryEnabled =
-		isAdmin || Boolean(debouncedAddressFilter?.trim());
-	const showTablePlaceholder =
-		requiresAddressToSearch && !debouncedAddressFilter?.trim();
+	const queryEnabled = isAdmin || Boolean(debouncedAddressFilter?.trim());
+	const showTablePlaceholder = requiresAddressToSearch && !debouncedAddressFilter?.trim();
 
 	const queryParams: DriversListQueryParams = {
 		currentPage,
@@ -199,23 +191,18 @@ export default function DriversListTable({
 		enabled: queryEnabled,
 	});
 
+	console.log("driverList", driverList);
+
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
 			if (!statusFilter) return true;
-			const status = item?.meta_data?.driver_status as
-				| string
-				| null
-				| undefined;
+			const status = item?.meta_data?.driver_status as string | null | undefined;
 			const statusLabel = getStatusLabel(status);
 			return statusLabel === statusFilter;
 		}) ?? [];
 
-	const visibleDriverIds: string[] = filteredResults.map((d: any) =>
-		String(d.id)
-	);
-	const selectableVisibleDriverIds = visibleDriverIds.filter(
-		id => !existingDriverIdsSet.has(id)
-	);
+	const visibleDriverIds: string[] = filteredResults.map((d: any) => String(d.id));
+	const selectableVisibleDriverIds = visibleDriverIds.filter(id => !existingDriverIdsSet.has(id));
 	const allVisibleSelected =
 		selectableVisibleDriverIds.length > 0 &&
 		selectableVisibleDriverIds.every(id => selectedDriverIds.includes(id));
@@ -254,94 +241,95 @@ export default function DriversListTable({
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
 	const showDistanceColumn =
-		Boolean(debouncedAddressFilter) &&
-		Boolean(driverList?.data?.has_distance_data);
+		Boolean(debouncedAddressFilter) && Boolean(driverList?.data?.has_distance_data);
 	const idPosts = driverList?.data?.id_posts ?? {};
-	const colCount = showDistanceColumn ? 7 : 6;
+	const colCount = showDistanceColumn ? 10 : 9;
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section — hidden for non-admin when Address is empty */}
 			{!showTablePlaceholder && (
-			<>
-			<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-				{/* Left: Items per page selector + Select all */}
-				<div className="flex items-center gap-3">
-					<span className="text-gray-500 dark:text-gray-400"> Show </span>
+				<>
+					<div className="relative z-20 flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+						{/* Left: Items per page selector + Select all */}
+						<div className="flex items-center gap-3">
+							<span className="text-gray-500 dark:text-gray-400"> Show </span>
 
-					<CustomStaticSelect
-						options={[
-							{ value: "5", label: "5" },
-							{ value: "8", label: "8" },
-							{ value: "10", label: "10" },
-							{ value: "20", label: "20" },
-							{ value: "50", label: "50" },
-							{ value: "80", label: "80" },
-							{ value: "100", label: "100" },
-						]}
-						value={itemsPerPage.toString()}
-						onChangeAction={val => {
-							setItemsPerPage(Number(val));
-							setCurrentPage(1);
-						}}
-					/>
-					<span className="text-gray-500 dark:text-gray-400"> entries </span>
+							<CustomStaticSelect
+								options={[
+									{ value: "5", label: "5" },
+									{ value: "8", label: "8" },
+									{ value: "10", label: "10" },
+									{ value: "20", label: "20" },
+									{ value: "50", label: "50" },
+									{ value: "80", label: "80" },
+									{ value: "100", label: "100" },
+								]}
+								value={itemsPerPage.toString()}
+								onChangeAction={val => {
+									setItemsPerPage(Number(val));
+									setCurrentPage(1);
+								}}
+							/>
+							<span className="text-gray-500 dark:text-gray-400"> entries </span>
+							{showActionsInHeader && (
+								<Button
+									size="sm"
+									variant="primary"
+									disabled={selectableVisibleDriverIds.length === 0}
+									onClick={toggleAllVisible}
+									className="ml-2 h-9"
+								>
+									{allVisibleSelected ? "Deselect all" : "Select all"}
+								</Button>
+							)}
+						</div>
+
+						{/* Right side: Create Offers (main page) or Add drivers button (modal) */}
+						<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[140px]">
+							{showActionsInHeader ? (
+								<Button
+									size="sm"
+									variant="primary"
+									disabled={selectedDriverIds.length === 0}
+									onClick={() => setCreateOfferModalOpen(true)}
+									className="h-9"
+								>
+									Create Offers
+								</Button>
+							) : (
+								footerButton && (
+									<Button
+										size="sm"
+										variant="primary"
+										disabled={
+											selectedDriverIds.length === 0 || footerButton.isLoading
+										}
+										onClick={() => footerButton.onClick(selectedDriverIds)}
+										className="inline-flex h-9 items-center gap-2"
+									>
+										{footerButton.label}
+										{footerButton.icon}
+									</Button>
+								)
+							)}
+						</div>
+					</div>
+
+					{/* Create Offer modal (only on main drivers-list page) */}
 					{showActionsInHeader && (
-						<Button
-							size="sm"
-							variant="primary"
-							disabled={selectableVisibleDriverIds.length === 0}
-							onClick={toggleAllVisible}
-							className="ml-2 h-9"
-						>
-							{allVisibleSelected ? "Deselect all" : "Select all"}
-						</Button>
+						<CreateOfferModal
+							isOpen={createOfferModalOpen}
+							onClose={() => setCreateOfferModalOpen(false)}
+							externalId={currentUser?.externalId ?? ""}
+							selectedDriverIds={selectedDriverIds}
+							onSubmit={values => {
+								// TODO: send to API
+								console.log("Create offer form submitted:", values);
+							}}
+						/>
 					)}
-				</div>
-
-				{/* Right side: Create Offers (main page) or Add drivers button (modal) */}
-				<div className="flex min-w-0 items-center justify-end gap-3 sm:min-w-[140px]">
-					{showActionsInHeader ? (
-						<Button
-							size="sm"
-							variant="primary"
-							disabled={selectedDriverIds.length === 0}
-							onClick={() => setCreateOfferModalOpen(true)}
-							className="h-9"
-						>
-							Create Offers
-						</Button>
-					) : (
-						footerButton && (
-							<Button
-								size="sm"
-								variant="primary"
-								disabled={selectedDriverIds.length === 0 || footerButton.isLoading}
-								onClick={() => footerButton.onClick(selectedDriverIds)}
-								className="inline-flex h-9 items-center gap-2"
-							>
-								{footerButton.label}
-								{footerButton.icon}
-							</Button>
-						)
-					)}
-				</div>
-			</div>
-
-			{/* Create Offer modal (only on main drivers-list page) */}
-			{showActionsInHeader && (
-				<CreateOfferModal
-					isOpen={createOfferModalOpen}
-					onClose={() => setCreateOfferModalOpen(false)}
-					externalId={currentUser?.externalId ?? ""}
-					selectedDriverIds={selectedDriverIds}
-					onSubmit={values => {
-						// TODO: send to API
-						console.log("Create offer form submitted:", values);
-					}}
-				/>
-			)}
-			</>
+				</>
 			)}
 
 			<div className="relative z-0 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
@@ -659,655 +647,873 @@ export default function DriversListTable({
 					</p>
 				</div>
 			) : (
-			<>
-			{/* Table section — min-w-0 so container can shrink; table width controlled by colgroup so no horizontal scrollbar */}
-			<div className="min-w-0 overflow-x-hidden">
-				<div
-					className={`w-full min-w-0 transition-opacity ${
-						isPlaceholderData ? "opacity-60" : "opacity-100"
-					}`}
-				>
-					<Table className="w-full max-w-full table-fixed">
-						{/* Order: Status, Location, Distance (only when Address filter), Driver, Vehicle, Dimensions, Equipment */}
-						<colgroup>
-							<col style={{ width: "140px", minWidth: "140px", maxWidth: "140px" }} />
-							<col
-								style={{
-									width: showDistanceColumn
-										? "calc((100% - 140px - 68px) * 35 / 107)"
-										: "calc((100% - 140px) * 19 / 87)",
-								}}
-							/>
-							{showDistanceColumn && (
-								<col style={{ width: "68px", minWidth: "68px", maxWidth: "68px" }} />
-							)}
-							<col
-								style={{
-									width: showDistanceColumn
-										? "calc((100% - 140px - 68px) * 30 / 107)"
-										: "calc((100% - 140px) * 23 / 87)",
-								}}
-							/>
-							<col
-								style={{
-									width: showDistanceColumn
-										? "calc((100% - 140px - 68px) * 19 / 107)"
-										: "calc((100% - 140px) * 19 / 87)",
-								}}
-							/>
-							<col
-								style={{
-									width: showDistanceColumn
-										? "calc((100% - 140px - 68px) * 10 / 107)"
-										: "calc((100% - 140px) * 13 / 87)",
-								}}
-							/>
-							<col
-								style={{
-									width: showDistanceColumn
-										? "calc((100% - 140px - 68px) * 13 / 107)"
-										: "calc((100% - 140px) * 13 / 87)",
-								}}
-							/>
-						</colgroup>
+				<>
+					{/* Table section — min-w-0 so container can shrink; table width controlled by colgroup so no horizontal scrollbar */}
+					<div className="min-w-0 overflow-x-hidden">
+						<div
+							className={`w-full min-w-0 transition-opacity ${
+								isPlaceholderData ? "opacity-60" : "opacity-100"
+							}`}
+						>
+							<Table className="w-full max-w-full table-fixed">
+								{/* Order: Status, Location, Distance (only when Address filter), Driver, Vehicle, Dimensions, Equipment, Comments, Rating, Notes */}
+								<colgroup>
+									<col
+										style={{
+											width: "140px",
+											minWidth: "140px",
+											maxWidth: "140px",
+										}}
+									/>
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 26.25 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 14.25 / 87)",
+										}}
+									/>
+									{showDistanceColumn && (
+										<col
+											style={{
+												width: "68px",
+												minWidth: "68px",
+												maxWidth: "68px",
+											}}
+										/>
+									)}
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 30 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 23 / 87)",
+										}}
+									/>
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 19 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 19 / 87)",
+										}}
+									/>
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 7.5 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 9.75 / 87)",
+										}}
+									/>
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 13 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 13 / 87)",
+										}}
+									/>
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 140px - 68px - 72px - 72px) * 11.25 / 107)"
+												: "calc((100% - 140px - 72px - 72px) * 8 / 87)",
+										}}
+									/>
+									<col
+										style={{
+											width: "72px",
+											minWidth: "72px",
+											maxWidth: "72px",
+										}}
+									/>
+									<col
+										style={{
+											width: "72px",
+											minWidth: "72px",
+											maxWidth: "72px",
+										}}
+									/>
+								</colgroup>
 
-						{/* Table header with sortable columns*/}
-						<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
-							<TableRow>
-								{[
-									{ key: "status", label: "Status", sortable: true },
-									{ key: "location", label: "Location & Date", sortable: false },
-									...(showDistanceColumn
-										? [{ key: "distance", label: "Distance", sortable: false }]
-										: []),
-									{ key: "driver", label: "Driver", sortable: false },
-									{ key: "vehicle", label: "Vehicle", sortable: false },
-									{ key: "dimensions", label: "Dimensions", sortable: false },
-									{ key: "equipment", label: "Equipment", sortable: false },
-								].map(({ key, label, sortable }) => (
-									<TableCell
-										key={key}
-										isHeader
-										className={`py-3 border border-gray-100 dark:border-white/[0.05] ${
-											key === "status"
-												? "px-4 text-center align-middle"
-												: key === "distance"
-													? "px-2 text-right"
-													: "px-4"
-										}`}
-										style={
-											key === "distance"
-												? { width: 68, minWidth: 68, maxWidth: 68 }
-												: undefined
-										}
-									>
-										<div className="flex items-center justify-between">
-											<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
-												{label}
-											</p>
-										</div>
-									</TableCell>
-								))}
-							</TableRow>
-						</TableHeader>
-
-						{/* Table body with user data */}
-						<TableBody>
-							{isPending ? (
-								<tr>
-									<td colSpan={colCount} className="p-4" aria-hidden />
-								</tr>
-							) : (
-								// Driver rows
-								filteredResults.map((item: any, i: number) => {
-									const preferred_distance = item?.meta_data?.preferred_distance;
-									const selected_distances = preferred_distance
-										.split(",")
-										.map((item: string) => item.trim());
-
-									const cross_border = item?.meta_data?.cross_border;
-									const selected_cross_border = cross_border
-										.split(",")
-										.map((item: string) => item.trim());
-
-									const legal_document_type =
-										item?.meta_data?.legal_document_type;
-									const legal_document_expiration =
-										item?.meta_data?.legal_document_expiration;
-									const legal_document_file = item?.meta_data?.legal_document;
-									const background_check = item?.meta_data?.background_check;
-									const background_file = item?.meta_data?.background_file;
-									let legal_valid = false;
-									const ny_timezone = "America/New_York";
-									const now_ny = new Date(
-										new Date().toLocaleString("en-US", {
-											timeZone: ny_timezone,
-										})
-									);
-									const now_ts = Math.floor(now_ny.getTime() / 1000);
-
-									let background_valid = false;
-									if (background_check && background_file) {
-										background_valid = true;
-									}
-
-									if (
-										legal_document_type === "us-passport" &&
-										legal_document_file &&
-										legal_document_expiration
-									) {
-										const $legal_exp_ts = Math.floor(
-											new Date(legal_document_expiration).getTime() / 1000
-										);
-
-										if (
-											!Number.isNaN($legal_exp_ts) &&
-											$legal_exp_ts >= now_ts
-										) {
-											legal_valid = true;
-										}
-									}
-
-									const military_capability = legal_valid && background_valid;
-									const isAlreadyInOffer = existingDriverIdsSet.has(
-										String(item.id)
-									);
-									const isStatusHovered = hoveredStatusRowIndex === i;
-									const isSelected = selectedDriverIds.includes(String(item.id));
-									const showHighlight = isSelected || isStatusHovered;
-
-									return (
-										<TableRow
-											key={i + 1}
-											className={`transition-none ${
-												isAlreadyInOffer
-													? "bg-gray-200/70 dark:bg-gray-700/50 opacity-90"
-													: isSelected
-														? "bg-gray-100 dark:bg-white/[0.08]"
-														: isStatusHovered
-															? "bg-gray-50 dark:bg-white/[0.04]"
-															: ""
-											}`}
-										>
-											{/*Status - first column, clickable to select driver*/}
-											{(() => {
-												const status = item?.meta_data?.driver_status as
-													| string
-													| null
-													| undefined;
-												const statusColor = getStatusColor(status);
-												const statusLabel = getStatusLabel(status);
-												return (
-													<TableCell
-														className={`relative px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle select-none ${
-															isAlreadyInOffer ? "cursor-not-allowed" : "cursor-pointer"
-														}`}
-														style={{ backgroundColor: statusColor }}
-														onMouseEnter={() => {
-															setHoveredStatusRowIndex(i);
-															if (dragSelectRef.current.isActive && !isAlreadyInOffer) {
-																const { startIndex, hasAddedAny } = dragSelectRef.current;
-																dragSelectRef.current.hasAddedAny = true;
-																setSelectedDriverIds(prev => {
-																	const next = new Set(prev);
-																	if (!hasAddedAny && startIndex >= 0) {
-																		const startItem = filteredResults[startIndex];
-																		if (startItem && !existingDriverIdsSet.has(String(startItem.id))) {
-																			next.add(String(startItem.id));
-																		}
-																	}
-																	next.add(String(item.id));
-																	return Array.from(next);
-																});
-															}
-														}}
-														onMouseLeave={() => setHoveredStatusRowIndex(null)}
-														onMouseDown={() => {
-															if (!isAlreadyInOffer) {
-																dragSelectRef.current = {
-																	isActive: true,
-																	startIndex: i,
-																	hasAddedAny: false,
-																};
-															}
-														}}
-													>
-														{showHighlight && (
-															<div
-																className="absolute left-0 top-0 bottom-0 w-1 bg-blue-800 dark:bg-blue-600"
-																aria-hidden
-															/>
-														)}
-														{statusLabel}
-													</TableCell>
-												);
-											})()}
-
-											{/*location & date — light red background if datetime on second line is older than 12 hours */}
-											{(() => {
-												const dateStr =
-													item?.updated_zipcode ||
-													(item as any)?.date_updated ||
-													item?.meta_data?.status_date ||
-													"";
-												const locationDate = dateStr
-													? new Date(dateStr.replace(/\s+/, "T"))
-													: null;
-												const isOlderThan12h =
-													locationDate &&
-													!Number.isNaN(locationDate.getTime()) &&
-													Date.now() - locationDate.getTime() >
-														12 * 60 * 60 * 1000;
-												const dateDisplay = locationDate
-													? formatDateMmDdYy(locationDate)
-													: dateStr || "";
-												return (
-													<TableCell
-														className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
-													>
-														<p>
-															{item?.meta_data?.current_city}{" "}
-															{item?.meta_data?.current_location}
-														</p>
-														<p>{dateDisplay}</p>
-													</TableCell>
-												);
-											})()}
-
-											{/*Distance - only when Address filter is filled and API returns id_posts*/}
-											{showDistanceColumn && (
-												<TableCell
-													className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-right"
-													style={{ width: 68, minWidth: 68, maxWidth: 68 }}
-												>
-													{(() => {
-														const key =
-															item?.meta_data?.driver_id ?? String(item?.id ?? "");
-														const dist = idPosts[key]?.distance;
-														return dist != null ? String(dist) : "—";
-													})()}
-												</TableCell>
-											)}
-
-											{/*Driver*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
-												<div className="space-y-0.5 break-words">
-													<p
-														className="break-words"
-														title={`(${item?.id}) ${item?.meta_data?.driver_name || ""}`}
-													>
-														({item?.id}) {item?.meta_data?.driver_name}
-													</p>
-													<p
-														className="break-words"
-														title={item?.meta_data?.driver_phone || ""}
-													>
-														{item?.meta_data?.driver_phone}
+								{/* Table header with sortable columns*/}
+								<TableHeader className="border-t border-gray-100 dark:border-white/[0.05]">
+									<TableRow>
+										{[
+											{ key: "status", label: "Status", sortable: true },
+											{
+												key: "location",
+												label: "Location & Date",
+												sortable: false,
+											},
+											...(showDistanceColumn
+												? [
+														{
+															key: "distance",
+															label: "Distance",
+															sortable: false,
+														},
+													]
+												: []),
+											{ key: "driver", label: "Driver", sortable: false },
+											{ key: "vehicle", label: "Vehicle", sortable: false },
+											{
+												key: "dimensions",
+												label: "Dimensions",
+												sortable: false,
+											},
+											{
+												key: "equipment",
+												label: "Equipment",
+												sortable: false,
+											},
+											{ key: "comments", label: "Comments", sortable: false },
+											{ key: "rating", label: "Rating", sortable: false },
+											{ key: "notes", label: "Notes", sortable: false },
+										].map(({ key, label, sortable }) => (
+											<TableCell
+												key={key}
+												isHeader
+												className={`py-3 border border-gray-100 dark:border-white/[0.05] ${
+													key === "status"
+														? "px-4 text-center align-middle"
+														: key === "distance"
+															? "px-2 text-right"
+															: key === "rating" || key === "notes"
+																? "px-2"
+																: "px-4"
+												}`}
+												style={
+													key === "distance"
+														? { width: 68, minWidth: 68, maxWidth: 68 }
+														: key === "rating" || key === "notes"
+															? {
+																	width: 72,
+																	minWidth: 72,
+																	maxWidth: 72,
+																}
+															: undefined
+												}
+											>
+												<div className="flex items-center justify-between">
+													<p className="font-medium text-gray-700 text-theme-xs dark:text-gray-400">
+														{label}
 													</p>
 												</div>
 											</TableCell>
+										))}
+									</TableRow>
+								</TableHeader>
 
-											{/*Vehicle*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
-												<p className="break-words">
-													{item?.meta_data?.vehicle_type}
-												</p>
-												<p className="break-words">
-													{item?.meta_data?.vehicle_make}{" "}
-													{item?.meta_data?.vehicle_model}{" "}
-													{item?.meta_data?.vehicle_year}
-												</p>
-											</TableCell>
+								{/* Table body with user data */}
+								<TableBody>
+									{isPending ? (
+										<tr>
+											<td colSpan={colCount} className="p-4" aria-hidden />
+										</tr>
+									) : (
+										// Driver rows
+										filteredResults.map((item: any, i: number) => {
+											const preferred_distance =
+												item?.meta_data?.preferred_distance;
+											const selected_distances = preferred_distance
+												.split(",")
+												.map((item: string) => item.trim());
 
-											{/*Dimensions*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-												<p>{item?.meta_data?.dimensions}</p>
-												<p>{item?.meta_data?.payload} lbs</p>
-											</TableCell>
+											const cross_border = item?.meta_data?.cross_border;
+											const selected_cross_border = cross_border
+												.split(",")
+												.map((item: string) => item.trim());
 
-											{/*Equipment*/}
-											<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]">
-												{item?.meta_data?.twic === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="TWIC"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TwicIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.hazmat_certificate === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Hazmat Certificate"
-														position="top"
-													>
-														<span className="inline-flex">
-															<HazmatIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.team_driver_enabled === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Team Driver"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TeamIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.driver_licence_type === "cdl" && (
-													<Tooltip
-														theme="inverse"
-														content="CDL"
-														position="top"
-													>
-														<span className="inline-flex">
-															<CdlIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.driver_licence_type ===
-													"tsa_approved" && (
-													<Tooltip
-														theme="inverse"
-														content="TSA"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TsaIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.hazmat_endorsement === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Hazmat Endorsement"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Hazmat2Icon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.change_9_training === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Change 9"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Change9Icon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.tanker_endorsement === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Tanker endorsement"
-														position="top"
-													>
-														<span className="inline-flex">
-															<TankerEndorsement className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.background_check === "on" && (
-													<Tooltip
-														content="Background Check"
-														position="top"
-													>
-														<span className="inline-flex">
-															<BackgroundCheck className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.lift_gate === "on" && (
-													<Tooltip content="Liftgate" position="top">
-														<span className="inline-flex">
-															<Liftgate className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.pallet_jack === "on" && (
-													<Tooltip content="Pallet jack" position="top">
-														<span className="inline-flex">
-															<PalletJack className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.dolly === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="Dolly"
-														position="top"
-													>
-														<span className="inline-flex">
-															<Dolly className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.ppe === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="PPE"
-														position="top"
-													>
-														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-															<Ppe className="h-5 w-5" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.e_tracks === "on" && (
-													<Tooltip
-														theme="inverse"
-														content="E-tracks"
-														position="top"
-													>
-														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-															<Etrack className="h-5 w-5" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.ramp === "on" && (
-													<Tooltip content="Ramp" position="top">
-														<span className="inline-flex">
-															<Ramp className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.printer === "on" && (
-													<Tooltip content="Printer" position="top">
-														<span className="inline-flex">
-															<Printer className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.sleeper === "on" && (
-													<Tooltip content="Sleeper" position="top">
-														<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-															<Sleeper className="h-5 w-5" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.load_bars === "on" && (
-													<Tooltip content="Load bars" position="top">
-														<span className="inline-flex">
-															<LoadBars className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.mc_enabled === "on" && (
-													<Tooltip content="MC" position="top">
-														<span className="inline-flex">
-															<Mc className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.dot_enabled === "on" && (
-													<Tooltip content="DOT" position="top">
-														<span className="inline-flex">
-															<Dot className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.real_id === "on" && (
-													<Tooltip content="Real ID" position="top">
-														<span className="inline-flex">
-															<RealId className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{military_capability && (
-													<Tooltip content="Military" position="top">
-														<span className="inline-flex">
-															<Military className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.macro_point === "on" && (
-													<Tooltip content="MacroPoint" position="top">
-														<span className="inline-flex">
-															<Image
-																src={macroPointIcon}
-																alt="MacroPoint"
-																className="h-7 w-7"
-															/>
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.trucker_tools === "on" && (
-													<Tooltip content="Trucker Tools" position="top">
-														<span className="inline-flex">
-															<Image
-																src={tuckerTools}
-																alt="Trucker Tools"
-																className="h-7 w-7"
-															/>
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.dock_high === "on" && (
-													<Tooltip content="Dock High" position="top">
-														<span className="inline-flex">
-															<DockHigh className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{selected_distances.includes("any") && (
-													<Tooltip content="Any" position="top">
-														<span className="inline-flex">
-															<Any className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{selected_distances.includes("otr") && (
-													<Tooltip content="OTR" position="top">
-														<span className="inline-flex">
-															<Otr className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{selected_distances.includes("local") && (
-													<Tooltip content="Local" position="top">
-														<span className="inline-flex">
-															<Local className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{selected_distances.includes("regional") && (
-													<Tooltip content="Regional" position="top">
-														<span className="inline-flex">
-															<Regional className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{(item?.meta_data?.canada_transition_proof ===
-													"on" ||
-													selected_cross_border.includes("canada")) && (
-													<Tooltip content="Canada" position="top">
-														<span className="inline-flex">
-															<Canada className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{selected_cross_border.includes("mexico") && (
-													<Tooltip content="Mexico" position="top">
-														<span className="inline-flex">
-															<Mexico className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.alaska === "on" && (
-													<Tooltip content="Alaska" position="top">
-														<span className="inline-flex">
-															<AlaskaIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-												{item?.meta_data?.side_door === "on" && (
-													<Tooltip content="Side door" position="top">
-														<span className="inline-flex">
-															<SideDoorIcon className="h-7 w-7" />
-														</span>
-													</Tooltip>
-												)}
-											</TableCell>
-										</TableRow>
-									);
-								})
-							)}
-						</TableBody>
-					</Table>
-				</div>
-			</div>
+											const legal_document_type =
+												item?.meta_data?.legal_document_type;
+											const legal_document_expiration =
+												item?.meta_data?.legal_document_expiration;
+											const legal_document_file =
+												item?.meta_data?.legal_document;
+											const background_check =
+												item?.meta_data?.background_check;
+											const background_file =
+												item?.meta_data?.background_file;
+											let legal_valid = false;
+											const ny_timezone = "America/New_York";
+											const now_ny = new Date(
+												new Date().toLocaleString("en-US", {
+													timeZone: ny_timezone,
+												})
+											);
+											const now_ts = Math.floor(now_ny.getTime() / 1000);
 
-			{/* Footer section with pagination info and controls */}
-			<div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
-				<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-					{/*Pagination info*/}
-					<div className="pb-3 xl:pb-0">
-						<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-							{totalItems === 0
-								? "Showing 0 entries"
-								: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
-										currentPage * itemsPerPage,
-										totalItems
-									)} of ${totalItems} entries`}
-						</p>
+											let background_valid = false;
+											if (background_check && background_file) {
+												background_valid = true;
+											}
+
+											if (
+												legal_document_type === "us-passport" &&
+												legal_document_file &&
+												legal_document_expiration
+											) {
+												const $legal_exp_ts = Math.floor(
+													new Date(legal_document_expiration).getTime() /
+														1000
+												);
+
+												if (
+													!Number.isNaN($legal_exp_ts) &&
+													$legal_exp_ts >= now_ts
+												) {
+													legal_valid = true;
+												}
+											}
+
+											const military_capability =
+												legal_valid && background_valid;
+											const isAlreadyInOffer = existingDriverIdsSet.has(
+												String(item.id)
+											);
+											const isStatusHovered = hoveredStatusRowIndex === i;
+											const isSelected = selectedDriverIds.includes(
+												String(item.id)
+											);
+											const showHighlight = isSelected || isStatusHovered;
+
+											return (
+												<TableRow
+													key={i + 1}
+													className={`transition-none ${
+														isAlreadyInOffer
+															? "bg-gray-200/70 dark:bg-gray-700/50 opacity-90"
+															: isSelected
+																? "bg-gray-100 dark:bg-white/[0.08]"
+																: isStatusHovered
+																	? "bg-gray-50 dark:bg-white/[0.04]"
+																	: ""
+													}`}
+												>
+													{/*Status - first column, clickable to select driver*/}
+													{(() => {
+														const status = item?.meta_data
+															?.driver_status as
+															| string
+															| null
+															| undefined;
+														const statusColor = getStatusColor(status);
+														const statusLabel = getStatusLabel(status);
+														return (
+															<TableCell
+																className={`relative px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle select-none ${
+																	isAlreadyInOffer
+																		? "cursor-not-allowed"
+																		: "cursor-pointer"
+																}`}
+																style={{
+																	backgroundColor: statusColor,
+																}}
+																onMouseEnter={() => {
+																	setHoveredStatusRowIndex(i);
+																	if (
+																		dragSelectRef.current
+																			.isActive &&
+																		!isAlreadyInOffer
+																	) {
+																		const {
+																			startIndex,
+																			hasAddedAny,
+																		} = dragSelectRef.current;
+																		dragSelectRef.current.hasAddedAny = true;
+																		setSelectedDriverIds(
+																			prev => {
+																				const next =
+																					new Set(prev);
+																				if (
+																					!hasAddedAny &&
+																					startIndex >= 0
+																				) {
+																					const startItem =
+																						filteredResults[
+																							startIndex
+																						];
+																					if (
+																						startItem &&
+																						!existingDriverIdsSet.has(
+																							String(
+																								startItem.id
+																							)
+																						)
+																					) {
+																						next.add(
+																							String(
+																								startItem.id
+																							)
+																						);
+																					}
+																				}
+																				next.add(
+																					String(item.id)
+																				);
+																				return Array.from(
+																					next
+																				);
+																			}
+																		);
+																	}
+																}}
+																onMouseLeave={() =>
+																	setHoveredStatusRowIndex(null)
+																}
+																onMouseDown={() => {
+																	if (!isAlreadyInOffer) {
+																		dragSelectRef.current = {
+																			isActive: true,
+																			startIndex: i,
+																			hasAddedAny: false,
+																		};
+																	}
+																}}
+															>
+																{showHighlight && (
+																	<div
+																		className="absolute left-0 top-0 bottom-0 w-1 bg-blue-800 dark:bg-blue-600"
+																		aria-hidden
+																	/>
+																)}
+																{statusLabel}
+															</TableCell>
+														);
+													})()}
+
+													{/*location & date — light red background if datetime on second line is older than 12 hours */}
+													{(() => {
+														const dateStr =
+															item?.updated_zipcode ||
+															(item as any)?.date_updated ||
+															item?.meta_data?.status_date ||
+															"";
+														const locationDate = dateStr
+															? new Date(dateStr.replace(/\s+/, "T"))
+															: null;
+														const isOlderThan12h =
+															locationDate &&
+															!Number.isNaN(locationDate.getTime()) &&
+															Date.now() - locationDate.getTime() >
+																12 * 60 * 60 * 1000;
+														const dateDisplay = locationDate
+															? formatDateMmDdYy(locationDate)
+															: dateStr || "";
+														return (
+															<TableCell
+																className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
+															>
+																<p>
+																	{item?.meta_data?.current_city}{" "}
+																	{
+																		item?.meta_data
+																			?.current_location
+																	}
+																</p>
+																<p>{dateDisplay}</p>
+															</TableCell>
+														);
+													})()}
+
+													{/*Distance - only when Address filter is filled and API returns id_posts*/}
+													{showDistanceColumn && (
+														<TableCell
+															className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-right"
+															style={{
+																width: 68,
+																minWidth: 68,
+																maxWidth: 68,
+															}}
+														>
+															{(() => {
+																const key =
+																	item?.meta_data?.driver_id ??
+																	String(item?.id ?? "");
+																const dist = idPosts[key]?.distance;
+																return dist != null
+																	? String(dist)
+																	: "—";
+															})()}
+														</TableCell>
+													)}
+
+													{/*Driver*/}
+													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
+														<div className="space-y-0.5 break-words">
+															<p
+																className="break-words"
+																title={`(${item?.id}) ${item?.meta_data?.driver_name || ""}`}
+															>
+																({item?.id}){" "}
+																{item?.meta_data?.driver_name}
+															</p>
+															<p
+																className="break-words"
+																title={
+																	item?.meta_data?.driver_phone ||
+																	""
+																}
+															>
+																{item?.meta_data?.driver_phone}
+															</p>
+														</div>
+													</TableCell>
+
+													{/*Vehicle*/}
+													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
+														<p className="break-words">
+															{item?.meta_data?.vehicle_type}
+														</p>
+														<p className="break-words">
+															{item?.meta_data?.vehicle_make}{" "}
+															{item?.meta_data?.vehicle_model}{" "}
+															{item?.meta_data?.vehicle_year}
+														</p>
+													</TableCell>
+
+													{/*Dimensions*/}
+													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+														<p>{item?.meta_data?.dimensions}</p>
+														<p>{item?.meta_data?.payload} lbs</p>
+													</TableCell>
+
+													{/*Equipment*/}
+													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]">
+														{item?.meta_data?.twic === "on" && (
+															<Tooltip
+																theme="inverse"
+																content="TWIC"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<TwicIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.hazmat_certificate ===
+															"on" && (
+															<Tooltip
+																theme="inverse"
+																content="Hazmat Certificate"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<HazmatIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.team_driver_enabled ===
+															"on" && (
+															<Tooltip
+																theme="inverse"
+																content="Team Driver"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<TeamIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.driver_licence_type ===
+															"cdl" && (
+															<Tooltip
+																theme="inverse"
+																content="CDL"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<CdlIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.driver_licence_type ===
+															"tsa_approved" && (
+															<Tooltip
+																theme="inverse"
+																content="TSA"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<TsaIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.hazmat_endorsement ===
+															"on" && (
+															<Tooltip
+																theme="inverse"
+																content="Hazmat Endorsement"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Hazmat2Icon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.change_9_training ===
+															"on" && (
+															<Tooltip
+																theme="inverse"
+																content="Change 9"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Change9Icon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.tanker_endorsement ===
+															"on" && (
+															<Tooltip
+																theme="inverse"
+																content="Tanker endorsement"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<TankerEndorsement className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.background_check ===
+															"on" && (
+															<Tooltip
+																content="Background Check"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<BackgroundCheck className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.lift_gate === "on" && (
+															<Tooltip
+																content="Liftgate"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Liftgate className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.pallet_jack === "on" && (
+															<Tooltip
+																content="Pallet jack"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<PalletJack className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.dolly === "on" && (
+															<Tooltip
+																theme="inverse"
+																content="Dolly"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Dolly className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.ppe === "on" && (
+															<Tooltip
+																theme="inverse"
+																content="PPE"
+																position="top"
+															>
+																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																	<Ppe className="h-5 w-5" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.e_tracks === "on" && (
+															<Tooltip
+																theme="inverse"
+																content="E-tracks"
+																position="top"
+															>
+																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																	<Etrack className="h-5 w-5" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.ramp === "on" && (
+															<Tooltip content="Ramp" position="top">
+																<span className="inline-flex">
+																	<Ramp className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.printer === "on" && (
+															<Tooltip
+																content="Printer"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Printer className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.sleeper === "on" && (
+															<Tooltip
+																content="Sleeper"
+																position="top"
+															>
+																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																	<Sleeper className="h-5 w-5" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.load_bars === "on" && (
+															<Tooltip
+																content="Load bars"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<LoadBars className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.mc_enabled === "on" && (
+															<Tooltip content="MC" position="top">
+																<span className="inline-flex">
+																	<Mc className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.dot_enabled === "on" && (
+															<Tooltip content="DOT" position="top">
+																<span className="inline-flex">
+																	<Dot className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.real_id === "on" && (
+															<Tooltip
+																content="Real ID"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<RealId className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{military_capability && (
+															<Tooltip
+																content="Military"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Military className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.macro_point === "on" && (
+															<Tooltip
+																content="MacroPoint"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Image
+																		src={macroPointIcon}
+																		alt="MacroPoint"
+																		className="h-7 w-7"
+																	/>
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.trucker_tools ===
+															"on" && (
+															<Tooltip
+																content="Trucker Tools"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Image
+																		src={tuckerTools}
+																		alt="Trucker Tools"
+																		className="h-7 w-7"
+																	/>
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.dock_high === "on" && (
+															<Tooltip
+																content="Dock High"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<DockHigh className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{selected_distances.includes("any") && (
+															<Tooltip content="Any" position="top">
+																<span className="inline-flex">
+																	<Any className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{selected_distances.includes("otr") && (
+															<Tooltip content="OTR" position="top">
+																<span className="inline-flex">
+																	<Otr className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{selected_distances.includes("local") && (
+															<Tooltip content="Local" position="top">
+																<span className="inline-flex">
+																	<Local className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{selected_distances.includes(
+															"regional"
+														) && (
+															<Tooltip
+																content="Regional"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Regional className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{(item?.meta_data
+															?.canada_transition_proof === "on" ||
+															selected_cross_border.includes(
+																"canada"
+															)) && (
+															<Tooltip
+																content="Canada"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Canada className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{selected_cross_border.includes(
+															"mexico"
+														) && (
+															<Tooltip
+																content="Mexico"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<Mexico className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.alaska === "on" && (
+															<Tooltip
+																content="Alaska"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<AlaskaIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+														{item?.meta_data?.side_door === "on" && (
+															<Tooltip
+																content="Side door"
+																position="top"
+															>
+																<span className="inline-flex">
+																	<SideDoorIcon className="h-7 w-7" />
+																</span>
+															</Tooltip>
+														)}
+													</TableCell>
+
+													{/* Comments */}
+													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
+														{item?.meta_data?.notes != null &&
+														String(item.meta_data.notes).trim() !== ""
+															? String(item.meta_data.notes)
+															: "—"}
+													</TableCell>
+
+													{/* Rating */}
+													<TableCell
+														className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap"
+														style={{
+															width: 72,
+															minWidth: 72,
+															maxWidth: 72,
+														}}
+													>
+														{item?.meta_data?.rating != null &&
+														item.meta_data.rating !== ""
+															? String(item.meta_data.rating)
+															: "—"}
+													</TableCell>
+
+													{/* Notes */}
+													<TableCell
+														className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap"
+														style={{
+															width: 72,
+															minWidth: 72,
+															maxWidth: 72,
+														}}
+													>
+														—
+													</TableCell>
+												</TableRow>
+											);
+										})
+									)}
+								</TableBody>
+							</Table>
+						</div>
 					</div>
 
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-						{/*Pagination controls*/}
-						{totalPages > 1 && (
-							<PaginationWithIcon
-								totalPages={totalPages}
-								initialPage={currentPage}
-								onPageChange={(page: number) => {
-									setCurrentPage(page);
-								}}
-							/>
-						)}
-						{footerButton && (
-							<Button
-								size="sm"
-								variant="primary"
-								disabled={selectedDriverIds.length === 0 || footerButton.isLoading}
-								onClick={() => footerButton.onClick(selectedDriverIds)}
-								className="inline-flex items-center gap-2"
-							>
-								{footerButton.label}
-								{footerButton.icon}
-							</Button>
-						)}
+					{/* Footer section with pagination info and controls */}
+					<div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
+						<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
+							{/*Pagination info*/}
+							<div className="pb-3 xl:pb-0">
+								<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
+									{totalItems === 0
+										? "Showing 0 entries"
+										: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
+												currentPage * itemsPerPage,
+												totalItems
+											)} of ${totalItems} entries`}
+								</p>
+							</div>
+
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+								{/*Pagination controls*/}
+								{totalPages > 1 && (
+									<PaginationWithIcon
+										totalPages={totalPages}
+										initialPage={currentPage}
+										onPageChange={(page: number) => {
+											setCurrentPage(page);
+										}}
+									/>
+								)}
+								{footerButton && (
+									<Button
+										size="sm"
+										variant="primary"
+										disabled={
+											selectedDriverIds.length === 0 || footerButton.isLoading
+										}
+										onClick={() => footerButton.onClick(selectedDriverIds)}
+										className="inline-flex items-center gap-2"
+									>
+										{footerButton.label}
+										{footerButton.icon}
+									</Button>
+								)}
+							</div>
+						</div>
 					</div>
-				</div>
-			</div>
-			</>
+				</>
 			)}
 			{(isPending || isFetching) && (
 				<div
