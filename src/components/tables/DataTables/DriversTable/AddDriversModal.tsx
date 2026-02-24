@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal } from "@/components/ui/modal";
-import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import DriversListTable from "./DriversListTable";
 
 export interface AddDriversModalProps {
@@ -94,7 +94,7 @@ export default function AddDriversModal({
 						className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-white/10"
 						aria-hidden
 					>
-						<WheelLoader size={160} />
+						<SpinnerOne />
 					</div>
 				)}
 			</div>

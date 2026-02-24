@@ -39,7 +39,7 @@ import macroPointIcon from "@/icons/additional/macropoint.png";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
 import AlaskaIcon from "@/icons/additional/usa-alaska.svg";
 import SideDoorIcon from "@/icons/additional/side_door.svg";
-import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import Label from "@/components/form/Label";
@@ -1314,7 +1314,7 @@ export default function DriversListTable({
 					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
 					aria-hidden
 				>
-					<WheelLoader size={107} />
+					<SpinnerOne />
 				</div>
 			)}
 		</div>

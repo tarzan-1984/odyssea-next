@@ -7,7 +7,6 @@ import { AngleDownIcon, AngleUpIcon } from "@/icons";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Link from "next/link";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
@@ -355,7 +354,7 @@ export default function UserListTable() {
 					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
 					aria-hidden
 				>
-					<WheelLoader size={107} />
+					<SpinnerOne />
 				</div>
 			)}
 		</div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useCurrentUser } from "@/stores/userStore";
@@ -144,7 +144,7 @@ const OffersListTable = () => {
 								<tr>
 									<td colSpan={10} className="p-2">
 										<div className="flex justify-center py-4">
-											<WheelLoader size={107} />
+											<SpinnerOne />
 										</div>
 									</td>
 								</tr>

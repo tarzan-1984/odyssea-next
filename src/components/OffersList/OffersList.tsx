@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
-import WheelLoader from "@/app/(admin)/(ui-elements)/spinners/WheelLoader";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
 import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
@@ -137,7 +137,7 @@ const OffersList = () => {
 			<div className="border border-t-0 border-b-0 border-gray-100 dark:border-white/[0.05] px-4 py-4">
 				{isPending ? (
 					<div className="flex justify-center py-8">
-						<WheelLoader size={107} />
+						<SpinnerOne />
 					</div>
 				) : results.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -196,19 +196,16 @@ const OffersList = () => {
 													<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																Pick Up Location
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																Delivery Location
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Pick Up Time
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Delivery Time
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Loaded Miles
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Empty Miles
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Total Miles
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Weight
@@ -224,19 +221,16 @@ const OffersList = () => {
 												<TableBody>
 													<TableRow className="border-gray-200 dark:border-white/[0.08]">
 														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															{row.pick_up_location ?? "—"}
+														</TableCell>
+														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															{row.delivery_location ?? "—"}
+														</TableCell>
+														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 															{row.pick_up_time ?? "—"}
 														</TableCell>
 														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 															{row.delivery_time ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.loaded_miles != null ? row.loaded_miles : "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.empty_miles != null ? row.empty_miles : "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.total_miles != null ? row.total_miles : "—"}
 														</TableCell>
 														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 															{row.weight != null ? row.weight : "—"}
@@ -432,7 +426,7 @@ const OffersList = () => {
 											className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/70 dark:bg-white/10"
 											aria-hidden
 										>
-											<WheelLoader size={107} />
+											<SpinnerOne />
 										</div>
 									)}
 								</div>
