@@ -1515,7 +1515,7 @@ export default function DriversListTable({
 					</div>
 				</>
 			)}
-			{(isPending || isFetching) && (
+			{queryEnabled && (isPending || isFetching) && (
 				<div
 					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-b-xl"
 					aria-hidden
