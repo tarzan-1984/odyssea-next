@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
@@ -10,6 +12,8 @@ import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
+
+const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
 export interface CreateOfferModalProps {
 	isOpen: boolean;
@@ -43,13 +47,14 @@ const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> 
 	notes: "",
 };
 
-/** Additional pick-up rows (location + time) added via "Add Pick Up" */
-type PickUpRow = { location: string; time: string };
-const initialPickUpRow = (): PickUpRow => ({ location: "", time: "" });
-
-/** Additional delivery rows (location + time) added via "Add Delivery" */
-type DeliveryRow = { location: string; time: string };
-const initialDeliveryRow = (): DeliveryRow => ({ location: "", time: "" });
+/** Additional rows (pickup or delivery) added in order between main rows */
+type ExtraRow = { id: string; type: "pickup" | "delivery"; location: string; time: string };
+const initialExtraRow = (type: "pickup" | "delivery"): ExtraRow => ({
+	id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+	type,
+	location: "",
+	time: "",
+});
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
 	"pickUpLocation",
@@ -59,6 +64,102 @@ const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
 	"weight",
 ];
 
+/** Draggable wrapper for an extra row (used between main Pick up and Delivery rows) */
+function DraggableExtraRow({
+	row,
+	index,
+	updateExtraRow,
+	removeExtraRow,
+	moveRow,
+}: {
+	row: ExtraRow;
+	index: number;
+	updateExtraRow: (index: number, field: "location" | "time", value: string) => void;
+	removeExtraRow: (index: number) => void;
+	moveRow: (dragIndex: number, hoverIndex: number) => void;
+}) {
+	const ref = useRef<HTMLDivElement>(null);
+
+	const [{ isDragging }, drag] = useDrag({
+		type: DND_EXTRA_ROW_TYPE,
+		item: () => ({ index }),
+		collect: monitor => ({ isDragging: monitor.isDragging() }),
+	});
+
+	const [, drop] = useDrop({
+		accept: DND_EXTRA_ROW_TYPE,
+		hover: (item: { index: number }, monitor) => {
+			if (!ref.current) return;
+			const dragIndex = item.index;
+			const hoverIndex = index;
+			if (dragIndex === hoverIndex) return;
+			const hoverBoundingRect = ref.current.getBoundingClientRect();
+			const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+			const clientOffset = monitor.getClientOffset();
+			if (!clientOffset) return;
+			const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+			if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+			if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+			moveRow(dragIndex, hoverIndex);
+			item.index = hoverIndex;
+		},
+	});
+
+	drag(drop(ref));
+
+	return (
+		<div
+			ref={ref}
+			className={`grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2 cursor-move ${isDragging ? "opacity-50" : ""}`}
+		>
+			<div className="min-w-0">
+				<Label>
+					{row.type === "pickup" ? "Pick up location" : "Delivery location"}
+				</Label>
+				<Input
+					type="text"
+					value={row.location}
+					onChange={e => updateExtraRow(index, "location", e.target.value)}
+					placeholder={
+						row.type === "pickup"
+							? "Enter pick up location"
+							: "Enter delivery location"
+					}
+					className="dark:bg-gray-900"
+				/>
+			</div>
+			<div className="min-w-0">
+				<Label>
+					{row.type === "pickup" ? "Pick up time" : "Delivery time"}
+				</Label>
+				<Input
+					type="text"
+					value={row.time}
+					onChange={e => updateExtraRow(index, "time", e.target.value)}
+					placeholder={
+						row.type === "pickup"
+							? "Enter pick up time"
+							: "Enter delivery time"
+					}
+					className="dark:bg-gray-900"
+				/>
+			</div>
+			<div className="flex items-center self-end mt-1.5">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+					onClick={() => removeExtraRow(index)}
+					aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
+				>
+					−
+				</Button>
+			</div>
+		</div>
+	);
+}
+
 export default function CreateOfferModal({
 	isOpen,
 	onClose,
@@ -67,8 +168,7 @@ export default function CreateOfferModal({
 	onSubmit,
 }: CreateOfferModalProps) {
 	const [formValues, setFormValues] = useState(initialFormState);
-	const [extraPickUps, setExtraPickUps] = useState<PickUpRow[]>([]);
-	const [extraDeliveries, setExtraDeliveries] = useState<DeliveryRow[]>([]);
+	const [extraRows, setExtraRows] = useState<ExtraRow[]>([]);
 	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>(
 		{}
 	);
@@ -79,43 +179,39 @@ export default function CreateOfferModal({
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
-			setExtraPickUps([]);
-			setExtraDeliveries([]);
+			setExtraRows([]);
 			setErrors({});
 			setSubmitError("");
 		}
 	}, [isOpen]);
 
 	const addPickUpRow = () => {
-		setExtraPickUps(prev => [...prev, initialPickUpRow()]);
-	};
-
-	const updateExtraPickUp = (index: number, field: "location" | "time", value: string) => {
-		setExtraPickUps(prev => {
-			const next = [...prev];
-			next[index] = { ...next[index], [field]: value };
-			return next;
-		});
-	};
-
-	const removeExtraPickUp = (index: number) => {
-		setExtraPickUps(prev => prev.filter((_, i) => i !== index));
+		setExtraRows(prev => [...prev, initialExtraRow("pickup")]);
 	};
 
 	const addDeliveryRow = () => {
-		setExtraDeliveries(prev => [...prev, initialDeliveryRow()]);
+		setExtraRows(prev => [...prev, initialExtraRow("delivery")]);
 	};
 
-	const updateExtraDelivery = (index: number, field: "location" | "time", value: string) => {
-		setExtraDeliveries(prev => {
+	const updateExtraRow = (index: number, field: "location" | "time", value: string) => {
+		setExtraRows(prev => {
 			const next = [...prev];
 			next[index] = { ...next[index], [field]: value };
 			return next;
 		});
 	};
 
-	const removeExtraDelivery = (index: number) => {
-		setExtraDeliveries(prev => prev.filter((_, i) => i !== index));
+	const removeExtraRow = (index: number) => {
+		setExtraRows(prev => prev.filter((_, i) => i !== index));
+	};
+
+	const moveExtraRow = (dragIndex: number, hoverIndex: number) => {
+		setExtraRows(prev => {
+			const next = [...prev];
+			const [removed] = next.splice(dragIndex, 1);
+			next.splice(hoverIndex, 0, removed);
+			return next;
+		});
 	};
 
 	const validate = (): Partial<Record<keyof typeof initialFormState, string>> => {
@@ -231,58 +327,19 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Additional Pick up rows (added via Add Pick Up) — above the button */}
-				{extraPickUps.map((row, index) => (
-					<div
-						key={index}
-						className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2"
-					>
-						<div className="min-w-0">
-							<Label>Pick up location</Label>
-							<Input
-								type="text"
-								value={row.location}
-								onChange={e => updateExtraPickUp(index, "location", e.target.value)}
-								placeholder="Enter pick up location"
-								className="dark:bg-gray-900"
-							/>
-						</div>
-						<div className="min-w-0">
-							<Label>Pick up time</Label>
-							<Input
-								type="text"
-								value={row.time}
-								onChange={e => updateExtraPickUp(index, "time", e.target.value)}
-								placeholder="Enter pick up time"
-								className="dark:bg-gray-900"
-							/>
-						</div>
-						<div className="flex items-center self-end mt-1.5">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
-								onClick={() => removeExtraPickUp(index)}
-								aria-label="Remove pick up row"
-							>
-								−
-							</Button>
-						</div>
-					</div>
-				))}
-
-				<div className="flex justify-end -mt-1">
-					<Button
-						type="button"
-						variant="primary"
-						size="sm"
-						className="!py-1.5 !px-3 text-xs"
-						onClick={addPickUpRow}
-					>
-						Add Pick Up
-					</Button>
-				</div>
+				{/* Additional rows (in order) between main Pick up and main Delivery — draggable */}
+				<DndProvider backend={HTML5Backend}>
+					{extraRows.map((row, index) => (
+						<DraggableExtraRow
+							key={row.id}
+							row={row}
+							index={index}
+							updateExtraRow={updateExtraRow}
+							removeExtraRow={removeExtraRow}
+							moveRow={moveExtraRow}
+						/>
+					))}
+				</DndProvider>
 
 				{/* Row 2: Delivery location, Delivery time */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
@@ -312,50 +369,17 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{/* Additional Delivery rows (added via Add Delivery) — above the button */}
-				{extraDeliveries.map((row, index) => (
-					<div
-						key={index}
-						className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2"
+				{/* Add Pick Up and Add Delivery — one row at the end of Pick up / Delivery fields */}
+				<div className="flex justify-end gap-2 -mt-1 mt-2">
+					<Button
+						type="button"
+						variant="primary"
+						size="sm"
+						className="!py-1.5 !px-3 text-xs"
+						onClick={addPickUpRow}
 					>
-						<div className="min-w-0">
-							<Label>Delivery location</Label>
-							<Input
-								type="text"
-								value={row.location}
-								onChange={e =>
-									updateExtraDelivery(index, "location", e.target.value)
-								}
-								placeholder="Enter delivery location"
-								className="dark:bg-gray-900"
-							/>
-						</div>
-						<div className="min-w-0">
-							<Label>Delivery time</Label>
-							<Input
-								type="text"
-								value={row.time}
-								onChange={e => updateExtraDelivery(index, "time", e.target.value)}
-								placeholder="Enter delivery time"
-								className="dark:bg-gray-900"
-							/>
-						</div>
-						<div className="flex items-center self-end mt-1.5">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
-								onClick={() => removeExtraDelivery(index)}
-								aria-label="Remove delivery row"
-							>
-								−
-							</Button>
-						</div>
-					</div>
-				))}
-
-				<div className="flex justify-end -mt-1 mt-2">
+						Add Pick Up
+					</Button>
 					<Button
 						type="button"
 						variant="primary"
