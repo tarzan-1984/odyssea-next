@@ -10,7 +10,7 @@ import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
-import offers from "@/app-api/offers";
+import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
@@ -319,8 +319,10 @@ export default function CreateOfferModal({
 		setSubmitError("");
 		setIsSubmitting(true);
 		try {
-			const routePayload = routeRows.map(row => ({
-				type: row.type === "pickup" ? "pick_up_location" : "delivery_location",
+			const routePayload: CreateOfferRoutePoint[] = routeRows.map(row => ({
+				type: (row.type === "pickup"
+					? "pick_up_location"
+					: "delivery_location") as CreateOfferRoutePoint["type"],
 				location: row.location.trim(),
 				time: row.time.trim(),
 			}));
