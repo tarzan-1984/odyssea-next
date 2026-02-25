@@ -56,13 +56,16 @@ export interface GetOffersResponse {
 	};
 }
 
+export interface CreateOfferRoutePoint {
+	type: "pick_up_location" | "delivery_location";
+	location: string;
+	time: string;
+}
+
 export interface CreateOfferPayload {
 	externalId: string;
 	driverIds: string[];
-	pickUpLocation: string;
-	pickUpTime: string;
-	deliveryLocation: string;
-	deliveryTime: string;
+	route: CreateOfferRoutePoint[];
 	loadedMiles?: number;
 	emptyMiles?: number;
 	totalMiles?: number;

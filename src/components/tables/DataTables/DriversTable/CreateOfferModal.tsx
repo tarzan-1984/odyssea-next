@@ -26,57 +26,48 @@ export interface CreateOfferModalProps {
 export interface CreateOfferFormValues {
 	externalId: string;
 	driverIds: string;
-	pickUpLocation: string;
-	deliveryLocation: string;
-	pickUpTime: string;
-	deliveryTime: string;
+	route: RouteRow[];
 	weight: string;
 	commodity: string;
 	specialRequirements: string[];
 	notes: string;
 }
 
-const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds"> = {
-	pickUpLocation: "",
-	deliveryLocation: "",
-	pickUpTime: "",
-	deliveryTime: "",
+/** Single row in the route UI (pickup or delivery) */
+type RouteRow = { id: string; type: "pickup" | "delivery"; location: string; time: string };
+
+const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds" | "route"> = {
 	weight: "",
 	commodity: "",
 	specialRequirements: [],
 	notes: "",
 };
 
-/** Additional rows (pickup or delivery) added in order between main rows */
-type ExtraRow = { id: string; type: "pickup" | "delivery"; location: string; time: string };
-const initialExtraRow = (type: "pickup" | "delivery"): ExtraRow => ({
+/** Create a new empty route row */
+const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 	id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
 	type,
 	location: "",
 	time: "",
 });
 
-const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = [
-	"pickUpLocation",
-	"deliveryLocation",
-	"pickUpTime",
-	"deliveryTime",
-	"weight",
-];
+const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
 
-/** Draggable wrapper for an extra row (used between main Pick up and Delivery rows) */
+/** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
 	row,
 	index,
 	updateExtraRow,
 	removeExtraRow,
 	moveRow,
+	pendingDropRef,
 }: {
-	row: ExtraRow;
+	row: RouteRow;
 	index: number;
 	updateExtraRow: (index: number, field: "location" | "time", value: string) => void;
 	removeExtraRow: (index: number) => void;
 	moveRow: (dragIndex: number, hoverIndex: number) => void;
+	pendingDropRef: React.MutableRefObject<number | null>;
 }) {
 	const ref = useRef<HTMLDivElement>(null);
 
@@ -86,8 +77,15 @@ function DraggableExtraRow({
 		collect: monitor => ({ isDragging: monitor.isDragging() }),
 	});
 
-	const [, drop] = useDrop({
+	const [{ isOver, dragIndex }, drop] = useDrop({
 		accept: DND_EXTRA_ROW_TYPE,
+		collect: monitor => {
+			const item = monitor.getItem() as { index: number } | null;
+			return {
+				isOver: monitor.isOver(),
+				dragIndex: item?.index ?? null,
+			};
+		},
 		hover: (item: { index: number }, monitor) => {
 			if (!ref.current) return;
 			const dragIndex = item.index;
@@ -100,8 +98,16 @@ function DraggableExtraRow({
 			const hoverClientY = clientOffset.y - hoverBoundingRect.top;
 			if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
 			if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-			moveRow(dragIndex, hoverIndex);
-			item.index = hoverIndex;
+			// Store target index for drop; do NOT move array during drag
+			pendingDropRef.current = hoverIndex;
+		},
+		drop: (item: { index: number }) => {
+			const dragIndex = item.index;
+			const dropIndex = pendingDropRef.current ?? index;
+			pendingDropRef.current = null;
+			if (dragIndex !== dropIndex) {
+				moveRow(dragIndex, dropIndex);
+			}
 		},
 	});
 
@@ -110,8 +116,21 @@ function DraggableExtraRow({
 	return (
 		<div
 			ref={ref}
-			className={`grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2 cursor-move ${isDragging ? "opacity-50" : ""}`}
+			className="relative grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2 cursor-move"
+			style={{
+				opacity: isDragging ? 0 : 1,
+				pointerEvents: isDragging ? "none" : undefined,
+			}}
 		>
+			{/* Blue insertion line when hovering over this row */}
+			{isOver && (
+				<div
+					className={`absolute left-0 right-0 h-1 bg-blue-500 rounded-full z-10 ${
+						dragIndex != null && dragIndex < index ? "bottom-0 translate-y-1" : "-top-1"
+					}`}
+					aria-hidden
+				/>
+			)}
 			<div className="min-w-0">
 				<Label>
 					{row.type === "pickup" ? "Pick up location" : "Delivery location"}
@@ -168,10 +187,11 @@ export default function CreateOfferModal({
 	onSubmit,
 }: CreateOfferModalProps) {
 	const [formValues, setFormValues] = useState(initialFormState);
-	const [extraRows, setExtraRows] = useState<ExtraRow[]>([]);
+	const [routeRows, setRouteRows] = useState<RouteRow[]>([]);
 	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>(
 		{}
 	);
+	const [routeError, setRouteError] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -179,22 +199,24 @@ export default function CreateOfferModal({
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
-			setExtraRows([]);
+			// Initialize route with one pickup and one delivery row
+			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
 			setErrors({});
+			setRouteError(null);
 			setSubmitError("");
 		}
 	}, [isOpen]);
 
 	const addPickUpRow = () => {
-		setExtraRows(prev => [...prev, initialExtraRow("pickup")]);
+		setRouteRows(prev => [...prev, initialRouteRow("pickup")]);
 	};
 
 	const addDeliveryRow = () => {
-		setExtraRows(prev => [...prev, initialExtraRow("delivery")]);
+		setRouteRows(prev => [...prev, initialRouteRow("delivery")]);
 	};
 
 	const updateExtraRow = (index: number, field: "location" | "time", value: string) => {
-		setExtraRows(prev => {
+		setRouteRows(prev => {
 			const next = [...prev];
 			next[index] = { ...next[index], [field]: value };
 			return next;
@@ -202,11 +224,11 @@ export default function CreateOfferModal({
 	};
 
 	const removeExtraRow = (index: number) => {
-		setExtraRows(prev => prev.filter((_, i) => i !== index));
+		setRouteRows(prev => prev.filter((_, i) => i !== index));
 	};
 
 	const moveExtraRow = (dragIndex: number, hoverIndex: number) => {
-		setExtraRows(prev => {
+		setRouteRows(prev => {
 			const next = [...prev];
 			const [removed] = next.splice(dragIndex, 1);
 			next.splice(hoverIndex, 0, removed);
@@ -214,16 +236,60 @@ export default function CreateOfferModal({
 		});
 	};
 
-	const validate = (): Partial<Record<keyof typeof initialFormState, string>> => {
-		const next: Partial<Record<keyof typeof initialFormState, string>> = {};
+	// Ref to store target index during drag; move happens only on drop
+	const pendingDropRef = useRef<number | null>(null);
+
+	const validate = (): {
+		fieldErrors: Partial<Record<keyof typeof initialFormState, string>>;
+		routeError: string | null;
+	} => {
+		const fieldErrors: Partial<Record<keyof typeof initialFormState, string>> = {};
 		for (const field of REQUIRED_FIELDS) {
 			const value = formValues[field];
 			const str = typeof value === "string" ? value.trim() : "";
 			if (str === "") {
-				next[field] = "This field is required";
+				fieldErrors[field] = "This field is required";
 			}
 		}
-		return next;
+
+		let routeError: string | null = null;
+		const trimmedRoute = routeRows.map(row => ({
+			...row,
+			location: row.location.trim(),
+			time: row.time.trim(),
+		}));
+
+		const pickups = trimmedRoute.filter(
+			row => row.type === "pickup" && row.location !== "" && row.time !== ""
+		);
+		const deliveries = trimmedRoute.filter(
+			row => row.type === "delivery" && row.location !== "" && row.time !== ""
+		);
+
+		if (trimmedRoute.length === 0) {
+			routeError = "Add at least one Pick up and one Delivery";
+		} else if (pickups.length === 0 || deliveries.length === 0) {
+			routeError = "At least one Pick up and one Delivery are required";
+		} else {
+			const incompleteRow = trimmedRoute.some(
+				row =>
+					(row.location === "" && row.time !== "") ||
+					(row.location !== "" && row.time === "")
+			);
+			if (incompleteRow) {
+				routeError = "Each stop must have both location and time";
+			} else {
+				const first = trimmedRoute[0];
+				const last = trimmedRoute[trimmedRoute.length - 1];
+				if (first.type !== "pickup") {
+					routeError = "The first stop in route must be Pick up";
+				} else if (last.type !== "delivery") {
+					routeError = "The last stop in route must be Delivery";
+				}
+			}
+		}
+
+		return { fieldErrors, routeError };
 	};
 
 	const driverIdsValue = selectedDriverIds.join(",");
@@ -242,22 +308,27 @@ export default function CreateOfferModal({
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		const validationErrors = validate();
-		if (Object.keys(validationErrors).length > 0) {
-			setErrors(validationErrors);
+		const { fieldErrors, routeError: nextRouteError } = validate();
+		if (Object.keys(fieldErrors).length > 0 || nextRouteError) {
+			setErrors(fieldErrors);
+			setRouteError(nextRouteError);
 			return;
 		}
 		setErrors({});
+		setRouteError(null);
 		setSubmitError("");
 		setIsSubmitting(true);
 		try {
+			const routePayload = routeRows.map(row => ({
+				type: row.type === "pickup" ? "pick_up_location" : "delivery_location",
+				location: row.location.trim(),
+				time: row.time.trim(),
+			}));
+
 			const payload = {
 				externalId,
 				driverIds: selectedDriverIds,
-				pickUpLocation: formValues.pickUpLocation.trim(),
-				pickUpTime: formValues.pickUpTime.trim(),
-				deliveryLocation: formValues.deliveryLocation.trim(),
-				deliveryTime: formValues.deliveryTime.trim(),
+				route: routePayload,
 				weight: parseWeight(formValues.weight),
 				commodity: formValues.commodity.trim() || undefined,
 				specialRequirements:
@@ -271,6 +342,7 @@ export default function CreateOfferModal({
 				onSubmit?.({
 					externalId,
 					driverIds: driverIdsValue,
+					route: routeRows,
 					...formValues,
 				});
 				onClose();
@@ -299,37 +371,9 @@ export default function CreateOfferModal({
 				{/* Hidden: selected driver IDs (comma-separated) */}
 				<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
 
-				{/* Row 1: Pick up location, Pick up time + Add Pick Up button below right */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div className="min-w-0">
-						<Label>Pick up location</Label>
-						<Input
-							type="text"
-							value={formValues.pickUpLocation}
-							onChange={e => handleChange("pickUpLocation", e.target.value)}
-							placeholder="Enter pick up location"
-							className="dark:bg-gray-900"
-							error={!!errors.pickUpLocation}
-							hint={errors.pickUpLocation}
-						/>
-					</div>
-					<div className="min-w-0">
-						<Label>Pick up time</Label>
-						<Input
-							type="text"
-							value={formValues.pickUpTime}
-							onChange={e => handleChange("pickUpTime", e.target.value)}
-							placeholder="Enter pick up time"
-							className="dark:bg-gray-900"
-							error={!!errors.pickUpTime}
-							hint={errors.pickUpTime}
-						/>
-					</div>
-				</div>
-
-				{/* Additional rows (in order) between main Pick up and main Delivery — draggable */}
+				{/* Route rows: first Pick up, then any intermediate points, last Delivery — all draggable */}
 				<DndProvider backend={HTML5Backend}>
-					{extraRows.map((row, index) => (
+					{routeRows.map((row, index) => (
 						<DraggableExtraRow
 							key={row.id}
 							row={row}
@@ -337,40 +381,13 @@ export default function CreateOfferModal({
 							updateExtraRow={updateExtraRow}
 							removeExtraRow={removeExtraRow}
 							moveRow={moveExtraRow}
+							pendingDropRef={pendingDropRef}
 						/>
 					))}
 				</DndProvider>
 
-				{/* Row 2: Delivery location, Delivery time */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
-					<div className="min-w-0">
-						<Label>Delivery location</Label>
-						<Input
-							type="text"
-							value={formValues.deliveryLocation}
-							onChange={e => handleChange("deliveryLocation", e.target.value)}
-							placeholder="Enter delivery location"
-							className="dark:bg-gray-900"
-							error={!!errors.deliveryLocation}
-							hint={errors.deliveryLocation}
-						/>
-					</div>
-					<div className="min-w-0">
-						<Label>Delivery time</Label>
-						<Input
-							type="text"
-							value={formValues.deliveryTime}
-							onChange={e => handleChange("deliveryTime", e.target.value)}
-							placeholder="Enter delivery time"
-							className="dark:bg-gray-900"
-							error={!!errors.deliveryTime}
-							hint={errors.deliveryTime}
-						/>
-					</div>
-				</div>
-
-				{/* Add Pick Up and Add Delivery — one row at the end of Pick up / Delivery fields */}
-				<div className="flex justify-end gap-2 -mt-1 mt-2">
+				{/* Add Pick Up and Add Delivery — below all route rows */}
+				<div className="flex justify-end gap-2 mt-2">
 					<Button
 						type="button"
 						variant="primary"
@@ -390,6 +407,10 @@ export default function CreateOfferModal({
 						Add Delivery
 					</Button>
 				</div>
+
+				{routeError && (
+					<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
+				)}
 
 				{/* Row 4: Weight, Commodity */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
