@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
+import TimePicker from "@/components/form/TimePicker";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
@@ -154,7 +155,7 @@ function DraggableExtraRow({
 	return (
 		<div
 			ref={ref}
-			className="relative grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end mt-2 cursor-move"
+			className="relative grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(9rem,1fr)_auto] sm:items-end mt-2 cursor-move"
 			style={{
 				opacity: isDragging ? 0 : 1,
 				pointerEvents: isDragging ? "none" : undefined,
@@ -195,19 +196,13 @@ function DraggableExtraRow({
 					</p>
 				)}
 			</div>
-			<div className="min-w-0">
-				<Label>
-					{row.type === "pickup" ? "Pick up time" : "Delivery time"}
-				</Label>
-				<Input
-					type="text"
+			<div className="min-w-[8rem] sm:min-w-[9rem]">
+				<TimePicker
+					id={`time-${row.id}`}
+					label={row.type === "pickup" ? "Pick up time" : "Delivery time"}
 					value={row.time}
-					onChange={e => updateExtraRow(index, "time", e.target.value)}
-					placeholder={
-						row.type === "pickup"
-							? "Enter pick up time"
-							: "Enter delivery time"
-					}
+					onChange={(v) => updateExtraRow(index, "time", v)}
+					placeholder="-- : -- pm"
 					className="dark:bg-gray-900"
 				/>
 			</div>

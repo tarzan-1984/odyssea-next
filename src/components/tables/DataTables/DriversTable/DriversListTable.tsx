@@ -191,8 +191,6 @@ export default function DriversListTable({
 		enabled: queryEnabled,
 	});
 
-	console.log("driverList", driverList);
-
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
 			if (!statusFilter) return true;

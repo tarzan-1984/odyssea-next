@@ -855,6 +855,11 @@ span.flatpickr-weekday,
 	@apply right-0;
 }
 
+/* Time-only picker: match dropdown width to input */
+.flatpickr-calendar.noCalendar.hasTime .flatpickr-time {
+	@apply !w-full !box-border;
+}
+
 @keyframes fadeOut {
 	0% {
 		opacity: 1;
