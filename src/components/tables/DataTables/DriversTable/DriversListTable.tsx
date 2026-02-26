@@ -245,6 +245,22 @@ export default function DriversListTable({
 	const idPosts = driverList?.data?.id_posts ?? {};
 	const colCount = showDistanceColumn ? 10 : 9;
 
+	/** Map driverId -> empty_miles (rounded) for selected drivers with distance data. Used when creating offers. */
+	const driverEmptyMiles: Record<string, number> = {};
+	for (const driverId of selectedDriverIds) {
+		const item = filteredResults.find((d: any) => String(d.id) === driverId);
+		if (item) {
+			const key = item?.meta_data?.driver_id ?? String(item?.id ?? "");
+			const dist = idPosts[key]?.distance;
+			if (dist != null) {
+				const num = typeof dist === "string" ? parseFloat(dist) : Number(dist);
+				if (Number.isFinite(num)) {
+					driverEmptyMiles[driverId] = Math.round(num);
+				}
+			}
+		}
+	}
+
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
 			{/* Header section — hidden for non-admin when Address is empty */}
@@ -291,7 +307,9 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={selectedDriverIds.length === 0}
+									disabled={
+										selectedDriverIds.length === 0 || !showDistanceColumn
+									}
 									onClick={() => setCreateOfferModalOpen(true)}
 									className="h-9"
 								>
@@ -323,9 +341,9 @@ export default function DriversListTable({
 							onClose={() => setCreateOfferModalOpen(false)}
 							externalId={currentUser?.externalId ?? ""}
 							selectedDriverIds={selectedDriverIds}
-							onSubmit={values => {
-								// TODO: send to API
-								console.log("Create offer form submitted:", values);
+							driverEmptyMiles={driverEmptyMiles}
+							onSubmit={() => {
+								setSelectedDriverIds([]);
 							}}
 						/>
 					)}
@@ -1028,8 +1046,13 @@ export default function DriversListTable({
 																	item?.meta_data?.driver_id ??
 																	String(item?.id ?? "");
 																const dist = idPosts[key]?.distance;
-																return dist != null
-																	? String(dist)
+																if (dist == null) return "—";
+																const num =
+																	typeof dist === "string"
+																		? parseFloat(dist)
+																		: Number(dist);
+																return Number.isFinite(num)
+																	? String(Math.round(num))
 																	: "—";
 															})()}
 														</TableCell>

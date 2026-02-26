@@ -7,7 +7,7 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useCurrentUser } from "@/stores/userStore";
-import offersApi from "@/app-api/offers";
+import offersApi, { formatRoute } from "@/app-api/offers";
 import type { OfferRow } from "@/app-api/offers";
 
 function formatSpecialRequirements(value: unknown): string {
@@ -117,8 +117,7 @@ const OffersListTable = () => {
 							<TableRow>
 								{[
 									{ key: "date_time", label: "Date & Time" },
-									{ key: "pick_up", label: "Pick Up" },
-									{ key: "delivery", label: "Delivery" },
+									{ key: "route", label: "Route" },
 									{ key: "loaded_miles", label: "Loaded Miles" },
 									{ key: "empty_miles", label: "Empty Miles" },
 									{ key: "total_miles", label: "Total Miles" },
@@ -142,7 +141,7 @@ const OffersListTable = () => {
 						<TableBody>
 							{isPending ? (
 								<tr>
-									<td colSpan={10} className="p-2">
+									<td colSpan={9} className="p-2">
 										<div className="flex justify-center py-4">
 											<SpinnerOne />
 										</div>
@@ -155,13 +154,8 @@ const OffersListTable = () => {
 											<p>Create: {formatDateMmDdYy(row.create_time)}</p>
 											<p>Update: {formatDateMmDdYy(row.update_time)}</p>
 										</TableCell>
-										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
-											<p>{row.pick_up_location}</p>
-											<p>{row.pick_up_time}</p>
-										</TableCell>
-										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
-											<p>{row.delivery_location}</p>
-											<p>{row.delivery_time}</p>
+										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-pre-line">
+											{formatRoute(row.route) || "—"}
 										</TableCell>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
 											{row.loaded_miles != null ? row.loaded_miles : "—"}

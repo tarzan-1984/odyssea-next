@@ -8,14 +8,14 @@ import { useCurrentUser } from "@/stores/userStore";
 import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import offersApi from "@/app-api/offers";
+import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
 import type { OfferRow } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
 import UserFilterSelect from "./UserFilterSelect";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
-	if (!dateStr || typeof dateStr !== "string") return "";
+	if (!dateStr) return "";
 	const trimmed = dateStr.trim();
 	const comma = trimmed.indexOf(", ");
 	if (comma !== -1) {
@@ -165,7 +165,8 @@ const OffersList = () => {
 										<div className="flex flex-col gap-1 min-w-0">
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
-												{row.pick_up_location} - {row.delivery_location}{" "}
+												{routeSummary(row.route) ||
+													`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
 												(id: {row.id})
 											</p>
 										</div>
@@ -196,61 +197,45 @@ const OffersList = () => {
 													<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Pick Up Location
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Delivery Location
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Pick Up Time
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																Delivery Time
+																Route
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Weight
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-white/[0.08]">
 																Commodity
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-white/[0.08]">
 																Special Requirements
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
+																Notes
 															</TableCell>
 														</TableRow>
 													</TableHeader>
-												<TableBody>
-													<TableRow className="border-gray-200 dark:border-white/[0.08]">
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.pick_up_location ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.delivery_location ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.pick_up_time ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.delivery_time ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.weight != null ? row.weight : "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-															{row.commodity ?? "—"}
-														</TableCell>
-														<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
-															{formatSpecialRequirements(row.special_requirements) || "—"}
-														</TableCell>
-													</TableRow>
-												</TableBody>
-											</Table>
+													<TableBody>
+														<TableRow className="border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-pre-line">
+																{formatRoute(row.route) || "—"}
+															</TableCell>
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																{row.weight != null ? row.weight : "—"}
+															</TableCell>
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
+																{row.commodity ?? "—"}
+															</TableCell>
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
+																{formatSpecialRequirements(row.special_requirements) || "—"}
+															</TableCell>
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-gray-200 dark:border-white/[0.08]">
+																{row.notes && String(row.notes).trim()
+																	? String(row.notes).trim()
+																	: "—"}
+															</TableCell>
+														</TableRow>
+													</TableBody>
+												</Table>
 											</div>
-
-											{row.notes && String(row.notes).trim() && (
-												<p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-													Notes: {row.notes}
-												</p>
-											)}
 
 											{/* Drivers table */}
 											{row.drivers && row.drivers.length > 0 && (
@@ -261,13 +246,15 @@ const OffersList = () => {
 													<div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/[0.08]">
 													<Table className="border-collapse w-full table-fixed">
 														<colgroup>
-															<col style={{ width: "22%" }} />
-															<col style={{ width: "18%" }} />
-															<col style={{ width: "12%" }} />
-															<col style={{ width: "11%" }} />
-															<col style={{ width: "9%" }} />
+															<col style={{ width: "17%" }} />
 															<col style={{ width: "13%" }} />
-															<col style={{ width: "15%" }} />
+															<col style={{ width: "9%" }} />
+															<col style={{ width: "8%" }} />
+															<col style={{ width: "10%" }} />
+															<col style={{ width: "8%" }} />
+															<col style={{ width: "7%" }} />
+															<col style={{ width: "7%" }} />
+															<col style={{ width: "13%" }} />
 														</colgroup>
 														<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 															<TableRow className="border-gray-200 dark:border-white/[0.08]">
@@ -282,6 +269,12 @@ const OffersList = () => {
 																</TableCell>
 																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Driver Id
+																</TableCell>
+																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																	Empty miles
+																</TableCell>
+																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																	Total miles
 																</TableCell>
 																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Rate
@@ -317,6 +310,16 @@ const OffersList = () => {
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		{driver.externalId ?? "—"}
+																	</TableCell>
+																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																		{driver.empty_miles != null
+																			? Math.round(driver.empty_miles)
+																			: "—"}
+																	</TableCell>
+																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08]">
+																		{driver.total_miles != null
+																			? Math.round(driver.total_miles)
+																			: "—"}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		{driver.rate != null ? driver.rate : "—"}

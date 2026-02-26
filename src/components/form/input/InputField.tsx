@@ -9,11 +9,13 @@ interface InputProps {
 	value?: string | number;
 	defaultValue?: string | number;
 	onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+	onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
 	className?: string;
 	min?: string;
 	max?: string;
 	step?: number;
 	disabled?: boolean;
+	readOnly?: boolean;
 	success?: boolean;
 	error?: boolean;
 	hint?: string;
@@ -27,11 +29,13 @@ const Input: FC<InputProps> = ({
 	value,
 	defaultValue,
 	onChange,
+	onBlur,
 	className = "",
 	min,
 	max,
 	step,
 	disabled = false,
+	readOnly = false,
 	success = false,
 	error = false,
 	hint,
@@ -58,10 +62,12 @@ const Input: FC<InputProps> = ({
 				value={value}
 				defaultValue={defaultValue}
 				onChange={onChange}
+				onBlur={onBlur}
 				min={min}
 				max={max}
 				step={step}
 				disabled={disabled}
+				readOnly={readOnly}
 				className={inputClasses}
 			/>
 

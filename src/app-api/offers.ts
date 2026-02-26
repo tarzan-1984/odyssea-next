@@ -10,6 +10,14 @@ export interface OfferDriver {
 	status: string;
 	rate: number | null;
 	action_time?: string | null;
+	empty_miles: number | null;
+	total_miles: number | null;
+}
+
+export interface OfferRoutePoint {
+	type: "pick_up_location" | "delivery_location";
+	location: string;
+	time: string;
 }
 
 export interface OfferRow {
@@ -18,10 +26,11 @@ export interface OfferRow {
 	external_user_id: string | null;
 	create_time: string;
 	update_time: string;
-	pick_up_location: string;
-	pick_up_time: string;
-	delivery_location: string;
-	delivery_time: string;
+	pick_up_location?: string;
+	pick_up_time?: string;
+	delivery_location?: string;
+	delivery_time?: string;
+	route?: OfferRoutePoint[] | null;
 	loaded_miles: number | null;
 	empty_miles: number | null;
 	weight: number | null;
@@ -56,6 +65,31 @@ export interface GetOffersResponse {
 	};
 }
 
+/** Format route array as "Pick up - location - time" / "Delivery - location - time" per line */
+export function formatRoute(
+	route: Array<{ type?: string; location?: string; time?: string }> | null | undefined,
+): string {
+	if (!Array.isArray(route) || route.length === 0) return "";
+	return route
+		.map((p) => {
+			const label = p.type === "pick_up_location" ? "Pick up" : "Delivery";
+			const loc = p.location ?? "";
+			const t = p.time ?? "";
+			return `${label} - ${loc} - ${t}`;
+		})
+		.join("\n");
+}
+
+/** First and last locations from route for short display (e.g. header) */
+export function routeSummary(
+	route: Array<{ location?: string }> | null | undefined,
+): string {
+	if (!Array.isArray(route) || route.length === 0) return "";
+	const first = route[0]?.location ?? "";
+	const last = route.length > 1 ? route[route.length - 1]?.location ?? "" : first;
+	return last ? `${first} → ${last}` : first;
+}
+
 export interface CreateOfferRoutePoint {
 	type: "pick_up_location" | "delivery_location";
 	location: string;
@@ -67,8 +101,8 @@ export interface CreateOfferPayload {
 	driverIds: string[];
 	route: CreateOfferRoutePoint[];
 	loadedMiles?: number;
-	emptyMiles?: number;
-	totalMiles?: number;
+	/** Map driverId -> empty_miles. Used for rate_offers: empty_miles per driver, total_miles = loaded_miles + empty_miles */
+	driverEmptyMiles?: Record<string, number>;
 	weight?: number;
 	commodity?: string;
 	specialRequirements?: string[];
@@ -120,6 +154,52 @@ const offers = {
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
+	},
+
+	/**
+	 * Geocode a ZIP code to "City, State (ZIP)" format.
+	 * Returns the input unchanged if not a ZIP or if geocoding fails.
+	 */
+	async geocodeToFormattedAddress(address: string): Promise<string> {
+		const response = await axios.post<{ formattedAddress?: string; error?: string }>(
+			"/api/offers/geocode-to-formatted",
+			{ address: address.trim() },
+			{
+				headers: { "Content-Type": "application/json" },
+				withCredentials: true,
+				validateStatus: () => true,
+			}
+		);
+		if (response.status >= 200 && response.status < 300) {
+			return response.data?.formattedAddress ?? address.trim();
+		}
+		return address.trim();
+	},
+
+	/**
+	 * Calculate route distance (road miles) for a sequence of addresses using Nominatim + OSRM.
+	 * Requires at least 2 locations. Returns loadedMiles or throws on error.
+	 */
+	async calculateRouteDistance(locations: string[]): Promise<{ loadedMiles: number }> {
+		const response = await axios.post<{ loadedMiles?: number; error?: string }>(
+			"/api/offers/calculate-route-distance",
+			{ locations },
+			{
+				headers: { "Content-Type": "application/json" },
+				withCredentials: true,
+				validateStatus: () => true,
+			}
+		);
+
+		const data = response.data;
+
+		if (response.status >= 200 && response.status < 300 && typeof data.loadedMiles === "number") {
+			return { loadedMiles: data.loadedMiles };
+		}
+
+		throw new Error(
+			(typeof data === "object" && data?.error) || "Failed to calculate route distance"
+		);
 	},
 
 	/**

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -12,6 +12,7 @@ import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -20,6 +21,8 @@ export interface CreateOfferModalProps {
 	onClose: () => void;
 	externalId: string;
 	selectedDriverIds: string[];
+	/** Map driverId -> empty_miles (rounded). Passed to backend for rate_offers. */
+	driverEmptyMiles?: Record<string, number>;
 	onSubmit?: (values: CreateOfferFormValues) => void;
 }
 
@@ -53,6 +56,22 @@ const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
 
+/** ZIP pattern: 5 digits, optionally +4 */
+const ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
+
+/** City, State format: "City, State" or "City, State (ZIP)" */
+const CITY_STATE_PATTERN = /^[^,]+\s*,\s*[^,]+$/;
+
+function isValidLocationFormat(value: string): boolean {
+	const trimmed = value.trim();
+	if (!trimmed) return true; // Empty is handled elsewhere
+	const normalized = trimmed.replace(/\s/g, "");
+	if (ZIP_PATTERN.test(normalized)) return true;
+	return CITY_STATE_PATTERN.test(trimmed);
+}
+
+const LOCATION_FORMAT_ERROR = "Use format: City, State (e.g. Los Angeles, CA) or ZIP code";
+
 /** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
 	row,
@@ -61,6 +80,11 @@ function DraggableExtraRow({
 	removeExtraRow,
 	moveRow,
 	pendingDropRef,
+	onAddressBlur,
+	onLocationChange,
+	locationError,
+	canRemove = true,
+	rowCount,
 }: {
 	row: RouteRow;
 	index: number;
@@ -68,29 +92,39 @@ function DraggableExtraRow({
 	removeExtraRow: (index: number) => void;
 	moveRow: (dragIndex: number, hoverIndex: number) => void;
 	pendingDropRef: React.MutableRefObject<number | null>;
+	onAddressBlur?: (index: number, value: string, rowId: string) => void | Promise<void>;
+	onLocationChange?: (rowId: string) => void;
+	locationError?: string;
+	/** When false, hide the remove button (e.g. only one row of this type remains) */
+	canRemove?: boolean;
+	rowCount: number;
 }) {
 	const ref = useRef<HTMLDivElement>(null);
 
 	const [{ isDragging }, drag] = useDrag({
 		type: DND_EXTRA_ROW_TYPE,
-		item: () => ({ index }),
+		item: () => ({ index, type: row.type }),
 		collect: monitor => ({ isDragging: monitor.isDragging() }),
 	});
 
 	const [{ isOver, dragIndex }, drop] = useDrop({
 		accept: DND_EXTRA_ROW_TYPE,
 		collect: monitor => {
-			const item = monitor.getItem() as { index: number } | null;
+			const item = monitor.getItem() as { index: number; type?: "pickup" | "delivery" } | null;
 			return {
 				isOver: monitor.isOver(),
 				dragIndex: item?.index ?? null,
 			};
 		},
-		hover: (item: { index: number }, monitor) => {
+		hover: (item: { index: number; type?: "pickup" | "delivery" }, monitor) => {
 			if (!ref.current) return;
 			const dragIndex = item.index;
 			const hoverIndex = index;
 			if (dragIndex === hoverIndex) return;
+			// Prevent Delivery from being first, Pick up from being last
+			const draggedType = item.type;
+			if (draggedType === "delivery" && hoverIndex === 0) return;
+			if (draggedType === "pickup" && hoverIndex === rowCount - 1) return;
 			const hoverBoundingRect = ref.current.getBoundingClientRect();
 			const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
 			const clientOffset = monitor.getClientOffset();
@@ -101,10 +135,14 @@ function DraggableExtraRow({
 			// Store target index for drop; do NOT move array during drag
 			pendingDropRef.current = hoverIndex;
 		},
-		drop: (item: { index: number }) => {
+		drop: (item: { index: number; type?: "pickup" | "delivery" }) => {
 			const dragIndex = item.index;
 			const dropIndex = pendingDropRef.current ?? index;
 			pendingDropRef.current = null;
+			// Prevent invalid moves: Delivery first or Pick up last
+			const draggedType = item.type;
+			if (draggedType === "delivery" && dropIndex === 0) return;
+			if (draggedType === "pickup" && dropIndex === rowCount - 1) return;
 			if (dragIndex !== dropIndex) {
 				moveRow(dragIndex, dropIndex);
 			}
@@ -131,21 +169,31 @@ function DraggableExtraRow({
 					aria-hidden
 				/>
 			)}
-			<div className="min-w-0">
+			<div className="min-w-0 relative">
 				<Label>
 					{row.type === "pickup" ? "Pick up location" : "Delivery location"}
 				</Label>
 				<Input
 					type="text"
 					value={row.location}
-					onChange={e => updateExtraRow(index, "location", e.target.value)}
+					onChange={e => {
+						updateExtraRow(index, "location", e.target.value);
+						onLocationChange?.(row.id);
+					}}
+					onBlur={() => onAddressBlur?.(index, row.location, row.id)}
 					placeholder={
 						row.type === "pickup"
 							? "Enter pick up location"
 							: "Enter delivery location"
 					}
 					className="dark:bg-gray-900"
+					error={Boolean(locationError)}
 				/>
+				{locationError && (
+					<p className="absolute left-0 top-full mt-1 text-xs text-red-500 dark:text-red-400 whitespace-nowrap">
+						{locationError}
+					</p>
+				)}
 			</div>
 			<div className="min-w-0">
 				<Label>
@@ -163,18 +211,20 @@ function DraggableExtraRow({
 					className="dark:bg-gray-900"
 				/>
 			</div>
-			<div className="flex items-center self-end mt-1.5">
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
-					onClick={() => removeExtraRow(index)}
-					aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
-				>
-					−
-				</Button>
-			</div>
+			{canRemove && (
+				<div className="flex items-center self-end mt-1.5">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+						onClick={() => removeExtraRow(index)}
+						aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
+					>
+						−
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -184,6 +234,7 @@ export default function CreateOfferModal({
 	onClose,
 	externalId,
 	selectedDriverIds,
+	driverEmptyMiles = {},
 	onSubmit,
 }: CreateOfferModalProps) {
 	const [formValues, setFormValues] = useState(initialFormState);
@@ -192,8 +243,22 @@ export default function CreateOfferModal({
 		{}
 	);
 	const [routeError, setRouteError] = useState<string | null>(null);
+	/** Location format errors keyed by row.id */
+	const [routeRowLocationErrors, setRouteRowLocationErrors] = useState<Record<string, string>>(
+		{}
+	);
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	const [loadedMiles, setLoadedMiles] = useState<number | null>(null);
+	const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+	const [routeDistanceError, setRouteDistanceError] = useState<string | null>(null);
+	const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const routeRowsRef = useRef(routeRows);
+
+	useEffect(() => {
+		routeRowsRef.current = routeRows;
+	}, [routeRows]);
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
@@ -203,9 +268,26 @@ export default function CreateOfferModal({
 			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
 			setErrors({});
 			setRouteError(null);
+			setRouteRowLocationErrors({});
 			setSubmitError("");
+			setLoadedMiles(null);
+			setRouteDistanceError(null);
+			if (debounceTimerRef.current) {
+				clearTimeout(debounceTimerRef.current);
+				debounceTimerRef.current = null;
+			}
 		}
 	}, [isOpen]);
+
+	// Reset loaded miles when route structure changes (add/remove rows)
+	useEffect(() => {
+		setLoadedMiles(null);
+		setRouteDistanceError(null);
+		if (debounceTimerRef.current) {
+			clearTimeout(debounceTimerRef.current);
+			debounceTimerRef.current = null;
+		}
+	}, [routeRows.length]);
 
 	const addPickUpRow = () => {
 		setRouteRows(prev => [...prev, initialRouteRow("pickup")]);
@@ -227,17 +309,113 @@ export default function CreateOfferModal({
 		setRouteRows(prev => prev.filter((_, i) => i !== index));
 	};
 
-	const moveExtraRow = (dragIndex: number, hoverIndex: number) => {
-		setRouteRows(prev => {
-			const next = [...prev];
-			const [removed] = next.splice(dragIndex, 1);
-			next.splice(hoverIndex, 0, removed);
-			return next;
-		});
-	};
-
 	// Ref to store target index during drag; move happens only on drop
 	const pendingDropRef = useRef<number | null>(null);
+
+	const runRouteDistanceCalculationWithLocations = useCallback(
+		async (locations: string[]) => {
+			if (locations.length < 2) {
+				setLoadedMiles(null);
+				setRouteDistanceError(null);
+				return;
+			}
+			setRouteDistanceError(null);
+			setIsCalculatingRoute(true);
+			try {
+				const { loadedMiles: miles } = await offers.calculateRouteDistance(locations);
+				setLoadedMiles(miles);
+			} catch (err) {
+				setLoadedMiles(null);
+				setRouteDistanceError(
+					err instanceof Error ? err.message : "Could not calculate route distance"
+				);
+			} finally {
+				setIsCalculatingRoute(false);
+			}
+		},
+		[]
+	);
+
+	const scheduleRouteRecalculation = useCallback(() => {
+		if (debounceTimerRef.current) {
+			clearTimeout(debounceTimerRef.current);
+		}
+		debounceTimerRef.current = setTimeout(() => {
+			debounceTimerRef.current = null;
+			const rows = routeRowsRef.current;
+			const locations = rows.map(r => r.location.trim()).filter(Boolean);
+			const allFilled = rows.every(r => r.location.trim() !== "");
+			const allValidFormat = rows
+				.filter(r => r.location.trim() !== "")
+				.every(r => isValidLocationFormat(r.location.trim()));
+			if (locations.length >= 2 && allFilled && allValidFormat) {
+				runRouteDistanceCalculationWithLocations(locations);
+			} else if (locations.length < 2 || !allValidFormat) {
+				setLoadedMiles(null);
+				setRouteDistanceError(null);
+			}
+		}, 1000);
+	}, [runRouteDistanceCalculationWithLocations]);
+
+	const handleAddressBlur = useCallback(
+		async (index: number, value: string, rowId: string) => {
+			const trimmed = value.trim();
+			if (!trimmed) {
+				setRouteRowLocationErrors(prev => {
+					const next = { ...prev };
+					delete next[rowId];
+					return next;
+				});
+				return;
+			}
+
+			// Validate format: must be ZIP or "City, State"
+			if (!isValidLocationFormat(trimmed)) {
+				setRouteRowLocationErrors(prev => ({ ...prev, [rowId]: LOCATION_FORMAT_ERROR }));
+				return;
+			}
+
+			setRouteRowLocationErrors(prev => {
+				const next = { ...prev };
+				delete next[rowId];
+				return next;
+			});
+
+			// Geocode ZIP to "City, State (ZIP)" format
+			if (ZIP_PATTERN.test(trimmed.replace(/\s/g, ""))) {
+				try {
+					const formatted = await offers.geocodeToFormattedAddress(trimmed);
+					if (formatted && formatted !== trimmed) {
+						setRouteRows(prev => {
+							const next = [...prev];
+							if (next[index]) {
+								next[index] = { ...next[index], location: formatted };
+							}
+							return next;
+						});
+					}
+				} catch {
+					// Keep original value on error
+				}
+			}
+
+			scheduleRouteRecalculation();
+		},
+		[scheduleRouteRecalculation]
+	);
+
+	const moveExtraRow = useCallback(
+		(dragIndex: number, hoverIndex: number) => {
+			setRouteRows(prev => {
+				const next = [...prev];
+				const [removed] = next.splice(dragIndex, 1);
+				next.splice(hoverIndex, 0, removed);
+				return next;
+			});
+			scheduleRouteRecalculation();
+		},
+		[scheduleRouteRecalculation]
+	);
 
 	const validate = (): {
 		fieldErrors: Partial<Record<keyof typeof initialFormState, string>>;
@@ -285,6 +463,14 @@ export default function CreateOfferModal({
 					routeError = "The first stop in route must be Pick up";
 				} else if (last.type !== "delivery") {
 					routeError = "The last stop in route must be Delivery";
+				} else {
+					// Validate location format for filled rows
+					const invalidLocation = trimmedRoute.some(
+						row => row.location !== "" && !isValidLocationFormat(row.location)
+					);
+					if (invalidLocation) {
+						routeError = LOCATION_FORMAT_ERROR;
+					}
 				}
 			}
 		}
@@ -317,6 +503,37 @@ export default function CreateOfferModal({
 		setErrors({});
 		setRouteError(null);
 		setSubmitError("");
+		setRouteDistanceError(null);
+
+		// Ensure route distance is calculated before submit
+		let milesToSend = loadedMiles;
+		if (milesToSend == null && !isCalculatingRoute) {
+			const locations = routeRows.map(r => r.location.trim()).filter(Boolean);
+			if (locations.length >= 2) {
+				setIsCalculatingRoute(true);
+				try {
+					const { loadedMiles: miles } = await offers.calculateRouteDistance(locations);
+					milesToSend = miles;
+					setLoadedMiles(miles);
+				} catch (err) {
+					setRouteDistanceError(
+						err instanceof Error ? err.message : "Could not calculate route distance"
+					);
+					setIsCalculatingRoute(false);
+					return;
+				}
+				setIsCalculatingRoute(false);
+			}
+		} else if (isCalculatingRoute) {
+			setSubmitError("Please wait for route distance calculation to complete");
+			return;
+		}
+
+		if (milesToSend == null) {
+			setRouteDistanceError("Route distance could not be calculated");
+			return;
+		}
+
 		setIsSubmitting(true);
 		try {
 			const routePayload: CreateOfferRoutePoint[] = routeRows.map(row => ({
@@ -331,6 +548,9 @@ export default function CreateOfferModal({
 				externalId,
 				driverIds: selectedDriverIds,
 				route: routePayload,
+				loadedMiles: Math.round(milesToSend),
+				driverEmptyMiles:
+					Object.keys(driverEmptyMiles).length > 0 ? driverEmptyMiles : undefined,
 				weight: parseWeight(formValues.weight),
 				commodity: formValues.commodity.trim() || undefined,
 				specialRequirements:
@@ -360,7 +580,7 @@ export default function CreateOfferModal({
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
-			className="relative w-full max-w-2xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
+			className="relative w-full max-w-4xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
 		>
 			<form onSubmit={handleSubmit} className="space-y-5">
 				<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -384,32 +604,78 @@ export default function CreateOfferModal({
 							removeExtraRow={removeExtraRow}
 							moveRow={moveExtraRow}
 							pendingDropRef={pendingDropRef}
+							onAddressBlur={handleAddressBlur}
+							onLocationChange={rowId =>
+								setRouteRowLocationErrors(prev => {
+									const next = { ...prev };
+									delete next[rowId];
+									return next;
+								})
+							}
+							locationError={routeRowLocationErrors[row.id]}
+							canRemove={
+								(row.type === "pickup" &&
+									routeRows.filter(r => r.type === "pickup").length > 1) ||
+								(row.type === "delivery" &&
+									routeRows.filter(r => r.type === "delivery").length > 1)
+							}
+							rowCount={routeRows.length}
 						/>
 					))}
 				</DndProvider>
 
-				{/* Add Pick Up and Add Delivery — below all route rows */}
-				<div className="flex justify-end gap-2 mt-2">
-					<Button
-						type="button"
-						variant="primary"
-						size="sm"
-						className="!py-1.5 !px-3 text-xs"
-						onClick={addPickUpRow}
-					>
-						Add Pick Up
-					</Button>
-					<Button
-						type="button"
-						variant="primary"
-						size="sm"
-						className="!py-1.5 !px-3 text-xs"
-						onClick={addDeliveryRow}
-					>
-						Add Delivery
-					</Button>
+				{/* Loaded miles (left, 50%) and Add Pick Up / Add Delivery buttons (right) */}
+				<div className="flex items-end gap-3 mt-2">
+					<div className="relative w-1/2 min-w-0">
+						<Label htmlFor="loaded-miles-field">Loaded miles</Label>
+						<div className="relative">
+							<Input
+								id="loaded-miles-field"
+								type="text"
+								readOnly
+								value={
+									loadedMiles != null
+										? Number.isFinite(loadedMiles)
+											? String(Math.round(loadedMiles))
+											: ""
+										: ""
+								}
+								placeholder="Fill all addresses and blur to calculate"
+								className="cursor-not-allowed"
+							/>
+							{isCalculatingRoute && (
+								<div
+									className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-gray-900/80"
+									aria-hidden
+								>
+									<SpinnerOne />
+								</div>
+							)}
+						</div>
+					</div>
+					<div className="flex gap-2 w-1/2 min-w-0">
+						<Button
+							type="button"
+							variant="primary"
+							className="h-11 flex-1 !py-0"
+							onClick={addPickUpRow}
+						>
+							Add Pick Up
+						</Button>
+						<Button
+							type="button"
+							variant="primary"
+							className="h-11 flex-1 !py-0"
+							onClick={addDeliveryRow}
+						>
+							Add Delivery
+						</Button>
+					</div>
 				</div>
 
+				{routeDistanceError && (
+					<p className="text-sm text-red-500 dark:text-red-400">{routeDistanceError}</p>
+				)}
 				{routeError && (
 					<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
 				)}
@@ -530,7 +796,16 @@ export default function CreateOfferModal({
 					>
 						Cancel
 					</Button>
-					<Button type="submit" size="sm" disabled={isSubmitting}>
+					<Button
+						type="submit"
+						size="sm"
+						disabled={
+							isSubmitting ||
+							isCalculatingRoute ||
+							loadedMiles == null ||
+							loadedMiles === 0
+						}
+					>
 						{isSubmitting ? "Creating…" : "Create"}
 					</Button>
 				</div>
