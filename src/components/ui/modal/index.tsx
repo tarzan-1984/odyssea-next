@@ -61,12 +61,13 @@ export const Modal: React.FC<ModalProps> = ({
 			{(!isFullscreen || closeOnBackdropClick) && (
 				<div
 					className="fixed inset-0 h-full w-full bg-primary/70 backdrop-blur-[3px] z-[99999]"
-				></div>
+					onClick={closeOnBackdropClick ? onClose : undefined}
+				/>
 			)}
 			<div
 				ref={modalRef}
 				className={`${contentClasses} ${className} relative z-[100000]`}
-				onClick={closeOnBackdropClick  ? onClose : e => e.stopPropagation()}
+				onClick={(e) => e.stopPropagation()}
 			>
 				{showCloseButton && (
 					<button

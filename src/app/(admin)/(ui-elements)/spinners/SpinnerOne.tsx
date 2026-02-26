@@ -1,8 +1,13 @@
 import React from "react";
+import { cn } from "@/utils";
 
-export default function SpinnerOne() {
+interface SpinnerOneProps {
+	className?: string;
+}
+
+export default function SpinnerOne({ className }: SpinnerOneProps) {
 	return (
-		<div className="flex items-center justify-center gap-4">
+		<div className={cn("flex items-center justify-center gap-4", className)}>
 			<div className="text-gray-200 animate-spin stroke-brand-500 dark:text-gray-800">
 				<svg
 					width="20"

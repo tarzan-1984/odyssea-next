@@ -48,6 +48,7 @@ import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
+import DriverNotesModal from "./DriverNotesModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 
 // Same status colors as on Drivers Map markers
@@ -135,6 +136,13 @@ export default function DriversListTable({
 	// Create offer modal (only used when showActionsInHeader)
 	const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
 
+	// Driver notes modal (driver id, name, notes count when open)
+	const [notesModalDriver, setNotesModalDriver] = useState<{
+		driverId: string;
+		name: string;
+		notesCount: number;
+	} | null>(null);
+
 	// Local filters
 	const [addressFilter, setAddressFilter] = useState<string>("");
 	const [debouncedAddressFilter, setDebouncedAddressFilter] = useState<string>("");
@@ -190,6 +198,8 @@ export default function DriversListTable({
 		placeholderData: keepPreviousData,
 		enabled: queryEnabled,
 	});
+
+	console.log('driverList', driverList);
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
@@ -348,7 +358,7 @@ export default function DriversListTable({
 				</>
 			)}
 
-			<div className="relative z-0 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
+			<div className="relative z-10 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
 					{/* Capabilities (multiselect) */}
 					<div className="flex min-w-0 flex-col md:min-w-[220px]">
@@ -1465,9 +1475,9 @@ export default function DriversListTable({
 															maxWidth: 72,
 														}}
 													>
-														{item?.meta_data?.rating != null &&
-														item.meta_data.rating !== ""
-															? String(item.meta_data.rating)
+														{item?.rating?.avg_rating != null &&
+														item.rating.avg_rating > 0
+															? item.rating.avg_rating
 															: "—"}
 													</TableCell>
 
@@ -1480,7 +1490,26 @@ export default function DriversListTable({
 															maxWidth: 72,
 														}}
 													>
-														—
+														<button
+															type="button"
+															onClick={() =>
+																setNotesModalDriver({
+																	driverId:
+																		String(
+																			item?.meta_data?.driver_id ??
+																				item?.id ??
+																				""
+																		),
+																	name:
+																		item?.meta_data?.driver_name ??
+																		"Driver",
+																	notesCount: item?.notes?.count ?? 0,
+																})
+															}
+															className="inline-flex min-w-[3.5rem] max-w-full items-center justify-center rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+														>
+															{item?.notes?.count ?? 0}
+														</button>
 													</TableCell>
 												</TableRow>
 											);
@@ -1543,6 +1572,16 @@ export default function DriversListTable({
 				>
 					<SpinnerOne />
 				</div>
+			)}
+
+			{notesModalDriver && (
+				<DriverNotesModal
+					isOpen
+					onClose={() => setNotesModalDriver(null)}
+					driverId={notesModalDriver.driverId}
+					driverName={notesModalDriver.name}
+					notesCount={notesModalDriver.notesCount}
+				/>
 			)}
 		</div>
 	);

@@ -203,6 +203,13 @@ export interface Driver {
 	updated_zipcode: string;
 	user_id_added: string;
 	user_id_updated: string;
+	rating: {
+		avg_rating: number;
+		count: 0;
+	}
+	notes: {
+		count: number
+	}
 }
 
 export interface DriversPage {
