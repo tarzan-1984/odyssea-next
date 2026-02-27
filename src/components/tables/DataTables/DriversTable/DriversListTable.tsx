@@ -98,6 +98,13 @@ function getStatusLabel(status: string | null | undefined): string {
 }
 
 /** Format date as mm/dd/YY for Location & Date column */
+function formatVehicleType(value: string | null | undefined): string {
+	if (!value) return "";
+	return value
+		.replace(/-/g, " ")
+		.replace(/^\w/, c => c.toUpperCase());
+}
+
 function formatDateMmDdYy(date: Date | null): string {
 	if (!date || Number.isNaN(date.getTime())) return "";
 	const m = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -165,12 +172,6 @@ export default function DriversListTable({
 		hasAddedAny: false,
 	});
 
-	const toggleDriverSelection = (driverId: string) => {
-		setSelectedDriverIds(prev =>
-			prev.includes(driverId) ? prev.filter(id => id !== driverId) : [...prev, driverId]
-		);
-	};
-
 	const isAdmin = currentUser?.role?.toLowerCase() === "administrator";
 	const requiresAddressToSearch = !isAdmin;
 	const queryEnabled = isAdmin || Boolean(debouncedAddressFilter?.trim());
@@ -198,8 +199,6 @@ export default function DriversListTable({
 		placeholderData: keepPreviousData,
 		enabled: queryEnabled,
 	});
-
-	console.log('driverList', driverList);
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
@@ -781,7 +780,7 @@ export default function DriversListTable({
 											{ key: "vehicle", label: "Vehicle", sortable: false },
 											{
 												key: "dimensions",
-												label: "Dimensions",
+												label: "Dimensions & Payload",
 												sortable: false,
 											},
 											{
@@ -799,8 +798,8 @@ export default function DriversListTable({
 												className={`py-3 border border-gray-100 dark:border-white/[0.05] ${
 													key === "status"
 														? "px-4 text-center align-middle"
-														: key === "distance"
-															? "px-2 text-right"
+						: key === "distance"
+								? "px-2 text-center"
 															: key === "rating" || key === "notes"
 																? "px-2"
 																: "px-4"
@@ -894,11 +893,14 @@ export default function DriversListTable({
 											const isAlreadyInOffer = existingDriverIdsSet.has(
 												String(item.id)
 											);
-											const isStatusHovered = hoveredStatusRowIndex === i;
-											const isSelected = selectedDriverIds.includes(
-												String(item.id)
-											);
-											const showHighlight = isSelected || isStatusHovered;
+										const isStatusHovered = hoveredStatusRowIndex === i;
+										const isSelected = selectedDriverIds.includes(
+											String(item.id)
+										);
+										const showHighlight = isSelected || isStatusHovered;
+										const cellBorder = isSelected
+											? "border-white dark:border-white/[0.12]"
+											: "border-gray-100 dark:border-white/[0.05]";
 
 											return (
 												<TableRow
@@ -923,12 +925,12 @@ export default function DriversListTable({
 														const statusColor = getStatusColor(status);
 														const statusLabel = getStatusLabel(status);
 														return (
-															<TableCell
-																className={`relative px-4 py-3 font-normal text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-center align-middle select-none ${
-																	isAlreadyInOffer
-																		? "cursor-not-allowed"
-																		: "cursor-pointer"
-																}`}
+														<TableCell
+															className={`relative px-4 py-3 font-normal text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center align-middle select-none ${
+																isAlreadyInOffer
+																	? "cursor-not-allowed"
+																	: "cursor-pointer"
+															}`}
 																style={{
 																	backgroundColor: statusColor,
 																}}
@@ -1024,9 +1026,9 @@ export default function DriversListTable({
 															? formatDateMmDdYy(locationDate)
 															: dateStr || "";
 														return (
-															<TableCell
-																className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
-															>
+														<TableCell
+															className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
+														>
 																<p>
 																	{item?.meta_data?.current_city}{" "}
 																	{
@@ -1041,13 +1043,13 @@ export default function DriversListTable({
 
 													{/*Distance - only when Address filter is filled and API returns id_posts*/}
 													{showDistanceColumn && (
-														<TableCell
-															className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap text-right"
-															style={{
-																width: 68,
-																minWidth: 68,
-																maxWidth: 68,
-															}}
+													<TableCell
+														className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center`}
+														style={{
+															width: 68,
+															minWidth: 68,
+															maxWidth: 68,
+														}}
 														>
 															{(() => {
 																const key =
@@ -1066,8 +1068,8 @@ export default function DriversListTable({
 														</TableCell>
 													)}
 
-													{/*Driver*/}
-													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
+												{/*Driver*/}
+												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 														<div className="space-y-0.5 break-words">
 															<p
 																className="break-words"
@@ -1088,11 +1090,11 @@ export default function DriversListTable({
 														</div>
 													</TableCell>
 
-													{/*Vehicle*/}
-													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
-														<p className="break-words">
-															{item?.meta_data?.vehicle_type}
-														</p>
+												{/*Vehicle*/}
+												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+							<p className="break-words">
+								{formatVehicleType(item?.meta_data?.vehicle_type)}
+							</p>
 														<p className="break-words">
 															{item?.meta_data?.vehicle_make}{" "}
 															{item?.meta_data?.vehicle_model}{" "}
@@ -1100,14 +1102,14 @@ export default function DriversListTable({
 														</p>
 													</TableCell>
 
-													{/*Dimensions*/}
-													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
+												{/*Dimensions*/}
+												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}>
 														<p>{item?.meta_data?.dimensions}</p>
 														<p>{item?.meta_data?.payload} lbs</p>
 													</TableCell>
 
-													{/*Equipment*/}
-													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]">
+												{/*Equipment*/}
+												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]`}>
 														{item?.meta_data?.twic === "on" && (
 															<Tooltip
 																theme="inverse"
@@ -1458,22 +1460,22 @@ export default function DriversListTable({
 														)}
 													</TableCell>
 
-													{/* Comments */}
-													<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm break-words">
+												{/* Comments */}
+												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 														{item?.meta_data?.notes != null &&
 														String(item.meta_data.notes).trim() !== ""
 															? String(item.meta_data.notes)
 															: "—"}
 													</TableCell>
 
-													{/* Rating */}
-													<TableCell
-														className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap"
-														style={{
-															width: 72,
-															minWidth: 72,
-															maxWidth: 72,
-														}}
+												{/* Rating */}
+												<TableCell
+													className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+													style={{
+														width: 72,
+														minWidth: 72,
+														maxWidth: 72,
+													}}
 													>
 														{item?.rating?.avg_rating != null &&
 														item.rating.avg_rating > 0
@@ -1481,14 +1483,14 @@ export default function DriversListTable({
 															: "—"}
 													</TableCell>
 
-													{/* Notes */}
-													<TableCell
-														className="px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap"
-														style={{
-															width: 72,
-															minWidth: 72,
-															maxWidth: 72,
-														}}
+												{/* Notes */}
+												<TableCell
+													className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+													style={{
+														width: 72,
+														minWidth: 72,
+														maxWidth: 72,
+													}}
 													>
 														<button
 															type="button"

@@ -96,6 +96,7 @@ import Local from "./additional/local.svg";
 import Regional from "./additional/regional.svg";
 import Canada from "./additional/canada.svg";
 import Mexico from "./additional/mexico.svg";
+import DragHandleIcon from "./DragHandleIcon";
 
 export {
 	Mexico,
@@ -196,4 +197,5 @@ export {
 	TeamIcon,
 	CdlIcon,
 	TsaIcon,
+	DragHandleIcon,
 };

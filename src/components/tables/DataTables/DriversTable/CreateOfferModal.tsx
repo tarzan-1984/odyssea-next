@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { useQuery } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
@@ -13,9 +14,11 @@ import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
+import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
+
 
 export interface CreateOfferModalProps {
 	isOpen: boolean;
@@ -73,6 +76,7 @@ function isValidLocationFormat(value: string): boolean {
 
 const LOCATION_FORMAT_ERROR = "Use format: City, State (e.g. Los Angeles, CA) or ZIP code";
 
+
 /** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
 	row,
@@ -83,6 +87,7 @@ function DraggableExtraRow({
 	pendingDropRef,
 	onAddressBlur,
 	onLocationChange,
+	onTimeBlur,
 	locationError,
 	canRemove = true,
 	rowCount,
@@ -95,14 +100,16 @@ function DraggableExtraRow({
 	pendingDropRef: React.MutableRefObject<number | null>;
 	onAddressBlur?: (index: number, value: string, rowId: string) => void | Promise<void>;
 	onLocationChange?: (rowId: string) => void;
+	onTimeBlur?: () => void;
 	locationError?: string;
 	/** When false, hide the remove button (e.g. only one row of this type remains) */
 	canRemove?: boolean;
 	rowCount: number;
 }) {
-	const ref = useRef<HTMLDivElement>(null);
+	const rowRef = useRef<HTMLDivElement>(null);
+	const handleRef = useRef<HTMLDivElement>(null);
 
-	const [{ isDragging }, drag] = useDrag({
+	const [{ isDragging }, drag, dragPreview] = useDrag({
 		type: DND_EXTRA_ROW_TYPE,
 		item: () => ({ index, type: row.type }),
 		collect: monitor => ({ isDragging: monitor.isDragging() }),
@@ -118,7 +125,7 @@ function DraggableExtraRow({
 			};
 		},
 		hover: (item: { index: number; type?: "pickup" | "delivery" }, monitor) => {
-			if (!ref.current) return;
+			if (!rowRef.current) return;
 			const dragIndex = item.index;
 			const hoverIndex = index;
 			if (dragIndex === hoverIndex) return;
@@ -126,21 +133,19 @@ function DraggableExtraRow({
 			const draggedType = item.type;
 			if (draggedType === "delivery" && hoverIndex === 0) return;
 			if (draggedType === "pickup" && hoverIndex === rowCount - 1) return;
-			const hoverBoundingRect = ref.current.getBoundingClientRect();
+			const hoverBoundingRect = rowRef.current.getBoundingClientRect();
 			const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
 			const clientOffset = monitor.getClientOffset();
 			if (!clientOffset) return;
 			const hoverClientY = clientOffset.y - hoverBoundingRect.top;
 			if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
 			if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-			// Store target index for drop; do NOT move array during drag
 			pendingDropRef.current = hoverIndex;
 		},
 		drop: (item: { index: number; type?: "pickup" | "delivery" }) => {
 			const dragIndex = item.index;
 			const dropIndex = pendingDropRef.current ?? index;
 			pendingDropRef.current = null;
-			// Prevent invalid moves: Delivery first or Pick up last
 			const draggedType = item.type;
 			if (draggedType === "delivery" && dropIndex === 0) return;
 			if (draggedType === "pickup" && dropIndex === rowCount - 1) return;
@@ -150,12 +155,18 @@ function DraggableExtraRow({
 		},
 	});
 
-	drag(drop(ref));
+	// Drop target is the whole row; drag source is the handle (only when reorder is available);
+	// dragPreview on rowRef so the whole row appears as ghost during drag
+	drop(rowRef);
+	if (rowCount > 2) {
+		drag(handleRef);
+		dragPreview(rowRef);
+	}
 
 	return (
 		<div
-			ref={ref}
-			className="relative grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(9rem,1fr)_auto] sm:items-end mt-2 cursor-move"
+			ref={rowRef}
+			className="relative flex flex-col sm:flex-row sm:items-end gap-4 mt-2"
 			style={{
 				opacity: isDragging ? 0 : 1,
 				pointerEvents: isDragging ? "none" : undefined,
@@ -170,7 +181,20 @@ function DraggableExtraRow({
 					aria-hidden
 				/>
 			)}
-			<div className="min-w-0 relative">
+
+		{/* Drag handle — only shown when there are more than 2 rows */}
+		{rowCount > 2 && (
+			<div
+				ref={handleRef}
+				className="hidden sm:flex items-center justify-center self-end w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:border-gray-400 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:border-gray-500 transition-colors shrink-0"
+				aria-label="Drag to reorder"
+			>
+				<DragHandleIcon />
+			</div>
+		)}
+
+			{/* Location field */}
+			<div className="flex-1 min-w-0 relative">
 				<Label>
 					{row.type === "pickup" ? "Pick up location" : "Delivery location"}
 				</Label>
@@ -196,30 +220,33 @@ function DraggableExtraRow({
 					</p>
 				)}
 			</div>
-			<div className="min-w-[8rem] sm:min-w-[9rem]">
+
+			{/* Time field + remove button grouped together */}
+			<div className="flex items-end gap-2 shrink-0">
+				<div className="flex-1 sm:w-[9rem]">
 				<TimePicker
 					id={`time-${row.id}`}
 					label={row.type === "pickup" ? "Pick up time" : "Delivery time"}
 					value={row.time}
 					onChange={(v) => updateExtraRow(index, "time", v)}
+					onBlur={onTimeBlur}
 					placeholder="-- : -- pm"
 					className="dark:bg-gray-900"
 				/>
-			</div>
-			{canRemove && (
-				<div className="flex items-center self-end mt-1.5">
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
-						onClick={() => removeExtraRow(index)}
-						aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
-					>
-						−
-					</Button>
 				</div>
+			{canRemove && (
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+					onClick={() => removeExtraRow(index)}
+					aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
+				>
+					−
+				</Button>
 			)}
+			</div>
 		</div>
 	);
 }
@@ -245,50 +272,57 @@ export default function CreateOfferModal({
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const [loadedMiles, setLoadedMiles] = useState<number | null>(null);
-	const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
-	const [routeDistanceError, setRouteDistanceError] = useState<string | null>(null);
-	const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const routeRowsRef = useRef(routeRows);
-
-	useEffect(() => {
-		routeRowsRef.current = routeRows;
-	}, [routeRows]);
+	/**
+	 * committedLocations is updated ONLY on blur (after user leaves a field).
+	 * This is used as the queryKey for useQuery so the request fires
+	 * only when locations actually changed, not on every focus/blur.
+	 */
+	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
 		if (isOpen) {
 			setFormValues({ ...initialFormState });
-			// Initialize route with one pickup and one delivery row
 			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
 			setErrors({});
 			setRouteError(null);
 			setRouteRowLocationErrors({});
 			setSubmitError("");
-			setLoadedMiles(null);
-			setRouteDistanceError(null);
-			if (debounceTimerRef.current) {
-				clearTimeout(debounceTimerRef.current);
-				debounceTimerRef.current = null;
-			}
+			setCommittedLocations([]);
 		}
 	}, [isOpen]);
 
-	// Reset loaded miles when route structure changes (add/remove rows)
-	useEffect(() => {
-		setLoadedMiles(null);
-		setRouteDistanceError(null);
-		if (debounceTimerRef.current) {
-			clearTimeout(debounceTimerRef.current);
-			debounceTimerRef.current = null;
-		}
-	}, [routeRows.length]);
+	const allLocationsFilledAndValid = (locs: string[]) =>
+		locs.length >= 2 && locs.every(l => l.trim() !== "" && isValidLocationFormat(l.trim()));
+
+	const {
+		data: routeDistanceData,
+		isFetching: isCalculatingRoute,
+		error: routeDistanceQueryError,
+	} = useQuery({
+		queryKey: ["route-distance", committedLocations],
+		queryFn: () => offers.calculateRouteDistance(committedLocations),
+		enabled: allLocationsFilledAndValid(committedLocations),
+		staleTime: 20 * 60 * 1000,
+		retry: 1,
+	});
+
+	const loadedMiles = routeDistanceData?.loadedMiles ?? null;
+	const routeDistanceError = routeDistanceQueryError
+		? routeDistanceQueryError instanceof Error
+			? routeDistanceQueryError.message
+			: "Could not calculate route distance"
+		: null;
 
 	const addPickUpRow = () => {
+		// Adding an empty row — reset committed so calculation stops until new row is filled
+		setCommittedLocations([]);
 		setRouteRows(prev => [...prev, initialRouteRow("pickup")]);
 	};
 
 	const addDeliveryRow = () => {
+		// Adding an empty row — reset committed so calculation stops until new row is filled
+		setCommittedLocations([]);
 		setRouteRows(prev => [...prev, initialRouteRow("delivery")]);
 	};
 
@@ -300,57 +334,31 @@ export default function CreateOfferModal({
 		});
 	};
 
-	const removeExtraRow = (index: number) => {
-		setRouteRows(prev => prev.filter((_, i) => i !== index));
-	};
+	const commitLocations = useCallback((rows: RouteRow[]) => {
+		// Only commit if ALL rows have a filled, valid location — so adding a new empty
+		// row does not trigger a distance request until the user fills it in.
+		const allFilled = rows.every(r => r.location.trim() !== "");
+		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
+		if (!allFilled || !allValid) {
+			setCommittedLocations([]);
+			return;
+		}
+		const locs = rows.map(r => r.location.trim());
+		setCommittedLocations(locs);
+	}, []);
+
+	const removeExtraRow = useCallback((index: number) => {
+		setRouteRows(prev => {
+			const next = prev.filter((_, i) => i !== index);
+			// After removing, commit the remaining rows immediately.
+			// If all are filled and valid, useQuery will use cache or fire a new request.
+			commitLocations(next);
+			return next;
+		});
+	}, [commitLocations]);
 
 	// Ref to store target index during drag; move happens only on drop
 	const pendingDropRef = useRef<number | null>(null);
-
-	const runRouteDistanceCalculationWithLocations = useCallback(
-		async (locations: string[]) => {
-			if (locations.length < 2) {
-				setLoadedMiles(null);
-				setRouteDistanceError(null);
-				return;
-			}
-			setRouteDistanceError(null);
-			setIsCalculatingRoute(true);
-			try {
-				const { loadedMiles: miles } = await offers.calculateRouteDistance(locations);
-				setLoadedMiles(miles);
-			} catch (err) {
-				setLoadedMiles(null);
-				setRouteDistanceError(
-					err instanceof Error ? err.message : "Could not calculate route distance"
-				);
-			} finally {
-				setIsCalculatingRoute(false);
-			}
-		},
-		[]
-	);
-
-	const scheduleRouteRecalculation = useCallback(() => {
-		if (debounceTimerRef.current) {
-			clearTimeout(debounceTimerRef.current);
-		}
-		debounceTimerRef.current = setTimeout(() => {
-			debounceTimerRef.current = null;
-			const rows = routeRowsRef.current;
-			const locations = rows.map(r => r.location.trim()).filter(Boolean);
-			const allFilled = rows.every(r => r.location.trim() !== "");
-			const allValidFormat = rows
-				.filter(r => r.location.trim() !== "")
-				.every(r => isValidLocationFormat(r.location.trim()));
-			if (locations.length >= 2 && allFilled && allValidFormat) {
-				runRouteDistanceCalculationWithLocations(locations);
-			} else if (locations.length < 2 || !allValidFormat) {
-				setLoadedMiles(null);
-				setRouteDistanceError(null);
-			}
-		}, 1000);
-	}, [runRouteDistanceCalculationWithLocations]);
 
 	const handleAddressBlur = useCallback(
 		async (index: number, value: string, rowId: string) => {
@@ -376,7 +384,8 @@ export default function CreateOfferModal({
 				return next;
 			});
 
-			// Geocode ZIP to "City, State (ZIP)" format
+			// Geocode ZIP to "City, State (ZIP)" format, then commit
+			let finalRows: RouteRow[] | null = null;
 			if (ZIP_PATTERN.test(trimmed.replace(/\s/g, ""))) {
 				try {
 					const formatted = await offers.geocodeToFormattedAddress(trimmed);
@@ -386,6 +395,7 @@ export default function CreateOfferModal({
 							if (next[index]) {
 								next[index] = { ...next[index], location: formatted };
 							}
+							finalRows = next;
 							return next;
 						});
 					}
@@ -394,9 +404,19 @@ export default function CreateOfferModal({
 				}
 			}
 
-			scheduleRouteRecalculation();
+			// Commit after geocoding resolves (or immediately if no geocoding)
+			// Use a microtask so setRouteRows state is flushed before reading it
+			setTimeout(() => {
+				setRouteRows(current => {
+					commitLocations(current);
+					return current;
+				});
+			}, 0);
+
+			// eslint-disable-next-line no-void
+			void finalRows; // suppress unused warning
 		},
-		[scheduleRouteRecalculation]
+		[commitLocations]
 	);
 
 	const moveExtraRow = useCallback(
@@ -405,11 +425,11 @@ export default function CreateOfferModal({
 				const next = [...prev];
 				const [removed] = next.splice(dragIndex, 1);
 				next.splice(hoverIndex, 0, removed);
+				commitLocations(next);
 				return next;
 			});
-			scheduleRouteRecalculation();
 		},
-		[scheduleRouteRecalculation]
+		[commitLocations]
 	);
 
 	const validate = (): {
@@ -444,13 +464,12 @@ export default function CreateOfferModal({
 		} else if (pickups.length === 0 || deliveries.length === 0) {
 			routeError = "At least one Pick up and one Delivery are required";
 		} else {
-			const incompleteRow = trimmedRoute.some(
-				row =>
-					(row.location === "" && row.time !== "") ||
-					(row.location !== "" && row.time === "")
-			);
-			if (incompleteRow) {
-				routeError = "Each stop must have both location and time";
+			const missingTime = trimmedRoute.some(row => row.time === "");
+			const missingLocation = trimmedRoute.some(row => row.location === "");
+			if (missingTime) {
+				routeError = "Each stop must have a time";
+			} else if (missingLocation) {
+				routeError = "Each stop must have a location";
 			} else {
 				const first = trimmedRoute[0];
 				const last = trimmedRoute[trimmedRoute.length - 1];
@@ -498,36 +517,18 @@ export default function CreateOfferModal({
 		setErrors({});
 		setRouteError(null);
 		setSubmitError("");
-		setRouteDistanceError(null);
 
-		// Ensure route distance is calculated before submit
-		let milesToSend = loadedMiles;
-		if (milesToSend == null && !isCalculatingRoute) {
-			const locations = routeRows.map(r => r.location.trim()).filter(Boolean);
-			if (locations.length >= 2) {
-				setIsCalculatingRoute(true);
-				try {
-					const { loadedMiles: miles } = await offers.calculateRouteDistance(locations);
-					milesToSend = miles;
-					setLoadedMiles(miles);
-				} catch (err) {
-					setRouteDistanceError(
-						err instanceof Error ? err.message : "Could not calculate route distance"
-					);
-					setIsCalculatingRoute(false);
-					return;
-				}
-				setIsCalculatingRoute(false);
-			}
-		} else if (isCalculatingRoute) {
+		if (isCalculatingRoute) {
 			setSubmitError("Please wait for route distance calculation to complete");
 			return;
 		}
 
-		if (milesToSend == null) {
-			setRouteDistanceError("Route distance could not be calculated");
+		if (loadedMiles == null) {
+			setSubmitError("Route distance could not be calculated");
 			return;
 		}
+
+		const milesToSend = loadedMiles;
 
 		setIsSubmitting(true);
 		try {
@@ -575,7 +576,7 @@ export default function CreateOfferModal({
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
-			className="relative w-full max-w-4xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
+			className="relative w-full max-w-3xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
 		>
 			<form onSubmit={handleSubmit} className="space-y-5">
 				<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -591,31 +592,31 @@ export default function CreateOfferModal({
 				{/* Route rows: first Pick up, then any intermediate points, last Delivery — all draggable */}
 				<DndProvider backend={HTML5Backend}>
 					{routeRows.map((row, index) => (
-						<DraggableExtraRow
-							key={row.id}
-							row={row}
-							index={index}
-							updateExtraRow={updateExtraRow}
-							removeExtraRow={removeExtraRow}
-							moveRow={moveExtraRow}
-							pendingDropRef={pendingDropRef}
-							onAddressBlur={handleAddressBlur}
-							onLocationChange={rowId =>
-								setRouteRowLocationErrors(prev => {
-									const next = { ...prev };
-									delete next[rowId];
-									return next;
-								})
-							}
-							locationError={routeRowLocationErrors[row.id]}
-							canRemove={
-								(row.type === "pickup" &&
-									routeRows.filter(r => r.type === "pickup").length > 1) ||
-								(row.type === "delivery" &&
-									routeRows.filter(r => r.type === "delivery").length > 1)
-							}
-							rowCount={routeRows.length}
-						/>
+					<DraggableExtraRow
+						key={row.id}
+						row={row}
+						index={index}
+						updateExtraRow={updateExtraRow}
+						removeExtraRow={removeExtraRow}
+						moveRow={moveExtraRow}
+						pendingDropRef={pendingDropRef}
+						onAddressBlur={handleAddressBlur}
+						onLocationChange={rowId =>
+							setRouteRowLocationErrors(prev => {
+								const next = { ...prev };
+								delete next[rowId];
+								return next;
+							})
+						}
+					locationError={routeRowLocationErrors[row.id]}
+						canRemove={
+							(row.type === "pickup" &&
+								routeRows.filter(r => r.type === "pickup").length > 1) ||
+							(row.type === "delivery" &&
+								routeRows.filter(r => r.type === "delivery").length > 1)
+						}
+						rowCount={routeRows.length}
+					/>
 					))}
 				</DndProvider>
 
@@ -668,12 +669,12 @@ export default function CreateOfferModal({
 					</div>
 				</div>
 
-				{routeDistanceError && (
-					<p className="text-sm text-red-500 dark:text-red-400">{routeDistanceError}</p>
-				)}
-				{routeError && (
-					<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
-				)}
+			{routeDistanceError && (
+				<p className="text-sm text-red-500 dark:text-red-400">{routeDistanceError}</p>
+			)}
+			{routeError && (
+				<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
+			)}
 
 				{/* Row 4: Weight, Commodity */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

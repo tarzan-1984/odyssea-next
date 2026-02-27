@@ -10,6 +10,7 @@ type PropsType = {
 	id: string;
 	value?: string;
 	onChange?: (value: string) => void;
+	onBlur?: () => void;
 	label?: string;
 	placeholder?: string;
 	className?: string;
@@ -41,6 +42,7 @@ export default function TimePicker({
 	id,
 	value = "",
 	onChange,
+	onBlur,
 	label,
 	placeholder = EMPTY_PLACEHOLDER,
 	className = "",
@@ -50,6 +52,8 @@ export default function TimePicker({
 	const fpRef = useRef<flatpickr.Instance | null>(null);
 	const onChangeRef = useRef(onChange);
 	onChangeRef.current = onChange;
+	const onBlurRef = useRef(onBlur);
+	onBlurRef.current = onBlur;
 
 	useEffect(() => {
 		if (!inputRef.current) return;
@@ -78,6 +82,9 @@ export default function TimePicker({
 					const formatted = fp.formatDate(selectedDates[0], DISPLAY_FORMAT).toLowerCase();
 					onChangeRef.current?.(formatted);
 				}
+			},
+			onClose: () => {
+				onBlurRef.current?.();
 			},
 		});
 
