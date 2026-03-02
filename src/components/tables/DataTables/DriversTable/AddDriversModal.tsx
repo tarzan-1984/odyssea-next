@@ -8,13 +8,13 @@ export interface AddDriversModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	/** Offer id to add drivers to (for future API call). */
-	offerId: string;
+	offerId: number;
 	/** Driver IDs already in this offer (blocked from selecting again). */
 	existingDriverIds?: string[];
 	/** True while the add-drivers API request is in progress. */
 	isSubmitting?: boolean;
 	/** Called when user clicks "Add drivers" with selected driver IDs. */
-	onAddDrivers?: (offerId: string, selectedDriverIds: string[]) => void | Promise<void>;
+	onAddDrivers?: (offerId: number, selectedDriverIds: string[]) => void | Promise<void>;
 }
 
 export default function AddDriversModal({
@@ -39,7 +39,7 @@ export default function AddDriversModal({
 						<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
 							Add drivers
 						</h2>
-						<p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400" title={offerId}>
+						<p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400" title={String(offerId)}>
 							Offer ID: <span className="font-mono text-gray-700 dark:text-gray-300">{offerId}</span>
 						</p>
 					</div>

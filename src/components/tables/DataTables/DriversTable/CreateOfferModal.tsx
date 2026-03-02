@@ -66,6 +66,9 @@ const ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
 /** City, State format: "City, State" or "City, State (ZIP)" */
 const CITY_STATE_PATTERN = /^[^,]+\s*,\s*[^,]+$/;
 
+/** "City, ST" with two-letter abbreviation — needs geocoding to add ZIP */
+const CITY_STATE_ABBR_PATTERN = /^([^,]+),\s*([A-Za-z]{2})\s*$/;
+
 function isValidLocationFormat(value: string): boolean {
 	const trimmed = value.trim();
 	if (!trimmed) return true; // Empty is handled elsewhere
@@ -384,25 +387,28 @@ export default function CreateOfferModal({
 				return next;
 			});
 
-			// Geocode ZIP to "City, State (ZIP)" format, then commit
-			let finalRows: RouteRow[] | null = null;
-			if (ZIP_PATTERN.test(trimmed.replace(/\s/g, ""))) {
-				try {
-					const formatted = await offers.geocodeToFormattedAddress(trimmed);
-					if (formatted && formatted !== trimmed) {
-						setRouteRows(prev => {
-							const next = [...prev];
-							if (next[index]) {
-								next[index] = { ...next[index], location: formatted };
-							}
-							finalRows = next;
-							return next;
-						});
-					}
-				} catch {
-					// Keep original value on error
+		// Geocode ZIP or "City, ST" abbreviation to "City, State (ZIP)" format, then commit
+		const needsGeocode =
+			ZIP_PATTERN.test(trimmed.replace(/\s/g, "")) ||
+			CITY_STATE_ABBR_PATTERN.test(trimmed);
+		let finalRows: RouteRow[] | null = null;
+		if (needsGeocode) {
+			try {
+				const formatted = await offers.geocodeToFormattedAddress(trimmed);
+				if (formatted && formatted !== trimmed) {
+					setRouteRows(prev => {
+						const next = [...prev];
+						if (next[index]) {
+							next[index] = { ...next[index], location: formatted };
+						}
+						finalRows = next;
+						return next;
+					});
 				}
+			} catch {
+				// Keep original value on error
 			}
+		}
 
 			// Commit after geocoding resolves (or immediately if no geocoding)
 			// Use a microtask so setRouteRows state is flushed before reading it

@@ -190,7 +190,7 @@ export default function DriverNotesModal({
 								Adding...
 							</span>
 						) : (
-							"Add Notice"
+							"Leave a note"
 						)}
 					</Button>
 

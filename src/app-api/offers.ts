@@ -21,7 +21,7 @@ export interface OfferRoutePoint {
 }
 
 export interface OfferRow {
-	id: string;
+	id: number;
 	active?: boolean;
 	external_user_id: string | null;
 	create_time: string;
@@ -111,7 +111,7 @@ export interface CreateOfferPayload {
 
 export interface CreateOfferResponse {
 	success: boolean;
-	data?: { id: string; [key: string]: unknown };
+	data?: { id: number; [key: string]: unknown };
 	error?: string;
 }
 
@@ -208,7 +208,7 @@ const offers = {
 	 */
 	async createOffer(payload: CreateOfferPayload): Promise<CreateOfferResponse> {
 		try {
-			const response = await axios.post<{ id?: string; [key: string]: unknown }>(
+			const response = await axios.post<{ id?: number; [key: string]: unknown }>(
 				"/api/offers/create",
 				payload,
 				{
@@ -221,10 +221,10 @@ const offers = {
 			const data = response.data;
 
 			if (response.status >= 200 && response.status < 300) {
-				return {
-					success: true,
-					data: data as { id: string; [key: string]: unknown },
-				};
+			return {
+				success: true,
+				data: data as { id: number; [key: string]: unknown },
+			};
 			}
 
 			return {
@@ -247,12 +247,12 @@ const offers = {
 	 * Add drivers to an existing offer. Calls PATCH /api/offers/:offerId/drivers.
 	 */
 	async addDriversToOffer(
-		offerId: string,
+		offerId: number,
 		driverIds: string[]
 	): Promise<AddDriversToOfferResponse> {
 		try {
 			const response = await axios.patch<AddDriversToOfferResponse>(
-				`/api/offers/${encodeURIComponent(offerId)}/drivers`,
+				`/api/offers/${offerId}/drivers`,
 				{ driverIds },
 				{
 					headers: { "Content-Type": "application/json" },
@@ -285,12 +285,12 @@ const offers = {
 	 * Refreshes offers list after success.
 	 */
 	async removeDriverFromOffer(
-		offerId: string,
+		offerId: number,
 		driverExternalId: string
 	): Promise<RemoveDriverFromOfferResponse> {
 		try {
 			const response = await axios.patch<RemoveDriverFromOfferResponse>(
-				`/api/offers/${encodeURIComponent(offerId)}/drivers/${encodeURIComponent(driverExternalId)}`,
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}`,
 				{},
 				{
 					withCredentials: true,
@@ -320,10 +320,10 @@ const offers = {
 	/**
 	 * Deactivate an offer (sets active=false in offers table).
 	 */
-	async deactivateOffer(offerId: string): Promise<DeactivateOfferResponse> {
+	async deactivateOffer(offerId: number): Promise<DeactivateOfferResponse> {
 		try {
 			const response = await axios.patch<DeactivateOfferResponse>(
-				`/api/offers/${encodeURIComponent(offerId)}/deactivate-offer`,
+				`/api/offers/${offerId}/deactivate-offer`,
 				{},
 				{ withCredentials: true, validateStatus: () => true }
 			);

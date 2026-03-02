@@ -46,12 +46,12 @@ const OffersList = () => {
 	const currentUser = useCurrentUser();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
-	const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
-	const [addDriversOfferId, setAddDriversOfferId] = useState<string | null>(null);
+	const [expandedOfferId, setExpandedOfferId] = useState<number | null>(null);
+	const [addDriversOfferId, setAddDriversOfferId] = useState<number | null>(null);
 	const [addDriversExistingDriverIds, setAddDriversExistingDriverIds] = useState<string[]>([]);
 	const [isAddingDrivers, setIsAddingDrivers] = useState(false);
 	const [deletingDriverKey, setDeletingDriverKey] = useState<string | null>(null);
-	const [deactivatingOfferId, setDeactivatingOfferId] = useState<string | null>(null);
+	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 
@@ -157,36 +157,42 @@ const OffersList = () => {
 									key={row.id}
 									className="relative w-full rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/[0.05] dark:bg-gray-900 overflow-hidden"
 								>
-									<div
-										className={`px-4 py-3 flex items-center justify-between gap-3 ${
-											row.active === false ? "bg-red-50 dark:bg-red-900/20" : ""
-										}`}
-									>
-										<div className="flex flex-col gap-1 min-w-0">
-											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
-												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
-												{routeSummary(row.route) ||
-													`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
-												(id: {row.id})
-											</p>
-										</div>
-										<div className="flex items-center justify-center flex-shrink-0">
-											<button
-												type="button"
-												onClick={() =>
-													setExpandedOfferId((id) => (id === row.id ? null : row.id))
-												}
-												className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:text-brand-200 dark:hover:bg-gray-800"
-											>
-												<span>{isExpanded ? "Show less" : "Show more"}</span>
-												{isExpanded ? (
-													<ChevronUpIcon className="h-4 w-4" />
-												) : (
-													<ChevronDownIcon className="h-4 w-4" />
-												)}
-											</button>
-										</div>
+								<div
+									className={`px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+										row.active === false
+											? "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+											: "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+									}`}
+									onClick={() =>
+										setExpandedOfferId((id) => (id === row.id ? null : row.id))
+									}
+								>
+									<div className="flex flex-col gap-1 min-w-0">
+										<p className="text-base font-medium text-gray-900 dark:text-white truncate">
+											<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
+											{routeSummary(row.route) ||
+												`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
+											(id: {row.id})
+										</p>
 									</div>
+									<div className="flex items-center justify-center flex-shrink-0">
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												setExpandedOfferId((id) => (id === row.id ? null : row.id));
+											}}
+											className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:text-brand-200 dark:hover:bg-gray-800"
+										>
+											<span>{isExpanded ? "Show less" : "Show more"}</span>
+											{isExpanded ? (
+												<ChevronUpIcon className="h-4 w-4" />
+											) : (
+												<ChevronDownIcon className="h-4 w-4" />
+											)}
+										</button>
+									</div>
+								</div>
 									{isExpanded && (
 										<div className="border-t border-gray-100 dark:border-white/[0.05] px-4 py-3">
 											<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
