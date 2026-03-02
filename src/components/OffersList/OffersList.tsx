@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
@@ -141,11 +142,13 @@ const OffersList = () => {
 					</div>
 				) : results.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-12 gap-4">
-						<img
-							src="/images/no_offers_found.png"
-							alt=""
-							className="max-w-[200px] h-auto object-contain"
-						/>
+					<Image
+						src="/images/no_offers_found.png"
+						alt=""
+						width={200}
+						height={200}
+						className="h-auto object-contain"
+					/>
 						<p className="text-sm text-gray-500 dark:text-gray-400">No offers found</p>
 					</div>
 				) : (
@@ -383,14 +386,14 @@ const OffersList = () => {
 															}}
 															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 														>
-															Deactivate offer
-															<img
-																src="/images/deactivate_offer.png"
-																alt=""
-																width={31}
-																height={31}
-																className="h-[31px] w-auto shrink-0"
-															/>
+								Deactivate offer
+								<Image
+									src="/images/deactivate_offer.png"
+									alt=""
+									width={31}
+									height={31}
+									className="h-[31px] w-auto shrink-0"
+								/>
 														</button>
 														<button
 															type="button"
@@ -410,13 +413,13 @@ const OffersList = () => {
 															}}
 															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
 														>
-															Add drivers
-															<img
-																src="/images/add_icon.png"
-																alt=""
-																width={31}
-																height={31}
-																className="h-[31px] w-auto shrink-0"
+								Add drivers
+								<Image
+									src="/images/add_icon.png"
+									alt=""
+									width={31}
+									height={31}
+									className="h-[31px] w-auto shrink-0"
 															/>
 														</button>
 													</div>
