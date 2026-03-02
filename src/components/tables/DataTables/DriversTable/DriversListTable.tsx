@@ -683,64 +683,70 @@ export default function DriversListTable({
 							<Table className="w-full max-w-full table-fixed">
 								{/* Order: Status, Location, Distance (only when Address filter), Driver, Vehicle, Dimensions, Equipment, Comments, Rating, Notes */}
 								<colgroup>
+								<col
+									style={{
+										width: "120px",
+										minWidth: "120px",
+										maxWidth: "120px",
+									}}
+								/>
+								{/* Location & Date: fixed 130px */}
+								<col
+									style={{
+										width: "130px",
+										minWidth: "130px",
+										maxWidth: "130px",
+									}}
+								/>
+								{showDistanceColumn && (
 									<col
 										style={{
-											width: "140px",
-											minWidth: "140px",
-											maxWidth: "140px",
+											width: "68px",
+											minWidth: "68px",
+											maxWidth: "68px",
 										}}
 									/>
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 26.25 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 14.25 / 87)",
-										}}
-									/>
-									{showDistanceColumn && (
-										<col
-											style={{
-												width: "68px",
-												minWidth: "68px",
-												maxWidth: "68px",
-											}}
-										/>
-									)}
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 30 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 23 / 87)",
-										}}
-									/>
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 19 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 19 / 87)",
-										}}
-									/>
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 7.5 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 9.75 / 87)",
-										}}
-									/>
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 13 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 13 / 87)",
-										}}
-									/>
-									<col
-										style={{
-											width: showDistanceColumn
-												? "calc((100% - 140px - 68px - 72px - 72px) * 11.25 / 107)"
-												: "calc((100% - 140px - 72px - 72px) * 8 / 87)",
-										}}
-									/>
+								)}
+								{/* Driver: ~30% */}
+								<col
+									style={{
+										width: showDistanceColumn
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 30 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 30 / 100)",
+									}}
+								/>
+								{/* Vehicle: ~13% */}
+								<col
+									style={{
+										width: showDistanceColumn
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 13 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 13 / 100)",
+									}}
+								/>
+								{/* Dimensions & Payload: fixed 120px */}
+								<col
+									style={{
+										width: "120px",
+										minWidth: "120px",
+										maxWidth: "120px",
+									}}
+								/>
+								{/* Equipment: ~30% */}
+								<col
+									style={{
+										width: showDistanceColumn
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 30 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 30 / 100)",
+									}}
+								/>
+								{/* Comments: ~27% */}
+								<col
+									style={{
+										width: showDistanceColumn
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 27 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 27 / 100)",
+									}}
+								/>
 									<col
 										style={{
 											width: "72px",
@@ -795,15 +801,13 @@ export default function DriversListTable({
 											<TableCell
 												key={key}
 												isHeader
-												className={`py-3 border border-gray-100 dark:border-white/[0.05] ${
-													key === "status"
-														? "px-4 text-center align-middle"
-						: key === "distance"
-								? "px-2 text-center"
-															: key === "rating" || key === "notes"
-																? "px-2"
-																: "px-4"
-												}`}
+											className={`p-2 border border-gray-100 dark:border-white/[0.05] ${
+												key === "status"
+													? "text-center align-middle"
+													: key === "distance"
+													? "text-center"
+													: ""
+											}`}
 												style={
 													key === "distance"
 														? { width: 68, minWidth: 68, maxWidth: 68 }
@@ -926,7 +930,7 @@ export default function DriversListTable({
 														const statusLabel = getStatusLabel(status);
 														return (
 														<TableCell
-															className={`relative px-4 py-3 font-normal text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center align-middle select-none ${
+															className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
 																isAlreadyInOffer
 																	? "cursor-not-allowed"
 																	: "cursor-pointer"
@@ -1027,16 +1031,16 @@ export default function DriversListTable({
 															: dateStr || "";
 														return (
 														<TableCell
-															className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
+															className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
 														>
-																<p>
-																	{item?.meta_data?.current_city}{" "}
-																	{
-																		item?.meta_data
-																			?.current_location
-																	}
-																</p>
-																<p>{dateDisplay}</p>
+															<p>
+																{item?.meta_data?.current_city}{" "}
+																{
+																	item?.meta_data
+																		?.current_location
+																}
+															</p>
+															<p className="text-[10px] text-gray-400 dark:text-gray-500">{dateDisplay}</p>
 															</TableCell>
 														);
 													})()}
@@ -1044,7 +1048,7 @@ export default function DriversListTable({
 													{/*Distance - only when Address filter is filled and API returns id_posts*/}
 													{showDistanceColumn && (
 													<TableCell
-														className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center`}
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center`}
 														style={{
 															width: 68,
 															minWidth: 68,
@@ -1069,7 +1073,7 @@ export default function DriversListTable({
 													)}
 
 												{/*Driver*/}
-												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 														<div className="space-y-0.5 break-words">
 															<p
 																className="break-words"
@@ -1091,7 +1095,7 @@ export default function DriversListTable({
 													</TableCell>
 
 												{/*Vehicle*/}
-												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 							<p className="break-words">
 								{formatVehicleType(item?.meta_data?.vehicle_type)}
 							</p>
@@ -1103,13 +1107,13 @@ export default function DriversListTable({
 													</TableCell>
 
 												{/*Dimensions*/}
-												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}>
 														<p>{item?.meta_data?.dimensions}</p>
 														<p>{item?.meta_data?.payload} lbs</p>
 													</TableCell>
 
 												{/*Equipment*/}
-												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]`}>
 														{item?.meta_data?.twic === "on" && (
 															<Tooltip
 																theme="inverse"
@@ -1461,7 +1465,7 @@ export default function DriversListTable({
 													</TableCell>
 
 												{/* Comments */}
-												<TableCell className={`px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 														{item?.meta_data?.notes != null &&
 														String(item.meta_data.notes).trim() !== ""
 															? String(item.meta_data.notes)
@@ -1470,7 +1474,7 @@ export default function DriversListTable({
 
 												{/* Rating */}
 												<TableCell
-													className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+													className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
 													style={{
 														width: 72,
 														minWidth: 72,
@@ -1485,7 +1489,7 @@ export default function DriversListTable({
 
 												{/* Notes */}
 												<TableCell
-													className={`px-2 py-3 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+													className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
 													style={{
 														width: 72,
 														minWidth: 72,
