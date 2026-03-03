@@ -396,38 +396,8 @@ export default function DriversMapWithMarkers({
 						d.driverStatus?.toLowerCase() === driverStatusFilter.toLowerCase()
 				);
 
-	const filteredByZip =
-		!zipFilter || !zipFilter.trim()
-			? filteredByStatus
-			: filteredByStatus.filter((d) => {
-					const driverZip = (d.zip ?? "").toString().toLowerCase().trim();
-					const searchZip = zipFilter.toLowerCase().trim();
-					return driverZip.includes(searchZip);
-				});
-
-	// Filter by radius (miles) from center when address filter was applied
-	const filteredDrivers =
-		centerCoordinates &&
-		typeof radiusMilesProp === "number" &&
-		radiusMilesProp > 0
-			? filteredByZip.filter((d) => {
-					if (
-						typeof d.latitude !== "number" ||
-						typeof d.longitude !== "number" ||
-						Number.isNaN(d.latitude) ||
-						Number.isNaN(d.longitude)
-					) {
-						return false;
-					}
-					const distance = getDistanceMiles(
-						centerCoordinates.lat,
-						centerCoordinates.lng,
-						d.latitude,
-						d.longitude
-					);
-					return distance <= radiusMilesProp;
-				})
-			: filteredByZip;
+	// Same as drivers-list: API already filters by address + radius. No client-side filtering.
+	const filteredDrivers = filteredByStatus;
 
 	if (error) {
 		return (

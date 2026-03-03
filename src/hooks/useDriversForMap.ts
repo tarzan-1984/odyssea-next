@@ -26,6 +26,8 @@ export interface DriversMapFilterParams {
 	locationFilter: "USA" | "Canada";
 	statusFilter: string;
 	role: string;
+	/** When false, query is disabled (same as drivers-list: only fetch when address set for non-admin). */
+	enabled?: boolean;
 }
 
 /** Maps a raw TMS Driver record to DriverForMap for use on the map. */
@@ -63,7 +65,7 @@ function mapDriverToDriverForMap(driver: {
  * Cache time: 10 minutes.
  * Pass enabled=false to skip fetching (when data is provided externally via props).
  */
-export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enabled = true) {
+export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enabledProp = true) {
 	const baseParams: Omit<DriversListQueryParams, "currentPage"> = {
 		itemsPerPage: PAGE_SIZE,
 		capabilitiesFilter: filters?.capabilitiesFilter ?? [],
@@ -71,8 +73,10 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		radiusFilter: filters?.radiusFilter ?? "500",
 		locationFilter: filters?.locationFilter ?? "USA",
 		statusFilter: filters?.statusFilter ?? "",
-		role: filters?.role ?? "administrator",
+		role: filters?.role ?? "",
 	};
+
+	const enabled = filters?.enabled !== undefined ? filters.enabled : enabledProp;
 
 	const query = useInfiniteQuery({
 		queryKey: [

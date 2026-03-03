@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useDriversForMap } from "@/hooks/useDriversForMap";
@@ -20,6 +20,7 @@ export function DriversMapPageClient() {
 	const [driverStatusFilter, setDriverStatusFilter] = useState<string>("all");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const [zipFilter, setZipFilter] = useState<string>("");
+	const [debouncedZipFilter, setDebouncedZipFilter] = useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [centerCoordinates, setCenterCoordinates] = useState<{
@@ -28,13 +29,22 @@ export function DriversMapPageClient() {
 	} | null>(null);
 	const [radiusMiles, setRadiusMiles] = useState<number | null>(null);
 
+	// Debounce address filter (1.5 second delay) — same as drivers-list
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedZipFilter(zipFilter);
+		}, 1500);
+		return () => clearTimeout(timer);
+	}, [zipFilter]);
+
+	// Query always enabled — initially show all drivers on map, then filter via filters
 	const { drivers, isLoading, isFetching, error, refetch } = useDriversForMap({
 		statusFilter: driverStatusFilter === "all" ? "" : driverStatusFilter,
 		capabilitiesFilter,
-		addressFilter: zipFilter,
+		addressFilter: debouncedZipFilter,
 		radiusFilter,
 		locationFilter,
-		role: currentUser?.role?.toLowerCase() ?? "administrator",
+		role: currentUser?.role?.toLowerCase() ?? "",
 	});
 
 	// Fixed status options - same as drivers-list (never derived from current results)
