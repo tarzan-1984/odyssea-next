@@ -177,6 +177,7 @@ export default function DriversListTable({
 	const requiresAddressToSearch = !isAdmin;
 	const queryEnabled = isAdmin || Boolean(debouncedAddressFilter?.trim());
 	const showTablePlaceholder = requiresAddressToSearch && !debouncedAddressFilter?.trim();
+	const canSelectDrivers = Boolean(debouncedAddressFilter?.trim());
 
 	const queryParams: DriversListQueryParams = {
 		currentPage,
@@ -226,9 +227,20 @@ export default function DriversListTable({
 		});
 	};
 
+	// Clear selection when address becomes empty
+	useEffect(() => {
+		if (!canSelectDrivers) {
+			setSelectedDriverIds([]);
+		}
+	}, [canSelectDrivers]);
+
 	useEffect(() => {
 		const handleMouseUp = () => {
 			const { isActive, startIndex, hasAddedAny } = dragSelectRef.current;
+			if (!canSelectDrivers) {
+				dragSelectRef.current = { isActive: false, startIndex: -1, hasAddedAny: false };
+				return;
+			}
 			if (isActive && !hasAddedAny && startIndex >= 0) {
 				const item = filteredResults[startIndex];
 				if (item && !existingDriverIdsSet.has(String(item.id))) {
@@ -242,7 +254,7 @@ export default function DriversListTable({
 		};
 		document.addEventListener("mouseup", handleMouseUp);
 		return () => document.removeEventListener("mouseup", handleMouseUp);
-	}, [filteredResults, existingDriverIdsSet]);
+	}, [filteredResults, existingDriverIdsSet, canSelectDrivers]);
 
 	// Calculate total pages for pagination
 	const totalItems = driverList?.data?.pagination?.total_posts || 0;
@@ -300,7 +312,9 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={selectableVisibleDriverIds.length === 0}
+									disabled={
+										!canSelectDrivers || selectableVisibleDriverIds.length === 0
+									}
 									onClick={toggleAllVisible}
 									className="ml-2 h-9"
 								>
@@ -741,7 +755,7 @@ export default function DriversListTable({
 														return (
 														<TableCell
 															className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
-																isAlreadyInOffer
+																isAlreadyInOffer || !canSelectDrivers
 																	? "cursor-not-allowed"
 																	: "cursor-pointer"
 															}`}
@@ -751,6 +765,7 @@ export default function DriversListTable({
 																onMouseEnter={() => {
 																	setHoveredStatusRowIndex(i);
 																	if (
+																		canSelectDrivers &&
 																		dragSelectRef.current
 																			.isActive &&
 																		!isAlreadyInOffer
@@ -801,7 +816,10 @@ export default function DriversListTable({
 																	setHoveredStatusRowIndex(null)
 																}
 																onMouseDown={() => {
-																	if (!isAlreadyInOffer) {
+																	if (
+																		canSelectDrivers &&
+																		!isAlreadyInOffer
+																	) {
 																		dragSelectRef.current = {
 																			isActive: true,
 																			startIndex: i,

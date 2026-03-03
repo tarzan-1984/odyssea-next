@@ -27,7 +27,7 @@ const STATE_ABBR_TO_NAME: Record<string, string> = {
 
 /**
  * POST /api/offers/geocode-to-formatted
- * Geocodes a ZIP code or "City, ST" abbreviation and returns "City, State (ZIP)" format.
+ * Geocodes a ZIP code or "City, ST" abbreviation and returns "City, State ZIP" format.
  * - ZIP input: uses Nominatim to get city + state
  * - "City, ST" input: uses Zippopotam.us to get ZIP, maps abbreviation to full state name
  * Body: { address: string }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
 					if (zip) {
 						return NextResponse.json(
-							{ formattedAddress: `${placeName}, ${stateFull} (${zip})` },
+							{ formattedAddress: `${placeName}, ${stateFull} ${zip}` },
 							{ status: 200 }
 						);
 					}
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 						const city = addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? cityRaw;
 						const zip = addr.postcode!;
 						return NextResponse.json(
-							{ formattedAddress: `${city}, ${stateFull} (${zip})` },
+							{ formattedAddress: `${city}, ${stateFull} ${zip}` },
 							{ status: 200 }
 						);
 					}
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
 
 		let formatted: string;
 		if (city && state && postcode) {
-			formatted = `${city}, ${state} (${postcode})`;
+			formatted = `${city}, ${state} ${postcode}`;
 		} else if (city && state) {
 			formatted = `${city}, ${state}`;
 		} else {
