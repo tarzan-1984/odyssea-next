@@ -7,6 +7,8 @@ import {
 	type SetStateAction,
 } from "react";
 import { DRIVER_STATUS_LABELS } from "@/components/logistics/driversMapConstants";
+import MultiSelect from "@/components/form/MultiSelect";
+import { CAPABILITIES_OPTIONS } from "@/components/tables/DataTables/DriversTable/capabilitiesFilterOptions";
 
 const ADDRESS_DEBOUNCE_MS = 400;
 
@@ -14,8 +16,14 @@ interface DriversMapFiltersProps {
 	driverStatusFilter: string;
 	setDriverStatusFilter: Dispatch<SetStateAction<string>>;
 	driverStatusOptions: string[];
+	capabilitiesFilter: string[];
+	setCapabilitiesFilter: Dispatch<SetStateAction<string[]>>;
 	zipFilter: string;
 	setZipFilter: Dispatch<SetStateAction<string>>;
+	locationFilter: "USA" | "Canada";
+	setLocationFilter: Dispatch<SetStateAction<"USA" | "Canada">>;
+	radiusFilter: string;
+	setRadiusFilter: Dispatch<SetStateAction<string>>;
 	onFilterApply?: (params: {
 		latitude: number;
 		longitude: number;
@@ -30,15 +38,19 @@ export function DriversMapFilters({
 	driverStatusFilter,
 	setDriverStatusFilter,
 	driverStatusOptions,
+	capabilitiesFilter,
+	setCapabilitiesFilter,
 	zipFilter,
 	setZipFilter,
+	locationFilter,
+	setLocationFilter,
+	radiusFilter,
+	setRadiusFilter,
 	onFilterApply,
 	onRadiusChange,
 	onClearFilter,
 	onReset,
 }: DriversMapFiltersProps) {
-	const [location, setLocation] = useState<"USA" | "Canada">("USA");
-	const [radius, setRadius] = useState<string>("500");
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastGeocodeRef = useRef<string>("");
 
@@ -120,34 +132,49 @@ export function DriversMapFilters({
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		debounceRef.current = setTimeout(() => {
 			debounceRef.current = null;
-			const miles = Number.parseInt(radius, 10) || 500;
-			runGeocodeAndApply(trimmed, location, miles);
+			const miles = Number.parseInt(radiusFilter, 10) || 500;
+			runGeocodeAndApply(trimmed, locationFilter, miles);
 		}, ADDRESS_DEBOUNCE_MS);
 
 		return () => {
 			if (debounceRef.current) clearTimeout(debounceRef.current);
 		};
-	}, [zipFilter, location, radius, runGeocodeAndApply]);
+	}, [zipFilter, locationFilter, radiusFilter, runGeocodeAndApply, onClearFilter]);
 
 	// When only radius changes (address not empty), update radius in parent
 	useEffect(() => {
 		if (!zipFilter.trim()) return;
-		const miles = Number.parseInt(radius, 10);
+		const miles = Number.parseInt(radiusFilter, 10);
 		if (Number.isNaN(miles)) return;
 		onRadiusChange?.(miles);
-	}, [radius, zipFilter, onRadiusChange]);
+	}, [radiusFilter, zipFilter, onRadiusChange]);
 
 	const handleResetClick = () => {
 		setDriverStatusFilter("all");
+		setCapabilitiesFilter([]);
 		setZipFilter("");
-		setLocation("USA");
-		setRadius("500");
+		setLocationFilter("USA");
+		setRadiusFilter("500");
 		lastGeocodeRef.current = "";
 		onReset?.();
 	};
 
 	return (
 		<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
+			{/* Capabilities (multiselect) */}
+			<div className="flex min-w-0 flex-col gap-1 md:min-w-[220px]">
+				<MultiSelect
+					label="Capabilities"
+					options={CAPABILITIES_OPTIONS}
+					defaultSelected={capabilitiesFilter}
+					onChange={(values) => setCapabilitiesFilter(values)}
+					size="sm"
+					dropdownInPortal
+				/>
+			</div>
+
+			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
 			<div className="flex min-w-0 flex-col gap-1">
 				<label
 					htmlFor="driver-status-filter"
@@ -164,7 +191,7 @@ export function DriversMapFilters({
 					<option value="all">{DRIVER_STATUS_LABELS.all}</option>
 					{driverStatusOptions.map((status) => (
 						<option key={status} value={status}>
-							{DRIVER_STATUS_LABELS[status.toLowerCase()] ?? status}
+							{status}
 						</option>
 					))}
 				</select>
@@ -200,9 +227,9 @@ export function DriversMapFilters({
 				</label>
 				<select
 					id="location-filter"
-					value={location}
+					value={locationFilter}
 					onChange={(e) =>
-						setLocation(e.target.value === "Canada" ? "Canada" : "USA")
+						setLocationFilter(e.target.value === "Canada" ? "Canada" : "USA")
 					}
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
 				>
@@ -222,8 +249,8 @@ export function DriversMapFilters({
 				</label>
 				<select
 					id="radius-filter"
-					value={radius}
-					onChange={(e) => setRadius(e.target.value)}
+					value={radiusFilter}
+					onChange={(e) => setRadiusFilter(e.target.value)}
 					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
 				>
 					<option value="50">50 miles</option>
@@ -243,7 +270,7 @@ export function DriversMapFilters({
 			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
 			<div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
-				{/* Invisible label so button aligns with other fields (same label + control height) */}
+				{/* Invisible label to align button with other fields */}
 				<label className="text-xs font-medium text-transparent select-none">
 					Reset
 				</label>
@@ -258,4 +285,3 @@ export function DriversMapFilters({
 		</div>
 	);
 }
-

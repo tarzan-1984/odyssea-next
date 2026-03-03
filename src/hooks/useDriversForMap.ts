@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { fetchDriversPage } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
+import type { DriversListQueryParams } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
+import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 
-const PAGE_SIZE = 100;
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes
+const PAGE_SIZE = 60;
 
 export interface DriverForMap {
 	id: string;
@@ -16,65 +19,110 @@ export interface DriverForMap {
 	zip?: string | null;
 }
 
-interface DriversMapPageResponse {
-	drivers: DriverForMap[];
-	pagination: {
-		current_page: number;
-		per_page: number;
-		total_count: number;
-		total_pages: number;
-		has_next_page: boolean;
-		has_prev_page: boolean;
+export interface DriversMapFilterParams {
+	capabilitiesFilter: string[];
+	addressFilter: string;
+	radiusFilter: string;
+	locationFilter: "USA" | "Canada";
+	statusFilter: string;
+	role: string;
+}
+
+/** Maps a raw TMS Driver record to DriverForMap for use on the map. */
+function mapDriverToDriverForMap(driver: {
+	id: string;
+	meta_data?: {
+		latitude?: string;
+		longitude?: string;
+		driver_status?: string;
+		current_zipcode?: string;
+		driver_id?: string;
+	};
+	status_post?: string;
+}): DriverForMap | null {
+	const lat = parseFloat(driver.meta_data?.latitude ?? "");
+	const lng = parseFloat(driver.meta_data?.longitude ?? "");
+
+	if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+	return {
+		id: driver.id,
+		externalId: driver.meta_data?.driver_id ?? driver.id ?? null,
+		latitude: lat,
+		longitude: lng,
+		driverStatus: driver.meta_data?.driver_status ?? null,
+		status: driver.status_post ?? null,
+		zip: driver.meta_data?.current_zipcode ?? null,
 	};
 }
 
-async function fetchDriversPage(page: number): Promise<DriversMapPageResponse> {
-	const params = new URLSearchParams();
-	params.set("page", String(page));
-	params.set("limit", String(PAGE_SIZE));
-
-	const response = await fetch(`/api/users/drivers/map?${params.toString()}`, {
-		method: "GET",
-		credentials: "include",
-	});
-
-	if (!response.ok) {
-		const err = await response.json().catch(() => ({}));
-		throw new Error(err.error || "Failed to fetch drivers");
-	}
-
-	return response.json();
-}
-
 /**
- * Hook to fetch all drivers for map display with pagination.
- * Uses TanStack Query useInfiniteQuery - fetches all pages and caches for 10 minutes.
+ * Hook to fetch all drivers for map display using the same API as drivers-list.
+ * Loads drivers in pages of 20, auto-fetches all pages so they appear gradually on the map.
+ * Applies filters (status, address/radius/location, capabilities).
+ * Cache time: 10 minutes.
+ * Pass enabled=false to skip fetching (when data is provided externally via props).
  */
-export function useDriversForMap() {
+export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enabled = true) {
+	const baseParams: Omit<DriversListQueryParams, "currentPage"> = {
+		itemsPerPage: PAGE_SIZE,
+		capabilitiesFilter: filters?.capabilitiesFilter ?? [],
+		addressFilter: filters?.addressFilter ?? "",
+		radiusFilter: filters?.radiusFilter ?? "500",
+		locationFilter: filters?.locationFilter ?? "USA",
+		statusFilter: filters?.statusFilter ?? "",
+		role: filters?.role ?? "administrator",
+	};
+
 	const query = useInfiniteQuery({
-		queryKey: ["drivers-map"],
-		queryFn: ({ pageParam }) => fetchDriversPage(pageParam),
+		queryKey: [
+			"drivers-map",
+			{
+				capabilitiesFilter: baseParams.capabilitiesFilter,
+				addressFilter: baseParams.addressFilter,
+				radiusFilter: baseParams.radiusFilter,
+				locationFilter: baseParams.locationFilter,
+				statusFilter: baseParams.statusFilter,
+			},
+		],
+		queryFn: ({ pageParam }) =>
+			fetchDriversPage({ ...baseParams, currentPage: pageParam }),
 		initialPageParam: 1,
-		getNextPageParam: lastPage => {
-			const { pagination } = lastPage;
-			if (pagination?.has_next_page) {
-				return (pagination.current_page ?? 0) + 1;
-			}
+		getNextPageParam: (lastPage) => {
+			const pagination = lastPage.data?.pagination;
+			if (!pagination) return undefined;
+			const { current_page, total_pages } = pagination;
+			if (current_page < total_pages) return current_page + 1;
 			return undefined;
 		},
 		staleTime: STALE_TIME_MS,
+		enabled,
 	});
 
 	const { hasNextPage, fetchNextPage, isFetchingNextPage } = query;
 
-	// Auto-fetch all pages when we have more data to load
+	// Auto-fetch all pages so drivers appear gradually on the map
 	useEffect(() => {
 		if (hasNextPage && !isFetchingNextPage) {
 			fetchNextPage().catch(() => undefined);
 		}
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-	const allDrivers: DriverForMap[] = query.data?.pages.flatMap(p => p.drivers ?? []) ?? [];
+	const rawDrivers: DriverForMap[] = (query.data?.pages ?? [])
+		.flatMap((page) => page.data?.results ?? [])
+		.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
+		.filter((d): d is DriverForMap => d !== null);
+
+	// Client-side status filter when address filter is present (API only sends extended_search when no address)
+	const allDrivers = useMemo(() => {
+		const statusFilter = baseParams.statusFilter;
+		if (!statusFilter) return rawDrivers;
+		const hasAddressFilter = Boolean(baseParams.addressFilter?.trim());
+		if (!hasAddressFilter) return rawDrivers; // API already filtered via extended_search
+		return rawDrivers.filter(
+			(d) => getStatusLabelForFilter(d.driverStatus) === statusFilter
+		);
+	}, [rawDrivers, baseParams.statusFilter, baseParams.addressFilter]);
 
 	return {
 		drivers: allDrivers,

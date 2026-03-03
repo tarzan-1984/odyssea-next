@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface Option {
 	value: string;
@@ -15,6 +16,10 @@ interface MultiSelectProps {
 	disabled?: boolean;
 	/** Optional class for the trigger (dropdown button) to match other form fields e.g. h-11 */
 	triggerClassName?: string;
+	/** When "sm", uses compact styling (h-[38px], px-3 py-2) to match native select inputs */
+	size?: "default" | "sm";
+	/** When true, renders dropdown via portal into document.body to avoid z-index/overflow issues (e.g. above maps) */
+	dropdownInPortal?: boolean;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -24,11 +29,16 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 	onChange,
 	disabled = false,
 	triggerClassName = "",
+	size = "default",
+	dropdownInPortal = false,
 }) => {
 	const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultSelected);
 	const [isOpen, setIsOpen] = useState(false);
 	const [searchTerm, setSearchTerm] = useState("");
+	const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const triggerRef = useRef<HTMLDivElement>(null);
+	const portalDropdownRef = useRef<HTMLDivElement | null>(null);
 
 	const toggleDropdown = () => {
 		if (disabled) return;
@@ -70,10 +80,85 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		setSelectedOptions(defaultSelected);
 	}, [defaultSelected]);
 
+	// Update dropdown position when opening (for portal mode) - use fixed position (viewport coords)
+	useEffect(() => {
+		if (isOpen && dropdownInPortal && triggerRef.current) {
+			const updateRect = () => {
+				if (triggerRef.current) {
+					const rect = triggerRef.current.getBoundingClientRect();
+					setDropdownRect({
+						top: rect.bottom,
+						left: rect.left,
+						width: rect.width,
+					});
+				}
+			};
+			updateRect();
+			window.addEventListener("scroll", updateRect, true);
+			window.addEventListener("resize", updateRect);
+			return () => {
+				window.removeEventListener("scroll", updateRect, true);
+				window.removeEventListener("resize", updateRect);
+			};
+		} else if (!isOpen) {
+			setDropdownRect(null);
+		}
+	}, [isOpen, dropdownInPortal]);
+
+	const dropdownContent = (
+		<>
+			<div className="p-2 border-b border-gray-200 dark:border-gray-700">
+				<input
+					type="text"
+					placeholder="Search participants..."
+					value={searchTerm}
+					onChange={e => setSearchTerm(e.target.value)}
+					className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+					onClick={e => e.stopPropagation()}
+				/>
+			</div>
+			<div className="flex flex-col">
+				{filteredOptions.length > 0 ? (
+					filteredOptions.map((option, index) => {
+						const isSelected = selectedOptions.includes(option.value);
+						return (
+							<div key={index}>
+								<div
+									className={`w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-700 p-2 pl-2 flex items-center ${
+										isSelected
+											? "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+											: "hover:bg-gray-50 dark:hover:bg-gray-600"
+									}`}
+									onClick={() => handleSelect(option.value)}
+								>
+									<div className="mx-2 flex items-center gap-2 leading-6 text-gray-800 dark:text-white">
+										{option.icon && (
+											<span className="inline-flex h-5 w-5 items-center justify-center">
+												{option.icon}
+											</span>
+										)}
+										<span>{option.text}</span>
+									</div>
+								</div>
+							</div>
+						);
+					})
+				) : (
+					<div className="p-3 text-sm text-gray-500 dark:text-white text-center">
+						No participants found
+					</div>
+				)}
+			</div>
+		</>
+	);
+
 	// Close dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+			const target = event.target as Node;
+			const inContainer = containerRef.current?.contains(target);
+			const inPortal = dropdownInPortal && portalDropdownRef.current?.contains(target);
+			if (!inContainer && !inPortal) {
 				setIsOpen(false);
 			}
 		};
@@ -85,18 +170,32 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		return () => {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
-	}, [isOpen]);
+	}, [isOpen, dropdownInPortal]);
+
+	const triggerBaseClass =
+		size === "sm"
+			? "relative flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-800 h-[38px] min-h-[38px]"
+			: "relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[44px]";
 
 	return (
-		<div className="w-full" ref={containerRef}>
-			<label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-white">
+		<div
+			className={`w-full ${size === "sm" ? "flex flex-col gap-1" : ""}`}
+			ref={containerRef}
+		>
+			<label
+				className={
+					size === "sm"
+						? "block text-xs font-medium text-gray-700 dark:text-gray-300"
+						: "mb-1.5 block text-sm font-medium text-gray-700 dark:text-white"
+				}
+			>
 				{label}
 			</label>
 
-			<div className="relative z-20 inline-block w-full">
+			<div ref={triggerRef} className="relative z-20 inline-block w-full">
 				<div className="relative flex flex-col items-center">
 					<div onClick={toggleDropdown} className="w-full">
-						<div className={`relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[44px] ${triggerClassName}`.trim()}>
+						<div className={`${triggerBaseClass} ${triggerClassName}`.trim()}>
 							<div className="flex flex-wrap flex-auto gap-2">
 								{selectedValuesText.length > 0 ? (
 									selectedValuesText.map((text, index) => (
@@ -167,55 +266,36 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 						</div>
 					</div>
 
-					{isOpen && (
+					{isOpen && !dropdownInPortal && (
 						<div
-							className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-60 dark:bg-gray-800"
+							className="absolute left-0 z-[1100] w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-60 dark:bg-gray-800"
 							onClick={e => e.stopPropagation()}
 						>
-							{/* Search input */}
-							<div className="p-2 border-b border-gray-200 dark:border-gray-700">
-								<input
-									type="text"
-									placeholder="Search participants..."
-									value={searchTerm}
-									onChange={e => setSearchTerm(e.target.value)}
-									className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-								/>
-							</div>
-							<div className="flex flex-col">
-								{filteredOptions.length > 0 ? (
-									filteredOptions.map((option, index) => {
-										const isSelected = selectedOptions.includes(option.value);
-										return (
-											<div key={index}>
-												<div
-													className={`w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-700 p-2 pl-2 flex items-center ${
-														isSelected
-															? "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-															: "hover:bg-gray-50 dark:hover:bg-gray-600"
-													}`}
-													onClick={() => handleSelect(option.value)}
-												>
-													<div className="mx-2 flex items-center gap-2 leading-6 text-gray-800 dark:text-white">
-														{option.icon && (
-															<span className="inline-flex h-5 w-5 items-center justify-center">
-																{option.icon}
-															</span>
-														)}
-														<span>{option.text}</span>
-													</div>
-												</div>
-											</div>
-										);
-									})
-								) : (
-									<div className="p-3 text-sm text-gray-500 dark:text-white text-center">
-										No participants found
-									</div>
-								)}
-							</div>
+							{dropdownContent}
 						</div>
 					)}
+
+					{isOpen &&
+						dropdownInPortal &&
+						dropdownRect &&
+						typeof document !== "undefined" &&
+						createPortal(
+							<div
+								ref={el => {
+									portalDropdownRef.current = el;
+								}}
+								className="fixed z-[9999] overflow-y-auto bg-white rounded-lg shadow-lg max-h-60 dark:bg-gray-800"
+								style={{
+									top: dropdownRect.top,
+									left: dropdownRect.left,
+									width: dropdownRect.width,
+								}}
+								onClick={e => e.stopPropagation()}
+							>
+								{dropdownContent}
+							</div>,
+							document.body
+						)}
 				</div>
 			</div>
 		</div>

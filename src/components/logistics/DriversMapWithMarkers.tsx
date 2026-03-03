@@ -193,7 +193,7 @@ export default function DriversMapWithMarkers({
 	const [isLoadingDriverData, setIsLoadingDriverData] = useState(false);
 	const [isChatActionLoading, setIsChatActionLoading] = useState(false);
 
-	const queryResult = useDriversForMap();
+	const queryResult = useDriversForMap(undefined, driversProp === undefined);
 	const drivers = driversProp ?? queryResult.drivers;
 	const isLoading = isLoadingProp ?? queryResult.isLoading;
 	const isFetching = isFetchingProp ?? queryResult.isFetching;
