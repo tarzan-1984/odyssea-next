@@ -516,12 +516,12 @@ export default function DriversListTable({
 										maxWidth: "120px",
 									}}
 								/>
-								{/* Location & Date: fixed 130px */}
+								{/* Location & Date: fixed 160px (room for address + date + map icon) */}
 								<col
 									style={{
-										width: "130px",
-										minWidth: "130px",
-										maxWidth: "130px",
+										width: "160px",
+										minWidth: "160px",
+										maxWidth: "160px",
 									}}
 								/>
 								{showDistanceColumn && (
@@ -537,16 +537,16 @@ export default function DriversListTable({
 								<col
 									style={{
 										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 30 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 30 / 100)",
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
 									}}
 								/>
 								{/* Vehicle: ~13% */}
 								<col
 									style={{
 										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 13 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 13 / 100)",
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 13 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 13 / 100)",
 									}}
 								/>
 								{/* Dimensions & Payload: fixed 120px */}
@@ -561,16 +561,16 @@ export default function DriversListTable({
 								<col
 									style={{
 										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 30 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 30 / 100)",
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
 									}}
 								/>
 								{/* Comments: ~27% */}
 								<col
 									style={{
 										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 130px) * 27 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 130px) * 27 / 100)",
+											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 27 / 100)"
+											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 27 / 100)",
 									}}
 								/>
 									<col
@@ -954,7 +954,8 @@ export default function DriversListTable({
 													</TableCell>
 
 												{/*Equipment*/}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap grid grid-cols-3 fullhd:grid-cols-4 gap-[10px]`}>
+												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm`}>
+													<div className="flex flex-wrap gap-[15px]">
 														{item?.meta_data?.twic === "on" && (
 															<Tooltip
 																theme="inverse"
@@ -1303,6 +1304,7 @@ export default function DriversListTable({
 																</span>
 															</Tooltip>
 														)}
+													</div>
 													</TableCell>
 
 												{/* Comments */}
