@@ -8,7 +8,7 @@ import MultiSelect from "../form/MultiSelect";
 import usersApi from "@/app-api/users";
 import { UserListItem } from "@/app-api/api-types";
 import { useChatSync } from "@/hooks/useChatSync";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useCurrentUser } from "@/stores/userStore";
 import { S3Uploader } from "@/app-api/S3Uploader";
@@ -416,7 +416,7 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 											</div>
 											<div className="flex-1 min-w-0 text-left">
 												<div className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.firstName} {u.lastName}</div>
-												<div className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.role?.toLowerCase().replace('_',' ')}</div>
+												<div className="text-xs text-gray-500 dark:text-gray-400 truncate">{getRoleDisplayLabel(u.role)}</div>
 											</div>
 											<div className={`w-4 h-4 rounded-full border ${selected ? "bg-blue-600 border-blue-600" : "border-gray-300"}`}></div>
 										</button>

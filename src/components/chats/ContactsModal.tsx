@@ -4,7 +4,7 @@ import { Modal } from "../ui/modal";
 import Input from "../form/input/InputField";
 import usersApi from "@/app-api/users";
 import { UserListItem } from "@/app-api/api-types";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
@@ -284,7 +284,7 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 											{user.firstName} {user.lastName}
 										</div>
 										<div className="text-sm text-gray-500 dark:text-gray-400 capitalize">
-											{user.role?.toLowerCase().replace('_', ' ')}
+											{getRoleDisplayLabel(user.role)}
 											{existingChat && (
 												<span className="ml-2 text-blue-600 dark:text-blue-400">
 													• Already chatting

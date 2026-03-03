@@ -5,7 +5,7 @@ import Button from "../ui/button/Button";
 import { ChatRoom, chatApi } from "@/app-api/chatApi";
 import { UserListItem } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import usersApi from "@/app-api/users";
 import { useWebSocketChatRooms } from "@/hooks/useWebSocketChatRooms";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -437,7 +437,7 @@ export default function ChatParticipantsModal({
 										)}
 									</div>
 									<p className="text-xs text-gray-500 dark:text-gray-400">
-									{safeUser.role.toLowerCase().replace('_', ' ')}
+									{getRoleDisplayLabel(safeUser.role)}
 									</p>
 								</div>
 								{canManageChat && !isAdmin && (() => {
@@ -539,7 +539,7 @@ export default function ChatParticipantsModal({
 														{user.firstName} {user.lastName}
 													</h5>
 													<p className="text-xs text-gray-500 dark:text-gray-400">
-														{user.role?.toLowerCase().replace('_', ' ')}
+														{getRoleDisplayLabel(user.role)}
 													</p>
 												</div>
 											</div>

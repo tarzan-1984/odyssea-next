@@ -2,6 +2,37 @@ import Image from "next/image";
 import { UserData, UserListItem } from "@/app-api/api-types";
 import { twMerge } from "tailwind-merge";
 
+/** Human-readable labels for user roles (used in chat, modals, etc.) */
+const ROLE_DISPLAY_LABELS: Record<string, string> = {
+	DRIVER_UPDATES: "Driver Updates",
+	MODERATOR: "Moderator",
+	RECRUITER: "Recruiter",
+	ADMINISTRATOR: "Administrator",
+	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
+	DISPATCHER: "Dispatcher",
+	BILLING: "Billing",
+	ACCOUNTING: "Accounting",
+	RECRUITER_TL: "Recruiter Team Leader",
+	DRIVER: "Driver",
+	EXPEDITE_MANAGER: "Expedite Manager",
+	TRACKING_TL: "Tracking Team Leader",
+	DISPATCHER_TL: "Dispatcher Team Leader",
+	TRACKING: "Tracking",
+	SUBSCRIBER: "Subscriber",
+	MORNING_TRACKING: "Morning Tracking",
+	HR_MANAGER: "HR Manager",
+};
+
+/**
+ * Returns human-readable label for a role code (e.g. DRIVER -> "Driver").
+ * Falls back to role with underscores replaced by spaces if not in mapping.
+ */
+export function getRoleDisplayLabel(role: string | null | undefined): string {
+	if (!role || typeof role !== "string") return "User";
+	const normalized = role.toUpperCase().trim();
+	return ROLE_DISPLAY_LABELS[normalized] ?? role.replace(/_/g, " ");
+}
+
 /**
  * Renders a user's avatar. If the user has an avatar image, it displays the image.
  * Otherwise, it generates a circle with the user's initials.

@@ -3,7 +3,7 @@
 import React from "react";
 import { Message } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
@@ -211,7 +211,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					<p className="text-gray-500 text-theme-xs dark:text-gray-400">
 						{isSender
 							? formatTime(message.createdAt)
-							: `${message.sender.role || "User"}, ${formatTime(message.createdAt)}`}
+							: `${getRoleDisplayLabel(message.sender.role)}, ${formatTime(message.createdAt)}`}
 					</p>
 				</div>
 			</div>
