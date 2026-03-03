@@ -32,7 +32,9 @@ import {
 	Regional,
 	Canada,
 	Mexico,
+	MapSearchIcon,
 } from "@/icons";
+import Link from "next/link";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Image from "next/image";
 import macroPointIcon from "@/icons/additional/macropoint.png";
@@ -861,12 +863,23 @@ export default function DriversListTable({
 														<TableCell
 															className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
 														>
-															<p>
+															<p className="inline-flex items-center gap-1">
 																{item?.meta_data?.current_city}{" "}
 																{
 																	item?.meta_data
 																		?.current_location
 																}
+																{(item?.meta_data?.driver_id ?? item?.id) && (
+																	<Link
+																		href={`/tracking/${String(
+																			item?.meta_data?.driver_id ?? item?.id
+																		)}`}
+																		className="inline-flex shrink-0 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+																		title="Show on map"
+																	>
+																		<MapSearchIcon className="h-4 w-4" />
+																	</Link>
+																)}
 															</p>
 															<p className="text-[10px] text-gray-400 dark:text-gray-500">{dateDisplay}</p>
 															</TableCell>
@@ -1323,7 +1336,8 @@ export default function DriversListTable({
 														minWidth: 72,
 														maxWidth: 72,
 													}}
-													>
+												>
+													<div className="flex items-center gap-1">
 														<button
 															type="button"
 															onClick={() =>
@@ -1344,7 +1358,8 @@ export default function DriversListTable({
 														>
 															{item?.notes?.count ?? 0}
 														</button>
-													</TableCell>
+													</div>
+												</TableCell>
 												</TableRow>
 											);
 										})

@@ -65,6 +65,8 @@ import PushPinIcon from "./push-pin.svg";
 import AttachmentIcon from "./attachment.svg";
 import UnreadIcon from "./unread.svg";
 import DriversMapIcon from "./drivers-map.svg";
+import WorldMapIcon from "./world-map-icon.svg";
+import MapSearchIcon from "./map-search-icon.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import TwicIcon from "./additional/twic.svg";
@@ -190,6 +192,8 @@ export {
 	AttachmentIcon,
 	UnreadIcon,
 	DriversMapIcon,
+	WorldMapIcon,
+	MapSearchIcon,
 	TwicIcon,
 	HazmatIcon,
 	Hazmat2Icon,
