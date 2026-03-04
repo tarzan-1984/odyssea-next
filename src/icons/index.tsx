@@ -98,6 +98,13 @@ import Local from "./additional/local.svg";
 import Regional from "./additional/regional.svg";
 import Canada from "./additional/canada.svg";
 import Mexico from "./additional/mexico.svg";
+import FlagEn from "./flags/flag-en.svg";
+import FlagSp from "./flags/flag-sp.svg";
+import FlagAr from "./flags/flag-ar.svg";
+import FlagUa from "./flags/flag-ua.svg";
+import FlagPt from "./flags/flag-pt.svg";
+import FlagFr from "./flags/flag-fr.svg";
+import FlagRu from "./flags/flag-ru.svg";
 import DragHandleIcon from "./DragHandleIcon";
 
 export {
@@ -194,6 +201,13 @@ export {
 	DriversMapIcon,
 	WorldMapIcon,
 	MapSearchIcon,
+	FlagEn,
+	FlagSp,
+	FlagAr,
+	FlagUa,
+	FlagPt,
+	FlagFr,
+	FlagRu,
 	TwicIcon,
 	HazmatIcon,
 	Hazmat2Icon,

@@ -50,6 +50,7 @@ import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
+import LanguageFlagIcon from "./LanguageFlagIcon";
 import DriverNotesModal from "./DriverNotesModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
@@ -203,6 +204,8 @@ export default function DriversListTable({
 		placeholderData: keepPreviousData,
 		enabled: queryEnabled,
 	});
+
+	console.log('driverList', driverList);
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
@@ -917,11 +920,15 @@ export default function DriversListTable({
 												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
 														<div className="space-y-0.5 break-words">
 															<p
-																className="break-words"
+																className="break-words inline-flex items-center gap-1"
 																title={`(${item?.id}) ${item?.meta_data?.driver_name || ""}`}
 															>
 																({item?.id}){" "}
 																{item?.meta_data?.driver_name}
+																<LanguageFlagIcon
+																	language={item?.meta_data?.languages ?? (item as any)?.languages}
+																	className="h-4 w-4 shrink-0"
+																/>
 															</p>
 															<p
 																className="break-words"
