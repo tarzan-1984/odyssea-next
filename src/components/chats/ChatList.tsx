@@ -327,7 +327,7 @@ export default function ChatList({
 	}
 
 	return (
-		<div className="sticky px-4 pt-4 pb-4 sm:px-5 sm:pt-5 xl:pb-0">
+		<div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-4 pb-4 sm:px-5 sm:pt-5 xl:pb-0">
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-2">
@@ -543,8 +543,8 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Chat List */}
-			<div className="overflow-y-auto h-[400px] max-h-[calc(100vh-220px)]">
+			{/* Chat List - fills remaining space with scroll */}
+			<div className="min-h-0 flex-1 overflow-y-auto pb-4">
 				{!filteredChatRooms || filteredChatRooms.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-gray-500 text-center">
