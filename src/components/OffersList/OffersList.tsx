@@ -42,6 +42,14 @@ function formatSpecialRequirements(value: unknown): string {
 	return String(value);
 }
 
+function hasHazmat(specialRequirements: unknown): boolean {
+	if (!specialRequirements) return false;
+	if (Array.isArray(specialRequirements)) {
+		return specialRequirements.some((v) => String(v).toLowerCase() === "hazmat");
+	}
+	return String(specialRequirements).toLowerCase().includes("hazmat");
+}
+
 const OffersList = () => {
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
@@ -170,13 +178,24 @@ const OffersList = () => {
 										setExpandedOfferId((id) => (id === row.id ? null : row.id))
 									}
 								>
-									<div className="flex flex-col gap-1 min-w-0">
-										<p className="text-base font-medium text-gray-900 dark:text-white truncate">
-											<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
-											{routeSummary(row.route) ||
-												`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
-											(id: {row.id})
-										</p>
+									<div className="flex flex-col gap-1 min-w-0 flex-1">
+										<div className="flex items-center gap-2">
+											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
+												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
+												{routeSummary(row.route) ||
+													`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
+												(id: {row.id})
+											</p>
+											{hasHazmat(row.special_requirements) && (
+												<Image
+													src="/images/hazmat.png"
+													alt="Hazmat"
+													width={42}
+													height={42}
+													className="flex-shrink-0 object-contain"
+												/>
+											)}
+										</div>
 									</div>
 									<div className="flex items-center justify-center flex-shrink-0">
 										<button
