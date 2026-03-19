@@ -8,8 +8,11 @@ export interface OfferDriver {
 	email: string;
 	phone: string | null;
 	status: string;
+	active: boolean;
+	is_selected: boolean;
 	rate: number | null;
-	action_time?: string | null;
+	action_time?: number | null;
+	action_time_display?: string | null;
 	empty_miles: number | null;
 	total_miles: number | null;
 }
@@ -23,6 +26,7 @@ export interface OfferRoutePoint {
 export interface OfferRow {
 	id: number;
 	active?: boolean;
+	is_driver_selected: boolean;
 	external_user_id: string | null;
 	create_time: string;
 	update_time: string;
@@ -38,7 +42,8 @@ export interface OfferRow {
 	special_requirements: unknown;
 	notes: string | null;
 	total_miles: number | null;
-	action_time: string | null;
+	action_time: number | null;
+	action_time_display?: string | null;
 	drivers: OfferDriver[];
 }
 
@@ -113,6 +118,7 @@ export interface CreateOfferResponse {
 	success: boolean;
 	data?: { id: number; [key: string]: unknown };
 	error?: string;
+	errors?: string[];
 }
 
 export interface AddDriversToOfferResponse {
@@ -123,6 +129,18 @@ export interface AddDriversToOfferResponse {
 }
 
 export interface RemoveDriverFromOfferResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+export interface ReturnDriverToOfferResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+export interface SelectDriverForOfferResponse {
 	success: boolean;
 	message?: string;
 	error?: string;
@@ -227,12 +245,21 @@ const offers = {
 			};
 			}
 
+			const errData = data as {
+				error?: string;
+				message?: string;
+				errors?: string[];
+			};
+			const errorMsg =
+				errData?.error ?? errData?.message ?? "Failed to create offer";
+			const errorDetails =
+				Array.isArray(errData?.errors) && errData.errors.length > 0
+					? errData.errors.join(". ")
+					: "";
 			return {
 				success: false,
-				error:
-					(data as { error?: string; message?: string })?.error ??
-					(data as { message?: string })?.message ??
-					"Failed to create offer",
+				error: errorDetails ? `${errorMsg}: ${errorDetails}` : errorMsg,
+				errors: errData?.errors,
 			};
 		} catch (error) {
 			console.error("Error in createOffer:", error);
@@ -310,6 +337,72 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in removeDriverFromOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async returnDriverToOffer(
+		offerId: number,
+		driverExternalId: string
+	): Promise<ReturnDriverToOfferResponse> {
+		try {
+			const response = await axios.patch<ReturnDriverToOfferResponse>(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/return`,
+				{},
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, message: data.message };
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to return driver",
+			};
+		} catch (error) {
+			console.error("Error in returnDriverToOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async selectDriverForOffer(
+		offerId: number,
+		driverExternalId: string
+	): Promise<SelectDriverForOfferResponse> {
+		try {
+			const response = await axios.patch<SelectDriverForOfferResponse>(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/select`,
+				{},
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, message: data.message };
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to select driver",
+			};
+		} catch (error) {
+			console.error("Error in selectDriverForOffer:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

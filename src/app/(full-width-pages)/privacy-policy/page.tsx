@@ -1,226 +1,310 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-	title: "Privacy Policy - Odysseia",
-	description: "Privacy Policy for Odysseia application",
+	title: "Odysseia Platform Privacy Policy",
+	description: "Odysseia Platform Privacy Policy",
 };
-
-const sectionTitle = "mb-3 text-lg font-semibold text-gray-900 dark:text-white";
-const sectionText = "text-gray-600 dark:text-gray-400 leading-relaxed";
-const listItem = "ml-4 mt-1 text-gray-600 dark:text-gray-400 leading-relaxed";
 
 export default function PrivacyPolicyPage() {
 	return (
 		<div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-			{/* Header */}
 			<header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
 				<div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-					<h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
-						Privacy Policy
-					</h1>
-					<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						Odysseia App · Last updated: {new Date().toLocaleDateString("en-US")}
-					</p>
+					<h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">ODYSSEIA PLATFORM PRIVACY POLICY</h1>
 				</div>
 			</header>
 
-			{/* Content */}
 			<main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
 				<div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-8">
-					<p className={`${sectionText} mb-8`}>
-						Odysseia Inc. (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates
-						the Odysseia App, a mobile application for carrier teams that provides
-						real-time location tracking, communication, and operational tools. This
-						Privacy Policy describes how we collect, use, store, and protect your
-						information when you use our application and related services.
-					</p>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>1. Information We Collect</h2>
-						<p className={sectionText}>
-							We collect the following categories of information:
-						</p>
-						<ul className="mt-3 list-disc space-y-2 pl-6">
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Account information:
-								</strong>{" "}
-								Email address, password (stored in encrypted form), first and last
-								name, phone number, role (e.g., driver, dispatcher), and company
-								affiliation.
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Location data:
-								</strong>{" "}
-								Precise GPS coordinates when you use the app. For drivers, we
-								collect location in the background to share your position with
-								dispatchers on the map. Location sharing can be enabled or disabled
-								in app settings.
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Profile photo:
-								</strong>{" "}
-								If you choose to set an avatar, we access your device&apos;s photo
-								library to let you select an image. The photo is uploaded to our
-								servers and displayed to other users in your organization (e.g., in
-								chat and contacts).
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Chat and messaging:
-								</strong>{" "}
-								Text messages, file attachments, and related metadata sent through
-								the in-app chat. Messages are stored on our servers and visible to
-								participants in the conversation.
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Device and app usage:
-								</strong>{" "}
-								Device identifiers for push notifications, app version, and basic
-								usage data to support functionality and troubleshoot issues.
-							</li>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">INTRODUCTION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This Privacy Policy describes how <strong>Odysseia Inc</strong>. ("Odysseia," "Company," "we," "our," or "us") processes personal information in connection with the Odysseia platform and related services (the "Service").</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Odysseia platform supports transportation and logistics operations and is used by drivers, dispatch personnel, and other authorized operational participants to coordinate deliveries, exchange operational communications, and manage shipment-related activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Because the Service operates within a logistics environment, certain information processed through the platform may relate to transportation operations. This may include operational communications between users, geographic location information used for shipment tracking, delivery status updates, and documents or images associated with logistics workflows.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">For purposes of this Privacy Policy, <strong>"Personal Information"</strong> means information that identifies, relates to, describes, or can reasonably be linked to an identifiable individual.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This Privacy Policy describes: the categories of personal information that may be processed through the Service; how such information is collected and used; the circumstances in which information may be shared with service providers or operational partners; and the safeguards used to protect personal information.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This Privacy Policy applies to personal information processed through the <strong>Odysseia mobile application (iOS and Android)</strong>, the Odysseia website, and the technical systems that support the operation of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">It does not apply to the privacy practices of independent third-party services that operate outside the Company's systems and maintain their own privacy policies.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Service is intended for individuals engaged in professional transportation activities. This includes drivers using the application, operational personnel communicating through the platform, and logistics partners participating in shipment coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">In certain situations, information transmitted through the Service may include details relating to other individuals involved in transportation activities, such as shipment contacts, warehouse personnel, or delivery recipients. Such information is processed solely as part of the operational logistics workflows supported by the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Company processes personal information only to the extent necessary to operate the Service, support communication between authorized users, facilitate shipment coordination and operational visibility, maintain the security and reliability of the platform, and comply with applicable legal obligations.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Odysseia <strong>does not sell personal information</strong> and does not use personal information processed through the Service for unrelated advertising or consumer profiling.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Company may update this Privacy Policy from time to time to reflect changes in the Service, applicable law, or the Company's data practices. Where material changes are made, users may be notified through the Service or other appropriate communication channels.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">1. INTERNAL OPERATIONAL USE OF THE SERVICE</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">1.1. The Odysseia platform is designed for internal operational use within transportation and logistics workflows.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">1.2. Access to the Service is restricted to individuals who have been authorized by the Company or its operational partners, including drivers, dispatch personnel, and other participants involved in transportation coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">1.3. The Service does not provide open public registration and is not intended for general consumer use. Access credentials are provided only to authorized operational users who have been onboarded through the Company's internal processes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">1.4. This operational structure helps ensure that the platform is used solely for logistics coordination and related transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">1.5. <strong>Role of the Company.</strong> The Company acts as a data controller with respect to personal information of users who access and use the Service directly. In certain cases where the Service is used by business customers to support their internal logistics operations, the Company may process limited information on behalf of such customers solely to provide the functionality of the Service.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">2. DEFINITIONS</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">For purposes of this Privacy Policy, the following terms have the meanings set out below.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.1. <strong>"Company," "Odysseia," "we," "our," or "us"</strong> means Odysseia Inc., the entity that operates the Odysseia platform and is responsible for the processing of personal information in connection with the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.2. <strong>"Service"</strong> means the Odysseia platform, including the Odysseia mobile application (iOS and Android), the Odysseia website, and the technical systems, infrastructure, and communication tools used to operate the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.3. <strong>"User"</strong> means an individual who accesses or uses the Service. Users may include drivers, dispatch personnel, logistics partners, or other authorized participants involved in transportation operations supported by the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.4. <strong>"Driver"</strong> means a transportation professional who uses the Odysseia application in connection with shipment coordination, delivery operations, or related logistics activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.5. <strong>"Personal Information"</strong> means information that identifies, relates to, describes, or can reasonably be linked to an identifiable individual. Personal Information may include account information, location data, communications, or other information processed through the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.6. <strong>"Account Information"</strong> means information used to create, authenticate, and manage a user account within the Service. This may include login credentials, email addresses, authentication data, and other information required for secure access to the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.7. <strong>"Location Data"</strong> means geographic location information generated by a user's mobile device while the application is operating. Location Data may include GPS coordinates or other device-generated positioning information used to support shipment tracking and operational visibility during transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.8. <strong>"Messages" </strong> means communications exchanged between users through the messaging functionality of the Service. Messages may include text communications, operational instructions, or other information related to logistics coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.9. <strong>"Attachments"</strong> means files transmitted through the messaging or communication features of the Service. Attachments may include images, documents, delivery confirmations, shipment records, or other materials associated with transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.10.  <strong>"Third-Party Services"</strong> means external systems, infrastructure providers, or technical platforms that support the operation of the Service, including hosting providers, cloud storage services, messaging infrastructure, and notification delivery services.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.11. <strong>"Device Information"</strong> means technical information generated when a user accesses the Service through a mobile device. Device Information may include device identifiers, operating system information, application version, network information, and similar technical data used to maintain the functionality and security of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">2.12. <strong>"Operational Data"</strong> means information generated as part of transportation and logistics workflows coordinated through the Service. Operational Data may include shipment updates, delivery status information, routing details, or other information necessary to support transportation operations.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">3. CATEGORIES OF PERSONAL INFORMATION WE COLLECT</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.1. To operate the Odysseia platform and support logistics coordination through the Service, the Company processes several categories of personal information. The specific types of information processed depend on how the Service is used and which operational features are enabled within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Because the Service is designed for transportation operations, certain information processed through the platform may relate to shipment coordination, operational communications, and delivery workflows.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.2. <strong>Account and Authentication Information.</strong> The Service processes information necessary to create and manage user accounts and to authenticate authorized users. This may include: name; email address; phone number (where available); login credentials; authentication information used to verify access to the platform. Authentication information may include verification mechanisms such as one-time passcodes used during login or account recovery in order to maintain secure access to the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.3. <strong>Location Data.</strong> When location services are enabled on a user's mobile device and permission is granted to the application, the Service may receive location information generated by the device. Location data may include GPS coordinates or other positioning information used to support shipment tracking and operational visibility during delivery activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location information may be processed while the application is active. Where operational tracking features are enabled, location updates may continue during active transportation tasks in order to support shipment coordination and operational visibility.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location monitoring associated with transportation operations may stop when a driver marks their operational status as off duty within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.4. <strong>Messages and Operational Communications.</strong> The Service includes messaging tools that allow drivers, dispatch personnel, and other authorized participants to communicate within the platform. When users exchange messages through the application, the Service processes the content of those communications in order to support logistics coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Messages may include operational instructions, delivery updates, shipment coordination details, or other communications related to transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.5. <strong>Attachments and Shared Files.</strong> Users may transmit files through the messaging features of the platform. Attachments may include photographs, delivery confirmations, shipment documentation, routing instructions, or other materials associated with transportation operations.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Files may be shared in commonly used formats, including image files and document formats such as PDF documents, spreadsheets, and text files.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.6. <strong>Device and Technical Information.</strong> When users access the Service through a mobile device, certain technical information may be generated automatically as part of the operation of the application. This may include: device type; operating system version; application version; device identifiers; network information; diagnostic and system-log data.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This information is used to maintain system performance, diagnose technical issues, and support the secure and reliable operation of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.7. <strong>Operational Logistics Data.</strong> Because the Odysseia platform supports transportation coordination, the Service may process operational information generated during logistics workflows. This may include shipment updates, delivery status information, routing details, operational notes, and other information necessary to support transportation operations managed through the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Operational information allows the platform to maintain visibility into active logistics processes and enables coordination between drivers and operational personnel.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">3.8. <strong>Information Contained in Logistics Documents.</strong> Documents or files transmitted through the platform may contain information relating to third parties involved in transportation activities. For example, shipment documentation or delivery confirmations may include names, contact details, addresses, or other identifying information relating to shipment contacts, warehouse personnel, or delivery recipients.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where such information appears within documents shared through the platform, it is processed solely as part of the logistics operations supported by the Service.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">4. HOW WE COLLECT PERSONAL INFORMATION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">4.1. Odysseia collects personal information through several channels depending on how the Service is used and which operational features are enabled within the platform. In general, personal information processed through the Service is obtained in the following ways.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">4.2. <strong>Information Provided Directly by Users.</strong> Certain information is provided directly by users when they access or use the Service. This may include information submitted when: user accounts are created or activated; users authenticate access to the platform; messages are exchanged through the application; documents or attachments are uploaded; operational updates are shared within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This information allows the Service to support communication and coordination between authorized operational participants.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">4.3. <strong>Information Generated Through Use of the Service.</strong> Certain information is generated automatically as part of logistics workflows managed through the platform. For example, information may be generated when users update shipment status, confirm delivery events, exchange operational communications, or otherwise interact with features of the Service used to coordinate transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">4.4. <strong>Location Information from Mobile Devices.</strong> When location services are enabled on a user's mobile device and permission is granted to the application, the Service may receive geographic location information generated by the device.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location information may include GPS coordinates or other device-generated positioning data used to support shipment tracking and operational visibility during transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location information may be processed while the application is actively in use. Where operational tracking features are enabled, location updates may continue during active transportation tasks.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">When a driver indicates that they are <strong>off duty</strong> within the application, the platform does not collect location information for operational shipment monitoring.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">4.5. <strong>Device and Technical Information.</strong> When users interact with the Service, certain technical information may be generated automatically as part of the operation of the application.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This may include device information, system logs, application activity data, network information, and other diagnostic or technical data generated during normal operation of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This information is used to maintain system stability, diagnose technical issues, monitor application performance, and support the secure functioning of the Service.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">5. HOW WE USE PERSONAL INFORMATION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.1. The Company uses personal information processed through the Service for operational, administrative, and security-related purposes associated with the functioning of the Odysseia platform. Personal information may be used for the following purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.2. <strong>Operating and Maintaining the Service.</strong> Personal information is used to create and manage user accounts, authenticate authorized users, and maintain secure access to the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Authentication mechanisms, including verification tools such as one-time passcodes, help ensure that only authorized users are able to access the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Account information and technical data are also used to maintain system stability, support platform functionality, and ensure the reliable operation of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.3. <strong>Supporting Logistics Operations.</strong> Personal information is used to support transportation coordination and logistics workflows managed through the platform. This includes enabling shipment tracking, delivery coordination, routing visibility, and other operational processes associated with transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location information may be used during active transportation tasks to provide operational visibility and allow authorized personnel to monitor shipment progress and coordinate deliveries.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.4. <strong>Facilitating Communication Between Users.</strong> The Service includes messaging functionality that allows drivers, dispatch personnel, and other authorized operational participants to communicate within the platform. Information contained in messages, attachments, and shared files is processed to enable operational communications related to transportation coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.5. <strong>Sending Operational Notifications.</strong> The Service may send notifications to inform users about operational events within the platform. These notifications may include alerts about new messages, updates related to logistics activities, or other service-related communications necessary for the functioning of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Notifications may be delivered through push notification systems integrated into the mobile application.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.6. <strong>Maintaining Security and Preventing Misuse.</strong> Personal information may be used to maintain the security and integrity of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This may include monitoring system activity, detecting unauthorized access, investigating potential misuse of the Service, and maintaining system logs used to identify and address technical or security issues.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.7. <strong>Complying with Legal Obligations.</strong> Personal information may also be processed where necessary to comply with applicable legal requirements, regulatory obligations, or lawful requests from public authorities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">In addition, personal information may be used where necessary to establish, exercise, or defend legal rights related to the operation of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.8. <strong>Data Minimization.</strong> Odysseia seeks to collect and process only the personal information that is reasonably necessary to operate the Service and support transportation coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Personal information processed through the platform is limited to the categories required for account authentication, operational communications, logistics coordination, system security, and platform functionality.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Company does not collect personal information for unrelated purposes such as consumer marketing, behavioral advertising, or commercial profiling.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where possible, the Company limits the scope, duration, and accessibility of personal information in order to reduce unnecessary data processing and support responsible data management practices.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">5.9. <strong>Use of Aggregated or De-Identified Information.</strong> The Company may use aggregated or de-identified information derived from the operation of the Service for purposes such as maintaining system performance, improving platform functionality, and supporting operational analytics.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Such information does not identify individual users and is not used to identify specific individuals. Where information is de-identified, the Company takes reasonable measures designed to prevent the information from being re-associated with identifiable individuals.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">6. WHEN WE SHARE PERSONAL INFORMATION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.1. Odysseia does not sell personal information. We disclose personal information only where necessary to operate the Service, maintain the platform's technical infrastructure, support logistics operations, comply with legal obligations, or protect the rights and security of the Company and its users. Personal information may be shared in the following circumstances.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.2. <strong>Service Providers and Technical Infrastructure.</strong> We may share personal information with third-party service providers that support the operation of the Service and perform services on our behalf. These providers may assist with services such as: cloud hosting and infrastructure; file storage; messaging functionality; notification delivery; system monitoring and performance.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Service providers are permitted to process personal information only as necessary to provide services to the Company and are not authorized to use such information for their own independent purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.3. <strong>Notification and Messaging Infrastructure.</strong> To support communication within the Service, certain information may be processed through third-party notification or messaging infrastructure.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">For example, mobile operating systems may use notification services such as Apple Push Notification service or Firebase Cloud Messaging to deliver operational alerts, message notifications, or other service-related communications. These providers process only the limited information necessary to transmit notifications to user devices.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.4. <strong>Cloud Hosting and Data Storage.</strong> Personal information processed through the Service may be stored or hosted using third-party infrastructure providers that support the technical operation of the platform. These providers may process personal information solely for the purpose of providing infrastructure, hosting, database, or storage services required to operate the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Depending on the system architecture, such infrastructure providers may be located in the United States or other jurisdictions where the Company or its infrastructure providers operate.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.5. <strong>Logistics and Operational Communications.</strong> Because the Service is used to coordinate transportation operations, certain personal information may be shared within the platform between authorized operational participants. This may include drivers, dispatch personnel, and other logistics participants involved in shipment coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Information shared within the platform may include messages, attachments, shipment updates, routing information, or other operational data necessary to coordinate transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.6. <strong>Affiliates and Internal Operations.</strong> Personal information may be shared within the Company's corporate structure where reasonably necessary for internal administration, technical support, compliance activities, operational management, or oversight of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Any such sharing is limited to legitimate business purposes connected to the operation of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.7. <strong>Legal and Compliance Disclosures.</strong> We may disclose personal information where required to do so by applicable law, regulation, legal process, or lawful governmental request.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">We may also disclose information where we believe in good faith that disclosure is necessary to: protect the rights, safety, or security of the Company or its users; investigate fraud, misuse, or security incidents; enforce applicable terms, policies, or agreements.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">6.8. <strong>Business Transactions.</strong> If the Company is involved in a merger, acquisition, financing transaction, corporate reorganization, sale of assets, or similar corporate event, personal information may be disclosed to relevant counterparties, advisors, or transaction participants as part of that process.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">In such circumstances, personal information will remain subject to appropriate confidentiality protections and will continue to be handled in a manner consistent with this Privacy Policy unless otherwise permitted by applicable law.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">7. LOCATION DATA AND TRACKING FEATURES</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.1. The Odysseia application may process location data generated by a user's mobile device in order to support transportation coordination and operational visibility within the Service. Location information allows authorized operational personnel, such as dispatch teams, to monitor shipment progress, coordinate transportation activities, and maintain visibility into deliveries while they are in progress.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.2. <strong>Collection of Location Information.</strong> When location services are enabled on a user's mobile device and the application has been granted permission to access location data, the Service may receive geographic information generated by the device.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This may include GPS coordinates and other positioning information that allow the platform to determine the approximate location of the device during transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Depending on device permissions and operating system behavior, location information may be processed while the application is actively in use. Where operational tracking features are enabled, location updates may continue during active transportation tasks in order to support shipment coordination and operational visibility.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location processing is limited to periods when the user is engaged in transportation activities within the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.3. <strong>Operational Use of Location Data.</strong> Location data processed through the Service is used solely to support transportation coordination and operational visibility within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This may include enabling shipment tracking, assisting dispatch personnel in monitoring delivery progress, and supporting communication between drivers and operational teams. Location information is not used for advertising, marketing profiling, or cross-service tracking.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.4. <strong>Driver Status and Location Monitoring.</strong> The platform allows drivers to indicate their operational status within the application. When a driver marks their status as <strong>off duty</strong>, the platform does not collect location information for the purpose of operational shipment tracking.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This approach is intended to limit operational location monitoring to periods when a driver is actively engaged in transportation activities supported by the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.5. <strong>Device Permissions and User Controls.</strong> Access to location data is controlled through the permission settings of the user's mobile device.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Users may manage or restrict location access at any time through their device settings. If location permissions are disabled, certain features of the Service that rely on location information, such as shipment monitoring or operational tracking, may not function as intended.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.6. <strong>Use and Protection of Location Data.</strong> Location information collected through the Service is processed only to support the operational functionality of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Company does not sell location data and does not use location information for advertising, behavioral profiling, or unrelated tracking activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Location information may be retained for a limited operational period as described in the <strong>Data Retention</strong> section of this Privacy Policy.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">7.7. <strong>Precision of Location Information.</strong> The application may rely on precise geographic positioning generated by the user's mobile device, including GPS-based location information where available.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Precise location data supports transportation coordination, shipment monitoring, and operational visibility during delivery activities.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">8. MESSAGES AND COMMUNICATION DATA</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.1. The Service includes messaging and communication features that allow authorized users of the platform, including drivers and operational personnel, to exchange information necessary for transportation coordination. Communications exchanged through the Service form part of the operational workflows supported by the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.2. <strong>Types of Conversations.</strong> The application may support different types of communications within the platform. These may include: private messages between individual users; group conversations involving multiple operational participants; communications associated with specific shipments or transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Such communications may relate to delivery coordination, shipment updates, routing instructions, or other operational matters.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.3. <strong>Message Content.</strong> When users exchange messages through the Service, the platform processes the content of those communications in order to support operational coordination.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Messages may include text communications, delivery instructions, operational updates, or other logistics-related information exchanged between authorized users of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.4. <strong>Attachments and Shared Files.</strong> Users may also share files through the messaging functionality of the Service. Attachments may include photographs, delivery confirmations, shipment documentation, routing instructions, or other operational materials used during transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Files may be transmitted in commonly used formats, including image files and document formats such as PDF documents, spreadsheets, or text files.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.5. <strong>Communications Involving Third Parties.</strong> In certain situations, communications exchanged through the Service may contain information relating to individuals involved in transportation activities who are not users of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">For example, shipment documentation or delivery communications may include information relating to shipment contacts, warehouse personnel, delivery recipients, or other logistics participants. Where such information appears within communications or attachments, it is processed solely for the purpose of supporting transportation operations managed through the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">8.6. <strong>Operational Records.</strong> Messages and attachments exchanged through the platform may be retained as part of the operational record of transportation activities managed through the Service. Maintaining these records helps support operational continuity, logistics coordination, and the resolution of operational questions or disputes related to transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">For operational, administrative, or legal reasons, users may not be able to independently delete certain messages or attachments exchanged through the Service where retention is necessary to maintain system integrity, operational records, or compliance obligations.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The retention period for communications and related files is described in the <strong>Data Retention</strong> section of this Privacy Policy.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">9. DATA RETENTION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.1. Retention periods are determined based on the nature of the information, operational necessity, system integrity requirements, and applicable legal obligations. The Company retains personal information only for as long as necessary to operate the Service, maintain operational records, comply with legal obligations, and protect the security and integrity of the platform. Retention periods may vary depending on the type of information involved, the purpose for which the information was collected, and applicable legal or operational requirements.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.2. <strong>Account Information.</strong> Information associated with a user account may be retained for as long as the account remains active within the Service. If an account is deactivated or no longer used, certain account information may continue to be retained for a reasonable period to maintain system records, ensure platform security, and comply with legal or operational obligations related to the operation of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.3. <strong>Messages and Communication Records.</strong> Messages exchanged through the platform and related communication records are generally retained for up to <strong>three months</strong> within the active operational environment of the Service. After this period, message records may be transferred to a restricted archival environment used for operational continuity, administrative review, and system integrity purposes. Archived communications are not used in day-to-day platform operations but may be preserved as part of the operational record of transportation activities.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.4. <strong>Attachments and Operational Files.</strong> Files and documents transmitted through the messaging functionality of the Service may be retained in a manner similar to communication records. Attachments such as photographs, delivery confirmations, shipment documentation, or other operational materials may remain available within the platform for up to <strong>three months</strong>, after which they may be transferred to restricted archival storage.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Archived files may be preserved for purposes such as shipment verification, operational review, or dispute resolution.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.5. <strong>Location Data.</strong> Location information processed through the Service may be retained for the period necessary to support shipment monitoring, operational visibility, and transportation coordination. Location records may also be retained for a limited period for purposes such as operational review, investigation of delivery issues, dispute resolution, or system diagnostics.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.6. <strong>Technical and System Information.</strong> Technical logs, diagnostic data, and system activity records may be retained for the period reasonably necessary to maintain system performance, monitor platform stability, investigate technical incidents, and protect the security of the Service. These records may include device information, system logs, and other technical activity data generated during the operation of the application.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.7. <strong>Legal and Compliance Retention.</strong> In certain circumstances, the Company may retain personal information for a longer period where necessary to comply with legal obligations, resolve disputes, enforce applicable agreements, or protect the rights and security of the Company, its users, or its operational partners. Where extended retention is required, such information will be stored in a restricted environment and processed only for the purposes associated with the applicable legal or compliance requirement.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">9.8. In certain cases, residual copies of personal information may remain in backup or archival systems for a limited period of time following deletion requests. Such information is retained only as necessary to support system integrity, disaster recovery, and legal compliance, and is securely deleted or overwritten in accordance with the Company's internal data retention practices.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Archived records may be retained for a limited period reasonably necessary to support operational continuity, legal compliance, dispute resolution, or system integrity purposes.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">10. DATA SECURITY</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.1. Odysseia implements administrative, technical, and organizational safeguards designed to protect personal information processed through the Service from unauthorized access, disclosure, alteration, misuse, or loss. These safeguards are intended to maintain the security, integrity, and reliability of the platform and the information processed through it.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.2. <strong>Secure Data Transmission.</strong> Information transmitted between the mobile application, backend systems, and supporting infrastructure is protected using industry-standard encryption technologies.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This includes the use of secure communication protocols such as Transport Layer Security (TLS) or comparable encryption methods designed to reduce the risk of unauthorized interception of data while it is transmitted between user devices and the systems supporting the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.3. <strong>Authentication and Account Protection.</strong> Access to the Service is restricted to authenticated user accounts. Users must authenticate in order to access the application and its operational features. Authentication mechanisms may include verification methods such as one-time passcodes or similar identity-verification tools used during login or account recovery.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">These measures help ensure that only authorized users are able to access operational information within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.4. <strong>Mobile Device Security Controls.</strong> Certain authentication credentials or access tokens used by the application may be protected using security mechanisms provided by the mobile operating system.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">On supported devices, these protections may include secure storage technologies designed to safeguard authentication elements and reduce the risk of unauthorized access to stored credentials.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.5. <strong>Infrastructure Security.</strong> The Service operates within secure infrastructure environments designed to support the safe storage and processing of operational data. The Company works with infrastructure and technology providers that implement appropriate technical and organizational safeguards designed to protect the data processed through their systems.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Access to systems containing personal information is restricted to authorized personnel and service relationships that require such access for operational, technical, or compliance purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.6. <strong>Notification and Communication Infrastructure.</strong> Push notifications may include limited information related to operational communications within the Service, such as the name of a conversation, delivery reference, or a brief preview of a message. The specific content displayed in notifications depends on the user's device settings and notification preferences. Users may control how notifications are displayed, including whether message previews are visible, through their device configuration settings.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.7. <strong>System Monitoring and Security Operations.</strong> The Company may maintain system logs, diagnostic records, and operational monitoring tools in order to maintain the security and stability of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">These processes help detect technical issues, identify abnormal system activity, investigate potential misuse of the Service, and support the reliability of the Service infrastructure. Monitoring activities are limited to operational, security, and system integrity purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.8. <strong>Limitations of Security Measures.</strong> While Odysseia applies reasonable safeguards designed to protect personal information, no method of electronic transmission or storage can guarantee absolute security.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Accordingly, the Company cannot guarantee that the Service will always be completely secure against every possible technical or external threat.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Users are encouraged to help protect their information by maintaining the confidentiality of their account credentials and using trusted devices when accessing the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">10.9. <strong>Security Incident Response.</strong> Odysseia maintains internal processes designed to detect, investigate, and respond to potential security incidents affecting the Service. These processes may include monitoring system activity, investigating unusual behavior, and implementing corrective measures where necessary to protect the security and integrity of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where required by applicable law, the Company will notify affected individuals or relevant authorities in the event of a data breach involving personal information.</p>
+					</section>
+					<section className="mb-10">
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">11. THIRD-PARTY INFRASTRUCTURE AND TECHNICAL SERVICE PROVIDERS</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.1. The Odysseia platform relies on certain third-party infrastructure and technology providers that support the operation and technical functionality of the Service. These providers assist the Company in maintaining the platform's hosting environment, delivering notifications, storing operational data, and supporting the reliable operation of the application.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Such providers may process limited personal information where necessary to perform services on behalf of the Company. This may include infrastructure services such as:</p>
+						<ul className="mt-3 space-y-2 pl-6 text-gray-600 dark:text-gray-400">
+							<li>11.1.1. technical infrastructure and hosting services</li>
+							<li>11.1.2. storage and file management services</li>
+							<li>11.1.3. messaging and notification delivery services</li>
+							<li>11.1.4. monitoring, diagnostics, and system support services.</li>
 						</ul>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.2. These providers process information solely to provide the services requested by the Company and are not authorized to use such information for their own independent purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.3. Third-party providers supporting the Service operate their own infrastructure and maintain their own privacy and security practices. The Company takes reasonable steps to work with providers that implement appropriate safeguards designed to protect the information processed through their systems.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.4. Where personal information is processed by such providers, it is handled only as necessary to support the operation and functionality of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.5. Where the Company processes personal information on behalf of business customers in connection with the Service, such processing may be governed by contractual arrangements implemented between the Company and the relevant customer where required under applicable law.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.6. <strong>International Data Transfers and Data Storage Locations.</strong> The Odysseia platform operates through technical infrastructure that may be located in multiple jurisdictions. As a result, personal information processed through the Service may be stored or processed on servers located outside a user's country of residence.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.7. Personal information may be stored and processed in jurisdictions where the Company or its service providers operate, including the United States and the European Economic Area. The Company does not rely on a single fixed data storage location and may use distributed infrastructure to support system reliability, availability, and performance.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.8. Accordingly, personal information may be transferred across national borders where such transfers are necessary to operate the platform and provide the functionality of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.9. Where personal information is transferred across jurisdictions, the Company takes reasonable steps to ensure that such information remains protected and is handled in accordance with this Privacy Policy and applicable data protection requirements.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where required under applicable law, the Company may rely on recognized legal mechanisms for international data transfers, including standard contractual protections or equivalent safeguards.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.10. These measures may include the use of service providers that maintain appropriate technical and organizational safeguards, as well as contractual commitments designed to protect personal information processed through their systems.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.11. By accessing or using the Service, users acknowledge that their personal information may be processed or stored in jurisdictions where data protection laws may differ from those of their country of residence.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">11.12. Regardless of where personal information is processed, the Company applies reasonable safeguards designed to protect the confidentiality, integrity, and security of information handled through the Service.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>2. How We Use Your Information</h2>
-						<p className={sectionText}>We use the information we collect to:</p>
-						<ul className="mt-3 list-disc space-y-2 pl-6">
-							<li className={listItem}>
-								Provide and operate the app (authentication, chat, location sharing,
-								notifications).
-							</li>
-							<li className={listItem}>
-								Display driver locations on the map for dispatchers and other
-								authorized users within your organization.
-							</li>
-							<li className={listItem}>
-								Enable direct and group messaging between drivers, dispatchers, and
-								office staff.
-							</li>
-							<li className={listItem}>
-								Send push notifications (e.g., new messages, status updates).
-							</li>
-							<li className={listItem}>
-								Maintain and improve our services, fix issues, and comply with legal
-								obligations.
-							</li>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">12. USER RIGHTS AND CHOICES</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.1. Individuals may have certain rights regarding their personal information under applicable privacy laws. Odysseia is committed to providing reasonable transparency and control over personal information processed through the Service. Where permitted by applicable law, users may exercise the following rights.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.2. <strong>Access to Personal Information.</strong> Users may request confirmation of whether the Company processes personal information relating to them and may request access to such information where it is reasonably available within the systems supporting the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.3. <strong>Correction of Information.</strong> Users may request that inaccurate or incomplete personal information maintained by the Company be corrected or updated. In some situations, certain information may also be updated directly through account settings or operational updates within the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.4. <strong>Deletion of Personal Information.</strong> Users may request deletion of personal information associated with their account, subject to technical, operational, or legal limitations. Certain information may need to be retained where necessary to maintain system integrity, comply with legal obligations, or preserve operational records associated with the use of the Service. Where deletion requests are approved, the Company will take reasonable steps to remove or de-identify personal information where technically feasible.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.5. <strong>Restriction of Processing.</strong> In certain circumstances, users may request that the Company limit the processing of their personal information, particularly where there is a dispute regarding the accuracy of information or the necessity of its use.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.6. <strong>Managing Device Permissions.</strong> Users may control certain types of data processing through the permission settings of their mobile device. This may include permissions related to location access, notifications, and other device-level controls used by the application. Disabling certain permissions may affect the functionality of specific features of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.7. <strong>Push Notifications.</strong> Users may disable push notifications through the settings of their mobile device. However, certain operational communications within the platform may rely on notification systems to inform users about messages or service-related updates.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.8. <strong>Account Deletion.</strong> Users may delete their account directly through the application interface. Where additional assistance is required, users may also contact the Company using the contact details provided in this Privacy Policy.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.9. <strong>Rights Under U.S. State Privacy Laws.</strong> Residents of certain U.S. states may have additional rights under applicable state privacy laws, including the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA), and other similar state privacy frameworks. Where applicable, such rights may include:</p>
+						<ul className="mt-3 space-y-2 pl-6 text-gray-600 dark:text-gray-400">
+							<li>12.9.1. the right to know what categories of personal information are collected and processed</li>
+							<li>12.9.2. the right to request access to specific pieces of personal information</li>
+							<li>12.9.3. the right to request correction of inaccurate personal information</li>
+							<li>12.9.4. the right to request deletion of certain personal information.</li>
 						</ul>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Odysseia does not sell personal information as defined under applicable privacy laws.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">12.10. <strong>Submitting Privacy Requests.</strong> Users who wish to exercise their privacy rights may contact the Company using the contact information provided in this Privacy Policy. To protect the security of personal information, the Company may take reasonable steps to verify the identity of the individual submitting a request before responding. Requests will be reviewed and addressed in accordance with applicable legal requirements and the operational structure of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where available, instructions for submitting certain privacy requests may also be provided within the Service interface.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>3. Who Has Access to Your Data</h2>
-						<p className={sectionText}>
-							Access to your data depends on your role and our app&apos;s
-							functionality:
-						</p>
-						<ul className="mt-3 list-disc space-y-2 pl-6">
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Drivers:
-								</strong>{" "}
-								Your location, status, name, phone, and profile photo may be visible
-								to dispatchers and other authorized users in your company. Your
-								phone number may be displayed so they can contact you.
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Dispatchers / office staff:
-								</strong>{" "}
-								You can view driver locations on the map and communicate via chat.
-								Your profile and contact details may be visible to other users in
-								your organization.
-							</li>
-							<li className={listItem}>
-								<strong className="text-gray-800 dark:text-gray-300">
-									Third parties:
-								</strong>{" "}
-								We do not sell your personal information. We may share data with
-								service providers (e.g., cloud hosting, push notification services)
-								who assist in operating the app, under strict confidentiality
-								agreements.
-							</li>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">13. AUTOMATED DECISION-MAKING</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.1. The Company does not use personal information for purposes that would require an opt-out right under applicable California privacy laws.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.2. The Service does not use personal information to make automated decisions that produce legal or similarly significant effects concerning individuals. Personal information processed through the platform is used solely to support logistics coordination, operational communication, shipment tracking, and system functionality.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Operational decisions within transportation workflows are made by authorized personnel and not through automated decision-making systems.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.3. <strong>Data Accuracy.</strong> The Company takes reasonable steps to ensure that personal information processed through the Service is accurate and kept up to date where appropriate. Users may request correction of inaccurate personal information as described in the User Rights section of this Privacy Policy. Maintaining accurate information helps support operational coordination and the reliable functioning of the platform.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.4. <strong>California Privacy Disclosure.</strong> This section applies to residents of the State of California and provides additional information required under the California Consumer Privacy Act (CCPA), as amended by the California Privacy Rights Act (CPRA).</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.5. <strong>Categories of Personal Information Collected.</strong> The categories of personal information that may be collected through the Service are described in the preceding sections of this Privacy Policy. In general, these categories may include:</p>
+						<ul className="mt-3 space-y-2 pl-6 text-gray-600 dark:text-gray-400">
+							<li>13.5.1. account and authentication information</li>
+							<li>13.5.2. location data generated through the operation of the mobile application</li>
+							<li>13.5.3. communications exchanged through the platform</li>
+							<li>13.5.4. attachments or documents transmitted through messaging features</li>
+							<li>13.5.5. device and technical information generated through the use of the application</li>
+							<li>13.5.6. operational logistics data associated with transportation coordination.</li>
 						</ul>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The specific categories of personal information collected may vary depending on how the Service is used and which operational features are enabled.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.6. <strong>Sources of Personal Information.</strong> Personal information processed through the Service is generally obtained from the following sources: information provided directly by users; information generated automatically through the operation of the application; communications and files transmitted through the platform; technical information generated by user devices interacting with the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.7. <strong>Purposes for Collecting Personal Information.</strong> Personal information is used for purposes that include: operating and maintaining the platform; enabling communications between authorized users; supporting transportation coordination and shipment monitoring; maintaining system security and platform stability; complying with applicable legal obligations. Additional details regarding the purposes for processing personal information are described in the <strong>How We Use Personal Information</strong> section of this Privacy Policy.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.8. <strong>No Sale or Sharing of Personal Information.</strong> Odysseia does not sell personal information as defined under the CCPA or CPRA. The Company also does not share personal information for cross-context behavioral advertising.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.9. <strong>Rights of California Residents.</strong> Subject to applicable legal limitations, California residents may have the right to: request access to the categories and specific pieces of personal information collected about them; request correction of inaccurate personal information; request deletion of certain personal information.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">California residents may exercise these rights by submitting a request using the contact information provided in this Privacy Policy. The Company may take reasonable steps to verify the identity of the individual submitting the request before responding.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">13.10. <strong>Non-Discrimination.</strong> The Company will not discriminate against individuals for exercising their rights under the CCPA or CPRA. However, certain features of the Service may require the processing of operational information in order to function properly. If a user requests the limitation or deletion of certain information, some functionality of the Service may no longer be available.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>4. Data Storage and Security</h2>
-						<p className={sectionText}>
-							Your data is stored on secure servers with industry-standard
-							protections. We use encryption for data in transit (TLS/HTTPS) and
-							appropriate safeguards to protect against unauthorized access,
-							alteration, or destruction. Chat messages and location data are cached
-							locally on your device for offline access and faster loading; you can
-							clear app data in your device settings.
-						</p>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">14. CHILDREN'S PRIVACY</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">14.1. The Service is intended for use by adults involved in transportation and logistics operations. The platform is not directed to children.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">14.2. In accordance with the U.S. Children's Online Privacy Protection Act (COPPA), Odysseia does not knowingly collect personal information from children under the age of 13.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">14.3. If the Company becomes aware that personal information has been collected from a child under the age of 13 without appropriate authorization, the Company will take reasonable steps to delete such information as soon as practicable.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">14.4. If a parent or legal guardian believes that a child under the age of 13 may have provided personal information through the Service, they may contact the Company using the contact information provided in this Privacy Policy. The Company will review such requests and take appropriate action where appropriate.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>5. Data Retention</h2>
-						<p className={sectionText}>
-							We retain your account and chat data for as long as your account is
-							active and as needed to provide our services. Location history may be
-							retained for a limited period to support map and tracking features. When
-							you delete your account or request deletion, we will remove or anonymize
-							your personal data in accordance with our retention policies and
-							applicable law.
-						</p>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">15. DO NOT TRACK SIGNALS</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">15.1. Certain web browsers and mobile devices may offer a "Do Not Track" ("DNT") feature that allows users to signal a preference regarding the tracking of online activity across websites or online services.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">15.2. At present, there is no widely accepted industry standard governing how online services should respond to Do Not Track signals. For this reason, the Odysseia Service does not currently respond to Do Not Track signals transmitted by web browsers or similar technologies.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">15.3. The Company does not track users across third-party websites for advertising purposes and does not use personal information collected through the Service for cross-context behavioral advertising. The Company does not track users across third-party apps, websites, or services for advertising or marketing purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">15.4. Users may manage certain privacy settings directly through their device settings, including permissions related to location access, notifications, and other application-level permissions used by the Service.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>6. Your Rights and Choices</h2>
-						<p className={sectionText}>
-							Depending on your location, you may have the right to:
-						</p>
-						<ul className="mt-3 list-disc space-y-2 pl-6">
-							<li className={listItem}>Access and receive a copy of your data.</li>
-							<li className={listItem}>Correct inaccurate personal information.</li>
-							<li className={listItem}>Request deletion of your personal data.</li>
-							<li className={listItem}>Object to or restrict certain processing.</li>
-							<li className={listItem}>
-								Withdraw consent where processing is based on consent.
-							</li>
-						</ul>
-						<p className={`${sectionText} mt-4`}>
-							You can control location sharing in the app settings. To exercise your
-							rights or ask questions about your data, contact your
-							organization&apos;s administrator or reach out to us using the contact
-							details below.
-						</p>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">16. WEBSITE AND TECHNICAL DATA</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">16.1. Where the Service is accessed through a website or other web-based interface, the Company may process limited technical information required for the operation and maintenance of such interface. This may include browser type, device characteristics, system configuration data, and basic usage information necessary to ensure proper functionality, security, and performance of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">This may also include limited network and request-related information, such as IP address, request logs, and system interaction data, where reasonably necessary for security, diagnostics, and system performance purposes.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">16.2. The Company does not use cookies or similar technologies for advertising purposes or cross-site tracking. Any use of technical data in web environments is limited to what is reasonably necessary to support system operation, maintain security, and ensure the stability of the Service.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">16.3. Technical information collected in connection with web access is not used to build user profiles, conduct behavioral analysis, or support marketing activities.</p>
 					</section>
-
 					<section className="mb-10">
-						<h2 className={sectionTitle}>7. Children&apos;s Privacy</h2>
-						<p className={sectionText}>
-							Odysseia App is intended for use by carrier team members in a
-							professional context. We do not knowingly collect personal information
-							from children under 13 (or the applicable age in your jurisdiction). If
-							you believe we have collected such information, please contact us so we
-							can delete it.
-						</p>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">17. CHANGES TO THIS PRIVACY POLICY</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">17.1. Odysseia may update this Privacy Policy from time to time to reflect changes in the Service, updates to applicable legal requirements, or modifications to the Company's data practices.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">17.2. When updates are made, the revised version of the Privacy Policy will be published within the Service or on the Company's official website, together with an updated <strong>"Last Updated"</strong> date.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">17.3. If a change materially affects how personal information is processed, the Company may provide additional notice through the application, the website, or other appropriate communication channels.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">17.4. Continued use of the Service after the updated Privacy Policy becomes effective indicates that the user has reviewed the updated policy, to the extent permitted by applicable law.</p>
 					</section>
-
-					<section className="mb-10">
-						<h2 className={sectionTitle}>8. Changes to This Policy</h2>
-						<p className={sectionText}>
-							We may update this Privacy Policy from time to time. We will notify you
-							of material changes by posting the updated policy in the app or on our
-							website and updating the &quot;Last updated&quot; date. Your continued
-							use of the app after changes constitutes acceptance of the revised
-							policy.
+					<section>
+						<h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">18. CONTACT INFORMATION</h2>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">If you have questions about this Privacy Policy or about how Odysseia processes personal information, you may contact the Company using the contact details below.</p>
+						<p className="mt-3 whitespace-pre-line leading-relaxed text-gray-600 dark:text-gray-400">
+							Odysseia Inc.
+							{"\n"}521 S Port St
+							{"\n"}Baltimore, MD 21224
+							{"\n"}United States
+							{"\n"}Email: <a className="text-blue-600 underline" href="mailto:operations@odysseia.one">operations@odysseia.one</a>
 						</p>
-					</section>
-
-					<section className="mb-8">
-						<h2 className={sectionTitle}>9. Contact Us</h2>
-						<p className={sectionText}>
-							If you have questions about this Privacy Policy or our data practices,
-							please contact Odysseia Inc. through your organization&apos;s support
-							channel or at the contact information provided by your employer.
-						</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">The Company will review and respond to privacy-related inquiries in accordance with applicable law.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where a request relates to the exercise of privacy rights under applicable law, the Company may take reasonable steps to verify the identity of the requesting individual before responding or taking action on the request.</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">Where required under applicable law, the Company may designate an authorized representative within the European Economic Area.</p>
 					</section>
 				</div>
 			</main>

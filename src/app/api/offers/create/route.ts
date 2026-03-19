@@ -27,8 +27,10 @@ export async function POST(request: NextRequest) {
 		const data = await response.json();
 
 		if (!response.ok) {
+			const errorMessage = data.message ?? data.error ?? "Failed to create offer";
+			const errors = Array.isArray(data.errors) ? data.errors : [];
 			return NextResponse.json(
-				{ error: data.message ?? data.error ?? "Failed to create offer" },
+				{ error: errorMessage, errors },
 				{ status: response.status }
 			);
 		}

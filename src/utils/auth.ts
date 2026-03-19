@@ -154,16 +154,17 @@ export const clientAuth = {
 	},
 
 	// Fetch with automatic authentication headers
-	fetch: async (url: string, options: RequestInit = {}) => {
+	fetch: (url: string, options: Parameters<typeof fetch>[1] = {}) => {
+		const opts = options ?? {};
 		const token = clientAuth.getAccessToken();
 		const headers = {
 			'Content-Type': 'application/json',
 			...(token && { Authorization: `Bearer ${token}` }),
-			...options.headers,
+			...opts.headers,
 		};
 
 		return fetch(url, {
-			...options,
+			...opts,
 			headers,
 		});
 	},

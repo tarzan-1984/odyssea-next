@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
@@ -112,6 +113,12 @@ interface RoleBroadcastData {
 	};
 }
 
+interface OfferUpdatedData {
+	offerId?: number;
+	reason?: string;
+	refreshedAt?: string;
+}
+
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
 export const useWebSocket = () => {
@@ -129,6 +136,7 @@ interface WebSocketProviderProps {
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [isConnected, setIsConnected] = useState(false);
+	const queryClient = useQueryClient();
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const reconnectAttempts = useRef(0);
 	const maxReconnectAttempts = 5;
@@ -223,6 +231,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle server's connected event (with user data)
 		newSocket.on("connected", (data: any) => {
 			// Connected successfully
+		});
+
+		newSocket.on("offerUpdated", (data: OfferUpdatedData) => {
+			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] }).catch(
+				() => {},
+			);
+			queryClient.invalidateQueries({ queryKey: ["offers-list"] }).catch(
+				() => {},
+			);
 		});
 
 		// Handle user location updates from backend (users table)

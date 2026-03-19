@@ -148,7 +148,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
         },
 
         // WebSocket methods
-        addNotification: (notification: any) => {
+        addNotification: (notification: Notification) => {
           set((state) => ({
             notifications: [notification, ...state.notifications],
             unreadCount: state.unreadCount + 1,

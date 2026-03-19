@@ -27,8 +27,8 @@ class IndexedDBChatService {
 	private initPromise: Promise<void> | null = null;
 
 	// Initialize IndexedDB database
-	private async init(): Promise<void> {
-		if (this.db) return;
+	private init(): Promise<void> {
+		if (this.db) return Promise.resolve();
 		if (this.initPromise) return this.initPromise;
 
 		this.initPromise = new Promise((resolve, reject) => {

@@ -715,7 +715,7 @@ export default function CreateOfferModal({
 							label="Special requirements"
 							options={[
 								{ value: "hazmat", text: "Hazmat", selected: false },
-								{ value: "tanker-end", text: "Tanker End.", selected: false },
+								{ value: "tanker-end", text: "Tanker End", selected: false },
 								{ value: "driver-assist", text: "Driver assist", selected: false },
 								{ value: "liftgate", text: "Liftgate", selected: false },
 								{ value: "pallet-jack", text: "Pallet Jack", selected: false },

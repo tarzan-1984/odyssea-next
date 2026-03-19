@@ -241,9 +241,9 @@ export const useChatStore = create<ChatState>()(
 
 					const updatedState: Partial<ChatState> = { chatRooms: sortedRooms };
 					if (currentChatRoom?.id === chatRoomId) {
-						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as any;
+						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as ChatRoom;
 					}
-					set(updatedState as any, false, "updateChatRoom");
+					set(updatedState, false, "updateChatRoom");
 
 					// Sync to IndexedDB
 					indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
@@ -262,7 +262,7 @@ export const useChatStore = create<ChatState>()(
 						updatedState.messages = [];
 					}
 
-					set(updatedState as any, false, "removeChatRoom");
+					set(updatedState, false, "removeChatRoom");
 
 					// Remove from IndexedDB
 					indexedDBChatService.deleteChatRoom(chatRoomId).catch(error => {

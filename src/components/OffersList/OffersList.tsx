@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
@@ -13,6 +13,7 @@ import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
 import type { OfferRow } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
 import UserFilterSelect from "./UserFilterSelect";
+import OfferTimeImage from "@/icons/OfferTime.png";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
@@ -50,6 +51,23 @@ function hasHazmat(specialRequirements: unknown): boolean {
 	return String(specialRequirements).toLowerCase().includes("hazmat");
 }
 
+function normalizeUnixSeconds(value: unknown): number | null {
+	if (value == null || value === "") return null;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return null;
+	return Math.floor(parsed);
+}
+
+function formatCountdown(totalSeconds: number): string {
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	return [hours, minutes, seconds]
+		.map((value) => String(value).padStart(2, "0"))
+		.join(":");
+}
+
 const OffersList = () => {
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
@@ -60,9 +78,14 @@ const OffersList = () => {
 	const [addDriversExistingDriverIds, setAddDriversExistingDriverIds] = useState<string[]>([]);
 	const [isAddingDrivers, setIsAddingDrivers] = useState(false);
 	const [deletingDriverKey, setDeletingDriverKey] = useState<string | null>(null);
+	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
+	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
+	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
+		Math.floor(Date.now() / 1000)
+	);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
 	const queryParams = {
@@ -91,6 +114,14 @@ const OffersList = () => {
 	const pagination = data?.data?.pagination;
 	const totalItems = pagination?.total_count ?? 0;
 	const totalPages = pagination?.total_pages ?? 1;
+
+	useEffect(() => {
+		const intervalId = window.setInterval(() => {
+			setNowUnixSeconds(Math.floor(Date.now() / 1000));
+		}, 1000);
+
+		return () => window.clearInterval(intervalId);
+	}, []);
 
 	return (
 		<div className="bg-white dark:bg-white/[0.03] rounded-xl">
@@ -278,9 +309,9 @@ const OffersList = () => {
 													<col style={{ width: "15%" }} />
 													<col style={{ width: "12%" }} />
 													<col style={{ width: "11%" }} />
-													<col style={{ width: "9%" }} />
-													<col style={{ width: "9%" }} />
-													<col style={{ width: "20%" }} />
+													<col style={{ width: row.is_driver_selected ? "14%" : "9%" }} />
+													<col style={{ width: row.is_driver_selected ? "24%" : "9%" }} />
+													{!row.is_driver_selected && <col style={{ width: "20%" }} />}
 												</colgroup>
 														<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 															<TableRow className="border-gray-200 dark:border-white/[0.08]">
@@ -302,14 +333,19 @@ const OffersList = () => {
 																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Bid timer
 																</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
-																	Actions
-																</TableCell>
+																{!row.is_driver_selected && (
+																	<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
+																		Actions
+																	</TableCell>
+																)}
 															</TableRow>
 														</TableHeader>
 														<TableBody>
 															{row.drivers.map((driver, driverIndex) => (
-																<TableRow key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIndex}`} className="border-gray-200 dark:border-white/[0.08]">
+																<TableRow
+																	key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIndex}`}
+																	className={`border-gray-200 dark:border-white/[0.08] ${driver.is_selected ? "bg-green-100 dark:bg-green-900/25" : driver.active === false ? "bg-red-100 dark:bg-red-900/25" : ""}`}
+																>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<span className="inline-flex items-center gap-1.5">
 																	<span>
@@ -317,9 +353,9 @@ const OffersList = () => {
 																		{[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—"}
 																	</span>
 																	{driver.status?.toUpperCase() === "ACTIVE" ? (
-																		<svg className="shrink-0 w-5 h-5" xmlns="http://www.w3.org/2000/svg" shapeRendering="geometricPrecision" textRendering="geometricPrecision" imageRendering="optimizeQuality" fillRule="evenodd" clipRule="evenodd" viewBox="0 0 397 511.911"><path fill="#1A1A1A" d="M62.087 0h168.92c17.125 0 32.753 6.988 43.891 18.212 11.293 11.306 18.184 26.85 18.184 43.89v36.586c-2.371-.11-4.755-.173-7.154-.173-4.28 0-8.515.188-12.704.538V61.507H19.771v364.164h253.453v-26.146c4.189.35 8.424.537 12.704.537a154.3 154.3 0 007.154-.172v49.934c0 17.138-6.975 32.766-18.184 43.891-11.322 11.321-26.85 18.196-43.891 18.196H62.087c-17.138 0-32.765-6.972-43.89-18.196C6.89 482.421 0 466.878 0 449.824V62.018c0-17.14 6.975-32.767 18.197-43.905C29.49 6.819 44.949 0 62.087 0zm84.376 445.096c14.046 0 25.523 11.308 25.523 25.523 0 14.061-11.306 25.538-25.523 25.538-14.046 0-25.538-11.307-25.538-25.538 0-14.031 11.309-25.523 25.538-25.523z"/><path fill="#00A912" d="M285.928 138.216c61.364 0 111.072 49.739 111.072 111.072 0 61.364-49.74 111.072-111.072 111.072-61.364 0-111.073-49.74-111.073-111.072 0-61.366 49.74-111.072 111.073-111.072zm-35.903 94.85l19.688 18.593 49.388-50.017c3.857-3.916 6.274-7.055 11.025-2.161l15.426 15.803c5.068 5.01 4.809 7.945.032 12.608l-67.062 66.023c-10.075 9.875-8.32 10.48-18.538.347l-35.921-35.722c-2.132-2.304-1.902-4.634.428-6.937l17.907-18.569c2.713-2.856 4.874-2.607 7.627.032z"/></svg>
+																		<svg className="shrink-0 w-5 h-5 text-gray-900 dark:text-white" xmlns="http://www.w3.org/2000/svg" shapeRendering="geometricPrecision" textRendering="geometricPrecision" imageRendering="optimizeQuality" fillRule="evenodd" clipRule="evenodd" viewBox="0 0 397 511.911"><path fill="currentColor" d="M62.087 0h168.92c17.125 0 32.753 6.988 43.891 18.212 11.293 11.306 18.184 26.85 18.184 43.89v36.586c-2.371-.11-4.755-.173-7.154-.173-4.28 0-8.515.188-12.704.538V61.507H19.771v364.164h253.453v-26.146c4.189.35 8.424.537 12.704.537a154.3 154.3 0 007.154-.172v49.934c0 17.138-6.975 32.766-18.184 43.891-11.322 11.321-26.85 18.196-43.891 18.196H62.087c-17.138 0-32.765-6.972-43.89-18.196C6.89 482.421 0 466.878 0 449.824V62.018c0-17.14 6.975-32.767 18.197-43.905C29.49 6.819 44.949 0 62.087 0zm84.376 445.096c14.046 0 25.523 11.308 25.523 25.523 0 14.061-11.306 25.538-25.523 25.538-14.046 0-25.538-11.307-25.538-25.538 0-14.031 11.309-25.523 25.538-25.523z"/><path fill="#00A912" d="M285.928 138.216c61.364 0 111.072 49.739 111.072 111.072 0 61.364-49.74 111.072-111.072 111.072-61.364 0-111.073-49.74-111.073-111.072 0-61.366 49.74-111.072 111.073-111.072zm-35.903 94.85l19.688 18.593 49.388-50.017c3.857-3.916 6.274-7.055 11.025-2.161l15.426 15.803c5.068 5.01 4.809 7.945.032 12.608l-67.062 66.023c-10.075 9.875-8.32 10.48-18.538.347l-35.921-35.722c-2.132-2.304-1.902-4.634.428-6.937l17.907-18.569c2.713-2.856 4.874-2.607 7.627.032z"/></svg>
 																	) : (
-																		<svg className="shrink-0 w-5 h-5" xmlns="http://www.w3.org/2000/svg" shapeRendering="geometricPrecision" textRendering="geometricPrecision" imageRendering="optimizeQuality" fillRule="evenodd" clipRule="evenodd" viewBox="0 0 397 511.546"><path d="M62.043 0h168.8c17.112 0 32.728 6.983 43.859 18.199 11.285 11.298 18.171 26.831 18.171 43.859v36.559a155.489 155.489 0 00-7.149-.172c-4.277 0-8.509.188-12.695.537V61.463H19.757v363.905h253.272V399.24c4.186.349 8.418.537 12.695.537 2.397 0 4.78-.063 7.149-.173v49.9c0 17.125-6.97 32.741-18.171 43.858-11.314 11.314-26.831 18.184-43.859 18.184h-168.8c-17.126 0-32.742-6.967-43.859-18.184C6.885 482.077 0 466.545 0 449.504V61.974C0 44.846 6.97 29.23 18.184 18.1 29.469 6.814 44.917 0 62.043 0zm84.316 444.778c14.036 0 25.505 11.301 25.505 25.505 0 14.051-11.299 25.52-25.505 25.52-14.036 0-25.52-11.298-25.52-25.52 0-14.021 11.3-25.505 25.52-25.505z"/><path fill="#F44336" d="M285.724 137.837c61.478 0 111.276 49.83 111.276 111.276 0 61.476-49.83 111.276-111.276 111.276-61.476 0-111.274-49.832-111.274-111.276 0-61.478 49.831-111.276 111.274-111.276zm-47.196 90.05c-3.921-3.86-7.067-6.284-2.162-11.043l15.832-15.455c5.016-5.077 7.959-4.818 12.63-.03l21.34 21.339 21.209-21.208c3.863-3.923 6.284-7.066 11.043-2.164l15.455 15.832c5.077 5.018 4.818 7.961.032 12.63l-21.324 21.325 21.324 21.323c4.786 4.671 5.045 7.614-.032 12.632l-15.455 15.83c-4.759 4.904-7.18 1.761-11.043-2.162l-21.209-21.208-21.34 21.34c-4.671 4.787-7.614 5.046-12.63-.031l-15.832-15.457c-4.905-4.76-1.759-7.181 2.162-11.044l21.226-21.223-21.226-21.226z"/></svg>
+																		<svg className="shrink-0 w-5 h-5 text-gray-900 dark:text-white" xmlns="http://www.w3.org/2000/svg" shapeRendering="geometricPrecision" textRendering="geometricPrecision" imageRendering="optimizeQuality" fillRule="evenodd" clipRule="evenodd" viewBox="0 0 397 511.546"><path fill="currentColor" d="M62.043 0h168.8c17.112 0 32.728 6.983 43.859 18.199 11.285 11.298 18.171 26.831 18.171 43.859v36.559a155.489 155.489 0 00-7.149-.172c-4.277 0-8.509.188-12.695.537V61.463H19.757v363.905h253.272V399.24c4.186.349 8.418.537 12.695.537 2.397 0 4.78-.063 7.149-.173v49.9c0 17.125-6.97 32.741-18.171 43.858-11.314 11.314-26.831 18.184-43.859 18.184h-168.8c-17.126 0-32.742-6.967-43.859-18.184C6.885 482.077 0 466.545 0 449.504V61.974C0 44.846 6.97 29.23 18.184 18.1 29.469 6.814 44.917 0 62.043 0zm84.316 444.778c14.036 0 25.505 11.301 25.505 25.505 0 14.051-11.299 25.52-25.505 25.52-14.036 0-25.52-11.298-25.52-25.52 0-14.021 11.3-25.505 25.52-25.505z"/><path fill="#F44336" d="M285.724 137.837c61.478 0 111.276 49.83 111.276 111.276 0 61.476-49.83 111.276-111.276 111.276-61.476 0-111.274-49.832-111.274-111.276 0-61.478 49.831-111.276 111.274-111.276zm-47.196 90.05c-3.921-3.86-7.067-6.284-2.162-11.043l15.832-15.455c5.016-5.077 7.959-4.818 12.63-.03l21.34 21.339 21.209-21.208c3.863-3.923 6.284-7.066 11.043-2.164l15.455 15.832c5.077 5.018 4.818 7.961.032 12.63l-21.324 21.325 21.324 21.323c4.786 4.671 5.045 7.614-.032 12.632l-15.455 15.83c-4.759 4.904-7.18 1.761-11.043-2.162l-21.209-21.208-21.34 21.34c-4.671 4.787-7.614 5.046-12.63-.031l-15.832-15.457c-4.905-4.76-1.759-7.181 2.162-11.044l21.226-21.223-21.226-21.226z"/></svg>
 																	)}
 																</span>
 															</TableCell>
@@ -349,40 +385,101 @@ const OffersList = () => {
 																		{driver.rate != null ? `$${Number(driver.rate).toLocaleString("en-US")}` : "—"}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																		{driver.action_time ?? "—"}
+																		{(() => {
+																			const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
+																			if (actionTimeUnix == null) return "—";
+
+																			const remainingSeconds = Math.max(0, actionTimeUnix - nowUnixSeconds);
+																			if (remainingSeconds > 0) {
+																				return (
+																					<span className="inline-flex min-w-[78px] items-center justify-center rounded-full bg-brand-600 px-2 py-1 text-xs font-semibold text-white">
+																						{formatCountdown(remainingSeconds)}
+																					</span>
+																				);
+																			}
+
+																			return (
+																				<Image
+																					src={OfferTimeImage}
+																					alt="Offer time expired"
+																					width={68}
+																					height={40}
+																					className="h-auto w-[68px] object-contain"
+																				/>
+																			);
+																		})()}
 																	</TableCell>
-																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
-																		<div className="flex items-center gap-1.5">
-																			<button
-																				type="button"
-																				disabled={deletingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
-																				onClick={async () => {
-																					const key = driver.externalId ?? driver.driver_id;
-																					if (!key) return;
-																					setDeletingDriverKey(`${row.id}-${key}`);
-																					const res = await offersApi.removeDriverFromOffer(row.id, key);
-																					setDeletingDriverKey(null);
-																					if (res.success) {
-																						await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																					} else {
-																						console.error(res.error);
-																					}
-																				}}
-																				className="min-w-0 flex-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-																			>
-																				Delete
-																			</button>
-																			<button
-																				type="button"
-																				onClick={() => {
-																					// TODO: wire to accept driver for offer API
-																				}}
-																				className="min-w-0 flex-1 rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
-																			>
-																				Accept
-																			</button>
-																		</div>
-																	</TableCell>
+																	{!row.is_driver_selected && (
+																		<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
+																			{driver.active === false ? (
+																				<button
+																					type="button"
+																					disabled={returningDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																					onClick={async () => {
+																						const key = driver.externalId ?? driver.driver_id;
+																						if (!key) return;
+																						setReturningDriverKey(`${row.id}-${key}`);
+																						const res = await offersApi.returnDriverToOffer(row.id, key);
+																						setReturningDriverKey(null);
+																						if (res.success) {
+																							await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																						} else {
+																							console.error(res.error);
+																						}
+																					}}
+																					className="w-full rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																				>
+																					Return
+																				</button>
+																			) : (
+																				<div className="flex items-center gap-1.5">
+																					<button
+																						type="button"
+																						disabled={deletingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																						onClick={async () => {
+																							const key = driver.externalId ?? driver.driver_id;
+																							if (!key) return;
+																							setDeletingDriverKey(`${row.id}-${key}`);
+																							const res = await offersApi.removeDriverFromOffer(row.id, key);
+																							setDeletingDriverKey(null);
+																							if (res.success) {
+																								await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																							} else {
+																								console.error(res.error);
+																							}
+																						}}
+																						className="min-w-0 flex-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																					>
+																						Delete
+																					</button>
+																					<button
+																						type="button"
+																						disabled={acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																						onClick={() => {
+																							const key = driver.externalId ?? driver.driver_id;
+																							if (!key) return;
+																							setAcceptingDriverKey(`${row.id}-${key}`);
+																							offersApi
+																								.selectDriverForOffer(row.id, key)
+																								.then(async (res) => {
+																									if (res.success) {
+																										await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																									} else {
+																										console.error(res.error);
+																									}
+																								})
+																								.finally(() => {
+																									setAcceptingDriverKey(null);
+																								});
+																						}}
+																						className="min-w-0 flex-1 rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																					>
+																						Accept
+																					</button>
+																				</div>
+																			)}
+																		</TableCell>
+																	)}
 																</TableRow>
 															))}
 														</TableBody>
@@ -414,33 +511,35 @@ const OffersList = () => {
 									className="h-[31px] w-auto shrink-0"
 								/>
 														</button>
-														<button
-															type="button"
-															onClick={() => {
-																setAddDriversOfferId(row.id);
-																setAddDriversExistingDriverIds(
-																	Array.from(
-																		new Set(
-																			(row.drivers ?? []).flatMap(d =>
-																				[d.driver_id, d.externalId].filter(
-																					(x): x is string => Boolean(x)
+														{!row.is_driver_selected && (
+															<button
+																type="button"
+																onClick={() => {
+																	setAddDriversOfferId(row.id);
+																	setAddDriversExistingDriverIds(
+																		Array.from(
+																			new Set(
+																				(row.drivers ?? []).flatMap(d =>
+																					[d.driver_id, d.externalId].filter(
+																						(x): x is string => Boolean(x)
+																					)
 																				)
 																			)
 																		)
-																	)
-																);
-															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
-														>
-								Add drivers
-								<Image
-									src="/images/add_icon.png"
-									alt=""
-									width={31}
-									height={31}
-									className="h-[31px] w-auto shrink-0"
-															/>
-														</button>
+																	);
+																}}
+																className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+															>
+									Add drivers
+									<Image
+										src="/images/add_icon.png"
+										alt=""
+										width={31}
+										height={31}
+										className="h-[31px] w-auto shrink-0"
+																/>
+															</button>
+														)}
 													</div>
 													)}
 												</div>
@@ -448,7 +547,9 @@ const OffersList = () => {
 										</div>
 									)}
 									{(deactivatingOfferId === row.id ||
-										(deletingDriverKey != null && deletingDriverKey.startsWith(`${row.id}-`))) && (
+										(deletingDriverKey != null && deletingDriverKey.startsWith(`${row.id}-`)) ||
+										(returningDriverKey != null && returningDriverKey.startsWith(`${row.id}-`)) ||
+										(acceptingDriverKey != null && acceptingDriverKey.startsWith(`${row.id}-`))) && (
 										<div
 											className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/70 dark:bg-white/10"
 											aria-hidden

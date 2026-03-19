@@ -185,7 +185,18 @@ export const useWebSocketMessages = ({
 			socket.off("userOnline", handleUserOnline);
 			socket.off("error", handleError);
 		};
-	}, [socket, chatRoomId]); // Remove callback functions from dependencies to prevent loops
+	}, [
+		socket,
+		chatRoomId,
+		addMessage,
+		updateMessage,
+		onNewMessage,
+		onMessageSent,
+		onMessageRead,
+		onUserTyping,
+		onUserOnline,
+		onError,
+	]);
 
 	// Send message function
 	const sendMessageHandler = useCallback(
