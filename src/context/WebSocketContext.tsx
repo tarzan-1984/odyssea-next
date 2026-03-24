@@ -234,12 +234,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.on("offerUpdated", (data: OfferUpdatedData) => {
-			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] }).catch(
-				() => {},
-			);
-			queryClient.invalidateQueries({ queryKey: ["offers-list"] }).catch(
-				() => {},
-			);
+			// Invalidate and immediately refetch to update offer cards in real time
+			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
+			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
+			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
 		});
 
 		// Handle user location updates from backend (users table)
@@ -431,6 +430,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("notification", (data: NotificationData) => {
 			// Add notification to store
 			addNotification(data);
+
+			// Show toast for offer notifications (bid, declined, extended)
+			const offerNotificationTypes = ["offer_bid", "offer_refused", "offer_extend_time"];
+			if (offerNotificationTypes.includes(data.type)) {
+				playNotificationSound();
+				const addSystemToast = (window as any).addSystemToastNotification;
+				if (typeof addSystemToast === "function") {
+					const variant =
+						data.type === "offer_refused" ? "error" : "success";
+					addSystemToast({
+						id: data.id,
+						title: data.title,
+						message: data.message,
+						avatar: data.avatar,
+						variant,
+					});
+				}
+			}
 		});
 
 		newSocket.on("unreadCountUpdate", (data: { unreadCount: number }) => {
@@ -940,11 +957,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		});
 
-		// Notification events
-		newSocket.on("notification", (data: NotificationData) => {
-			// Handle notifications if needed
-		});
-
 		newSocket.on("roleBroadcast", (data: RoleBroadcastData) => {
 			// Handle role broadcasts if needed
 		});
@@ -1057,6 +1069,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		} else if (!currentUser && isConnected) {
 			disconnect();
 		}
+	}, [currentUser, isConnected]);
+
+	// Reconnect when tab becomes visible (browser may have disconnected WebSocket in background)
+	const connectRef = useRef(connect);
+	connectRef.current = connect;
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (
+				document.visibilityState === "visible" &&
+				currentUser &&
+				!isConnected
+			) {
+				connectRef.current();
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () =>
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
 	}, [currentUser, isConnected]);
 
 	// Cleanup on unmount

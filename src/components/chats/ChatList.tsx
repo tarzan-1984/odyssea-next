@@ -567,6 +567,7 @@ export default function ChatList({
 							const firstRoom = rooms[0];
 							const { route, id } = getOfferAccordionTitle(firstRoom);
 							const isExpanded = expandedOfferIds.has(offerId);
+							const groupUnreadCount = rooms.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
 							return (
 								<div
 									key={offerId}
@@ -585,11 +586,18 @@ export default function ChatList({
 												(id: {id})
 											</div>
 										</div>
-										{isExpanded ? (
-											<ChevronUpIcon className="h-4 w-4 flex-shrink-0 text-gray-500" />
-										) : (
-											<ChevronDownIcon className="h-4 w-4 flex-shrink-0 text-gray-500" />
-										)}
+										<div className="flex items-center gap-2 flex-shrink-0">
+											{groupUnreadCount > 0 && (
+												<div className="w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
+													{groupUnreadCount > 99 ? "99+" : groupUnreadCount}
+												</div>
+											)}
+											{isExpanded ? (
+												<ChevronUpIcon className="h-4 w-4 text-gray-500" />
+											) : (
+												<ChevronDownIcon className="h-4 w-4 text-gray-500" />
+											)}
+										</div>
 									</button>
 									{isExpanded && (
 										<div className="border-t border-gray-200 dark:border-white/10">

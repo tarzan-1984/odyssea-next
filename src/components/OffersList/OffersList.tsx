@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
@@ -14,6 +15,8 @@ import type { OfferRow } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
 import UserFilterSelect from "./UserFilterSelect";
 import OfferTimeImage from "@/icons/OfferTime.png";
+import TimeOverIcon from "@/icons/timeOver.png";
+import CloseOfferIcon from "@/icons/CloseOffer.png";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
@@ -69,6 +72,7 @@ function formatCountdown(totalSeconds: number): string {
 }
 
 const OffersList = () => {
+	useWebSocketConnectionCheck();
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
 	const [currentPage, setCurrentPage] = useState(1);
@@ -81,7 +85,7 @@ const OffersList = () => {
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
-	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
+	const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "assigned">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
 		Math.floor(Date.now() / 1000)
@@ -162,11 +166,12 @@ const OffersList = () => {
 					<CustomStaticSelect
 						options={[
 							{ value: "active", label: "Active" },
+							{ value: "assigned", label: "Assigned" },
 							{ value: "inactive", label: "Inactive" },
 						]}
 						value={statusFilter}
 						onChangeAction={(val) => {
-							setStatusFilter(val as "active" | "inactive");
+							setStatusFilter(val as "active" | "inactive" | "assigned");
 							setCurrentPage(1);
 						}}
 					/>
@@ -194,6 +199,10 @@ const OffersList = () => {
 					<div className="space-y-3">
 						{results.map((row) => {
 							const isExpanded = expandedOfferId === row.id;
+							const allDriversInactive =
+								(row.drivers?.length ?? 0) > 0 &&
+								row.drivers!.every((d) => d.active === false);
+							const headerHighlightRed = row.active === false || allDriversInactive;
 							return (
 								<div
 									key={row.id}
@@ -201,7 +210,7 @@ const OffersList = () => {
 								>
 								<div
 									className={`px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
-										row.active === false
+										headerHighlightRed
 											? "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
 											: "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
 									}`}
@@ -227,6 +236,63 @@ const OffersList = () => {
 												/>
 											)}
 										</div>
+										{/* Driver row: only drivers who placed bid or were refused/deleted */}
+										{(() => {
+											const participatingDrivers =
+												row.drivers?.filter(
+													(d) =>
+														d.active === false ||
+														d.rate != null ||
+														normalizeUnixSeconds(d.action_time) != null
+												) ?? [];
+											if (participatingDrivers.length === 0) return null;
+											return (
+												<div className="mt-2 flex flex-wrap items-center gap-2">
+													{participatingDrivers.map((driver, driverIdx) => {
+														const driverName = [driver.firstName, driver.lastName]
+															.filter(Boolean)
+															.join(" ") || "—";
+														const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
+														const remainingSeconds =
+															actionTimeUnix != null
+																? Math.max(0, actionTimeUnix - nowUnixSeconds)
+																: null;
+
+														return (
+															<div
+																key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIdx}`}
+																className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.04] px-2.5 py-1"
+															>
+																<span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[100px]">
+																	{driverName}
+																</span>
+																{driver.active === false ? (
+																	<Image
+																		src={CloseOfferIcon}
+																		alt="Refused/removed"
+																		width={22}
+																		height={22}
+																		className="h-[22px] w-[22px] flex-shrink-0 object-contain"
+																	/>
+																) : remainingSeconds != null && remainingSeconds > 0 ? (
+																	<span className="inline-flex min-w-[64px] items-center justify-center rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
+																		{formatCountdown(remainingSeconds)}
+																	</span>
+																) : actionTimeUnix != null ? (
+																	<Image
+																		src={TimeOverIcon}
+																		alt="Time expired"
+																		width={64}
+																		height={22}
+																		className="h-[22px] w-auto max-w-[64px] flex-shrink-0 object-contain"
+																	/>
+																) : null}
+															</div>
+														);
+													})}
+												</div>
+											);
+										})()}
 									</div>
 									<div className="flex items-center justify-center flex-shrink-0">
 										<button
@@ -455,22 +521,23 @@ const OffersList = () => {
 																					<button
 																						type="button"
 																						disabled={acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
-																						onClick={() => {
-																							const key = driver.externalId ?? driver.driver_id;
-																							if (!key) return;
-																							setAcceptingDriverKey(`${row.id}-${key}`);
-																							offersApi
-																								.selectDriverForOffer(row.id, key)
-																								.then(async (res) => {
-																									if (res.success) {
-																										await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																									} else {
-																										console.error(res.error);
-																									}
-																								})
-																								.finally(() => {
-																									setAcceptingDriverKey(null);
-																								});
+																					onClick={() => {
+																						const key = driver.externalId ?? driver.driver_id;
+																						if (!key) return;
+																						setAcceptingDriverKey(`${row.id}-${key}`);
+																						offersApi
+																							.selectDriverForOffer(row.id, key)
+																							.then(async (res) => {
+																								if (res.success) {
+																									await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																									await queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
+																								} else {
+																									console.error(res.error);
+																								}
+																							})
+																							.finally(() => {
+																								setAcceptingDriverKey(null);
+																							});
 																						}}
 																						className="min-w-0 flex-1 rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																					>

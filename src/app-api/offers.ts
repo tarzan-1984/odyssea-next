@@ -53,7 +53,7 @@ export interface GetOffersParams {
 	is_expired?: boolean;
 	user_id?: string;
 	sort_order?: "action_time_asc" | "action_time_desc";
-	status?: "active" | "inactive";
+	status?: "active" | "inactive" | "assigned";
 }
 
 export interface GetOffersResponse {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNotifications, useUnreadCount, useLoadNotifications, useLoadMoreNotifications, useMarkAllAsRead, useGetUnreadCount, useNotificationsStore } from "@/stores/notificationsStore";
 import { useUserStore } from "@/stores/userStore";
@@ -118,6 +118,12 @@ export default function NotificationDropdown() {
 	const currentUser = useUserStore(state => state.currentUser);
 	const hasMore = useNotificationsStore(state => state.hasMore);
 
+	// Deduplicate by id - same notification may arrive twice via WebSocket
+	const uniqueNotifications = useMemo(
+		() => notifications.filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i),
+		[notifications]
+	);
+
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
 	}
@@ -231,7 +237,7 @@ export default function NotificationDropdown() {
 						</li>
 					) : (
 						<>
-							{notifications.map((notification) => (
+							{uniqueNotifications.map((notification) => (
 								<NotificationItem
 									key={notification.id}
 									notification={notification}
