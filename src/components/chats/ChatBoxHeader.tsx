@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon } from "@/icons";
@@ -17,6 +17,7 @@ interface ChatBoxHeaderProps {
 
 export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const dropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
@@ -190,10 +191,20 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 				<div className="flex items-center gap-3">
 					<div className="relative -mb-1.5">
-						<button onClick={toggleDropdown} className="dropdown-toggle">
+						<button
+							ref={dropdownAnchorRef}
+							onClick={toggleDropdown}
+							className="dropdown-toggle"
+						>
 							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
 						</button>
-						<Dropdown isOpen={isOpen} onClose={closeDropdown} className="w-40 p-2">
+						<Dropdown
+							isOpen={isOpen}
+							onClose={closeDropdown}
+							className="w-40 p-2"
+							anchorRef={dropdownAnchorRef}
+							anchorAlign="right"
+						>
 							{chatRoom?.adminId === currentUser?.id &&
 								chatRoom?.type === "GROUP" && (
 									<DropdownItem

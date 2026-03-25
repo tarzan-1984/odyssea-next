@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
@@ -41,6 +41,7 @@ export default function ChatList({
 	const { updateChatRoom, updateMessage } = useChatStore();
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
+	const headerDropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
@@ -139,6 +140,20 @@ export default function ChatList({
 		setSearchQuery("");
 		setDebouncedSearchQuery("");
 	};
+
+	// Unread counts per tab (for badge on tab buttons)
+	const tabUnreadCounts = useMemo(() => {
+		const chats = chatRooms
+			.filter((r) => r.type !== "LOAD" && r.type !== "OFFER")
+			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+		const shipments = chatRooms
+			.filter((r) => r.type === "LOAD")
+			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+		const offers = chatRooms
+			.filter((r) => r.type === "OFFER")
+			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+		return { chats, shipments, offers };
+	}, [chatRooms]);
 
 	// Tab filtering:
 	// - Chats tab: show DIRECT and GROUP (exclude LOAD and OFFER)
@@ -346,13 +361,19 @@ export default function ChatList({
 				</div>
 				<div className="flex items-center gap-1">
 					<div>
-						<button className="dropdown-toggle d-block" onClick={toggleDropdownTwo}>
+						<button
+							ref={headerDropdownAnchorRef}
+							className="dropdown-toggle d-block"
+							onClick={toggleDropdownTwo}
+						>
 							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
 						</button>
 						<Dropdown
 							isOpen={isOpenTwo}
 							onClose={closeDropdownTwo}
 							className="w-40 p-2"
+							anchorRef={headerDropdownAnchorRef}
+							anchorAlign="right"
 						>
 							<DropdownItem
 								onItemClick={() => {
@@ -429,41 +450,74 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Tabs (Chats / Shipments) */}
+			{/* Tabs (Chats / Shipments / Offers) with unread counts */}
 			<div className="px-0 pt-2 pb-2">
-				<div className="flex gap-[15px]">
+				<div className="flex gap-1">
 					<button
 						type="button"
 						onClick={() => setActiveTab("chats")}
-						className={`flex-1 flex items-center justify-center h-8 rounded-lg text-sm font-medium transition-colors ${
+						className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 							activeTab === "chats"
 								? "bg-brand-500 text-white"
 								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
 						}`}
 					>
 						Chats
+						{tabUnreadCounts.chats > 0 && (
+							<span
+								className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+									activeTab === "chats"
+										? "bg-white/25 text-white"
+										: "bg-red-500 text-white dark:bg-red-600"
+								}`}
+							>
+								{tabUnreadCounts.chats > 99 ? "99+" : tabUnreadCounts.chats}
+							</span>
+						)}
 					</button>
 					<button
 						type="button"
 						onClick={() => setActiveTab("shipments")}
-						className={`flex-1 flex items-center justify-center h-8 rounded-lg text-sm font-medium transition-colors ${
+						className={`flex-[1.3] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 							activeTab === "shipments"
 								? "bg-brand-500 text-white"
 								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
 						}`}
 					>
 						Shipments
+						{tabUnreadCounts.shipments > 0 && (
+							<span
+								className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+									activeTab === "shipments"
+										? "bg-white/25 text-white"
+										: "bg-red-500 text-white dark:bg-red-600"
+								}`}
+							>
+								{tabUnreadCounts.shipments > 99 ? "99+" : tabUnreadCounts.shipments}
+							</span>
+						)}
 					</button>
 					<button
 						type="button"
 						onClick={() => setActiveTab("offers")}
-						className={`flex-1 flex items-center justify-center h-8 rounded-lg text-sm font-medium transition-colors ${
+						className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 							activeTab === "offers"
 								? "bg-brand-500 text-white"
 								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
 						}`}
 					>
 						Offers
+						{tabUnreadCounts.offers > 0 && (
+							<span
+								className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+									activeTab === "offers"
+										? "bg-white/25 text-white"
+										: "bg-red-500 text-white dark:bg-red-600"
+								}`}
+							>
+								{tabUnreadCounts.offers > 99 ? "99+" : tabUnreadCounts.offers}
+							</span>
+						)}
 					</button>
 				</div>
 			</div>

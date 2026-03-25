@@ -23,6 +23,17 @@ const mergeMessagesWithUpdates = (
 	return mergedMessages;
 };
 
+/** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
+const mergeSourcesUnreadCount = (
+	sourceUnread: number | undefined,
+	storeUnread: number | undefined
+): number => {
+	const s = sourceUnread ?? 0;
+	const st = storeUnread ?? 0;
+	if (s === 0) return 0;
+	return Math.max(s, st);
+};
+
 // Hook for managing chat synchronization between Zustand store, IndexedDB, and API
 export const useChatSync = () => {
 	// Get current user data for message sending
@@ -101,10 +112,9 @@ export const useChatSync = () => {
 								storeRoom => storeRoom.id === cachedRoom.id
 							);
 							if (storeRoom) {
-								// Preserve the maximum unreadCount to avoid losing real-time increments after reload
-								const finalUnreadCount = Math.max(
-									cachedRoom.unreadCount ?? 0,
-									storeRoom.unreadCount ?? 0
+								const finalUnreadCount = mergeSourcesUnreadCount(
+									cachedRoom.unreadCount,
+									storeRoom.unreadCount
 								);
 								return {
 									...cachedRoom,
@@ -137,10 +147,9 @@ export const useChatSync = () => {
 							storeRoom => storeRoom.id === apiRoom.id
 						);
 						if (storeRoom) {
-							// Preserve the maximum unreadCount to avoid regressing due to stale API values
-							const finalUnreadCount = Math.max(
-								apiRoom.unreadCount ?? 0,
-								storeRoom.unreadCount ?? 0
+							const finalUnreadCount = mergeSourcesUnreadCount(
+								apiRoom.unreadCount,
+								storeRoom.unreadCount
 							);
 							return {
 								...apiRoom,
@@ -171,10 +180,9 @@ export const useChatSync = () => {
 							if (storeRoom) {
 								return {
 									...cachedRoom,
-									// Keep the maximum value between cache and store
-									unreadCount: Math.max(
-										cachedRoom.unreadCount ?? 0,
-										storeRoom.unreadCount ?? 0
+									unreadCount: mergeSourcesUnreadCount(
+										cachedRoom.unreadCount,
+										storeRoom.unreadCount
 									),
 									lastMessage: storeRoom.lastMessage || cachedRoom.lastMessage,
 									updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
@@ -205,10 +213,9 @@ export const useChatSync = () => {
 						storeRoom => storeRoom.id === apiRoom.id
 					);
 					if (storeRoom) {
-						// Preserve the maximum unreadCount to avoid regressing due to stale API values
-						const finalUnreadCount = Math.max(
-							apiRoom.unreadCount ?? 0,
-							storeRoom.unreadCount ?? 0
+						const finalUnreadCount = mergeSourcesUnreadCount(
+							apiRoom.unreadCount,
+							storeRoom.unreadCount
 						);
 						return {
 							...apiRoom,

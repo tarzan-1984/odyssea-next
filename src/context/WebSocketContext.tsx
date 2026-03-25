@@ -711,17 +711,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Calculate how many messages were marked as read
 				const readCount = data.messageIds.length;
 
-				// Update chat room's unreadCount only if the current user read the messages
-				// This ensures that unreadCount is only decremented for the user who actually read them
-				// For group/load chats, each user has their own unreadCount based on their readBy status
+				// Use getState() to get fresh currentUser (avoids stale closure in socket handler)
+				const currentUserId = useUserStore.getState().currentUser?.id;
+
+				// Update chat room's unreadCount when the current user read the messages
+				// For GROUP/LOAD chats: each user has their own unreadCount based on readBy
 				const updatedRooms = state.chatRooms.map(room => {
 					if (
 						room.id === data.chatRoomId &&
-						data.userId === currentUser?.id &&
-						room.unreadCount &&
-						room.unreadCount > 0
+						data.userId === currentUserId
 					) {
-						const newUnreadCount = Math.max(0, room.unreadCount - readCount);
+						const currentUnread = room.unreadCount ?? 0;
+						const newUnreadCount = Math.max(0, currentUnread - readCount);
 						const updatedRoom = { ...room, unreadCount: newUnreadCount };
 
 						// Save updated room to IndexedDB
@@ -1048,11 +1049,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 	};
 
-	const markChatRoomAsRead = (chatRoomId: string) => {
-		if (socket && isConnected) {
-			socket.emit("markChatRoomAsRead", { chatRoomId });
-		}
-	};
+	const markChatRoomAsRead = useCallback(
+		async (chatRoomId: string) => {
+			if (socket && isConnected) {
+				socket.emit("markChatRoomAsRead", { chatRoomId });
+				// Same as HTTP path: DB may already have readBy filled, so the server often
+				// returns no messageIds and skips messagesMarkedAsRead — UI would keep a stale badge.
+				useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+				return;
+			}
+			// Fallback to HTTP when WebSocket is not connected
+			try {
+				await chatApi.markChatRoomAsRead(chatRoomId);
+				// Optimistically set unreadCount to 0 (we just marked all as read)
+				useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+			} catch (err) {
+				console.warn("[WebSocket] HTTP fallback markChatRoomAsRead failed:", err);
+			}
+		},
+		[socket, isConnected]
+	);
 
 	// Get authentication token from the project's auth system
 	const getAuthToken = (): string | null => {

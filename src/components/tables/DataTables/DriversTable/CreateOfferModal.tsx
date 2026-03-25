@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
-import TimePicker from "@/components/form/TimePicker";
+import DateTimePicker from "@/components/form/DateTimePicker";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
@@ -226,14 +226,13 @@ function DraggableExtraRow({
 
 			{/* Time field + remove button grouped together */}
 			<div className="flex items-end gap-2 shrink-0">
-				<div className="flex-1 sm:w-[9rem]">
-				<TimePicker
-					id={`time-${row.id}`}
-					label={row.type === "pickup" ? "Pick up time" : "Delivery time"}
+				<div className="flex-1 min-w-0 sm:min-w-[13.5rem] sm:max-w-[16rem]">
+				<DateTimePicker
+					id={`datetime-${row.id}`}
+					label={row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
 					value={row.time}
 					onChange={(v) => updateExtraRow(index, "time", v)}
 					onBlur={onTimeBlur}
-					placeholder="-- : -- pm"
 					className="dark:bg-gray-900"
 				/>
 				</div>
@@ -473,7 +472,7 @@ export default function CreateOfferModal({
 			const missingTime = trimmedRoute.some(row => row.time === "");
 			const missingLocation = trimmedRoute.some(row => row.location === "");
 			if (missingTime) {
-				routeError = "Each stop must have a time";
+				routeError = "Each stop must have a date and time";
 			} else if (missingLocation) {
 				routeError = "Each stop must have a location";
 			} else {

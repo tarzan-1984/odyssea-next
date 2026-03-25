@@ -3,14 +3,17 @@ import { cn } from "@/utils";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { createPopper, type Instance } from "@popperjs/core";
 
 interface DropdownProps {
 	isOpen: boolean;
 	onClose: () => void;
 	children: React.ReactNode;
 	className?: string;
-	/** When set, renders via portal with fixed positioning to avoid overflow clipping (e.g. in scrollable lists) */
+	/** When set, uses Popper.js for correct positioning (portal to body) */
 	anchorRef?: React.RefObject<HTMLElement | null>;
+	/** Popper placement: 'bottom-start' = left align, 'bottom-end' = right align */
+	anchorAlign?: "left" | "right";
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -19,8 +22,10 @@ export const Dropdown: React.FC<DropdownProps> = ({
 	children,
 	className = "",
 	anchorRef,
+	anchorAlign = "left",
 }) => {
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	const popperInstanceRef = useRef<Instance | null>(null);
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
@@ -39,20 +44,47 @@ export const Dropdown: React.FC<DropdownProps> = ({
 		};
 	}, [onClose]);
 
+	// Popper: create/update/destroy when isOpen or anchorRef changes
+	useEffect(() => {
+		if (!isOpen || !anchorRef?.current || !dropdownRef.current) {
+			if (popperInstanceRef.current) {
+				popperInstanceRef.current.destroy();
+				popperInstanceRef.current = null;
+			}
+			return;
+		}
+		popperInstanceRef.current = createPopper(anchorRef.current, dropdownRef.current, {
+			placement: anchorAlign === "right" ? "bottom-end" : "bottom-start",
+			strategy: "fixed",
+			modifiers: [
+				{ name: "offset", options: { offset: [0, 4] } },
+				{ name: "flip", options: { fallbackPlacements: ["top-end", "top-start"] } },
+				{ name: "preventOverflow" },
+			],
+		});
+		return () => {
+			if (popperInstanceRef.current) {
+				popperInstanceRef.current.destroy();
+				popperInstanceRef.current = null;
+			}
+		};
+	}, [isOpen, anchorRef, anchorAlign]);
+
+	// Update popper position when opened
+	useEffect(() => {
+		if (isOpen && popperInstanceRef.current) {
+			popperInstanceRef.current.update();
+		}
+	}, [isOpen]);
+
 	if (!isOpen) return null;
 
 	const baseClass =
 		"z-[9999] rounded-xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark";
 
 	if (anchorRef?.current && typeof document !== "undefined") {
-		const rect = anchorRef.current.getBoundingClientRect();
-		const style: React.CSSProperties = {
-			position: "fixed",
-			top: rect.bottom + 4,
-			left: rect.left,
-		};
 		return createPortal(
-			<div ref={dropdownRef} className={cn(baseClass, className)} style={style}>
+			<div ref={dropdownRef} className={cn(baseClass, className)}>
 				{children}
 			</div>,
 			document.body
