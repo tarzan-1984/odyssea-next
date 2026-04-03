@@ -69,6 +69,7 @@ import WorldMapIcon from "./world-map-icon.svg";
 import MapSearchIcon from "./map-search-icon.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
+import WorkstationIcon from "./workstation.svg";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
 import Hazmat2Icon from "./additional/hazmat2.svg";
@@ -132,6 +133,7 @@ export {
 	TankerEndorsement,
 	DriverListIcon,
 	OffersIcon,
+	WorkstationIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,

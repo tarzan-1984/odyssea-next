@@ -37,7 +37,7 @@ export const useWebSocketMessages = ({
 	} = useWebSocket();
 	const { addMessage, updateMessage } = useChatStore();
 	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string; role?: string }>>({});
-	const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const currentRoomRef = useRef<string | null>(null);
 
 	// Join chat room when component mounts or chatRoomId changes
@@ -50,9 +50,9 @@ export const useWebSocketMessages = ({
 
 			// Clear typing state and timeout when switching chat rooms
 			setIsTyping({});
-			if (typingTimeout) {
-				clearTimeout(typingTimeout);
-				setTypingTimeout(null);
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
+				typingTimeoutRef.current = null;
 			}
 
 			currentRoomRef.current = chatRoomId;
@@ -69,12 +69,12 @@ export const useWebSocketMessages = ({
 			leaveChatRoom(currentRoomRef.current);
 			currentRoomRef.current = null;
 			setIsTyping({});
-			if (typingTimeout) {
-				clearTimeout(typingTimeout);
-				setTypingTimeout(null);
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
+				typingTimeoutRef.current = null;
 			}
 		}
-	}, [isConnected, chatRoomId]); // Remove join/leave from deps to prevent loops
+	}, [isConnected, chatRoomId, joinChatRoom, leaveChatRoom, markChatRoomAsRead]);
 
 	// Leave chat room on unmount
 	useEffect(() => {
@@ -85,11 +85,11 @@ export const useWebSocketMessages = ({
 			}
 
 			// Clear typing timeout on unmount
-			if (typingTimeout) {
-				clearTimeout(typingTimeout);
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
 			}
 		};
-	}, []); // Remove leaveChatRoom from dependencies to prevent loops
+	}, [leaveChatRoom]);
 
 	// Set up event listeners
 	useEffect(() => {
@@ -222,27 +222,22 @@ export const useWebSocketMessages = ({
 
 			// Auto-stop typing indicator after 4 seconds
 			if (isTyping) {
-				// Clear any existing timeout
-				if (typingTimeout) {
-					clearTimeout(typingTimeout);
+				if (typingTimeoutRef.current) {
+					clearTimeout(typingTimeoutRef.current);
 				}
 
-				// Set new timeout to stop typing indicator after 4 seconds
-				const timeout = setTimeout(() => {
+				typingTimeoutRef.current = setTimeout(() => {
 					sendTyping(chatRoomId, false);
-					setTypingTimeout(null);
+					typingTimeoutRef.current = null;
 				}, 4000);
-
-				setTypingTimeout(timeout);
 			} else {
-				// User stopped typing, clear the timeout
-				if (typingTimeout) {
-					clearTimeout(typingTimeout);
-					setTypingTimeout(null);
+				if (typingTimeoutRef.current) {
+					clearTimeout(typingTimeoutRef.current);
+					typingTimeoutRef.current = null;
 				}
 			}
 		},
-		[sendTyping, chatRoomId, typingTimeout]
+		[sendTyping, chatRoomId]
 	);
 
 	// Mark message as read
@@ -252,17 +247,6 @@ export const useWebSocketMessages = ({
 		},
 		[markMessageAsRead, chatRoomId]
 	);
-
-	// Cleanup typing timeout on unmount
-	useEffect(() => {
-		return () => {
-			if (typingTimeout) {
-				clearTimeout(typingTimeout);
-			}
-		};
-	}, [typingTimeout]);
-
-	// Note: joinChatRoom and leaveChatRoom are imported from useWebSocket
 
 	return {
 		sendMessage: sendMessageHandler,

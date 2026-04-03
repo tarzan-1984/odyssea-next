@@ -19,6 +19,7 @@ import {
 	DriversMapIcon,
 	DriverListIcon,
 	OffersIcon,
+	WorkstationIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
@@ -31,6 +32,7 @@ type NavItem = {
 	new?: boolean;
 	subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 	isSignOut?: boolean; // Add this flag to identify the sign-out button
+	adminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
@@ -73,6 +75,12 @@ const navItems: NavItem[] = [
 		icon: <OffersIcon className="h-5 w-5" />,
 		name: "My offers",
 		path: "/offers",
+	},
+	{
+		icon: <WorkstationIcon className="h-5 w-5" />,
+		name: "App settings",
+		path: "/app-settings",
+		adminOnly: true,
 	},
 	// {
 	//   name: "AI Assistant",
@@ -263,12 +271,14 @@ const AppSidebar: React.FC = () => {
 	const pathname = usePathname();
 	const router = useRouter();
 	const currentUser = useCurrentUser();
+	const isAdmin = (currentUser?.role || "").trim().toUpperCase() === "ADMINISTRATOR";
 	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
 	const menuNavItems = navItems.filter(
 		(item) =>
-			!item.path ||
-			!DRIVERS_OFFERS_PATHS.includes(item.path) ||
-			canAccessDriversOffers
+			(!item.adminOnly || isAdmin) &&
+			(!item.path ||
+				!DRIVERS_OFFERS_PATHS.includes(item.path) ||
+				canAccessDriversOffers)
 	);
 
 	const handleSignOut = async () => {

@@ -34,6 +34,9 @@ const mergeSourcesUnreadCount = (
 	return Math.max(s, st);
 };
 
+export type LoadChatRoomsOptions = { force?: boolean };
+export type LoadMessagesOptions = { force?: boolean };
+
 // Hook for managing chat synchronization between Zustand store, IndexedDB, and API
 export const useChatSync = () => {
 	// Get current user data for message sending
@@ -75,7 +78,8 @@ export const useChatSync = () => {
 	};
 
 	// Load chat rooms from API and sync with cache
-	const loadChatRooms = useCallback(async () => {
+	const loadChatRooms = useCallback(async (options?: LoadChatRoomsOptions) => {
+		const force = options?.force ?? false;
 		// Skip loading on public tracking page
 		if (typeof window !== "undefined" && window.location.pathname.startsWith("/tracking/")) {
 			console.log("⏭️ [useChatSync] Skipping chat rooms load on tracking page");
@@ -101,7 +105,7 @@ export const useChatSync = () => {
 				// Check if cache is fresh (less than 5 minutes old)
 				const isCacheFresh = await indexedDBChatService.isCacheFresh("chatRooms", 5);
 
-				if (isCacheFresh) {
+				if (!force && isCacheFresh) {
 					// Load from cache for immediate display only if cache is fresh
 					const cachedRooms = await indexedDBChatService.getChatRooms();
 					if (cachedRooms.length > 0) {
@@ -250,7 +254,13 @@ export const useChatSync = () => {
 
 	// Load messages for a specific chat room
 	const loadMessages = useCallback(
-		async (chatRoomId: string, page: number = 1, limit: number = 50) => {
+		async (
+			chatRoomId: string,
+			page: number = 1,
+			limit: number = 50,
+			syncOptions?: LoadMessagesOptions
+		) => {
+			const force = syncOptions?.force ?? false;
 			try {
 				setLoadingMessages(true);
 				setError(null);
@@ -285,17 +295,17 @@ export const useChatSync = () => {
 							5
 						);
 
-						// Only update from API if cache is not fresh
-						if (!isCacheFresh) {
+						// Only update from API if cache is not fresh (or WS reconnect forced catch-up)
+						if (force || !isCacheFresh) {
 							try {
 								const response = await chatApi.getMessages(chatRoomId, page, limit);
-								// Only update if we got different data
-								if (
+								const apiDiffers =
 									response.messages.length !== cachedMessages.length ||
 									response.messages.some(
 										(msg, index) => msg.id !== cachedMessages[index]?.id
-									)
-								) {
+									);
+								// WS reconnect: always apply API so new messages never skipped by shallow compare
+								if (force || apiDiffers) {
 									// Merge API messages with real-time updates from store
 									const { messages: currentMessages } = useChatStore.getState();
 									const mergedMessages = mergeMessagesWithUpdates(

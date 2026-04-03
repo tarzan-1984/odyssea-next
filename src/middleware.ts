@@ -97,6 +97,27 @@ export function middleware(request: NextRequest) {
 		}
 	}
 
+	// App settings: only for ADMINISTRATOR
+	const isAppSettingsPage =
+		pathname === "/app-settings" || pathname.startsWith("/app-settings/");
+	if (isAppSettingsPage && hasToken) {
+		const userDataCookie = request.cookies.get(USER_DATA_COOKIE)?.value;
+		if (userDataCookie) {
+			try {
+				const decoded = tokenEncoder.decode(userDataCookie);
+				const userData = JSON.parse(decoded) as { role?: string };
+				const role = (userData.role || "").trim().toUpperCase();
+				if (role !== "ADMINISTRATOR") {
+					return NextResponse.redirect(new URL("/", request.url));
+				}
+			} catch {
+				return NextResponse.redirect(new URL("/", request.url));
+			}
+		} else {
+			return NextResponse.redirect(new URL("/", request.url));
+		}
+	}
+
 	return NextResponse.next();
 }
 

@@ -16,6 +16,7 @@ import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 
 // WebSocket context interface
 interface WebSocketContextType {
@@ -140,6 +141,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const reconnectAttempts = useRef(0);
 	const maxReconnectAttempts = 5;
+	/** After first successful connect, further connects are reconnects → trigger chat catch-up sync. */
+	const hadSuccessfulSocketConnectionRef = useRef(false);
 
 	// Get store actions
 	const { addMessage, addChatRoom, updateChatRoom, updateMessage } = useChatStore();
@@ -226,6 +229,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				clearTimeout(reconnectTimeoutRef.current);
 				reconnectTimeoutRef.current = null;
 			}
+
+			if (
+				typeof window !== "undefined" &&
+				hadSuccessfulSocketConnectionRef.current
+			) {
+				window.dispatchEvent(new CustomEvent(ODYSSEA_WS_RECONNECTED_EVENT));
+			}
+			hadSuccessfulSocketConnectionRef.current = true;
 		});
 
 		// Handle server's connected event (with user data)
@@ -774,15 +785,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		});
 
-		newSocket.on("connect_error", (error: any) => {
-			console.error("WebSocket connection error:", error);
-			console.error("Error details:", {
-				message: error.message,
-				description: error.description,
-				context: error.context,
-				type: error.type,
-				stack: error.stack,
-			});
+		newSocket.on("connect_error", (error: unknown) => {
+			const message = error instanceof Error ? error.message : String(error);
+			console.error("WebSocket connection error:", message);
+			try {
+				const e = error as Record<string, unknown>;
+				console.error("Error details:", {
+					message: e?.message,
+					description: e?.description,
+					type: e?.type,
+				});
+			} catch {
+				// Avoid dev overlay if error object has throwing getters
+			}
 			setIsConnected(false);
 
 			// Attempt to reconnect on connection error
@@ -987,6 +1002,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	};
 
 	const disconnect = () => {
+		hadSuccessfulSocketConnectionRef.current = false;
 		if (socket) {
 			socket.disconnect();
 			setSocket(null);

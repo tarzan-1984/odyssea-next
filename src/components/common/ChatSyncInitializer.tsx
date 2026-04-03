@@ -2,18 +2,21 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useChatSync } from "@/hooks/useChatSync";
-import { useCurrentUser } from "@/stores/userStore";
+import { useCurrentUser, useUserStore } from "@/stores/userStore";
+import { useChatStore } from "@/stores/chatStore";
+import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 
 /**
  * ChatSyncInitializer
  * - Globally loads chat rooms after user sign-in
  *   so the unread badge in the sidebar is correct right after app load.
  * - Skips loading on public pages like /tracking/[id]
+ * - After WebSocket reconnects, forces API sync so messages/unread missed while offline appear.
  */
 export default function ChatSyncInitializer() {
 	const currentUser = useCurrentUser();
 	const pathname = usePathname();
-	const { loadChatRooms } = useChatSync();
+	const { loadChatRooms, loadMessages } = useChatSync();
 	const hasLoadedRef = React.useRef(false);
 	const lastPathnameRef = React.useRef<string | null>(null);
 
@@ -45,6 +48,32 @@ export default function ChatSyncInitializer() {
 			});
 		}
 	}, [currentUser, loadChatRooms, pathname]);
+
+	React.useEffect(() => {
+		const onWsReconnected = () => {
+			if (
+				typeof window !== "undefined" &&
+				window.location.pathname.startsWith("/tracking/")
+			) {
+				return;
+			}
+			if (!useUserStore.getState().currentUser) return;
+
+			loadChatRooms({ force: true }).catch((error: unknown) => {
+				console.error("[ChatSync] Failed to refresh chat rooms after WS reconnect:", error);
+			});
+
+			const openRoom = useChatStore.getState().currentChatRoom;
+			if (openRoom?.id) {
+				loadMessages(openRoom.id, 1, 50, { force: true }).catch((error: unknown) => {
+					console.error("[ChatSync] Failed to refresh messages after WS reconnect:", error);
+				});
+			}
+		};
+
+		window.addEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
+		return () => window.removeEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
+	}, [loadChatRooms, loadMessages]);
 
 	// Render nothing
 	return null;
