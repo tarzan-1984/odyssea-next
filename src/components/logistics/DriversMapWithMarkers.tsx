@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import L from "leaflet";
@@ -17,6 +17,7 @@ import type { ChatRoom } from "@/app-api/chatApi";
 import type { TMSDriverResponse } from "@/app-api/api-types";
 import DriverInfoModal from "./DriverInfoModal";
 import { DRIVER_STATUS_LABELS } from "./driversMapConstants";
+import { getLeafletRasterTileLayerProps } from "@/lib/mapTileLayer";
 
 const MapContainer = dynamic(
 	() => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -375,8 +376,7 @@ export default function DriversMapWithMarkers({
 		mapRef.current.setView([lat, lng], zoom);
 	}, [centerCoordinates]);
 
-	const tileLayerAttribution =
-		'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
 
 	// Unique driverStatus values from data for filter options
 	const driverStatusOptions = Array.from(
@@ -461,8 +461,12 @@ export default function DriversMapWithMarkers({
 				>
 					<MapRefSetter mapRef={mapRef} />
 					<TileLayer
-						attribution={tileLayerAttribution}
-						url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+						attribution={mapTiles.attribution}
+						url={mapTiles.url}
+						{...(mapTiles.subdomains
+							? { subdomains: mapTiles.subdomains }
+							: {})}
+						maxZoom={mapTiles.maxZoom}
 					/>
 					{filteredDrivers.map((driver, index) => {
 						if (

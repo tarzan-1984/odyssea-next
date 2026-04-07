@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/context/ThemeContext";
+import { getLeafletRasterTileLayerProps } from "@/lib/mapTileLayer";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
@@ -152,17 +153,7 @@ export default function TrackingDeliveryMap({
 		});
 	}, []);
 
-	// Get tile layer URL based on theme
-	const tileLayerUrl = useMemo(() => {
-		// Use OpenStreetMap for both themes - we'll apply CSS filters for dark theme
-		// This ensures text labels remain visible
-		return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-	}, []);
-
-	// Get tile layer attribution
-	const tileLayerAttribution = useMemo(() => {
-		return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-	}, []);
+	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
 
 	// Center map when lastLocationUpdateAt changes (every WebSocket update)
 	// This ensures map centers on driver location even if coordinates haven't changed
@@ -229,8 +220,12 @@ export default function TrackingDeliveryMap({
 				<MapRefSetter mapRef={mapRef} />
 				<TileLayer
 					key={`tiles-${isDark ? "dark" : "light"}`}
-					attribution={tileLayerAttribution}
-					url={tileLayerUrl}
+					attribution={mapTiles.attribution}
+					url={mapTiles.url}
+					{...(mapTiles.subdomains
+						? { subdomains: mapTiles.subdomains }
+						: {})}
+					maxZoom={mapTiles.maxZoom}
 				/>
 				{markerPosition && (
 					<Marker
