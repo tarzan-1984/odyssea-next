@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import UserInitializer from "@/components/common/UserInitializer";
+import AccessTokenRefreshInitializer from "@/components/common/AccessTokenRefreshInitializer";
 import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
 import NotificationsInitializer from "@/components/common/NotificationsInitializer";
 import { ToastNotificationManager } from "@/components/notifications/ToastNotificationManager";
@@ -18,6 +19,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 			<ThemeProvider>
 				<SidebarProvider>
 					<WebSocketProvider>
+						<AccessTokenRefreshInitializer />
 						<UserInitializer />
 						<ChatSyncInitializer />
 						<NotificationsInitializer />

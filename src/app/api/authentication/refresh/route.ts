@@ -30,12 +30,21 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Encode new access token before returning it
-		if (data.accessToken) {
-			data.accessToken = tokenEncoder.encode(data.accessToken);
+		// Nest TransformInterceptor wraps payload as { data: { accessToken } }
+		const rawAccess =
+			typeof data?.data?.accessToken === "string"
+				? data.data.accessToken
+				: typeof data?.accessToken === "string"
+					? data.accessToken
+					: undefined;
+
+		if (!rawAccess) {
+			return NextResponse.json({ error: "Invalid refresh response from backend" }, { status: 502 });
 		}
 
-		return NextResponse.json(data, { status: 200 });
+		const encodedAccess = tokenEncoder.encode(rawAccess);
+
+		return NextResponse.json({ accessToken: encodedAccess }, { status: 200 });
 	} catch (error) {
 		console.error("Error during token refresh:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });

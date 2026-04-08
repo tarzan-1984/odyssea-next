@@ -318,9 +318,16 @@ const authentication = {
 				};
 			}
 
+			const accessToken =
+				typeof data.accessToken === "string"
+					? data.accessToken
+					: typeof data.data?.accessToken === "string"
+						? data.data.accessToken
+						: undefined;
+
 			return {
 				success: true,
-				accessToken: data.accessToken,
+				accessToken,
 			};
 		} catch {
 			return {
