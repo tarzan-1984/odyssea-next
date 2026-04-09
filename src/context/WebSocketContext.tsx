@@ -252,6 +252,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
 		});
 
+		newSocket.on("appLocationSettingsUpdated", () => {
+			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
+			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
+			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
+		});
+
 		// Handle user location updates from backend (users table)
 		newSocket.on("userLocationUpdate", (payload: any) => {
 			console.log("[WebSocket] User location update");

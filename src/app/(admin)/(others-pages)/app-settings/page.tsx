@@ -28,6 +28,12 @@ type LocationEnvironmentPayload = {
 	updatedAt?: string;
 };
 
+type OffersAppSettingsPayload = {
+	id: string;
+	maxDriverOpenOfferParticipations: number;
+	updatedAt?: string;
+};
+
 type ApiEnvelope<T> = {
 	data: T;
 	timestamp?: string;
@@ -97,6 +103,21 @@ function parseLocationEnvironment(json: unknown): LocationEnvironmentPayload | n
 	return raw;
 }
 
+function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null {
+	if (!json || typeof json !== "object") return null;
+	const root = json as ApiEnvelope<OffersAppSettingsPayload> & OffersAppSettingsPayload;
+	const raw =
+		root.data && typeof root.data === "object" && "maxDriverOpenOfferParticipations" in root.data
+			? root.data
+			: "maxDriverOpenOfferParticipations" in root
+				? (root as OffersAppSettingsPayload)
+				: null;
+	if (!raw || typeof raw.maxDriverOpenOfferParticipations !== "number") {
+		return null;
+	}
+	return raw;
+}
+
 export default function AppSettingsPage() {
 	const [intervalMin, setIntervalMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
@@ -105,19 +126,24 @@ export default function AppSettingsPage() {
 	const [tmsBatchSize, setTmsBatchSize] = useState("");
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
 	const [locationTestDriverExternalId, setLocationTestDriverExternalId] = useState("3343");
+	const [maxOpenOfferParticipationsInput, setMaxOpenOfferParticipationsInput] = useState("2");
 
 	const [loadingMobile, setLoadingMobile] = useState(true);
 	const [loadingTms, setLoadingTms] = useState(true);
 	const [loadingEnv, setLoadingEnv] = useState(true);
+	const [loadingOffers, setLoadingOffers] = useState(true);
 	const [savingMobile, setSavingMobile] = useState(false);
 	const [savingTms, setSavingTms] = useState(false);
 	const [savingEnv, setSavingEnv] = useState(false);
+	const [savingOffers, setSavingOffers] = useState(false);
 	const [errorMobile, setErrorMobile] = useState<string | null>(null);
 	const [errorTms, setErrorTms] = useState<string | null>(null);
 	const [errorEnv, setErrorEnv] = useState<string | null>(null);
+	const [errorOffers, setErrorOffers] = useState<string | null>(null);
 	const [successMobile, setSuccessMobile] = useState<string | null>(null);
 	const [successTms, setSuccessTms] = useState<string | null>(null);
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
+	const [successOffers, setSuccessOffers] = useState<string | null>(null);
 
 	const loadMobile = useCallback(async () => {
 		setLoadingMobile(true);
@@ -192,11 +218,80 @@ export default function AppSettingsPage() {
 		}
 	}, []);
 
+	const loadOffers = useCallback(async () => {
+		setLoadingOffers(true);
+		setErrorOffers(null);
+		try {
+			const res = await fetch("/api/app-settings/offers", { method: "GET" });
+			const json = await res.json();
+			if (!res.ok) {
+				setErrorOffers(typeof json.error === "string" ? json.error : "Failed to load offers settings");
+				return;
+			}
+			const s = parseOffersAppSettings(json);
+			if (!s) {
+				setErrorOffers("Unexpected response from server");
+				return;
+			}
+			setMaxOpenOfferParticipationsInput(String(s.maxDriverOpenOfferParticipations));
+		} catch {
+			setErrorOffers("Network error while loading offers settings");
+		} finally {
+			setLoadingOffers(false);
+		}
+	}, []);
+
 	useEffect(() => {
-		Promise.all([loadMobile(), loadTms(), loadEnv()]).catch(() => {
+		Promise.all([loadMobile(), loadTms(), loadEnv(), loadOffers()]).catch(() => {
 			/* errors surfaced via per-loader setError* */
 		});
-	}, [loadMobile, loadTms, loadEnv]);
+	}, [loadMobile, loadTms, loadEnv, loadOffers]);
+
+	async function onSubmitOffers(e: FormEvent) {
+		e.preventDefault();
+		setSavingOffers(true);
+		setErrorOffers(null);
+		setSuccessOffers(null);
+
+		const parsedMax = Number.parseInt(maxOpenOfferParticipationsInput, 10);
+		if (!Number.isFinite(parsedMax) || parsedMax < 1 || parsedMax > 50) {
+			setErrorOffers("Enter an integer from 1 to 50.");
+			setSavingOffers(false);
+			return;
+		}
+
+		try {
+			const res = await fetch("/api/app-settings/offers", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ maxDriverOpenOfferParticipations: parsedMax }),
+			});
+			const json = await res.json();
+			if (!res.ok) {
+				const msg =
+					typeof json.error === "string"
+						? json.error
+						: typeof json.message === "string"
+							? json.message
+							: Array.isArray(json.message)
+								? json.message.join(", ")
+								: "Failed to save offers settings";
+				setErrorOffers(msg);
+				return;
+			}
+			const s = parseOffersAppSettings(json);
+			if (s) {
+				setMaxOpenOfferParticipationsInput(String(s.maxDriverOpenOfferParticipations));
+			}
+			setSuccessOffers(
+				"Saved. Driver apps receive this via GET /v1/app-settings and WebSocket appLocationSettingsUpdated.",
+			);
+		} catch {
+			setErrorOffers("Network error while saving");
+		} finally {
+			setSavingOffers(false);
+		}
+	}
 
 	async function onSubmitMobile(e: FormEvent) {
 		e.preventDefault();
@@ -373,7 +468,7 @@ export default function AppSettingsPage() {
 		}
 	}
 
-	const pageLoading = loadingMobile || loadingTms || loadingEnv;
+	const pageLoading = loadingMobile || loadingTms || loadingEnv || loadingOffers;
 
 	return (
 		<div>
@@ -482,10 +577,66 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingMobile || savingEnv}
+							disabled={pageLoading || savingMobile || savingEnv || savingOffers}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingMobile ? "Saving…" : "Save mobile app settings"}
+						</button>
+					</div>
+				</form>
+
+				<form
+					onSubmit={onSubmitOffers}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Offers</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						Maximum number of <strong className="font-medium">active, unassigned</strong> offers a driver can place
+						a bid on at the same time. Assigned loads do not count toward this limit. Default 2. Mobile apps read
+						this from GET /v1/app-settings and get live updates via WebSocket{" "}
+						<code className="text-xs">appLocationSettingsUpdated</code>.
+					</p>
+
+					{loadingOffers ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">Loading…</div>
+					) : (
+						<div className="max-w-xl">
+							<Label htmlFor="maxDriverOpenOfferParticipations" className="mb-1">
+								Max concurrent open bids per driver
+							</Label>
+							<Input
+								id="maxDriverOpenOfferParticipations"
+								name="maxDriverOpenOfferParticipations"
+								type="number"
+								min="1"
+								max="50"
+								step={1}
+								value={maxOpenOfferParticipationsInput}
+								onChange={(e) => setMaxOpenOfferParticipationsInput(e.target.value)}
+								placeholder="2"
+								required
+								className="!h-9 !min-h-0 !py-1.5"
+							/>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Integer from 1 to 50.</p>
+						</div>
+					)}
+
+					{errorOffers ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorOffers}
+						</p>
+					) : null}
+					{successOffers ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successOffers}</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={pageLoading || savingOffers}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{savingOffers ? "Saving…" : "Save offers settings"}
 						</button>
 					</div>
 				</form>
@@ -649,7 +800,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingTms || savingEnv}
+							disabled={pageLoading || savingTms || savingEnv || savingOffers}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingTms ? "Saving…" : "Save TMS batch settings"}

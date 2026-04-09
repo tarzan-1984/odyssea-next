@@ -85,7 +85,7 @@ const OffersList = () => {
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
-	const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "assigned">("active");
+	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
 		Math.floor(Date.now() / 1000)
@@ -166,12 +166,11 @@ const OffersList = () => {
 					<CustomStaticSelect
 						options={[
 							{ value: "active", label: "Active" },
-							{ value: "assigned", label: "Assigned" },
 							{ value: "inactive", label: "Inactive" },
 						]}
 						value={statusFilter}
 						onChangeAction={(val) => {
-							setStatusFilter(val as "active" | "inactive" | "assigned");
+							setStatusFilter(val as "active" | "inactive");
 							setCurrentPage(1);
 						}}
 					/>
@@ -520,7 +519,11 @@ const OffersList = () => {
 																					</button>
 																					<button
 																						type="button"
-																						disabled={acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																						disabled={
+																							acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}` ||
+																							driver.rate == null
+																						}
+																						title={driver.rate == null ? 'Rate is not set' : undefined}
 																					onClick={() => {
 																						const key = driver.externalId ?? driver.driver_id;
 																						if (!key) return;
