@@ -6,12 +6,37 @@ import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
+function useTzClock(timeZone: string): string {
+	const [now, setNow] = useState(() => new Date());
+
+	useEffect(() => {
+		const id = window.setInterval(() => setNow(new Date()), 1000);
+		return () => window.clearInterval(id);
+	}, []);
+
+	const formatter = useMemo(
+		() =>
+			new Intl.DateTimeFormat("en-US", {
+				timeZone,
+				hour: "2-digit",
+				minute: "2-digit",
+				second: "2-digit",
+				hour12: false,
+			}),
+		[timeZone]
+	);
+
+	return formatter.format(now);
+}
 
 const AppHeader: React.FC = () => {
 	const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
 
 	const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+	const nyTime = useTzClock("America/New_York");
+	const plTime = useTzClock("Europe/Warsaw");
 
 	const handleToggle = () => {
 		if (window.innerWidth >= 1280) {
@@ -87,6 +112,18 @@ const AppHeader: React.FC = () => {
 							alt="Logo"
 						/>
 					</Link>
+
+					{/* Time widgets (desktop) */}
+					<div className="hidden xl:flex items-center gap-3 ml-2">
+						<div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">New York (ET)</span>
+							<span className="tabular-nums">{nyTime}</span>
+						</div>
+						<div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Poland</span>
+							<span className="tabular-nums">{plTime}</span>
+						</div>
+					</div>
 
 					<button
 						onClick={toggleApplicationMenu}

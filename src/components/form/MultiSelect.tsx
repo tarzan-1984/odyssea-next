@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, ReactNode } from "react";
+import React, { useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 interface Option {
@@ -152,10 +152,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		</>
 	);
 
-	// Close dropdown when clicking outside
+	// Close when clicking outside (capture phase: works inside modals that stopPropagation on click bubble)
 	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
+		const handlePointerDownOutside = (event: PointerEvent) => {
 			const target = event.target as Node;
+			if (!target) return;
 			const inContainer = containerRef.current?.contains(target);
 			const inPortal = dropdownInPortal && portalDropdownRef.current?.contains(target);
 			if (!inContainer && !inPortal) {
@@ -164,11 +165,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 		};
 
 		if (isOpen) {
-			document.addEventListener("mousedown", handleClickOutside);
+			document.addEventListener("pointerdown", handlePointerDownOutside, true);
 		}
 
 		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
+			document.removeEventListener("pointerdown", handlePointerDownOutside, true);
 		};
 	}, [isOpen, dropdownInPortal]);
 
@@ -177,22 +178,24 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 			? "relative flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-800 h-[38px] min-h-[38px]"
 			: "relative flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 min-h-[44px]";
 
+	const setControlRootRef = useCallback((el: HTMLDivElement | null) => {
+		containerRef.current = el;
+		triggerRef.current = el;
+	}, []);
+
 	return (
-		<div
-			className={`w-full ${size === "sm" ? "flex flex-col gap-1" : ""}`}
-			ref={containerRef}
-		>
+		<div className={`w-full ${size === "sm" ? "flex flex-col gap-1" : ""}`}>
 			<label
 				className={
 					size === "sm"
-						? "block text-xs font-medium text-gray-700 dark:text-gray-300"
-						: "mb-1.5 block text-sm font-medium text-gray-700 dark:text-white"
+						? "block w-fit max-w-full text-xs font-medium text-gray-700 dark:text-gray-300"
+						: "mb-1.5 block w-fit max-w-full text-sm font-medium text-gray-700 dark:text-white"
 				}
 			>
 				{label}
 			</label>
 
-			<div ref={triggerRef} className="relative z-20 inline-block w-full">
+			<div ref={setControlRootRef} className="relative z-20 inline-block w-full">
 				<div className="relative flex flex-col items-center">
 					<div onClick={toggleDropdown} className="w-full">
 						<div className={`${triggerBaseClass} ${triggerClassName}`.trim()}>

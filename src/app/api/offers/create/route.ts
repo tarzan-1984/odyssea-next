@@ -15,6 +15,18 @@ export async function POST(request: NextRequest) {
 
 		const body = await request.json();
 
+		const externalId =
+			typeof body?.externalId === "string" ? body.externalId.trim() : "";
+		if (!externalId) {
+			return NextResponse.json(
+				{
+					error: "externalId is required and cannot be empty",
+					errors: ["externalId must be set (creator TMS id / external_user_id)"],
+				},
+				{ status: 400 }
+			);
+		}
+
 		const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/offers`, {
 			method: "POST",
 			headers: {
