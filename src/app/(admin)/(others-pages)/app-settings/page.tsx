@@ -10,8 +10,6 @@ type MobileAppSettingsPayload = {
 	locationMinIntervalMs: number;
 	locationMinDistanceM: number;
 	reverseGeocodeMinDistanceM: number;
-	activityPingMinIntervalMs?: number;
-	activityPingMinSilenceAfterLocationMs?: number;
 	createdAt?: string;
 	updatedAt?: string;
 };
@@ -45,7 +43,6 @@ type ApiEnvelope<T> = {
 /** Backend stores `locationMinIntervalMs`; max 24 h per API validation. */
 const LOCATION_INTERVAL_MAX_MINUTES = 1440;
 const MS_PER_MINUTE = 60_000;
-const PING_INTERVAL_MAX_MINUTES = 1440;
 
 function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
@@ -65,12 +62,6 @@ function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 			typeof raw.reverseGeocodeMinDistanceM === "number"
 				? raw.reverseGeocodeMinDistanceM
 				: 5000,
-		activityPingMinIntervalMs:
-			typeof raw.activityPingMinIntervalMs === "number" ? raw.activityPingMinIntervalMs : 10 * MS_PER_MINUTE,
-		activityPingMinSilenceAfterLocationMs:
-			typeof raw.activityPingMinSilenceAfterLocationMs === "number"
-				? raw.activityPingMinSilenceAfterLocationMs
-				: 15 * MS_PER_MINUTE,
 	};
 }
 
@@ -131,8 +122,6 @@ export default function AppSettingsPage() {
 	const [intervalMin, setIntervalMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
-	const [pingIntervalMin, setPingIntervalMin] = useState("");
-	const [pingSilenceAfterLocationMin, setPingSilenceAfterLocationMin] = useState("");
 	const [tmsCronIntervalMin, setTmsCronIntervalMin] = useState("");
 	const [tmsBatchSize, setTmsBatchSize] = useState("");
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
@@ -174,16 +163,6 @@ export default function AppSettingsPage() {
 			setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
 			setDistanceM(String(s.locationMinDistanceM));
 			setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
-			setPingIntervalMin(
-				String(Math.round((s.activityPingMinIntervalMs ?? 10 * MS_PER_MINUTE) / MS_PER_MINUTE)),
-			);
-			setPingSilenceAfterLocationMin(
-				String(
-					Math.round(
-						(s.activityPingMinSilenceAfterLocationMs ?? 15 * MS_PER_MINUTE) / MS_PER_MINUTE,
-					),
-				),
-			);
 		} catch {
 			setErrorMobile("Network error while loading settings");
 		} finally {
@@ -324,32 +303,20 @@ export default function AppSettingsPage() {
 		const locationMinIntervalMs = intervalMinutes * MS_PER_MINUTE;
 		const locationMinDistanceM = Number.parseInt(distanceM, 10);
 		const reverseGeocodeMinDistanceM = Number.parseInt(reverseGeocodeM, 10);
-		const pingIntervalMinutes = Number.parseInt(pingIntervalMin, 10);
-		const activityPingMinIntervalMs = pingIntervalMinutes * MS_PER_MINUTE;
-		const pingSilenceMinutes = Number.parseInt(pingSilenceAfterLocationMin, 10);
-		const activityPingMinSilenceAfterLocationMs = pingSilenceMinutes * MS_PER_MINUTE;
 
 		if (
 			!Number.isFinite(intervalMinutes) ||
 			!Number.isFinite(locationMinIntervalMs) ||
 			!Number.isFinite(locationMinDistanceM) ||
 			!Number.isFinite(reverseGeocodeMinDistanceM) ||
-			!Number.isFinite(pingIntervalMinutes) ||
-			!Number.isFinite(activityPingMinIntervalMs) ||
-			!Number.isFinite(pingSilenceMinutes) ||
-			!Number.isFinite(activityPingMinSilenceAfterLocationMs) ||
 			intervalMinutes < 0 ||
 			intervalMinutes > LOCATION_INTERVAL_MAX_MINUTES ||
 			locationMinDistanceM < 0 ||
 			reverseGeocodeMinDistanceM < 100 ||
-			reverseGeocodeMinDistanceM > 500_000 ||
-			pingIntervalMinutes < 0 ||
-			pingIntervalMinutes > PING_INTERVAL_MAX_MINUTES ||
-			pingSilenceMinutes < 0 ||
-			pingSilenceMinutes > PING_INTERVAL_MAX_MINUTES
+			reverseGeocodeMinDistanceM > 500_000
 		) {
 			setErrorMobile(
-				`Valid values: location interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 = no time gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; activity ping interval 0–${PING_INTERVAL_MAX_MINUTES} min; silence after location 0–${PING_INTERVAL_MAX_MINUTES} min.`
+				`Valid values: location interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 = no time gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m.`
 			);
 			setSavingMobile(false);
 			return;
@@ -363,8 +330,6 @@ export default function AppSettingsPage() {
 					locationMinIntervalMs,
 					locationMinDistanceM,
 					reverseGeocodeMinDistanceM,
-					activityPingMinIntervalMs,
-					activityPingMinSilenceAfterLocationMs,
 				}),
 			});
 			const json = await res.json();
@@ -385,16 +350,6 @@ export default function AppSettingsPage() {
 				setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
 				setDistanceM(String(s.locationMinDistanceM));
 				setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
-				setPingIntervalMin(
-					String(Math.round((s.activityPingMinIntervalMs ?? 10 * MS_PER_MINUTE) / MS_PER_MINUTE)),
-				);
-				setPingSilenceAfterLocationMin(
-					String(
-						Math.round(
-							(s.activityPingMinSilenceAfterLocationMs ?? 15 * MS_PER_MINUTE) / MS_PER_MINUTE,
-						),
-					),
-				);
 			}
 			setSuccessMobile("Mobile app settings saved.");
 		} catch {
@@ -608,53 +563,6 @@ export default function AppSettingsPage() {
 								</p>
 							</div>
 
-							<div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
-								<div className="min-w-0 flex-1">
-									<Label htmlFor="activityPingIntervalMinutes" className="mb-1">
-										Activity ping: minimum interval (minutes)
-									</Label>
-									<Input
-										id="activityPingIntervalMinutes"
-										name="activityPingIntervalMinutes"
-										type="number"
-										min="0"
-										max={String(PING_INTERVAL_MAX_MINUTES)}
-										step={1}
-										value={pingIntervalMin}
-										onChange={(e) => setPingIntervalMin(e.target.value)}
-										placeholder="10"
-										required
-										className="!h-9 !min-h-0 !py-1.5"
-									/>
-									<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-										How often the app may call <code className="text-xs">POST /v1/app-settings/activity-ping</code>. 0
-										= no minimum time gate. Stored on the server as milliseconds.
-									</p>
-								</div>
-
-								<div className="min-w-0 flex-1">
-									<Label htmlFor="activityPingSilenceAfterLocationMinutes" className="mb-1">
-										Activity ping: silence after location send (minutes)
-									</Label>
-									<Input
-										id="activityPingSilenceAfterLocationMinutes"
-										name="activityPingSilenceAfterLocationMinutes"
-										type="number"
-										min="0"
-										max={String(PING_INTERVAL_MAX_MINUTES)}
-										step={1}
-										value={pingSilenceAfterLocationMin}
-										onChange={(e) => setPingSilenceAfterLocationMin(e.target.value)}
-										placeholder="15"
-										required
-										className="!h-9 !min-h-0 !py-1.5"
-									/>
-									<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-										Minimum time since the last successful location API send before activity ping is allowed. Prevents
-										redundant heartbeats right after location sync.
-									</p>
-								</div>
-							</div>
 						</div>
 					)}
 
