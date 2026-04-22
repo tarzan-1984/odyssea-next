@@ -9,9 +9,12 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 
 function useTzClock(timeZone: string): string {
-	const [now, setNow] = useState(() => new Date());
+	const [now, setNow] = useState<Date | null>(null);
+	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
+		setMounted(true);
+		setNow(new Date());
 		const id = window.setInterval(() => setNow(new Date()), 1000);
 		return () => window.clearInterval(id);
 	}, []);
@@ -28,6 +31,8 @@ function useTzClock(timeZone: string): string {
 		[timeZone]
 	);
 
+	// Avoid SSR/CSR mismatch: the server render can't know the "current second" at hydrate time.
+	if (!mounted || !now) return "--:--:--";
 	return formatter.format(now);
 }
 
