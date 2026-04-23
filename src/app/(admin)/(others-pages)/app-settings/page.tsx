@@ -9,6 +9,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import usersApi from "@/app-api/users";
 import type { UserListItem } from "@/app-api/api-types";
 import { renderAvatar } from "@/helpers";
+import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 
 type MobileAppSettingsPayload = {
 	id: string;
@@ -50,6 +51,27 @@ const LOCATION_INTERVAL_MAX_MINUTES = 1440;
 const MS_PER_MINUTE = 60_000;
 const PUSH_USERS_PAGE_SIZE = 20;
 const PUSH_USERS_CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+const PUSH_RECIPIENT_ROLE_OPTIONS: { value: string; label: string }[] = [
+	{ value: "", label: "All roles" },
+	{ value: "DRIVER_UPDATES", label: "Driver Updates" },
+	{ value: "MODERATOR", label: "Moderator" },
+	{ value: "RECRUITER", label: "Recruiter" },
+	{ value: "ADMINISTRATOR", label: "Administrator" },
+	{ value: "NIGHTSHIFT_TRACKING", label: "Nightshift Tracking" },
+	{ value: "DISPATCHER", label: "Dispatcher" },
+	{ value: "BILLING", label: "Billing" },
+	{ value: "SUBSCRIBER", label: "Subscriber" },
+	{ value: "ACCOUNTING", label: "Accounting" },
+	{ value: "RECRUITER_TL", label: "Recruiter TL" },
+	{ value: "TRACKING", label: "Tracking" },
+	{ value: "DISPATCHER_TL", label: "Dispatcher TL" },
+	{ value: "TRACKING_TL", label: "Tracking TL" },
+	{ value: "MORNING_TRACKING", label: "Morning Tracking" },
+	{ value: "EXPEDITE_MANAGER", label: "Expedite Manager" },
+	{ value: "DRIVER", label: "Driver" },
+	{ value: "HR_MANAGER", label: "HR Manager" },
+];
 
 type UsersListApiResponse = {
 	data: {
@@ -190,6 +212,7 @@ export default function AppSettingsPage() {
 	const [pushMessage, setPushMessage] = useState("");
 	const [pushSearch, setPushSearch] = useState("");
 	const [pushSearchDebounced, setPushSearchDebounced] = useState("");
+	const [pushRoleFilter, setPushRoleFilter] = useState("");
 	const [pushOpen, setPushOpen] = useState(false);
 	const [pushSending, setPushSending] = useState(false);
 	const [pushError, setPushError] = useState<string | null>(null);
@@ -204,6 +227,11 @@ export default function AppSettingsPage() {
 		return () => window.clearTimeout(id);
 	}, [pushSearch]);
 
+	useEffect(() => {
+		// Role filter changes the result set; reset specific selection to avoid stale pick.
+		setPushRecipientUserId("");
+	}, [pushRoleFilter]);
+
 	const loadUsage = useCallback(async () => {
 		setLoadingUsage(true);
 		setErrorUsage(null);
@@ -217,7 +245,7 @@ export default function AppSettingsPage() {
 				return;
 			}
 			// Some API proxies wrap payload as data.data (envelope inside envelope).
-			const data = ((json?.data?.data ?? json?.data) ?? null) as UsageStatsPayload | null;
+			const data = (json?.data?.data ?? json?.data ?? null) as UsageStatsPayload | null;
 			if (
 				!data ||
 				typeof data.total?.all !== "number" ||
@@ -236,13 +264,18 @@ export default function AppSettingsPage() {
 	}, []);
 
 	const pushUsersQuery = useInfiniteQuery({
-		queryKey: ["push-active-users", { search: pushSearchDebounced }],
+		queryKey: [
+			"push-active-users",
+			{ search: pushSearchDebounced, role: pushRoleFilter, hasUserDevice: true },
+		],
 		queryFn: async ({ pageParam }): Promise<UsersListApiResponse> => {
 			const res = await usersApi.getAllUsers({
 				page: pageParam,
 				limit: PUSH_USERS_PAGE_SIZE,
 				contactsOnly: true,
 				status: "ACTIVE",
+				hasUserDevice: true,
+				...(pushRoleFilter ? { roles: [pushRoleFilter] } : {}),
 				...(pushSearchDebounced ? { search: pushSearchDebounced } : {}),
 			});
 			if (!res.success) {
@@ -676,9 +709,9 @@ export default function AppSettingsPage() {
 						Mobile app usage (ACTIVE + device registered)
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Counts are based on <code className="text-xs">users.status=ACTIVE</code> and presence of a row in{" "}
-						<code className="text-xs">user_devices</code> (one row per{" "}
-						<code className="text-xs">externalId</code>).
+						Counts are based on <code className="text-xs">users.status=ACTIVE</code> and
+						presence of a row in <code className="text-xs">user_devices</code> (one row
+						per <code className="text-xs">externalId</code>).
 					</p>
 
 					{loadingUsage ? (
@@ -705,81 +738,81 @@ export default function AppSettingsPage() {
 											Grand total: {grandTotal}
 										</div>
 										<table className="w-full border-collapse text-sm">
-										<thead>
-											<tr>
-												<th
-													colSpan={2}
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													Users
-												</th>
-												<th
-													colSpan={2}
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													Drivers
-												</th>
-											</tr>
-											<tr>
-												<th
-													scope="col"
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													iOS
-												</th>
-												<th
-													scope="col"
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													Android
-												</th>
-												<th
-													scope="col"
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													iOS
-												</th>
-												<th
-													scope="col"
-													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-												>
-													Android
-												</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr>
-												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
-													{uIos}
-												</td>
-												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
-													{uAndroid}
-												</td>
-												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
-													{dIos}
-												</td>
-												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
-													{dAndroid}
-												</td>
-											</tr>
-										</tbody>
-										<tfoot>
-											<tr className="bg-gray-50 dark:bg-white/[0.03]">
-												<td
-													className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-													colSpan={2}
-												>
-													Total: {allUsers}
-												</td>
-												<td
-													className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
-													colSpan={2}
-												>
-													Total: {allDrivers}
-												</td>
-											</tr>
-										</tfoot>
-									</table>
+											<thead>
+												<tr>
+													<th
+														colSpan={2}
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														Users
+													</th>
+													<th
+														colSpan={2}
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														Drivers
+													</th>
+												</tr>
+												<tr>
+													<th
+														scope="col"
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														iOS
+													</th>
+													<th
+														scope="col"
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														Android
+													</th>
+													<th
+														scope="col"
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														iOS
+													</th>
+													<th
+														scope="col"
+														className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													>
+														Android
+													</th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr>
+													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+														{uIos}
+													</td>
+													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+														{uAndroid}
+													</td>
+													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+														{dIos}
+													</td>
+													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+														{dAndroid}
+													</td>
+												</tr>
+											</tbody>
+											<tfoot>
+												<tr className="bg-gray-50 dark:bg-white/[0.03]">
+													<td
+														className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+														colSpan={2}
+													>
+														Total: {allUsers}
+													</td>
+													<td
+														className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+														colSpan={2}
+													>
+														Total: {allDrivers}
+													</td>
+												</tr>
+											</tfoot>
+										</table>
 									</div>
 								);
 							})()}
@@ -830,12 +863,23 @@ export default function AppSettingsPage() {
 								{pushOpen && (
 									<div className="absolute z-[100] w-full overflow-hidden rounded-b-lg border border-t-0 border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
 										<div className="border-b border-gray-200 p-2 dark:border-gray-700">
-											<input
-												value={pushSearch}
-												onChange={e => setPushSearch(e.target.value)}
-												placeholder="Search by name or email…"
-												className="h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-300 dark:border-gray-700 dark:text-white/90"
-											/>
+											<div className="flex items-center gap-2">
+												<input
+													value={pushSearch}
+													onChange={e => setPushSearch(e.target.value)}
+													placeholder="Search by name or email…"
+													className="h-9 min-w-0 flex-1 rounded-md border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-300 dark:border-gray-700 dark:text-white/90"
+												/>
+												<div className="w-[200px] shrink-0">
+													<CustomStaticSelect
+														options={PUSH_RECIPIENT_ROLE_OPTIONS}
+														value={pushRoleFilter}
+														onChangeAction={val =>
+															setPushRoleFilter(val)
+														}
+													/>
+												</div>
+											</div>
 										</div>
 										<div
 											className="max-h-[280px] overflow-y-auto"
@@ -917,12 +961,6 @@ export default function AppSettingsPage() {
 									</div>
 								)}
 							</div>
-							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-								The list is loaded from{" "}
-								<code className="text-xs">GET /v1/users</code> with{" "}
-								<code className="text-xs">status=ACTIVE</code> and cached for 2
-								hours.
-							</p>
 						</div>
 
 						{!pushRecipientUserId ? (

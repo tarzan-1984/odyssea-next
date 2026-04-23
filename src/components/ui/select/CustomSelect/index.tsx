@@ -38,7 +38,25 @@ export default function CustomStaticSelect({
 			</button>
 
 			{open && (
-				<div className="absolute z-[100] w-full bg-white border border-gray-300 border-t-0 rounded-b-md shadow-lg dark:bg-gray-800 dark:border-gray-700">
+				<div
+					className="absolute z-[100] w-full max-h-60 overflow-y-auto overscroll-y-contain bg-white border border-gray-300 border-t-0 rounded-b-md shadow-lg dark:bg-gray-800 dark:border-gray-700"
+					// Keep wheel scrolling inside the menu (avoids scrolling the page behind/nested popovers)
+					onWheel={e => {
+						e.stopPropagation();
+						// If the list can't scroll further, don't bubble the wheel to the page
+						const el = e.currentTarget;
+						const { scrollTop, scrollHeight, clientHeight } = el;
+						const deltaY = e.deltaY;
+						const atTop = scrollTop <= 0;
+						const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+						if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+							e.preventDefault();
+						}
+					}}
+					onTouchMove={e => {
+						e.stopPropagation();
+					}}
+				>
 					{options.map(option => {
 						const isSelected = option.value === value;
 
