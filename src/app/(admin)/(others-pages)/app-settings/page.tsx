@@ -3,7 +3,12 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
-import React, { FormEvent, useCallback, useEffect, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useClickOutside } from "@/hooks/useClickOutside";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import usersApi from "@/app-api/users";
+import type { UserListItem } from "@/app-api/api-types";
+import { renderAvatar } from "@/helpers";
 
 type MobileAppSettingsPayload = {
 	id: string;
@@ -43,6 +48,18 @@ type ApiEnvelope<T> = {
 /** Backend stores `locationMinIntervalMs`; max 24 h per API validation. */
 const LOCATION_INTERVAL_MAX_MINUTES = 1440;
 const MS_PER_MINUTE = 60_000;
+const PUSH_USERS_PAGE_SIZE = 20;
+const PUSH_USERS_CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+type UsersListApiResponse = {
+	data: {
+		users: UserListItem[];
+		pagination: {
+			current_page: number;
+			total_pages: number;
+		};
+	};
+};
 
 function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
@@ -53,7 +70,11 @@ function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 			: "locationMinIntervalMs" in root && "locationMinDistanceM" in root
 				? (root as MobileAppSettingsPayload)
 				: null;
-	if (!raw || typeof raw.locationMinIntervalMs !== "number" || typeof raw.locationMinDistanceM !== "number") {
+	if (
+		!raw ||
+		typeof raw.locationMinIntervalMs !== "number" ||
+		typeof raw.locationMinDistanceM !== "number"
+	) {
 		return null;
 	}
 	return {
@@ -107,7 +128,9 @@ function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null 
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<OffersAppSettingsPayload> & OffersAppSettingsPayload;
 	const raw =
-		root.data && typeof root.data === "object" && "maxDriverOpenOfferParticipations" in root.data
+		root.data &&
+		typeof root.data === "object" &&
+		"maxDriverOpenOfferParticipations" in root.data
 			? root.data
 			: "maxDriverOpenOfferParticipations" in root
 				? (root as OffersAppSettingsPayload)
@@ -116,6 +139,11 @@ function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null 
 		return null;
 	}
 	return raw;
+}
+
+function getUserDisplayName(u: UserListItem): string {
+	const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
+	return fullName || u.email || "-";
 }
 
 export default function AppSettingsPage() {
@@ -145,6 +173,118 @@ export default function AppSettingsPage() {
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
 
+	// Push notifications (admin) section
+	const [pushRecipientUserId, setPushRecipientUserId] = useState<string>("");
+	const [pushPlatform, setPushPlatform] = useState<"all" | "ios" | "android">("all");
+	const [pushMessage, setPushMessage] = useState("");
+	const [pushSearch, setPushSearch] = useState("");
+	const [pushSearchDebounced, setPushSearchDebounced] = useState("");
+	const [pushOpen, setPushOpen] = useState(false);
+	const [pushSending, setPushSending] = useState(false);
+	const [pushError, setPushError] = useState<string | null>(null);
+	const [pushSuccess, setPushSuccess] = useState<string | null>(null);
+	const pushDropdownRef = useRef<HTMLDivElement>(null);
+	useClickOutside(pushDropdownRef, () => setPushOpen(false));
+
+	useEffect(() => {
+		const id = window.setTimeout(() => {
+			setPushSearchDebounced(pushSearch.trim());
+		}, 300);
+		return () => window.clearTimeout(id);
+	}, [pushSearch]);
+
+	const pushUsersQuery = useInfiniteQuery({
+		queryKey: ["push-active-users", { search: pushSearchDebounced }],
+		queryFn: async ({ pageParam }): Promise<UsersListApiResponse> => {
+			const res = await usersApi.getAllUsers({
+				page: pageParam,
+				limit: PUSH_USERS_PAGE_SIZE,
+				contactsOnly: true,
+				status: "ACTIVE",
+				...(pushSearchDebounced ? { search: pushSearchDebounced } : {}),
+			});
+			if (!res.success) {
+				throw new Error(res.error || "Failed to load users");
+			}
+			return res.data as UsersListApiResponse;
+		},
+		initialPageParam: 1,
+		getNextPageParam: lastPage => {
+			const pagination = lastPage?.data?.pagination;
+			if (!pagination) return undefined;
+			if (pagination.current_page < pagination.total_pages)
+				return pagination.current_page + 1;
+			return undefined;
+		},
+		staleTime: PUSH_USERS_CACHE_MS,
+		gcTime: PUSH_USERS_CACHE_MS,
+	});
+
+	const pushUsers: UserListItem[] = useMemo(() => {
+		const pages = pushUsersQuery.data?.pages ?? [];
+		return pages.flatMap(p => p?.data?.users ?? []);
+	}, [pushUsersQuery.data]);
+
+	const selectedPushUser = useMemo(() => {
+		if (!pushRecipientUserId) return null;
+		return pushUsers.find(u => u.id === pushRecipientUserId) ?? null;
+	}, [pushRecipientUserId, pushUsers]);
+
+	const onPushScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const el = e.currentTarget;
+		const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 60;
+		if (nearBottom && pushUsersQuery.hasNextPage && !pushUsersQuery.isFetchingNextPage) {
+			pushUsersQuery.fetchNextPage().catch(() => undefined);
+		}
+	};
+
+	async function onSendPush(e: FormEvent) {
+		e.preventDefault();
+		setPushError(null);
+		setPushSuccess(null);
+
+		const message = pushMessage.trim();
+		if (!message) {
+			setPushError("Please enter a message.");
+			return;
+		}
+
+		setPushSending(true);
+		try {
+			const res = await fetch("/api/v1/notifications/push", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					message,
+					userId: pushRecipientUserId ? pushRecipientUserId : null,
+					platform: pushRecipientUserId ? null : pushPlatform,
+				}),
+			});
+			const json = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				const msg =
+					(typeof json.error === "string" ? json.error : null) ??
+					(typeof json.message === "string" ? json.message : null) ??
+					"Failed to send push notification.";
+				setPushError(msg);
+				return;
+			}
+			const usersCount = json?.data?.users;
+			if (pushRecipientUserId) {
+				setPushSuccess("Sent to the selected user.");
+			} else if (typeof usersCount === "number") {
+				setPushSuccess(`Sent to ${usersCount} users.`);
+			} else {
+				setPushSuccess("Sent.");
+			}
+			setPushMessage("");
+		} catch {
+			setPushError("Network error while sending push");
+		} finally {
+			setPushSending(false);
+		}
+	}
+
 	const loadMobile = useCallback(async () => {
 		setLoadingMobile(true);
 		setErrorMobile(null);
@@ -152,7 +292,9 @@ export default function AppSettingsPage() {
 			const res = await fetch("/api/app-settings", { method: "GET" });
 			const json = await res.json();
 			if (!res.ok) {
-				setErrorMobile(typeof json.error === "string" ? json.error : "Failed to load settings");
+				setErrorMobile(
+					typeof json.error === "string" ? json.error : "Failed to load settings"
+				);
 				return;
 			}
 			const s = parseMobileSettings(json);
@@ -177,7 +319,11 @@ export default function AppSettingsPage() {
 			const res = await fetch("/api/app-settings/tms-batch", { method: "GET" });
 			const json = await res.json();
 			if (!res.ok) {
-				setErrorTms(typeof json.error === "string" ? json.error : "Failed to load TMS batch settings");
+				setErrorTms(
+					typeof json.error === "string"
+						? json.error
+						: "Failed to load TMS batch settings"
+				);
 				return;
 			}
 			const s = parseTmsBatchSettings(json);
@@ -201,7 +347,11 @@ export default function AppSettingsPage() {
 			const res = await fetch("/api/app-settings/location-environment", { method: "GET" });
 			const json = await res.json();
 			if (!res.ok) {
-				setErrorEnv(typeof json.error === "string" ? json.error : "Failed to load location environment");
+				setErrorEnv(
+					typeof json.error === "string"
+						? json.error
+						: "Failed to load location environment"
+				);
 				return;
 			}
 			const s = parseLocationEnvironment(json);
@@ -225,7 +375,9 @@ export default function AppSettingsPage() {
 			const res = await fetch("/api/app-settings/offers", { method: "GET" });
 			const json = await res.json();
 			if (!res.ok) {
-				setErrorOffers(typeof json.error === "string" ? json.error : "Failed to load offers settings");
+				setErrorOffers(
+					typeof json.error === "string" ? json.error : "Failed to load offers settings"
+				);
 				return;
 			}
 			const s = parseOffersAppSettings(json);
@@ -284,7 +436,7 @@ export default function AppSettingsPage() {
 				setMaxOpenOfferParticipationsInput(String(s.maxDriverOpenOfferParticipations));
 			}
 			setSuccessOffers(
-				"Saved. Driver apps receive this via GET /v1/app-settings and WebSocket appLocationSettingsUpdated.",
+				"Saved. Driver apps receive this via GET /v1/app-settings and WebSocket appLocationSettingsUpdated."
 			);
 		} catch {
 			setErrorOffers("Network error while saving");
@@ -426,7 +578,9 @@ export default function AppSettingsPage() {
 
 		const trimmedId = locationTestDriverExternalId.trim();
 		if (!trimmedId || !/^[\dA-Za-z_-]+$/.test(trimmedId)) {
-			setErrorEnv("Test driver external id must be a non-empty id (letters, digits, _ or -).");
+			setErrorEnv(
+				"Test driver external id must be a non-empty id (letters, digits, _ or -)."
+			);
 			setSavingEnv(false);
 			return;
 		}
@@ -459,7 +613,7 @@ export default function AppSettingsPage() {
 				setLocationTestDriverExternalId(s.locationTestDriverExternalId);
 			}
 			setSuccessEnv(
-				"Saved. Live/test mode applies to PUT /users/:id/location and to the TMS batch cron.",
+				"Saved. Live/test mode applies to PUT /users/:id/location and to the TMS batch cron."
 			);
 		} catch {
 			setErrorEnv("Network error while saving");
@@ -476,6 +630,204 @@ export default function AppSettingsPage() {
 
 			<div className="flex flex-col gap-8">
 				<form
+					onSubmit={onSendPush}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Push notifications
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						Send a push to all users with status{" "}
+						<strong className="font-medium">ACTIVE</strong> or to a specific user.
+						Tokens are taken from <code className="text-xs">push_tokens</code>.
+					</p>
+
+					<div className="flex flex-col gap-5">
+						<div className="max-w-xl">
+							<Label className="mb-1">Recipient</Label>
+							<div className="relative" ref={pushDropdownRef}>
+								<button
+									type="button"
+									onClick={() => setPushOpen(v => !v)}
+									className={`flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 ${pushOpen ? "rounded-b-none" : ""}`}
+								>
+									<span className="flex min-w-0 items-center gap-2">
+										{pushRecipientUserId && selectedPushUser ? (
+											<>
+												{renderAvatar(
+													selectedPushUser,
+													"w-6 h-6 flex-shrink-0"
+												)}
+												<span className="truncate">
+													{getUserDisplayName(selectedPushUser)}
+												</span>
+											</>
+										) : (
+											<span className="truncate">All (ACTIVE)</span>
+										)}
+									</span>
+									<span className="text-gray-400">▾</span>
+								</button>
+
+								{pushOpen && (
+									<div className="absolute z-[100] w-full overflow-hidden rounded-b-lg border border-t-0 border-gray-300 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+										<div className="border-b border-gray-200 p-2 dark:border-gray-700">
+											<input
+												value={pushSearch}
+												onChange={e => setPushSearch(e.target.value)}
+												placeholder="Search by name or email…"
+												className="h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-300 dark:border-gray-700 dark:text-white/90"
+											/>
+										</div>
+										<div
+											className="max-h-[280px] overflow-y-auto"
+											onScroll={onPushScroll}
+										>
+											<div
+												onClick={() => {
+													setPushRecipientUserId("");
+													setPushOpen(false);
+												}}
+												className={`cursor-pointer px-3 py-2 text-sm ${
+													!pushRecipientUserId
+														? "bg-brand-500 text-white"
+														: "text-gray-900 hover:bg-brand-500 hover:text-white dark:text-white"
+												}`}
+											>
+												All (ACTIVE)
+											</div>
+
+											{pushUsers.map(u => {
+												const isSelected = u.id === pushRecipientUserId;
+												return (
+													<div
+														key={u.id}
+														onClick={() => {
+															setPushRecipientUserId(u.id);
+															setPushOpen(false);
+														}}
+														className={`group flex cursor-pointer items-center gap-2 px-3 py-2 text-sm ${
+															isSelected
+																? "bg-brand-500 text-white"
+																: "text-gray-900 hover:bg-brand-500 hover:text-white dark:text-white"
+														}`}
+													>
+														{renderAvatar(
+															u,
+															`w-6 h-6 flex-shrink-0 ${
+																isSelected
+																	? "!bg-white !text-brand-600"
+																	: "group-hover:!bg-white group-hover:!text-brand-600"
+															}`
+														)}
+														<div className="min-w-0 flex-1">
+															<div className="truncate">
+																{getUserDisplayName(u)}
+															</div>
+															{u.email ? (
+																<div
+																	className={`truncate text-[11px] ${
+																		isSelected
+																			? "text-white/80"
+																			: "text-gray-500 group-hover:text-white/80 dark:text-gray-400"
+																	}`}
+																>
+																	{u.email}
+																</div>
+															) : null}
+														</div>
+													</div>
+												);
+											})}
+
+											{pushUsersQuery.isFetchingNextPage ? (
+												<div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-300">
+													Loading…
+												</div>
+											) : null}
+											{pushUsersQuery.isLoading ? (
+												<div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-300">
+													Loading…
+												</div>
+											) : null}
+											{pushUsersQuery.error ? (
+												<div className="px-3 py-2 text-xs text-red-600 dark:text-red-400">
+													Failed to load users
+												</div>
+											) : null}
+										</div>
+									</div>
+								)}
+							</div>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								The list is loaded from{" "}
+								<code className="text-xs">GET /v1/users</code> with{" "}
+								<code className="text-xs">status=ACTIVE</code> and cached for 2
+								hours.
+							</p>
+						</div>
+
+						{!pushRecipientUserId ? (
+							<div className="max-w-xs">
+								<Label htmlFor="pushPlatform" className="mb-1">
+									Platform
+								</Label>
+								<select
+									id="pushPlatform"
+									value={pushPlatform}
+									onChange={e =>
+										setPushPlatform(e.target.value as "all" | "ios" | "android")
+									}
+									className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+								>
+									<option value="all">All</option>
+									<option value="ios">iOS</option>
+									<option value="android">Android</option>
+								</select>
+								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+									Applies only when sending to{" "}
+									<strong className="font-medium">All (ACTIVE)</strong>.
+								</p>
+							</div>
+						) : null}
+
+						<div className="max-w-2xl">
+							<Label htmlFor="pushMessage" className="mb-1">
+								Message
+							</Label>
+							<textarea
+								id="pushMessage"
+								value={pushMessage}
+								onChange={e => setPushMessage(e.target.value)}
+								placeholder="Enter push notification text…"
+								className="min-h-[110px] w-full resize-y rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs outline-none focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+							/>
+						</div>
+					</div>
+
+					{pushError ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{pushError}
+						</p>
+					) : null}
+					{pushSuccess ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{pushSuccess}
+						</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={pushSending || pageLoading}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{pushSending ? "Sending…" : "Send push"}
+						</button>
+					</div>
+				</form>
+
+				<form
 					onSubmit={onSubmitMobile}
 					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 				>
@@ -483,9 +835,10 @@ export default function AppSettingsPage() {
 						Mobile app — location throttling
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Shared settings for the driver app (one row in the database). Interval and distance control how
-						often location is sent; reverse geocode distance controls how far a driver must move from the last
-						successful address lookup before ZIP/city/state are resolved again.
+						Shared settings for the driver app (one row in the database). Interval and
+						distance control how often location is sent; reverse geocode distance
+						controls how far a driver must move from the last successful address lookup
+						before ZIP/city/state are resolved again.
 					</p>
 
 					{loadingMobile ? (
@@ -507,14 +860,16 @@ export default function AppSettingsPage() {
 										max={String(LOCATION_INTERVAL_MAX_MINUTES)}
 										step={1}
 										value={intervalMin}
-										onChange={(e) => setIntervalMin(e.target.value)}
+										onChange={e => setIntervalMin(e.target.value)}
 										placeholder="3"
 										required
 										className="!h-9 !min-h-0 !py-1.5"
 									/>
 									<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-										0 = no minimum time between sends (still limited by OS). Example: 3 = every 3 minutes. Max{" "}
-										{LOCATION_INTERVAL_MAX_MINUTES} min (24 h). Stored on the server as milliseconds.
+										0 = no minimum time between sends (still limited by OS).
+										Example: 3 = every 3 minutes. Max{" "}
+										{LOCATION_INTERVAL_MAX_MINUTES} min (24 h). Stored on the
+										server as milliseconds.
 									</p>
 								</div>
 
@@ -529,14 +884,16 @@ export default function AppSettingsPage() {
 										min="0"
 										step={1}
 										value={distanceM}
-										onChange={(e) => setDistanceM(e.target.value)}
+										onChange={e => setDistanceM(e.target.value)}
 										placeholder="3000"
 										required
 										className="!h-9 !min-h-0 !py-1.5"
 									/>
 									<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-										0 = no distance gate (only interval applies). Otherwise displacement required before a send
-										(together with interval). Mobile OS may still use at least 1 m for native callbacks.
+										0 = no distance gate (only interval applies). Otherwise
+										displacement required before a send (together with
+										interval). Mobile OS may still use at least 1 m for native
+										callbacks.
 									</p>
 								</div>
 							</div>
@@ -552,17 +909,17 @@ export default function AppSettingsPage() {
 									min="100"
 									step={100}
 									value={reverseGeocodeM}
-									onChange={(e) => setReverseGeocodeM(e.target.value)}
+									onChange={e => setReverseGeocodeM(e.target.value)}
 									placeholder="5000"
 									required
 									className="!h-9 !min-h-0 !py-1.5"
 								/>
 								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-									After moving this far from the last successful ZIP/city/state lookup, the app runs Expo then
-									Nominatim. Default 5000 m (5 km). Range 100–500000.
+									After moving this far from the last successful ZIP/city/state
+									lookup, the app runs Expo then Nominatim. Default 5000 m (5 km).
+									Range 100–500000.
 								</p>
 							</div>
-
 						</div>
 					)}
 
@@ -572,7 +929,9 @@ export default function AppSettingsPage() {
 						</p>
 					) : null}
 					{successMobile ? (
-						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successMobile}</p>
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successMobile}
+						</p>
 					) : null}
 
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
@@ -590,16 +949,22 @@ export default function AppSettingsPage() {
 					onSubmit={onSubmitOffers}
 					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 				>
-					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Offers</h2>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Offers
+					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Maximum number of <strong className="font-medium">active, unassigned</strong> offers a driver can place
-						a bid on at the same time. Assigned loads do not count toward this limit. Default 2. Mobile apps read
-						this from GET /v1/app-settings and get live updates via WebSocket{" "}
+						Maximum number of{" "}
+						<strong className="font-medium">active, unassigned</strong> offers a driver
+						can place a bid on at the same time. Assigned loads do not count toward this
+						limit. Default 2. Mobile apps read this from GET /v1/app-settings and get
+						live updates via WebSocket{" "}
 						<code className="text-xs">appLocationSettingsUpdated</code>.
 					</p>
 
 					{loadingOffers ? (
-						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">Loading…</div>
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
 					) : (
 						<div className="max-w-xl">
 							<Label htmlFor="maxDriverOpenOfferParticipations" className="mb-1">
@@ -613,12 +978,14 @@ export default function AppSettingsPage() {
 								max="50"
 								step={1}
 								value={maxOpenOfferParticipationsInput}
-								onChange={(e) => setMaxOpenOfferParticipationsInput(e.target.value)}
+								onChange={e => setMaxOpenOfferParticipationsInput(e.target.value)}
 								placeholder="2"
 								required
 								className="!h-9 !min-h-0 !py-1.5"
 							/>
-							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Integer from 1 to 50.</p>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Integer from 1 to 50.
+							</p>
 						</div>
 					)}
 
@@ -628,7 +995,9 @@ export default function AppSettingsPage() {
 						</p>
 					) : null}
 					{successOffers ? (
-						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successOffers}</p>
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successOffers}
+						</p>
 					) : null}
 
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
@@ -650,15 +1019,17 @@ export default function AppSettingsPage() {
 						Backend — location environment (live / test)
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						In <strong className="font-medium">test</strong> mode, only the driver with the configured TMS{" "}
-						<code className="text-xs">externalId</code> may call{" "}
-						<code className="text-xs">PUT /users/:id/location</code> (automatic or manual). All other drivers get{" "}
-						403. TMS batch cron also sends only that driver. Use <strong className="font-medium">live</strong> for
-						production.
+						In <strong className="font-medium">test</strong> mode, only the driver with
+						the configured TMS <code className="text-xs">externalId</code> may call{" "}
+						<code className="text-xs">PUT /users/:id/location</code> (automatic or
+						manual). All other drivers get 403. TMS batch cron also sends only that
+						driver. Use <strong className="font-medium">live</strong> for production.
 					</p>
 
 					{loadingEnv ? (
-						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">Loading…</div>
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
 					) : (
 						<div className="flex max-w-xl flex-col gap-5">
 							<div className="flex flex-col gap-3">
@@ -693,13 +1064,14 @@ export default function AppSettingsPage() {
 									name="locationTestDriverExternalId"
 									type="text"
 									value={locationTestDriverExternalId}
-									onChange={(e) => setLocationTestDriverExternalId(e.target.value)}
+									onChange={e => setLocationTestDriverExternalId(e.target.value)}
 									placeholder="3343"
 									required
 									className="!h-9 !min-h-0 !py-1.5"
 								/>
 								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-									Must match <code className="text-xs">users.externalId</code> exactly (trimmed). Default 3343.
+									Must match <code className="text-xs">users.externalId</code>{" "}
+									exactly (trimmed). Default 3343.
 								</p>
 							</div>
 						</div>
@@ -711,7 +1083,9 @@ export default function AppSettingsPage() {
 						</p>
 					) : null}
 					{successEnv ? (
-						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successEnv}</p>
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successEnv}
+						</p>
 					) : null}
 
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
@@ -733,13 +1107,16 @@ export default function AppSettingsPage() {
 						Backend — TMS batch location sync
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Server-side job that sends driver locations to TMS in batches (drivers with automatic location updates
-						enabled). This does not affect how often the mobile app writes to our database. Saved separately from
-						mobile throttling above.
+						Server-side job that sends driver locations to TMS in batches (drivers with
+						automatic location updates enabled). This does not affect how often the
+						mobile app writes to our database. Saved separately from mobile throttling
+						above.
 					</p>
 
 					{loadingTms ? (
-						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">Loading…</div>
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
 					) : (
 						<div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
 							<div className="min-w-0 flex-1">
@@ -754,14 +1131,15 @@ export default function AppSettingsPage() {
 									max="1440"
 									step={1}
 									value={tmsCronIntervalMin}
-									onChange={(e) => setTmsCronIntervalMin(e.target.value)}
+									onChange={e => setTmsCronIntervalMin(e.target.value)}
 									placeholder="5"
 									required
 									className="!h-9 !min-h-0 !py-1.5"
 								/>
 								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-									How often the backend may run a full TMS batch sync (e.g. 5 = every 5 minutes). Range 1–1440
-									min (1 min–24 h). Stored on the server as seconds.
+									How often the backend may run a full TMS batch sync (e.g. 5 =
+									every 5 minutes). Range 1–1440 min (1 min–24 h). Stored on the
+									server as seconds.
 								</p>
 							</div>
 
@@ -777,7 +1155,7 @@ export default function AppSettingsPage() {
 									max="500"
 									step={1}
 									value={tmsBatchSize}
-									onChange={(e) => setTmsBatchSize(e.target.value)}
+									onChange={e => setTmsBatchSize(e.target.value)}
 									placeholder="150"
 									required
 									className="!h-9 !min-h-0 !py-1.5"
@@ -795,7 +1173,9 @@ export default function AppSettingsPage() {
 						</p>
 					) : null}
 					{successTms ? (
-						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successTms}</p>
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successTms}
+						</p>
 					) : null}
 
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
