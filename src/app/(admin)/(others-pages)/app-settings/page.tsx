@@ -40,6 +40,12 @@ type OffersAppSettingsPayload = {
 	updatedAt?: string;
 };
 
+type AccountDeletionRequestSettingsPayload = {
+	id: string;
+	accountDeletionRequestEmail: string;
+	updatedAt?: string;
+};
+
 type ApiEnvelope<T> = {
 	data: T;
 	timestamp?: string;
@@ -169,6 +175,24 @@ function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null 
 	return raw;
 }
 
+function parseAccountDeletionRequestSettings(
+	json: unknown
+): AccountDeletionRequestSettingsPayload | null {
+	if (!json || typeof json !== "object") return null;
+	const root = json as ApiEnvelope<AccountDeletionRequestSettingsPayload> &
+		AccountDeletionRequestSettingsPayload;
+	const raw =
+		root.data &&
+		typeof root.data === "object" &&
+		"accountDeletionRequestEmail" in root.data
+			? root.data
+			: "accountDeletionRequestEmail" in root
+				? (root as AccountDeletionRequestSettingsPayload)
+				: null;
+	if (!raw || typeof raw.accountDeletionRequestEmail !== "string") return null;
+	return raw;
+}
+
 function getUserDisplayName(u: UserListItem): string {
 	const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
 	return fullName || u.email || "-";
@@ -183,23 +207,28 @@ export default function AppSettingsPage() {
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
 	const [locationTestDriverExternalId, setLocationTestDriverExternalId] = useState("3343");
 	const [maxOpenOfferParticipationsInput, setMaxOpenOfferParticipationsInput] = useState("2");
+	const [accountDeletionRequestEmail, setAccountDeletionRequestEmail] = useState("");
 
 	const [loadingMobile, setLoadingMobile] = useState(true);
 	const [loadingTms, setLoadingTms] = useState(true);
 	const [loadingEnv, setLoadingEnv] = useState(true);
 	const [loadingOffers, setLoadingOffers] = useState(true);
+	const [loadingDeletion, setLoadingDeletion] = useState(true);
 	const [savingMobile, setSavingMobile] = useState(false);
 	const [savingTms, setSavingTms] = useState(false);
 	const [savingEnv, setSavingEnv] = useState(false);
 	const [savingOffers, setSavingOffers] = useState(false);
+	const [savingDeletion, setSavingDeletion] = useState(false);
 	const [errorMobile, setErrorMobile] = useState<string | null>(null);
 	const [errorTms, setErrorTms] = useState<string | null>(null);
 	const [errorEnv, setErrorEnv] = useState<string | null>(null);
 	const [errorOffers, setErrorOffers] = useState<string | null>(null);
+	const [errorDeletion, setErrorDeletion] = useState<string | null>(null);
 	const [successMobile, setSuccessMobile] = useState<string | null>(null);
 	const [successTms, setSuccessTms] = useState<string | null>(null);
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
+	const [successDeletion, setSuccessDeletion] = useState<string | null>(null);
 
 	// Usage stats (admin) section
 	const [usageStats, setUsageStats] = useState<UsageStatsPayload | null>(null);
@@ -468,11 +497,80 @@ export default function AppSettingsPage() {
 		}
 	}, []);
 
+	const loadDeletion = useCallback(async () => {
+		setLoadingDeletion(true);
+		setErrorDeletion(null);
+		try {
+			const res = await fetch("/api/app-settings/account-deletion-request", { method: "GET" });
+			const json = await res.json();
+			if (!res.ok) {
+				setErrorDeletion(
+					typeof json.error === "string" ? json.error : "Failed to load account deletion settings"
+				);
+				return;
+			}
+			const s = parseAccountDeletionRequestSettings(json);
+			if (!s) {
+				setErrorDeletion("Unexpected response from server");
+				return;
+			}
+			setAccountDeletionRequestEmail(s.accountDeletionRequestEmail ?? "");
+		} catch {
+			setErrorDeletion("Network error while loading account deletion settings");
+		} finally {
+			setLoadingDeletion(false);
+		}
+	}, []);
+
 	useEffect(() => {
-		Promise.all([loadUsage(), loadMobile(), loadTms(), loadEnv(), loadOffers()]).catch(() => {
+		Promise.all([loadUsage(), loadMobile(), loadTms(), loadEnv(), loadOffers(), loadDeletion()]).catch(() => {
 			/* errors surfaced via per-loader setError* */
 		});
-	}, [loadUsage, loadMobile, loadTms, loadEnv, loadOffers]);
+	}, [loadUsage, loadMobile, loadTms, loadEnv, loadOffers, loadDeletion]);
+
+	async function onSubmitDeletion(e: FormEvent) {
+		e.preventDefault();
+		setSavingDeletion(true);
+		setErrorDeletion(null);
+		setSuccessDeletion(null);
+
+		const email = accountDeletionRequestEmail.trim();
+		if (!email) {
+			setErrorDeletion("Enter a recipient email.");
+			setSavingDeletion(false);
+			return;
+		}
+
+		try {
+			const res = await fetch("/api/app-settings/account-deletion-request", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ accountDeletionRequestEmail: email }),
+			});
+			const json = await res.json();
+			if (!res.ok) {
+				const msg =
+					typeof json.error === "string"
+						? json.error
+						: typeof json.message === "string"
+							? json.message
+							: Array.isArray(json.message)
+								? json.message.join(", ")
+								: "Failed to save account deletion settings";
+				setErrorDeletion(msg);
+				return;
+			}
+			const s = parseAccountDeletionRequestSettings(json);
+			if (s) {
+				setAccountDeletionRequestEmail(s.accountDeletionRequestEmail ?? "");
+			}
+			setSuccessDeletion("Saved.");
+		} catch {
+			setErrorDeletion("Network error while saving");
+		} finally {
+			setSavingDeletion(false);
+		}
+	}
 
 	async function onSubmitOffers(e: FormEvent) {
 		e.preventDefault();
@@ -1203,6 +1301,63 @@ export default function AppSettingsPage() {
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingOffers ? "Saving…" : "Save offers settings"}
+						</button>
+					</div>
+				</form>
+
+				<form
+					onSubmit={onSubmitDeletion}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Account deletion requests
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						Public requests from <code className="text-xs">/delete-account</code> will be emailed to this
+						address.
+					</p>
+
+					{loadingDeletion ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
+					) : (
+						<div className="max-w-xl">
+							<Label htmlFor="accountDeletionRequestEmail" className="mb-1">
+								Recipient email
+							</Label>
+							<Input
+								id="accountDeletionRequestEmail"
+								name="accountDeletionRequestEmail"
+								type="email"
+								value={accountDeletionRequestEmail}
+								onChange={(e) => setAccountDeletionRequestEmail(e.target.value)}
+								placeholder="support@yourcompany.com"
+								required
+								className="!h-9 !min-h-0 !py-1.5"
+							/>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								If this is empty, the public form will return an error.
+							</p>
+						</div>
+					)}
+
+					{errorDeletion ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorDeletion}
+						</p>
+					) : null}
+					{successDeletion ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successDeletion}</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={pageLoading || savingDeletion}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{savingDeletion ? "Saving…" : "Save account deletion settings"}
 						</button>
 					</div>
 				</form>
