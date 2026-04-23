@@ -61,6 +61,12 @@ type UsersListApiResponse = {
 	};
 };
 
+type UsageStatsPayload = {
+	users: { ios: number; android: number };
+	drivers: { ios: number; android: number };
+	total: { ios: number; android: number; all: number };
+};
+
 function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<MobileAppSettingsPayload> & MobileAppSettingsPayload;
@@ -173,6 +179,11 @@ export default function AppSettingsPage() {
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
 
+	// Usage stats (admin) section
+	const [usageStats, setUsageStats] = useState<UsageStatsPayload | null>(null);
+	const [loadingUsage, setLoadingUsage] = useState(true);
+	const [errorUsage, setErrorUsage] = useState<string | null>(null);
+
 	// Push notifications (admin) section
 	const [pushRecipientUserId, setPushRecipientUserId] = useState<string>("");
 	const [pushPlatform, setPushPlatform] = useState<"all" | "ios" | "android">("all");
@@ -192,6 +203,37 @@ export default function AppSettingsPage() {
 		}, 300);
 		return () => window.clearTimeout(id);
 	}, [pushSearch]);
+
+	const loadUsage = useCallback(async () => {
+		setLoadingUsage(true);
+		setErrorUsage(null);
+		try {
+			const res = await fetch("/api/app-settings/usage-stats", { method: "GET" });
+			const json = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				setErrorUsage(
+					typeof json.error === "string" ? json.error : "Failed to load usage stats"
+				);
+				return;
+			}
+			// Some API proxies wrap payload as data.data (envelope inside envelope).
+			const data = ((json?.data?.data ?? json?.data) ?? null) as UsageStatsPayload | null;
+			if (
+				!data ||
+				typeof data.total?.all !== "number" ||
+				typeof data.total?.ios !== "number" ||
+				typeof data.total?.android !== "number"
+			) {
+				setErrorUsage("Unexpected response from server");
+				return;
+			}
+			setUsageStats(data);
+		} catch {
+			setErrorUsage("Network error while loading usage stats");
+		} finally {
+			setLoadingUsage(false);
+		}
+	}, []);
 
 	const pushUsersQuery = useInfiniteQuery({
 		queryKey: ["push-active-users", { search: pushSearchDebounced }],
@@ -394,10 +436,10 @@ export default function AppSettingsPage() {
 	}, []);
 
 	useEffect(() => {
-		Promise.all([loadMobile(), loadTms(), loadEnv(), loadOffers()]).catch(() => {
+		Promise.all([loadUsage(), loadMobile(), loadTms(), loadEnv(), loadOffers()]).catch(() => {
 			/* errors surfaced via per-loader setError* */
 		});
-	}, [loadMobile, loadTms, loadEnv, loadOffers]);
+	}, [loadUsage, loadMobile, loadTms, loadEnv, loadOffers]);
 
 	async function onSubmitOffers(e: FormEvent) {
 		e.preventDefault();
@@ -629,6 +671,122 @@ export default function AppSettingsPage() {
 			<PageBreadcrumb pageTitle="App settings" />
 
 			<div className="flex flex-col gap-8">
+				<div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Mobile app usage (ACTIVE + device registered)
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						Counts are based on <code className="text-xs">users.status=ACTIVE</code> and presence of a row in{" "}
+						<code className="text-xs">user_devices</code> (one row per{" "}
+						<code className="text-xs">externalId</code>).
+					</p>
+
+					{loadingUsage ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
+					) : errorUsage ? (
+						<p className="text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorUsage}
+						</p>
+					) : (
+						<div className="overflow-x-auto">
+							{(() => {
+								const uIos = usageStats?.users.ios ?? 0;
+								const uAndroid = usageStats?.users.android ?? 0;
+								const dIos = usageStats?.drivers.ios ?? 0;
+								const dAndroid = usageStats?.drivers.android ?? 0;
+								const allUsers = uIos + uAndroid;
+								const allDrivers = dIos + dAndroid;
+								const grandTotal = allUsers + allDrivers;
+								return (
+									<div className="w-full min-w-[520px] overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+										<div className="bg-brand-500 px-3 py-2 text-center text-sm font-semibold text-white">
+											Grand total: {grandTotal}
+										</div>
+										<table className="w-full border-collapse text-sm">
+										<thead>
+											<tr>
+												<th
+													colSpan={2}
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													Users
+												</th>
+												<th
+													colSpan={2}
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													Drivers
+												</th>
+											</tr>
+											<tr>
+												<th
+													scope="col"
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													iOS
+												</th>
+												<th
+													scope="col"
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													Android
+												</th>
+												<th
+													scope="col"
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													iOS
+												</th>
+												<th
+													scope="col"
+													className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+												>
+													Android
+												</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr>
+												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													{uIos}
+												</td>
+												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													{uAndroid}
+												</td>
+												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													{dIos}
+												</td>
+												<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													{dAndroid}
+												</td>
+											</tr>
+										</tbody>
+										<tfoot>
+											<tr className="bg-gray-50 dark:bg-white/[0.03]">
+												<td
+													className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													colSpan={2}
+												>
+													Total: {allUsers}
+												</td>
+												<td
+													className="border border-gray-200 px-3 py-2 text-center text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-200"
+													colSpan={2}
+												>
+													Total: {allDrivers}
+												</td>
+											</tr>
+										</tfoot>
+									</table>
+									</div>
+								);
+							})()}
+						</div>
+					)}
+				</div>
+
 				<form
 					onSubmit={onSendPush}
 					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
