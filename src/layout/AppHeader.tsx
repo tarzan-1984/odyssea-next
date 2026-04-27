@@ -42,6 +42,10 @@ const AppHeader: React.FC = () => {
 	const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 	const nyTime = useTzClock("America/New_York");
 	const plTime = useTzClock("Europe/Warsaw");
+	const uaTime = useTzClock("Europe/Kyiv");
+	const geTime = useTzClock("Asia/Tbilisi");
+	const dzTime = useTzClock("Africa/Algiers");
+	const uzTime = useTzClock("Asia/Tashkent");
 
 	const handleToggle = () => {
 		if (window.innerWidth >= 1280) {
@@ -54,7 +58,6 @@ const AppHeader: React.FC = () => {
 	const toggleApplicationMenu = () => {
 		setApplicationMenuOpen(!isApplicationMenuOpen);
 	};
-
 
 	return (
 		<header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 xl:border-b">
@@ -119,14 +122,30 @@ const AppHeader: React.FC = () => {
 					</Link>
 
 					{/* Time widgets (desktop) */}
-					<div className="hidden xl:flex items-center gap-3 ml-2">
-						<div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+					<div className="hidden xl:flex items-center gap-2 ml-2 max-w-[calc(100vw-540px)] overflow-x-auto">
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
 							<span className="text-gray-500 dark:text-gray-400">New York (ET)</span>
 							<span className="tabular-nums">{nyTime}</span>
 						</div>
-						<div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
 							<span className="text-gray-500 dark:text-gray-400">Poland</span>
 							<span className="tabular-nums">{plTime}</span>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Ukraine</span>
+							<span className="tabular-nums">{uaTime}</span>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Georgia</span>
+							<span className="tabular-nums">{geTime}</span>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Algeria</span>
+							<span className="tabular-nums">{dzTime}</span>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Uzbekistan</span>
+							<span className="tabular-nums">{uzTime}</span>
 						</div>
 					</div>
 
@@ -149,7 +168,6 @@ const AppHeader: React.FC = () => {
 							/>
 						</svg>
 					</button>
-
 				</div>
 				<div
 					className={`${
