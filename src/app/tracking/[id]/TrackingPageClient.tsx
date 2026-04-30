@@ -18,6 +18,10 @@ interface DriverData {
 	latitude: number | null;
 	longitude: number | null;
 	lastLocationUpdateAt: string | null;
+	trackingLoadId?: string | null;
+	pick_up_location?: string | null;
+	delivery_location?: string | null;
+	load_history?: [number, number][];
 }
 
 interface TrackingPageClientProps {

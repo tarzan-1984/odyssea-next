@@ -104,9 +104,7 @@ function getStatusLabel(status: string | null | undefined): string {
 /** Format date as mm/dd/YY for Location & Date column */
 function formatVehicleType(value: string | null | undefined): string {
 	if (!value) return "";
-	return value
-		.replace(/-/g, " ")
-		.replace(/^\w/, c => c.toUpperCase());
+	return value.replace(/-/g, " ").replace(/^\w/, c => c.toUpperCase());
 }
 
 function formatDateMmDdYy(date: Date | null): string {
@@ -204,8 +202,6 @@ export default function DriversListTable({
 		placeholderData: keepPreviousData,
 		enabled: queryEnabled,
 	});
-
-	console.log('driverList', driverList);
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
@@ -334,9 +330,7 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={
-										selectedDriverIds.length === 0 || !showDistanceColumn
-									}
+									disabled={selectedDriverIds.length === 0 || !showDistanceColumn}
 									onClick={() => setCreateOfferModalOpen(true)}
 									className="h-9"
 								>
@@ -512,70 +506,70 @@ export default function DriversListTable({
 							<Table className="w-full max-w-full table-fixed">
 								{/* Order: Status, Location, Distance (only when Address filter), Driver, Vehicle, Dimensions, Equipment, Comments, Rating, Notes */}
 								<colgroup>
-								<col
-									style={{
-										width: "120px",
-										minWidth: "120px",
-										maxWidth: "120px",
-									}}
-								/>
-								{/* Location & Date: fixed 160px (room for address + date + map icon) */}
-								<col
-									style={{
-										width: "160px",
-										minWidth: "160px",
-										maxWidth: "160px",
-									}}
-								/>
-								{showDistanceColumn && (
 									<col
 										style={{
-											width: "68px",
-											minWidth: "68px",
-											maxWidth: "68px",
+											width: "120px",
+											minWidth: "120px",
+											maxWidth: "120px",
 										}}
 									/>
-								)}
-								{/* Driver: ~30% */}
-								<col
-									style={{
-										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
-									}}
-								/>
-								{/* Vehicle: ~13% */}
-								<col
-									style={{
-										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 13 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 13 / 100)",
-									}}
-								/>
-								{/* Dimensions & Payload: fixed 120px */}
-								<col
-									style={{
-										width: "120px",
-										minWidth: "120px",
-										maxWidth: "120px",
-									}}
-								/>
-								{/* Equipment: ~30% */}
-								<col
-									style={{
-										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
-									}}
-								/>
-								{/* Comments: ~27% */}
-								<col
-									style={{
-										width: showDistanceColumn
-											? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 27 / 100)"
-											: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 27 / 100)",
-									}}
-								/>
+									{/* Location & Date: fixed 160px (room for address + date + map icon) */}
+									<col
+										style={{
+											width: "160px",
+											minWidth: "160px",
+											maxWidth: "160px",
+										}}
+									/>
+									{showDistanceColumn && (
+										<col
+											style={{
+												width: "68px",
+												minWidth: "68px",
+												maxWidth: "68px",
+											}}
+										/>
+									)}
+									{/* Driver: ~30% */}
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
+										}}
+									/>
+									{/* Vehicle: ~13% */}
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 13 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 13 / 100)",
+										}}
+									/>
+									{/* Dimensions & Payload: fixed 120px */}
+									<col
+										style={{
+											width: "120px",
+											minWidth: "120px",
+											maxWidth: "120px",
+										}}
+									/>
+									{/* Equipment: ~30% */}
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
+										}}
+									/>
+									{/* Comments: ~27% */}
+									<col
+										style={{
+											width: showDistanceColumn
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 27 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 27 / 100)",
+										}}
+									/>
 									<col
 										style={{
 											width: "72px",
@@ -630,13 +624,13 @@ export default function DriversListTable({
 											<TableCell
 												key={key}
 												isHeader
-											className={`p-2 border border-gray-100 dark:border-white/[0.05] ${
-												key === "status"
-													? "text-center align-middle"
-													: key === "distance"
-													? "text-center"
-													: ""
-											}`}
+												className={`p-2 border border-gray-100 dark:border-white/[0.05] ${
+													key === "status"
+														? "text-center align-middle"
+														: key === "distance"
+															? "text-center"
+															: ""
+												}`}
 												style={
 													key === "distance"
 														? { width: 68, minWidth: 68, maxWidth: 68 }
@@ -726,14 +720,14 @@ export default function DriversListTable({
 											const isAlreadyInOffer = existingDriverIdsSet.has(
 												String(item.id)
 											);
-										const isStatusHovered = hoveredStatusRowIndex === i;
-										const isSelected = selectedDriverIds.includes(
-											String(item.id)
-										);
-										const showHighlight = isSelected || isStatusHovered;
-										const cellBorder = isSelected
-											? "border-white dark:border-white/[0.12]"
-											: "border-gray-100 dark:border-white/[0.05]";
+											const isStatusHovered = hoveredStatusRowIndex === i;
+											const isSelected = selectedDriverIds.includes(
+												String(item.id)
+											);
+											const showHighlight = isSelected || isStatusHovered;
+											const cellBorder = isSelected
+												? "border-white dark:border-white/[0.12]"
+												: "border-gray-100 dark:border-white/[0.05]";
 
 											return (
 												<TableRow
@@ -758,12 +752,13 @@ export default function DriversListTable({
 														const statusColor = getStatusColor(status);
 														const statusLabel = getStatusLabel(status);
 														return (
-														<TableCell
-															className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
-																isAlreadyInOffer || !canSelectDrivers
-																	? "cursor-not-allowed"
-																	: "cursor-pointer"
-															}`}
+															<TableCell
+																className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
+																	isAlreadyInOffer ||
+																	!canSelectDrivers
+																		? "cursor-not-allowed"
+																		: "cursor-pointer"
+																}`}
 																style={{
 																	backgroundColor: statusColor,
 																}}
@@ -863,41 +858,46 @@ export default function DriversListTable({
 															? formatDateMmDdYy(locationDate)
 															: dateStr || "";
 														return (
-														<TableCell
-															className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
-														>
-															<p className="inline-flex items-center gap-1">
-																{item?.meta_data?.current_city}{" "}
-																{
-																	item?.meta_data
-																		?.current_location
-																}
-																{(item?.meta_data?.driver_id ?? item?.id) && (
-																	<Link
-																		href={`/tracking/${String(
-																			item?.meta_data?.driver_id ?? item?.id
-																		)}`}
-																		className="inline-flex shrink-0 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-																		title="Show on map"
-																	>
-																		<MapSearchIcon className="h-4 w-4" />
-																	</Link>
-																)}
-															</p>
-															<p className="text-[10px] text-gray-400 dark:text-gray-500">{dateDisplay}</p>
+															<TableCell
+																className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
+															>
+																<p className="inline-flex items-center gap-1">
+																	{item?.meta_data?.current_city}{" "}
+																	{
+																		item?.meta_data
+																			?.current_location
+																	}
+																	{(item?.meta_data?.driver_id ??
+																		item?.id) && (
+																		<Link
+																			href={`/tracking/${String(
+																				item?.meta_data
+																					?.driver_id ??
+																					item?.id
+																			)}`}
+																			className="inline-flex shrink-0 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+																			title="Show on map"
+																		>
+																			<MapSearchIcon className="h-4 w-4" />
+																		</Link>
+																	)}
+																</p>
+																<p className="text-[10px] text-gray-400 dark:text-gray-500">
+																	{dateDisplay}
+																</p>
 															</TableCell>
 														);
 													})()}
 
 													{/*Distance - only when Address filter is filled and API returns id_posts*/}
 													{showDistanceColumn && (
-													<TableCell
-														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center`}
-														style={{
-															width: 68,
-															minWidth: 68,
-															maxWidth: 68,
-														}}
+														<TableCell
+															className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap text-center`}
+															style={{
+																width: 68,
+																minWidth: 68,
+																maxWidth: 68,
+															}}
 														>
 															{(() => {
 																const key =
@@ -916,8 +916,10 @@ export default function DriversListTable({
 														</TableCell>
 													)}
 
-												{/*Driver*/}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+													{/*Driver*/}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}
+													>
 														<div className="space-y-0.5 break-words">
 															<p
 																className="break-words inline-flex items-center gap-1"
@@ -926,7 +928,11 @@ export default function DriversListTable({
 																({item?.id}){" "}
 																{item?.meta_data?.driver_name}
 																<LanguageFlagIcon
-																	language={item?.meta_data?.languages ?? (item as any)?.languages}
+																	language={
+																		item?.meta_data
+																			?.languages ??
+																		(item as any)?.languages
+																	}
 																	className="h-4 w-4 shrink-0"
 																/>
 															</p>
@@ -942,11 +948,15 @@ export default function DriversListTable({
 														</div>
 													</TableCell>
 
-												{/*Vehicle*/}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
-							<p className="break-words">
-								{formatVehicleType(item?.meta_data?.vehicle_type)}
-							</p>
+													{/*Vehicle*/}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}
+													>
+														<p className="break-words">
+															{formatVehicleType(
+																item?.meta_data?.vehicle_type
+															)}
+														</p>
 														<p className="break-words">
 															{item?.meta_data?.vehicle_make}{" "}
 															{item?.meta_data?.vehicle_model}{" "}
@@ -954,382 +964,418 @@ export default function DriversListTable({
 														</p>
 													</TableCell>
 
-												{/*Dimensions*/}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}>
+													{/*Dimensions*/}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+													>
 														<p>{item?.meta_data?.dimensions}</p>
 														<p>{item?.meta_data?.payload} lbs</p>
 													</TableCell>
 
-												{/*Equipment*/}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm`}>
-													<div className="flex flex-wrap gap-[15px]">
-														{item?.meta_data?.twic === "on" && (
-															<Tooltip
-																theme="inverse"
-																content="TWIC"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<TwicIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.hazmat_certificate ===
-															"on" && (
-															<Tooltip
-																theme="inverse"
-																content="Hazmat Certificate"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<HazmatIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.team_driver_enabled ===
-															"on" && (
-															<Tooltip
-																theme="inverse"
-																content="Team Driver"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<TeamIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.driver_licence_type ===
-															"cdl" && (
-															<Tooltip
-																theme="inverse"
-																content="CDL"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<CdlIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.driver_licence_type ===
-															"tsa_approved" && (
-															<Tooltip
-																theme="inverse"
-																content="TSA"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<TsaIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.hazmat_endorsement ===
-															"on" && (
-															<Tooltip
-																theme="inverse"
-																content="Hazmat Endorsement"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Hazmat2Icon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.change_9_training ===
-															"on" && (
-															<Tooltip
-																theme="inverse"
-																content="Change 9"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Change9Icon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.tanker_endorsement ===
-															"on" && (
-															<Tooltip
-																theme="inverse"
-																content="Tanker endorsement"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<TankerEndorsement className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.background_check ===
-															"on" && (
-															<Tooltip
-																content="Background Check"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<BackgroundCheck className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.lift_gate === "on" && (
-															<Tooltip
-																content="Liftgate"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Liftgate className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.pallet_jack === "on" && (
-															<Tooltip
-																content="Pallet jack"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<PalletJack className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.dolly === "on" && (
-															<Tooltip
-																theme="inverse"
-																content="Dolly"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Dolly className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.ppe === "on" && (
-															<Tooltip
-																theme="inverse"
-																content="PPE"
-																position="top"
-															>
-																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-																	<Ppe className="h-5 w-5" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.e_tracks === "on" && (
-															<Tooltip
-																theme="inverse"
-																content="E-tracks"
-																position="top"
-															>
-																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-																	<Etrack className="h-5 w-5" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.ramp === "on" && (
-															<Tooltip content="Ramp" position="top">
-																<span className="inline-flex">
-																	<Ramp className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.printer === "on" && (
-															<Tooltip
-																content="Printer"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Printer className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.sleeper === "on" && (
-															<Tooltip
-																content="Sleeper"
-																position="top"
-															>
-																<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
-																	<Sleeper className="h-5 w-5" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.load_bars === "on" && (
-															<Tooltip
-																content="Load bars"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<LoadBars className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.mc_enabled === "on" && (
-															<Tooltip content="MC" position="top">
-																<span className="inline-flex">
-																	<Mc className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.dot_enabled === "on" && (
-															<Tooltip content="DOT" position="top">
-																<span className="inline-flex">
-																	<Dot className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.real_id === "on" && (
-															<Tooltip
-																content="Real ID"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<RealId className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{military_capability && (
-															<Tooltip
-																content="Military"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Military className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.macro_point === "on" && (
-															<Tooltip
-																content="MacroPoint"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Image
-																		src={macroPointIcon}
-																		alt="MacroPoint"
-																		className="h-7 w-7"
-																	/>
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.trucker_tools ===
-															"on" && (
-															<Tooltip
-																content="Trucker Tools"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Image
-																		src={tuckerTools}
-																		alt="Trucker Tools"
-																		className="h-7 w-7"
-																	/>
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.dock_high === "on" && (
-															<Tooltip
-																content="Dock High"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<DockHigh className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{selected_distances.includes("any") && (
-															<Tooltip content="Any" position="top">
-																<span className="inline-flex">
-																	<Any className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{selected_distances.includes("otr") && (
-															<Tooltip content="OTR" position="top">
-																<span className="inline-flex">
-																	<Otr className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{selected_distances.includes("local") && (
-															<Tooltip content="Local" position="top">
-																<span className="inline-flex">
-																	<Local className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{selected_distances.includes(
-															"regional"
-														) && (
-															<Tooltip
-																content="Regional"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Regional className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{(item?.meta_data
-															?.canada_transition_proof === "on" ||
-															selected_cross_border.includes(
-																"canada"
-															)) && (
-															<Tooltip
-																content="Canada"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Canada className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{selected_cross_border.includes(
-															"mexico"
-														) && (
-															<Tooltip
-																content="Mexico"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<Mexico className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.alaska === "on" && (
-															<Tooltip
-																content="Alaska"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<AlaskaIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-														{item?.meta_data?.side_door === "on" && (
-															<Tooltip
-																content="Side door"
-																position="top"
-															>
-																<span className="inline-flex">
-																	<SideDoorIcon className="h-7 w-7" />
-																</span>
-															</Tooltip>
-														)}
-													</div>
+													{/*Equipment*/}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm`}
+													>
+														<div className="flex flex-wrap gap-[15px]">
+															{item?.meta_data?.twic === "on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="TWIC"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<TwicIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.hazmat_certificate ===
+																"on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Hazmat Certificate"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<HazmatIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data
+																?.team_driver_enabled === "on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Team Driver"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<TeamIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data
+																?.driver_licence_type === "cdl" && (
+																<Tooltip
+																	theme="inverse"
+																	content="CDL"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<CdlIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data
+																?.driver_licence_type ===
+																"tsa_approved" && (
+																<Tooltip
+																	theme="inverse"
+																	content="TSA"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<TsaIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.hazmat_endorsement ===
+																"on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Hazmat Endorsement"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Hazmat2Icon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.change_9_training ===
+																"on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Change 9"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Change9Icon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.tanker_endorsement ===
+																"on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Tanker endorsement"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<TankerEndorsement className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.background_check ===
+																"on" && (
+																<Tooltip
+																	content="Background Check"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<BackgroundCheck className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.lift_gate ===
+																"on" && (
+																<Tooltip
+																	content="Liftgate"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Liftgate className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.pallet_jack ===
+																"on" && (
+																<Tooltip
+																	content="Pallet jack"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<PalletJack className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.dolly === "on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="Dolly"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Dolly className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.ppe === "on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="PPE"
+																	position="top"
+																>
+																	<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																		<Ppe className="h-5 w-5" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.e_tracks === "on" && (
+																<Tooltip
+																	theme="inverse"
+																	content="E-tracks"
+																	position="top"
+																>
+																	<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																		<Etrack className="h-5 w-5" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.ramp === "on" && (
+																<Tooltip
+																	content="Ramp"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Ramp className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.printer === "on" && (
+																<Tooltip
+																	content="Printer"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Printer className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.sleeper === "on" && (
+																<Tooltip
+																	content="Sleeper"
+																	position="top"
+																>
+																	<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+																		<Sleeper className="h-5 w-5" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.load_bars ===
+																"on" && (
+																<Tooltip
+																	content="Load bars"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<LoadBars className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.mc_enabled ===
+																"on" && (
+																<Tooltip
+																	content="MC"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Mc className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.dot_enabled ===
+																"on" && (
+																<Tooltip
+																	content="DOT"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Dot className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.real_id === "on" && (
+																<Tooltip
+																	content="Real ID"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<RealId className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{military_capability && (
+																<Tooltip
+																	content="Military"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Military className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.macro_point ===
+																"on" && (
+																<Tooltip
+																	content="MacroPoint"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Image
+																			src={macroPointIcon}
+																			alt="MacroPoint"
+																			className="h-7 w-7"
+																		/>
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.trucker_tools ===
+																"on" && (
+																<Tooltip
+																	content="Trucker Tools"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Image
+																			src={tuckerTools}
+																			alt="Trucker Tools"
+																			className="h-7 w-7"
+																		/>
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.dock_high ===
+																"on" && (
+																<Tooltip
+																	content="Dock High"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<DockHigh className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{selected_distances.includes("any") && (
+																<Tooltip
+																	content="Any"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Any className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{selected_distances.includes("otr") && (
+																<Tooltip
+																	content="OTR"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Otr className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{selected_distances.includes(
+																"local"
+															) && (
+																<Tooltip
+																	content="Local"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Local className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{selected_distances.includes(
+																"regional"
+															) && (
+																<Tooltip
+																	content="Regional"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Regional className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{(item?.meta_data
+																?.canada_transition_proof ===
+																"on" ||
+																selected_cross_border.includes(
+																	"canada"
+																)) && (
+																<Tooltip
+																	content="Canada"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Canada className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{selected_cross_border.includes(
+																"mexico"
+															) && (
+																<Tooltip
+																	content="Mexico"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Mexico className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.alaska === "on" && (
+																<Tooltip
+																	content="Alaska"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<AlaskaIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.side_door ===
+																"on" && (
+																<Tooltip
+																	content="Side door"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<SideDoorIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+														</div>
 													</TableCell>
 
-												{/* Comments */}
-												<TableCell className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}>
+													{/* Comments */}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm break-words`}
+													>
 														{item?.meta_data?.notes != null &&
 														String(item.meta_data.notes).trim() !== ""
 															? String(item.meta_data.notes)
 															: "—"}
 													</TableCell>
 
-												{/* Rating */}
-												<TableCell
-													className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
-													style={{
-														width: 72,
-														minWidth: 72,
-														maxWidth: 72,
-													}}
+													{/* Rating */}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+														style={{
+															width: 72,
+															minWidth: 72,
+															maxWidth: 72,
+														}}
 													>
 														{item?.rating?.avg_rating != null &&
 														item.rating.avg_rating > 0
@@ -1337,38 +1383,40 @@ export default function DriversListTable({
 															: "—"}
 													</TableCell>
 
-												{/* Notes */}
-												<TableCell
-													className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
-													style={{
-														width: 72,
-														minWidth: 72,
-														maxWidth: 72,
-													}}
-												>
-													<div className="flex items-center gap-1">
-														<button
-															type="button"
-															onClick={() =>
-																setNotesModalDriver({
-																	driverId:
-																		String(
-																			item?.meta_data?.driver_id ??
+													{/* Notes */}
+													<TableCell
+														className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap`}
+														style={{
+															width: 72,
+															minWidth: 72,
+															maxWidth: 72,
+														}}
+													>
+														<div className="flex items-center gap-1">
+															<button
+																type="button"
+																onClick={() =>
+																	setNotesModalDriver({
+																		driverId: String(
+																			item?.meta_data
+																				?.driver_id ??
 																				item?.id ??
 																				""
 																		),
-																	name:
-																		item?.meta_data?.driver_name ??
-																		"Driver",
-																	notesCount: item?.notes?.count ?? 0,
-																})
-															}
-															className="inline-flex min-w-[3.5rem] max-w-full items-center justify-center rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
-														>
-															{item?.notes?.count ?? 0}
-														</button>
-													</div>
-												</TableCell>
+																		name:
+																			item?.meta_data
+																				?.driver_name ??
+																			"Driver",
+																		notesCount:
+																			item?.notes?.count ?? 0,
+																	})
+																}
+																className="inline-flex min-w-[3.5rem] max-w-full items-center justify-center rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+															>
+																{item?.notes?.count ?? 0}
+															</button>
+														</div>
+													</TableCell>
 												</TableRow>
 											);
 										})

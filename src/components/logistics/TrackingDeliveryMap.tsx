@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState, useRef } from "react";
+import { useCallback, useMemo, useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -19,16 +19,192 @@ const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { 
 
 const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
 
+const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
+
+type LoadLocation = {
+	address?: string;
+	short_address?: string;
+	type?: string;
+};
+
+type RoutePoint = {
+	lat: number;
+	lng: number;
+	address: string;
+};
+
+type LoadRoute = {
+	pickup: RoutePoint;
+	delivery: RoutePoint;
+	completedPath: [number, number][];
+	remainingPath: [number, number][];
+};
+
+const MIN_DRIVER_MARKER_SIZE = 34;
+const MAX_DRIVER_MARKER_SIZE = 78;
+const MAX_OSRM_WAYPOINTS = 25;
+
+function getDriverMarkerSizeByZoom(zoom: number): number {
+	const minZoom = 6;
+	const maxZoom = 16;
+	const normalized = Math.max(0, Math.min(1, (zoom - minZoom) / (maxZoom - minZoom)));
+	return Math.round(
+		MIN_DRIVER_MARKER_SIZE + (MAX_DRIVER_MARKER_SIZE - MIN_DRIVER_MARKER_SIZE) * normalized
+	);
+}
+
+function parseLoadLocation(value: unknown): LoadLocation | null {
+	if (!value) return null;
+
+	try {
+		const parsed = typeof value === "string" ? JSON.parse(value) : value;
+		const first = Array.isArray(parsed) ? parsed[0] : parsed;
+		if (!first || typeof first !== "object") return null;
+		return first as LoadLocation;
+	} catch (error) {
+		console.warn("[TrackingDeliveryMap] Failed to parse load location:", error);
+		return null;
+	}
+}
+
+function normalizeAddressForGeocoding(address: string): string {
+	return address
+		.replace(/\bN\.?\s*E\.?\b/gi, "NE")
+		.replace(/\bN\.?\s*W\.?\b/gi, "NW")
+		.replace(/\bS\.?\s*E\.?\b/gi, "SE")
+		.replace(/\bS\.?\s*W\.?\b/gi, "SW")
+		.replace(/\bAVENUE\b/gi, "Ave")
+		.replace(/\bSTREET\b/gi, "St")
+		.replace(/\bROAD\b/gi, "Rd")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function getLoadLocationAddressCandidates(value: unknown): string[] {
+	const location = parseLoadLocation(value);
+	const candidates = [
+		location?.address?.trim(),
+		location?.address ? normalizeAddressForGeocoding(location.address) : null,
+		location?.short_address?.trim(),
+	].filter((candidate): candidate is string => Boolean(candidate));
+
+	return Array.from(new Set(candidates));
+}
+
+async function geocodeAddress(address: string): Promise<RoutePoint | null> {
+	const url = new URL("https://nominatim.openstreetmap.org/search");
+	url.searchParams.set("q", address);
+	url.searchParams.set("format", "json");
+	url.searchParams.set("limit", "1");
+	url.searchParams.set("addressdetails", "0");
+	url.searchParams.set("accept-language", "en");
+	url.searchParams.set("countrycodes", "us");
+
+	const response = await fetch(url.toString());
+	if (!response.ok) return null;
+
+	const results = (await response.json()) as Array<{ lat?: string; lon?: string }>;
+	const first = results[0];
+	if (!first?.lat || !first?.lon) return null;
+
+	const lat = Number(first.lat);
+	const lng = Number(first.lon);
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+	return { lat, lng, address };
+}
+
+async function geocodeAddressCandidates(candidates: string[]): Promise<RoutePoint | null> {
+	for (const candidate of candidates) {
+		const point = await geocodeAddress(candidate);
+		if (point) return point;
+	}
+
+	return null;
+}
+
+function areRoutePointsClose(a: RoutePoint, b: RoutePoint): boolean {
+	return Math.abs(a.lat - b.lat) < 0.0001 && Math.abs(a.lng - b.lng) < 0.0001;
+}
+
+function toRoutePoint(value: [number, number], address: string): RoutePoint | null {
+	const [lat, lng] = value;
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+	return { lat, lng, address };
+}
+
+function uniqueSequentialRoutePoints(points: RoutePoint[]): RoutePoint[] {
+	return points.reduce<RoutePoint[]>((acc, point) => {
+		const prev = acc[acc.length - 1];
+		if (!prev || !areRoutePointsClose(prev, point)) {
+			acc.push(point);
+		}
+		return acc;
+	}, []);
+}
+
+function limitRouteWaypoints(points: RoutePoint[]): RoutePoint[] {
+	if (points.length <= MAX_OSRM_WAYPOINTS) return points;
+
+	const first = points[0];
+	const last = points[points.length - 1];
+	const middle = points.slice(1, -1);
+	const slots = MAX_OSRM_WAYPOINTS - 2;
+	const step = Math.max(1, Math.ceil(middle.length / slots));
+	const sampledMiddle = middle.filter((_, index) => index % step === 0).slice(0, slots);
+
+	return [first, ...sampledMiddle, last].filter((point): point is RoutePoint => Boolean(point));
+}
+
+async function fetchRoutePath(points: RoutePoint[]): Promise<[number, number][]> {
+	const cleanPoints = uniqueSequentialRoutePoints(points);
+	if (cleanPoints.length < 2) return [];
+
+	const limitedPoints = limitRouteWaypoints(cleanPoints);
+
+	const fallbackPath = cleanPoints.map(point => [point.lat, point.lng] as [number, number]);
+
+	try {
+		const coordinatesParam = limitedPoints.map(point => `${point.lng},${point.lat}`).join(";");
+		const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinatesParam}`);
+		url.searchParams.set("overview", "full");
+		url.searchParams.set("geometries", "geojson");
+
+		const response = await fetch(url.toString());
+		if (!response.ok) throw new Error(`OSRM ${response.status}`);
+
+		const data = (await response.json()) as {
+			routes?: Array<{
+				geometry?: {
+					coordinates?: [number, number][];
+				};
+			}>;
+		};
+		const coordinates = data.routes?.[0]?.geometry?.coordinates;
+		if (!coordinates?.length) throw new Error("OSRM route is empty");
+
+		return coordinates.map(([lng, lat]) => [lat, lng]);
+	} catch (error) {
+		console.warn(
+			"[TrackingDeliveryMap] Failed to build road route, using straight line:",
+			error
+		);
+		return fallbackPath;
+	}
+}
+
 // Component to set map reference using useMap hook
 // This component must be inside MapContainer to use useMap hook
 const MapRefSetter = dynamic(
 	() =>
-		import("react-leaflet").then((mod) => {
+		import("react-leaflet").then(mod => {
 			const { useMap } = mod;
 			return function MapRefSetterComponent({
 				mapRef,
+				onZoomChange,
 			}: {
 				mapRef: React.MutableRefObject<L.Map | null>;
+				onZoomChange?: (zoom: number) => void;
 			}) {
 				const map = useMap();
 				useEffect(() => {
@@ -40,10 +216,17 @@ const MapRefSetter = dynamic(
 							if (mapRef.current !== map) {
 								mapRef.current = map;
 							}
-							console.log('✅ [TrackingDeliveryMap] Map reference set and ready');
 						});
+						onZoomChange?.(map.getZoom());
+						const handleZoomEnd = () => {
+							onZoomChange?.(map.getZoom());
+						};
+						map.on("zoomend", handleZoomEnd);
+						return () => {
+							map.off("zoomend", handleZoomEnd);
+						};
 					}
-				}, [map, mapRef]);
+				}, [map, mapRef, onZoomChange]);
 				return null;
 			};
 		}),
@@ -72,6 +255,9 @@ interface DriverData {
 	latitude: number | null;
 	longitude: number | null;
 	lastLocationUpdateAt: string | null;
+	pick_up_location?: string | null;
+	delivery_location?: string | null;
+	load_history?: [number, number][];
 }
 
 interface TrackingDeliveryMapProps {
@@ -85,6 +271,8 @@ export default function TrackingDeliveryMap({
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
+	const [loadRoute, setLoadRoute] = useState<LoadRoute | null>(null);
+	const [driverMarkerSize, setDriverMarkerSize] = useState(MAX_DRIVER_MARKER_SIZE);
 	const mapRef = useRef<L.Map | null>(null);
 
 	// Check if dark theme is active
@@ -133,27 +321,132 @@ export default function TrackingDeliveryMap({
 		return null;
 	}, [hasValidCoordinates, driverData?.latitude, driverData?.longitude]);
 
-	// Custom car marker icon (similar to mobile app)
+	// Custom driver marker icon
 	const carIcon = useMemo(() => {
+		const anchorX = driverMarkerSize / 2;
+		const anchorY = driverMarkerSize * 0.95;
 		return L.divIcon({
-			className: "custom-car-marker",
+			className: "tracking-driver-marker-icon",
 			html: `
-				<div style="width:40px;height:40px;position:relative;">
-					<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-						<path d="M20 2C15.26 2 11.4 5.86 11.4 10.6C11.4 12.92 12.69 15.19 14.87 17.37L20 22.5L25.13 17.37C27.31 15.19 28.6 12.92 28.6 10.6C28.6 5.86 24.74 2 20 2Z" fill="#F73E3E" stroke="#000" stroke-width="0.5"/>
-						<path d="M12 28L28 28L28 32L12 32Z" fill="#F73E3E" stroke="#000" stroke-width="0.5"/>
-						<path d="M10 26L30 26L30 28L10 28Z" fill="#F73E3E" stroke="#000" stroke-width="0.5"/>
-						<circle cx="15" cy="30" r="2" fill="#2F4859"/>
-						<circle cx="25" cy="30" r="2" fill="#2F4859"/>
-					</svg>
-				</div>
+				<img
+					src="/images/tracking-driver-marker.png"
+					alt="Driver"
+					style="width:${driverMarkerSize}px;height:auto;display:block;"
+				/>
 			`,
-			iconSize: [40, 40],
-			iconAnchor: [20, 40],
+			iconSize: [driverMarkerSize, driverMarkerSize],
+			iconAnchor: [anchorX, anchorY],
+			popupAnchor: [0, -driverMarkerSize * 0.92],
 		});
+	}, [driverMarkerSize]);
+
+	const handleZoomChange = useCallback((zoom: number) => {
+		setDriverMarkerSize(getDriverMarkerSizeByZoom(zoom));
 	}, []);
 
 	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
+
+	const pickupAddressCandidates = useMemo(
+		() => getLoadLocationAddressCandidates(driverData?.pick_up_location),
+		[driverData?.pick_up_location]
+	);
+
+	const deliveryAddressCandidates = useMemo(
+		() => getLoadLocationAddressCandidates(driverData?.delivery_location),
+		[driverData?.delivery_location]
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const buildLoadRoute = async () => {
+			if (!pickupAddressCandidates.length || !deliveryAddressCandidates.length) {
+				setLoadRoute(null);
+				return;
+			}
+
+			try {
+				const [pickup, delivery] = await Promise.all([
+					geocodeAddressCandidates(pickupAddressCandidates),
+					geocodeAddressCandidates(deliveryAddressCandidates),
+				]);
+
+				if (cancelled) return;
+
+				if (!pickup || !delivery) {
+					console.warn("[TrackingDeliveryMap] Pickup or delivery geocoding failed", {
+						pickupAddressCandidates,
+						deliveryAddressCandidates,
+					});
+					setLoadRoute(null);
+					return;
+				}
+
+				const historyPoints = (driverData?.load_history ?? [])
+					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
+					.filter((point): point is RoutePoint => point !== null);
+				const currentDriverPoint = markerPosition
+					? toRoutePoint(markerPosition, "Current driver location")
+					: null;
+				const completedWaypoints = uniqueSequentialRoutePoints([
+					pickup,
+					...historyPoints,
+					...(currentDriverPoint ? [currentDriverPoint] : []),
+				]);
+				const remainingStart =
+					currentDriverPoint ??
+					completedWaypoints[completedWaypoints.length - 1] ??
+					pickup;
+
+				const [completedPath, remainingPath] = await Promise.all([
+					completedWaypoints.length > 1
+						? fetchRoutePath(completedWaypoints)
+						: Promise.resolve([]),
+					fetchRoutePath([remainingStart, delivery]),
+				]);
+				if (cancelled) return;
+
+				setLoadRoute({ pickup, delivery, completedPath, remainingPath });
+			} catch (error) {
+				if (!cancelled) {
+					console.warn("[TrackingDeliveryMap] Failed to build load route:", error);
+					setLoadRoute(null);
+				}
+			}
+		};
+
+		buildLoadRoute().catch(error => {
+			if (!cancelled) {
+				console.warn("[TrackingDeliveryMap] Failed to start route build:", error);
+			}
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		pickupAddressCandidates,
+		deliveryAddressCandidates,
+		driverData?.load_history,
+		markerPosition,
+	]);
+
+	useEffect(() => {
+		if (!loadRoute || !mapRef.current) return;
+
+		const boundsPoints: [number, number][] = [
+			[loadRoute.pickup.lat, loadRoute.pickup.lng],
+			[loadRoute.delivery.lat, loadRoute.delivery.lng],
+		];
+		if (markerPosition) {
+			boundsPoints.push(markerPosition);
+		}
+
+		mapRef.current.fitBounds(L.latLngBounds(boundsPoints), {
+			padding: [60, 60],
+			maxZoom: 12,
+		});
+	}, [loadRoute, markerPosition]);
 
 	// Center map when lastLocationUpdateAt changes (every WebSocket update)
 	// This ensures map centers on driver location even if coordinates haven't changed
@@ -172,20 +465,18 @@ export default function TrackingDeliveryMap({
 
 		const newCenter: [number, number] = [driverData.latitude, driverData.longitude];
 		const map = mapRef.current;
-		
+
 		// Function to center the map while preserving user's zoom level
 		const centerMap = () => {
 			if (mapRef.current === map && map) {
 				// Get current zoom level set by user
 				const currentZoom = map.getZoom();
-				
+
 				// Center map on new coordinates while keeping user's zoom
 				map.setView(newCenter, currentZoom, {
 					animate: true,
 					duration: 0.5,
 				});
-				
-				console.log('📍 [TrackingDeliveryMap] Map centered to:', newCenter, 'zoom:', currentZoom, 'update time:', driverData.lastLocationUpdateAt);
 			}
 		};
 
@@ -194,7 +485,12 @@ export default function TrackingDeliveryMap({
 		map.whenReady(() => {
 			centerMap();
 		});
-	}, [driverData?.lastLocationUpdateAt, driverData?.latitude, driverData?.longitude, hasValidCoordinates]);
+	}, [
+		driverData?.lastLocationUpdateAt,
+		driverData?.latitude,
+		driverData?.longitude,
+		hasValidCoordinates,
+	]);
 
 	if (!hasValidCoordinates) {
 		return (
@@ -217,20 +513,63 @@ export default function TrackingDeliveryMap({
 				scrollWheelZoom={true}
 				key={`map-${isDark ? "dark" : "light"}`}
 			>
-				<MapRefSetter mapRef={mapRef} />
+				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
 				<TileLayer
 					key={`tiles-${isDark ? "dark" : "light"}`}
 					attribution={mapTiles.attribution}
 					url={mapTiles.url}
-					{...(mapTiles.subdomains
-						? { subdomains: mapTiles.subdomains }
-						: {})}
+					{...(mapTiles.subdomains ? { subdomains: mapTiles.subdomains } : {})}
 					maxZoom={mapTiles.maxZoom}
 				/>
+				{loadRoute && (
+					<>
+						{loadRoute.remainingPath.length > 1 && (
+							<Polyline
+								positions={loadRoute.remainingPath}
+								pathOptions={{
+									color: "#2563eb",
+									weight: 5,
+									opacity: 0.85,
+								}}
+							/>
+						)}
+						{loadRoute.completedPath.length > 1 && (
+							<Polyline
+								positions={loadRoute.completedPath}
+								pathOptions={{
+									color: "#dc2626",
+									weight: 5,
+									opacity: 0.9,
+								}}
+							/>
+						)}
+						<Marker position={[loadRoute.pickup.lat, loadRoute.pickup.lng]}>
+							<Popup>
+								<div className="text-sm dark:text-white">
+									<p className="font-semibold dark:text-white">Pick up</p>
+									<p className="text-gray-600 dark:text-gray-300">
+										{loadRoute.pickup.address}
+									</p>
+								</div>
+							</Popup>
+						</Marker>
+						<Marker position={[loadRoute.delivery.lat, loadRoute.delivery.lng]}>
+							<Popup>
+								<div className="text-sm dark:text-white">
+									<p className="font-semibold dark:text-white">Delivery</p>
+									<p className="text-gray-600 dark:text-gray-300">
+										{loadRoute.delivery.address}
+									</p>
+								</div>
+							</Popup>
+						</Marker>
+					</>
+				)}
 				{markerPosition && (
 					<Marker
 						position={markerPosition}
 						icon={carIcon}
+						zIndexOffset={1000}
 						// No key prop - react-leaflet will update position automatically without recreating marker
 					>
 						{driverData && (
