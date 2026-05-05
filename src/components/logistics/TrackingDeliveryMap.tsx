@@ -21,6 +21,10 @@ const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ss
 
 const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
 
+const CircleMarker = dynamic(() => import("react-leaflet").then(mod => mod.CircleMarker), {
+	ssr: false,
+});
+
 type LoadLocation = {
 	address?: string;
 	short_address?: string;
@@ -278,22 +282,36 @@ interface DriverData {
 	pick_up_location?: string | null;
 	delivery_location?: string | null;
 	load_history?: [number, number][];
+	load_history_details?: {
+		position: [number, number];
+		createdAt: string | null;
+		updatedAt: string | null;
+		externalDriverId?: string | null;
+		driverName?: string | null;
+	}[];
 }
 
 interface TrackingDeliveryMapProps {
 	driverId?: string;
 	driverData?: DriverData | null;
+	showEmptyMap?: boolean;
+	initialCenter?: [number, number];
+	initialZoom?: number;
 }
 
 export default function TrackingDeliveryMap({
 	driverId,
 	driverData,
+	showEmptyMap = false,
+	initialCenter = [39.2904, -76.6122],
+	initialZoom = 18,
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
 	const [loadRoute, setLoadRoute] = useState<LoadRoute | null>(null);
 	const [driverMarkerSize, setDriverMarkerSize] = useState(MAX_DRIVER_MARKER_SIZE);
 	const mapRef = useRef<L.Map | null>(null);
+	const hasFitInitialBoundsRef = useRef(false);
 
 	// Check if dark theme is active
 	useEffect(() => {
@@ -329,9 +347,8 @@ export default function TrackingDeliveryMap({
 		if (hasValidCoordinates && driverData) {
 			return [driverData.latitude!, driverData.longitude!] as [number, number];
 		}
-		// Default center (Baltimore)
-		return [39.2904, -76.6122] as [number, number];
-	}, [hasValidCoordinates, driverData?.latitude, driverData?.longitude]);
+		return initialCenter;
+	}, [hasValidCoordinates, driverData?.latitude, driverData?.longitude, initialCenter]);
 
 	// Get marker position
 	const markerPosition = useMemo(() => {
@@ -376,6 +393,44 @@ export default function TrackingDeliveryMap({
 		[driverData?.delivery_location]
 	);
 
+	const historyMarkerPositions = useMemo(
+		() =>
+			(driverData?.load_history ?? []).filter(
+				(point): point is [number, number] =>
+					Array.isArray(point) &&
+					Number.isFinite(point[0]) &&
+					Number.isFinite(point[1])
+			),
+		[driverData?.load_history]
+	);
+
+	const historyMarkerDetails = useMemo(() => {
+		const details = driverData?.load_history_details ?? [];
+		if (details.length > 0) {
+			return details.filter(
+				(point) =>
+					Array.isArray(point.position) &&
+					Number.isFinite(point.position[0]) &&
+					Number.isFinite(point.position[1])
+			);
+		}
+
+		return historyMarkerPositions.map((position) => ({
+			position,
+			createdAt: null,
+			updatedAt: null,
+			externalDriverId: null,
+			driverName: null,
+		}));
+	}, [driverData?.load_history_details, historyMarkerPositions]);
+
+	const formatHistoryPointTime = useCallback((dateString: string | null) => {
+		if (!dateString) return "N/A";
+		const date = new Date(dateString);
+		if (Number.isNaN(date.getTime())) return dateString;
+		return date.toLocaleString();
+	}, []);
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -402,7 +457,7 @@ export default function TrackingDeliveryMap({
 					return;
 				}
 
-				const historyPoints = (driverData?.load_history ?? [])
+				const historyPoints = historyMarkerPositions
 					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
 					.filter((point): point is RoutePoint => point !== null);
 				const currentDriverPoint = markerPosition
@@ -447,12 +502,13 @@ export default function TrackingDeliveryMap({
 	}, [
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
-		driverData?.load_history,
+		historyMarkerPositions,
 		markerPosition,
 	]);
 
 	useEffect(() => {
 		if (!loadRoute || !mapRef.current) return;
+		if (hasFitInitialBoundsRef.current) return;
 
 		const boundsPoints: [number, number][] = [
 			[loadRoute.pickup.lat, loadRoute.pickup.lng],
@@ -461,12 +517,14 @@ export default function TrackingDeliveryMap({
 		if (markerPosition) {
 			boundsPoints.push(markerPosition);
 		}
+		boundsPoints.push(...historyMarkerPositions);
 
 		mapRef.current.fitBounds(L.latLngBounds(boundsPoints), {
 			padding: [60, 60],
 			maxZoom: 12,
 		});
-	}, [loadRoute, markerPosition]);
+		hasFitInitialBoundsRef.current = true;
+	}, [loadRoute, markerPosition, historyMarkerPositions]);
 
 	// Center map when lastLocationUpdateAt changes (every WebSocket update)
 	// This ensures map centers on driver location even if coordinates haven't changed
@@ -512,7 +570,7 @@ export default function TrackingDeliveryMap({
 		hasValidCoordinates,
 	]);
 
-	if (!hasValidCoordinates) {
+	if (!hasValidCoordinates && !showEmptyMap) {
 		return (
 			<div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
 				<div className="text-center p-4">
@@ -528,7 +586,7 @@ export default function TrackingDeliveryMap({
 		<div className="w-full h-full bg-white dark:bg-gray-900 relative z-0">
 			<MapContainer
 				center={center}
-				zoom={18}
+				zoom={initialZoom}
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
 				key={`map-${isDark ? "dark" : "light"}`}
@@ -583,6 +641,41 @@ export default function TrackingDeliveryMap({
 								</div>
 							</Popup>
 						</Marker>
+						{historyMarkerDetails.map((point, index) => (
+							<CircleMarker
+								key={`history-point-${index}-${point.position[0]}-${point.position[1]}`}
+								center={point.position}
+								radius={15}
+								pathOptions={{
+									color: "#991b1b",
+									fillColor: "#dc2626",
+									fillOpacity: 0.95,
+									weight: 3,
+								}}
+							>
+								<Popup>
+									<div className="text-sm dark:text-white">
+										<p className="font-semibold dark:text-white">
+											History point {index + 1}
+										</p>
+										<p className="text-gray-600 dark:text-gray-300">
+											{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
+										</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+											Driver:{" "}
+											{point.driverName ||
+												(point.externalDriverId
+													? `(${point.externalDriverId})`
+													: "N/A")}
+										</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+											Created:{" "}
+											{formatHistoryPointTime(point.createdAt ?? point.updatedAt)}
+										</p>
+									</div>
+								</Popup>
+							</CircleMarker>
+						))}
 					</>
 				)}
 				{markerPosition && (

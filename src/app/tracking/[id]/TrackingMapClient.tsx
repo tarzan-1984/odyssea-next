@@ -14,11 +14,13 @@ interface TrackingMapClientProps {
 }
 
 interface DriverData {
+	externalId: string | null;
 	firstName: string;
 	lastName: string;
 	phone: string;
 	profilePhoto: string | null;
 	driverStatus: string | null;
+	status: string | null;
 	city: string | null;
 	state: string | null;
 	zip: string | null;
@@ -81,11 +83,13 @@ export default function TrackingMapClient({
 
 				// Save data to state
 				const newDriverData = {
+					externalId: data.externalId || null,
 					firstName: data.firstName || "",
 					lastName: data.lastName || "",
 					phone: data.phone || "",
 					profilePhoto: data.profilePhoto || null,
 					driverStatus: (data as any).driverStatus ?? null,
+					status: data.status || null,
 					city: data.city || null,
 					state: data.state || null,
 					zip: data.zip || null,

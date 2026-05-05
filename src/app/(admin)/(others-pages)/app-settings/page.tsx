@@ -16,6 +16,7 @@ type MobileAppSettingsPayload = {
 	locationMinIntervalMs: number;
 	locationMinDistanceM: number;
 	reverseGeocodeMinDistanceM: number;
+	driverTrackingPointMinIntervalMs: number;
 	createdAt?: string;
 	updatedAt?: string;
 };
@@ -117,6 +118,10 @@ function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 			typeof raw.reverseGeocodeMinDistanceM === "number"
 				? raw.reverseGeocodeMinDistanceM
 				: 5000,
+		driverTrackingPointMinIntervalMs:
+			typeof raw.driverTrackingPointMinIntervalMs === "number"
+				? raw.driverTrackingPointMinIntervalMs
+				: 30 * MS_PER_MINUTE,
 	};
 }
 
@@ -202,6 +207,7 @@ export default function AppSettingsPage() {
 	const [intervalMin, setIntervalMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
+	const [driverTrackingIntervalMin, setDriverTrackingIntervalMin] = useState("");
 	const [tmsCronIntervalMin, setTmsCronIntervalMin] = useState("");
 	const [tmsBatchSize, setTmsBatchSize] = useState("");
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
@@ -409,6 +415,9 @@ export default function AppSettingsPage() {
 			setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
 			setDistanceM(String(s.locationMinDistanceM));
 			setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
+			setDriverTrackingIntervalMin(
+				String(Math.round(s.driverTrackingPointMinIntervalMs / MS_PER_MINUTE))
+			);
 		} catch {
 			setErrorMobile("Network error while loading settings");
 		} finally {
@@ -628,20 +637,27 @@ export default function AppSettingsPage() {
 		const locationMinIntervalMs = intervalMinutes * MS_PER_MINUTE;
 		const locationMinDistanceM = Number.parseInt(distanceM, 10);
 		const reverseGeocodeMinDistanceM = Number.parseInt(reverseGeocodeM, 10);
+		const driverTrackingIntervalMinutes = Number.parseInt(driverTrackingIntervalMin, 10);
+		const driverTrackingPointMinIntervalMs =
+			driverTrackingIntervalMinutes * MS_PER_MINUTE;
 
 		if (
 			!Number.isFinite(intervalMinutes) ||
 			!Number.isFinite(locationMinIntervalMs) ||
 			!Number.isFinite(locationMinDistanceM) ||
 			!Number.isFinite(reverseGeocodeMinDistanceM) ||
+			!Number.isFinite(driverTrackingIntervalMinutes) ||
+			!Number.isFinite(driverTrackingPointMinIntervalMs) ||
 			intervalMinutes < 0 ||
 			intervalMinutes > LOCATION_INTERVAL_MAX_MINUTES ||
 			locationMinDistanceM < 0 ||
 			reverseGeocodeMinDistanceM < 100 ||
-			reverseGeocodeMinDistanceM > 500_000
+			reverseGeocodeMinDistanceM > 500_000 ||
+			driverTrackingIntervalMinutes < 0 ||
+			driverTrackingIntervalMinutes > LOCATION_INTERVAL_MAX_MINUTES
 		) {
 			setErrorMobile(
-				`Valid values: location interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 = no time gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m.`
+				`Valid values: location interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 = no time gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; tracking history interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min.`
 			);
 			setSavingMobile(false);
 			return;
@@ -655,6 +671,7 @@ export default function AppSettingsPage() {
 					locationMinIntervalMs,
 					locationMinDistanceM,
 					reverseGeocodeMinDistanceM,
+					driverTrackingPointMinIntervalMs,
 				}),
 			});
 			const json = await res.json();
@@ -675,6 +692,9 @@ export default function AppSettingsPage() {
 				setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
 				setDistanceM(String(s.locationMinDistanceM));
 				setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
+				setDriverTrackingIntervalMin(
+					String(Math.round(s.driverTrackingPointMinIntervalMs / MS_PER_MINUTE))
+				);
 			}
 			setSuccessMobile("Mobile app settings saved.");
 		} catch {
@@ -1212,6 +1232,31 @@ export default function AppSettingsPage() {
 									After moving this far from the last successful ZIP/city/state
 									lookup, the app runs Expo then Nominatim. Default 5000 m (5 km).
 									Range 100–500000.
+								</p>
+							</div>
+
+							<div className="max-w-xl">
+								<Label htmlFor="driverTrackingPointMinIntervalMinutes" className="mb-1">
+									Driver tracking history: min interval between points (minutes)
+								</Label>
+								<Input
+									id="driverTrackingPointMinIntervalMinutes"
+									name="driverTrackingPointMinIntervalMinutes"
+									type="number"
+									min="0"
+									max={String(LOCATION_INTERVAL_MAX_MINUTES)}
+									step={1}
+									value={driverTrackingIntervalMin}
+									onChange={e => setDriverTrackingIntervalMin(e.target.value)}
+									placeholder="30"
+									required
+									className="!h-9 !min-h-0 !py-1.5"
+								/>
+								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+									Controls how often backend writes a new point to{" "}
+									<code className="text-xs">driver_tracking</code> for the same
+									driver and load. 0 = write every accepted location update. Default
+									30 minutes.
 								</p>
 							</div>
 						</div>

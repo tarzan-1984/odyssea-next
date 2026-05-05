@@ -7,11 +7,13 @@ import { clientAuth } from "@/utils/auth";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 
 interface DriverData {
+	externalId: string | null;
 	firstName: string;
 	lastName: string;
 	phone: string;
 	profilePhoto: string | null;
 	driverStatus: string | null;
+	status: string | null;
 	city: string | null;
 	state: string | null;
 	zip: string | null;
