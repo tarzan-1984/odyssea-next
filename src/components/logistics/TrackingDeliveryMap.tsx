@@ -53,14 +53,31 @@ function getDriverMarkerSizeByZoom(zoom: number): number {
 	);
 }
 
-function parseLoadLocation(value: unknown): LoadLocation | null {
+function normalizeLoadLocationType(type: unknown): string {
+	return String(type ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/[\s-]+/g, "_");
+}
+
+function parseLoadLocation(value: unknown, preferredType: "pick_up_location" | "delivery_location"): LoadLocation | null {
 	if (!value) return null;
 
 	try {
 		const parsed = typeof value === "string" ? JSON.parse(value) : value;
-		const first = Array.isArray(parsed) ? parsed[0] : parsed;
-		if (!first || typeof first !== "object") return null;
-		return first as LoadLocation;
+		const locations = Array.isArray(parsed) ? parsed : [parsed];
+		const typedLocation = locations.find(
+			location =>
+				location &&
+				typeof location === "object" &&
+				normalizeLoadLocationType((location as LoadLocation).type) === preferredType
+		);
+		const fallbackLocation = locations.find(
+			location => location && typeof location === "object"
+		);
+		const location = typedLocation ?? fallbackLocation;
+		if (!location || typeof location !== "object") return null;
+		return location as LoadLocation;
 	} catch (error) {
 		console.warn("[TrackingDeliveryMap] Failed to parse load location:", error);
 		return null;
@@ -80,8 +97,11 @@ function normalizeAddressForGeocoding(address: string): string {
 		.trim();
 }
 
-function getLoadLocationAddressCandidates(value: unknown): string[] {
-	const location = parseLoadLocation(value);
+function getLoadLocationAddressCandidates(
+	value: unknown,
+	preferredType: "pick_up_location" | "delivery_location"
+): string[] {
+	const location = parseLoadLocation(value, preferredType);
 	const candidates = [
 		location?.address?.trim(),
 		location?.address ? normalizeAddressForGeocoding(location.address) : null,
@@ -347,12 +367,12 @@ export default function TrackingDeliveryMap({
 	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
 
 	const pickupAddressCandidates = useMemo(
-		() => getLoadLocationAddressCandidates(driverData?.pick_up_location),
+		() => getLoadLocationAddressCandidates(driverData?.pick_up_location, "pick_up_location"),
 		[driverData?.pick_up_location]
 	);
 
 	const deliveryAddressCandidates = useMemo(
-		() => getLoadLocationAddressCandidates(driverData?.delivery_location),
+		() => getLoadLocationAddressCandidates(driverData?.delivery_location, "delivery_location"),
 		[driverData?.delivery_location]
 	);
 

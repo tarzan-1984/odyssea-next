@@ -128,6 +128,10 @@ const AppHeader: React.FC = () => {
 							<span className="tabular-nums">{nyTime}</span>
 						</div>
 						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
+							<span className="text-gray-500 dark:text-gray-400">Algeria</span>
+							<span className="tabular-nums">{dzTime}</span>
+						</div>
+						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
 							<span className="text-gray-500 dark:text-gray-400">Poland</span>
 							<span className="tabular-nums">{plTime}</span>
 						</div>
@@ -138,10 +142,6 @@ const AppHeader: React.FC = () => {
 						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
 							<span className="text-gray-500 dark:text-gray-400">Georgia</span>
 							<span className="tabular-nums">{geTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Algeria</span>
-							<span className="tabular-nums">{dzTime}</span>
 						</div>
 						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
 							<span className="text-gray-500 dark:text-gray-400">Uzbekistan</span>
