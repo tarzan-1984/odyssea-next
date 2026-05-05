@@ -113,8 +113,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		});
 
 		const refreshLoadDetails = () => {
-			void queryClient.invalidateQueries({
+			queryClient.invalidateQueries({
 				queryKey: ["tracking-load-details", loadId],
+			}).catch(error => {
+				console.error("[TrackingLoadPage] Failed to refresh load details:", error);
 			});
 		};
 
