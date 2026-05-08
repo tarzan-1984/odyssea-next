@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
@@ -15,22 +15,38 @@ interface TrackingLoadPageClientProps {
 	loadId: string;
 }
 
+type RouteGeocodeMarker = {
+	lat: number;
+	lng: number;
+	addressLabel: string;
+};
+
 type LoadDetailsResponse = {
 	data?: {
 		data?: {
 			meta_data?: {
 				pick_up_location?: string | null;
 				delivery_location?: string | null;
+				load_status?: string | null;
 			};
 			drivers?: LoadDriver[];
 			trackingPoints?: LoadTrackingPoint[];
+			routeGeocode?: {
+				pickup: RouteGeocodeMarker | null;
+				delivery: RouteGeocodeMarker | null;
+			};
 		};
 		meta_data?: {
 			pick_up_location?: string | null;
 			delivery_location?: string | null;
+			load_status?: string | null;
 		};
 		drivers?: LoadDriver[];
 		trackingPoints?: LoadTrackingPoint[];
+		routeGeocode?: {
+			pickup: RouteGeocodeMarker | null;
+			delivery: RouteGeocodeMarker | null;
+		};
 	};
 };
 
@@ -51,6 +67,7 @@ type LoadDriver = {
 };
 
 type LoadTrackingPoint = {
+	id?: string | null;
 	externalDriverId?: string | null;
 	latitude?: number | string | null;
 	longitude?: number | string | null;
@@ -67,8 +84,61 @@ type DriverTrackingPointCreatedPayload = {
 	loadId?: string | null;
 };
 
+function formatHistoryDate(dateString: string | null) {
+	if (!dateString) return "N/A";
+
+	try {
+		return new Date(dateString).toLocaleString();
+	} catch {
+		return dateString;
+	}
+}
+
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const queryClient = useQueryClient();
+	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+	const [selectedHistoryPointIndex, setSelectedHistoryPointIndex] = useState<number | null>(null);
+	const [editingHistoryPointIndex, setEditingHistoryPointIndex] = useState<number | null>(null);
+	const [historyDragDraft, setHistoryDragDraft] = useState<[number, number] | null>(null);
+	const [historyEditShowApplyCancel, setHistoryEditShowApplyCancel] = useState(false);
+	const [savingHistoryPointId, setSavingHistoryPointId] = useState<string | null>(null);
+	const historyCardRefs = useRef<(HTMLLIElement | null)[]>([]);
+
+	useEffect(() => {
+		setHistoryDragDraft(null);
+		setHistoryEditShowApplyCancel(false);
+	}, [editingHistoryPointIndex]);
+
+	const clearHistoryPointSelection = useCallback(() => {
+		setSelectedHistoryPointIndex(null);
+		setEditingHistoryPointIndex(null);
+		setHistoryDragDraft(null);
+		setHistoryEditShowApplyCancel(false);
+	}, []);
+
+	const applyHistoryPointSelection = useCallback((index: number) => {
+		setEditingHistoryPointIndex((prev) =>
+			prev !== null && prev !== index ? null : prev
+		);
+		setSelectedHistoryPointIndex(index);
+	}, []);
+
+	const handleLoadHistoryPointMarkerClick = useCallback(
+		(index: number) => {
+			const wasClosed = !isHistoryOpen;
+			setIsHistoryOpen(true);
+			applyHistoryPointSelection(index);
+			window.setTimeout(() => {
+				historyCardRefs.current[index]?.scrollIntoView({
+					behavior: "smooth",
+					block: "start",
+				});
+			}, wasClosed ? 150 : 0);
+		},
+		[applyHistoryPointSelection, isHistoryOpen]
+	);
+
+	const [deletingHistoryPointId, setDeletingHistoryPointId] = useState<string | null>(null);
 	const { data: loadDetails } = useQuery({
 		queryKey: ["tracking-load-details", loadId],
 		queryFn: async () => {
@@ -82,6 +152,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		staleTime: 10 * 60 * 1000,
 		gcTime: 10 * 60 * 1000,
 	});
+
+	const refreshLoadDetails = useCallback(() => {
+		return queryClient.invalidateQueries({
+			queryKey: ["tracking-load-details", loadId],
+		}).catch(error => {
+			console.error("[TrackingLoadPage] Failed to refresh load details:", error);
+		});
+	}, [loadId, queryClient]);
 
 	useEffect(() => {
 		if (loadDetails) {
@@ -112,14 +190,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			reconnectionDelay: 1000,
 		});
 
-		const refreshLoadDetails = () => {
-			queryClient.invalidateQueries({
-				queryKey: ["tracking-load-details", loadId],
-			}).catch(error => {
-				console.error("[TrackingLoadPage] Failed to refresh load details:", error);
-			});
-		};
-
 		socket.on("connect_error", error => {
 			console.error("❌ [TrackingLoadPage] WebSocket connection error:", error);
 		});
@@ -142,12 +212,23 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return () => {
 			socket.disconnect();
 		};
-	}, [loadId, queryClient]);
+	}, [loadId, refreshLoadDetails]);
+
+	const routeGeocodeFromApi = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return (
+			details?.data?.data?.routeGeocode ??
+			details?.data?.routeGeocode ??
+			null
+		);
+	}, [loadDetails]);
 
 	const loadMetaData = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
 		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
 	}, [loadDetails]);
+	const isDeliveredLoad =
+		loadMetaData?.load_status?.trim().toLowerCase() === "delivered";
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
@@ -179,6 +260,19 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			.filter((point): point is [number, number] => point !== null);
 	}, [sortedTrackingPoints]);
 
+	const loadHistoryForMap = useMemo(() => {
+		if (
+			editingHistoryPointIndex === null ||
+			historyDragDraft === null ||
+			editingHistoryPointIndex >= loadHistory.length
+		) {
+			return loadHistory;
+		}
+		const next = [...loadHistory];
+		next[editingHistoryPointIndex] = historyDragDraft;
+		return next;
+	}, [editingHistoryPointIndex, historyDragDraft, loadHistory]);
+
 	const loadHistoryDetails = useMemo(() => {
 		return sortedTrackingPoints
 			.map((point) => {
@@ -196,6 +290,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					.join(" ")
 					.trim();
 				return {
+					id: point.id ?? null,
 					position: [latitude, longitude] as [number, number],
 					createdAt: point.createdAt ?? null,
 					updatedAt: point.updatedAt ?? null,
@@ -207,6 +302,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				(
 					point
 				): point is {
+					id: string | null;
 					position: [number, number];
 					createdAt: string | null;
 					updatedAt: string | null;
@@ -215,6 +311,131 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				} => point !== null
 			);
 	}, [loadDrivers, sortedTrackingPoints]);
+
+	const loadHistoryDetailsRef = useRef(loadHistoryDetails);
+	loadHistoryDetailsRef.current = loadHistoryDetails;
+
+	useEffect(() => {
+		if (
+			selectedHistoryPointIndex !== null &&
+			selectedHistoryPointIndex >= loadHistoryDetails.length
+		) {
+			setSelectedHistoryPointIndex(null);
+		}
+		if (
+			editingHistoryPointIndex !== null &&
+			editingHistoryPointIndex >= loadHistoryDetails.length
+		) {
+			setEditingHistoryPointIndex(null);
+		}
+	}, [editingHistoryPointIndex, loadHistoryDetails.length, selectedHistoryPointIndex]);
+
+	const handleDeleteHistoryPoint = useCallback(
+		async (pointId: string | null, pointIndex: number) => {
+			if (!pointId || deletingHistoryPointId) return;
+
+			setDeletingHistoryPointId(pointId);
+			try {
+				const response = await fetch(
+					`/api/tms/load/${encodeURIComponent(loadId)}/tracking/${encodeURIComponent(pointId)}`,
+					{ method: "DELETE" }
+				);
+				if (!response.ok) {
+					const data = await response.json().catch(() => null);
+					throw new Error(data?.error || "Failed to delete tracking point");
+				}
+
+				if (selectedHistoryPointIndex === pointIndex) {
+					setSelectedHistoryPointIndex(null);
+				} else if (
+					selectedHistoryPointIndex !== null &&
+					selectedHistoryPointIndex > pointIndex
+				) {
+					setSelectedHistoryPointIndex(selectedHistoryPointIndex - 1);
+				}
+
+				if (editingHistoryPointIndex === pointIndex) {
+					setEditingHistoryPointIndex(null);
+					setHistoryDragDraft(null);
+					setHistoryEditShowApplyCancel(false);
+				} else if (
+					editingHistoryPointIndex !== null &&
+					editingHistoryPointIndex > pointIndex
+				) {
+					setEditingHistoryPointIndex(editingHistoryPointIndex - 1);
+				}
+
+				await refreshLoadDetails();
+			} catch (error) {
+				console.error("[TrackingLoadPage] Failed to delete tracking point:", error);
+			} finally {
+				setDeletingHistoryPointId(null);
+			}
+		},
+		[
+			deletingHistoryPointId,
+			editingHistoryPointIndex,
+			loadId,
+			refreshLoadDetails,
+			selectedHistoryPointIndex,
+		]
+	);
+
+	const handleHistoryEditDragEnd = useCallback((lat: number, lng: number) => {
+		setHistoryDragDraft([lat, lng]);
+		const idx = editingHistoryPointIndex;
+		if (idx === null) return;
+		const orig = loadHistoryDetailsRef.current[idx]?.position;
+		if (!orig) return;
+		const changed =
+			Math.abs(orig[0] - lat) > 1e-7 || Math.abs(orig[1] - lng) > 1e-7;
+		setHistoryEditShowApplyCancel(changed);
+	}, [editingHistoryPointIndex]);
+
+	const handleCancelHistoryPointEdit = useCallback(() => {
+		setHistoryDragDraft(null);
+		setHistoryEditShowApplyCancel(false);
+		setEditingHistoryPointIndex(null);
+	}, []);
+
+	const handleApplyHistoryPointEdit = useCallback(async () => {
+		const idx = editingHistoryPointIndex;
+		const draft = historyDragDraft;
+		if (idx === null || draft === null) return;
+		const pointId = loadHistoryDetails[idx]?.id;
+		if (!pointId || savingHistoryPointId) return;
+
+		setSavingHistoryPointId(pointId);
+		try {
+			const response = await fetch(
+				`/api/tms/load/${encodeURIComponent(loadId)}/tracking/${encodeURIComponent(pointId)}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ latitude: draft[0], longitude: draft[1] }),
+				}
+			);
+			if (!response.ok) {
+				const data = await response.json().catch(() => null);
+				throw new Error(data?.error || "Failed to update tracking point");
+			}
+			setHistoryDragDraft(null);
+			setHistoryEditShowApplyCancel(false);
+			setEditingHistoryPointIndex(null);
+			await refreshLoadDetails();
+		} catch (error) {
+			console.error("[TrackingLoadPage] Failed to update tracking point:", error);
+		} finally {
+			setSavingHistoryPointId(null);
+		}
+	}, [
+		editingHistoryPointIndex,
+		historyDragDraft,
+		loadHistoryDetails,
+		loadId,
+		refreshLoadDetails,
+		savingHistoryPointId,
+	]);
 
 	const currentTrackingDriver = useMemo(() => {
 		const lastTrackingPoint = sortedTrackingPoints[sortedTrackingPoints.length - 1];
@@ -243,20 +464,26 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		city: currentTrackingDriver?.city ?? null,
 		state: currentTrackingDriver?.state ?? null,
 		zip: currentTrackingDriver?.zip ?? null,
-		latitude: hasCurrentDriverCoordinates ? currentDriverLatitude : null,
-		longitude: hasCurrentDriverCoordinates ? currentDriverLongitude : null,
+		latitude: !isDeliveredLoad && hasCurrentDriverCoordinates ? currentDriverLatitude : null,
+		longitude: !isDeliveredLoad && hasCurrentDriverCoordinates ? currentDriverLongitude : null,
 		lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
 		pick_up_location: loadMetaData?.pick_up_location ?? null,
 		delivery_location: loadMetaData?.delivery_location ?? null,
-		load_history: loadHistory,
+		routeGeocode:
+			routeGeocodeFromApi?.pickup && routeGeocodeFromApi?.delivery
+				? routeGeocodeFromApi
+				: null,
+		load_history: loadHistoryForMap,
 		load_history_details: loadHistoryDetails,
 	}), [
 		currentDriverLatitude,
 		currentDriverLongitude,
 		currentTrackingDriver,
 		hasCurrentDriverCoordinates,
+		isDeliveredLoad,
 		loadMetaData,
-		loadHistory,
+		routeGeocodeFromApi,
+		loadHistoryForMap,
 		loadHistoryDetails,
 	]);
 
@@ -266,7 +493,190 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				driverData={mapLoadData}
 				showEmptyMap
 				initialZoom={4}
+				selectedLoadHistoryPointIndex={selectedHistoryPointIndex}
+				editingLoadHistoryPointIndex={editingHistoryPointIndex}
+				onLoadHistoryPointMarkerClick={handleLoadHistoryPointMarkerClick}
+				onMapBackgroundClick={clearHistoryPointSelection}
+				historyEditDragPosition={historyDragDraft}
+				onHistoryEditPointDragEnd={handleHistoryEditDragEnd}
 			/>
+			<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+				<button
+					type="button"
+					className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800"
+					onClick={() => setIsHistoryOpen((value) => !value)}
+				>
+					<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+						Load history
+						<span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+							{loadHistoryDetails.length}
+						</span>
+					</span>
+					<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+						{isHistoryOpen ? "Hide" : "Show"}
+					</span>
+				</button>
+				{isHistoryOpen && (
+					<div className="max-h-[calc(50vh-45px)] overflow-y-auto px-4 py-3">
+						{loadHistoryDetails.length > 0 ? (
+							<ol className="space-y-3">
+								{loadHistoryDetails.map((point, index) => {
+									const isEditingCard = editingHistoryPointIndex === index;
+									const isSelectedCard = selectedHistoryPointIndex === index;
+									const displayCoords =
+										isEditingCard && historyDragDraft
+											? historyDragDraft
+											: point.position;
+
+									let cardTone: string;
+									if (isEditingCard) {
+										cardTone =
+											"border-blue-700 bg-blue-100 text-blue-950 shadow-md ring-2 ring-blue-500/50 ring-offset-1 ring-offset-white dark:border-blue-400 dark:bg-blue-950 dark:text-blue-100 dark:ring-blue-400/35 dark:ring-offset-gray-900";
+									} else if (isSelectedCard) {
+										cardTone =
+											"border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-100";
+									} else {
+										cardTone =
+											"border-gray-100 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300";
+									}
+
+									return (
+									<li
+										key={point.id ?? `${point.position[0]}-${point.position[1]}-${point.createdAt ?? index}`}
+										ref={(el) => {
+											historyCardRefs.current[index] = el;
+										}}
+									>
+										<div
+											role="button"
+											tabIndex={0}
+											className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
+											onClick={() => {
+												applyHistoryPointSelection(index);
+											}}
+											onKeyDown={(event) => {
+												if (event.key === "Enter" || event.key === " ") {
+													event.preventDefault();
+													applyHistoryPointSelection(index);
+												}
+											}}
+										>
+											<div className="mb-2 flex items-center justify-between gap-2">
+												<p
+													className={`font-semibold ${
+														isEditingCard
+															? "text-blue-900 dark:text-blue-50"
+															: "text-gray-900 dark:text-white"
+													}`}
+												>
+													Step {index + 1}
+												</p>
+												<div className="flex items-center gap-2">
+													{isEditingCard && historyEditShowApplyCancel ? (
+														<>
+															<button
+																type="button"
+																className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+																disabled={
+																	Boolean(savingHistoryPointId) ||
+																	!point.id
+																}
+																onClick={(event) => {
+																	event.stopPropagation();
+																	handleApplyHistoryPointEdit();
+																}}
+															>
+																Apply
+															</button>
+															<button
+																type="button"
+																className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+																disabled={Boolean(savingHistoryPointId)}
+																onClick={(event) => {
+																	event.stopPropagation();
+																	handleCancelHistoryPointEdit();
+																}}
+															>
+																Cancel
+															</button>
+														</>
+													) : (
+														<>
+													<button
+														type="button"
+														className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
+														aria-label="Edit history point"
+														onClick={(event) => {
+															event.stopPropagation();
+															setSelectedHistoryPointIndex(index);
+															setEditingHistoryPointIndex(index);
+														}}
+													>
+														<svg
+															className="h-full w-full"
+															xmlns="http://www.w3.org/2000/svg"
+															viewBox="0 0 122.88 122.88"
+															aria-hidden="true"
+														>
+															<path
+																fill="currentColor"
+																fillRule="evenodd"
+																clipRule="evenodd"
+																d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
+															/>
+														</svg>
+													</button>
+													<button
+														type="button"
+														className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
+														aria-label="Delete history point"
+														disabled={!point.id || deletingHistoryPointId === point.id}
+														onClick={(event) => {
+															event.stopPropagation();
+															handleDeleteHistoryPoint(point.id, index);
+														}}
+													>
+														<svg
+															className="h-full w-full"
+															xmlns="http://www.w3.org/2000/svg"
+															viewBox="0 0 122.88 122.88"
+															aria-hidden="true"
+														>
+															<path
+																fill="currentColor"
+																d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
+															/>
+														</svg>
+													</button>
+														</>
+													)}
+												</div>
+											</div>
+											<p>
+												<span className="font-medium">Coordinates:</span>{" "}
+												{displayCoords[0].toFixed(6)}, {displayCoords[1].toFixed(6)}
+											</p>
+											<p>
+												<span className="font-medium">Created:</span>{" "}
+												{formatHistoryDate(point.createdAt)}
+											</p>
+											<p>
+												<span className="font-medium">Updated:</span>{" "}
+												{formatHistoryDate(point.updatedAt)}
+											</p>
+										</div>
+									</li>
+									);
+								})}
+							</ol>
+						) : (
+							<p className="text-sm text-gray-500 dark:text-gray-400">
+								No history points yet.
+							</p>
+						)}
+					</div>
+				)}
+			</div>
 			{currentTrackingDriver && (
 				<div className="absolute bottom-[50px] left-1/2 transform -translate-x-1/2 z-[1000]">
 					<DriverInfo driverData={mapLoadData} />

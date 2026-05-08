@@ -46,7 +46,20 @@ type LoadRoute = {
 
 const MIN_DRIVER_MARKER_SIZE = 34;
 const MAX_DRIVER_MARKER_SIZE = 78;
+const MIN_HISTORY_MARKER_RADIUS = 6;
+const MAX_HISTORY_MARKER_RADIUS = 15;
 const MAX_OSRM_WAYPOINTS = 25;
+const SELECTED_HISTORY_POINT_ZOOM = 8;
+
+function getHistoryMarkerRadiusByZoom(zoom: number): number {
+	const minZoom = 4;
+	const maxZoom = 12;
+	const normalized = Math.max(0, Math.min(1, (zoom - minZoom) / (maxZoom - minZoom)));
+	return Math.round(
+		MIN_HISTORY_MARKER_RADIUS +
+			(MAX_HISTORY_MARKER_RADIUS - MIN_HISTORY_MARKER_RADIUS) * normalized
+	);
+}
 
 function getDriverMarkerSizeByZoom(zoom: number): number {
 	const minZoom = 6;
@@ -257,6 +270,45 @@ const MapRefSetter = dynamic(
 	{ ssr: false }
 );
 
+function stopMapClickBubbling(e: L.LeafletMouseEvent) {
+	L.DomEvent.stopPropagation(e.originalEvent);
+}
+
+function createHistoryPointEditIcon(diameterPx: number) {
+	// Match CircleMarker visual size: radius in px → diameter = 2 * radius (we pass 2*radius here).
+	const dot = Math.round(Math.max(10, diameterPx));
+	const pad = 22;
+	const outer = dot + pad * 2;
+	return L.divIcon({
+		className: "tracking-history-point-edit-icon",
+		html: `<div class="tracking-history-edit-hit" style="width:${outer}px;height:${outer}px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;">
+<div class="tracking-history-edit-marker-dot" style="width:${dot}px;height:${dot}px;box-sizing:border-box;"></div>
+</div>`,
+		iconSize: [outer, outer],
+		iconAnchor: [outer / 2, outer / 2],
+	});
+}
+
+const MapBackgroundClickListener = dynamic(
+	() =>
+		import("react-leaflet").then(mod => {
+			const { useMapEvents } = mod;
+			return function MapBackgroundClickListenerComponent({
+				onBackgroundClick,
+			}: {
+				onBackgroundClick?: () => void;
+			}) {
+				useMapEvents({
+					click: () => {
+						onBackgroundClick?.();
+					},
+				});
+				return null;
+			};
+		}),
+	{ ssr: false }
+);
+
 // Fix for default marker icon in Next.js
 if (typeof window !== "undefined") {
 	delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -281,6 +333,11 @@ interface DriverData {
 	lastLocationUpdateAt: string | null;
 	pick_up_location?: string | null;
 	delivery_location?: string | null;
+	/** From GET load — server-cached Nominatim pickup/delivery (preferred over browser geocoding). */
+	routeGeocode?: {
+		pickup: { lat: number; lng: number; addressLabel: string } | null;
+		delivery: { lat: number; lng: number; addressLabel: string } | null;
+	} | null;
 	load_history?: [number, number][];
 	load_history_details?: {
 		position: [number, number];
@@ -297,6 +354,15 @@ interface TrackingDeliveryMapProps {
 	showEmptyMap?: boolean;
 	initialCenter?: [number, number];
 	initialZoom?: number;
+	selectedLoadHistoryPointIndex?: number | null;
+	editingLoadHistoryPointIndex?: number | null;
+	/** Fired when user clicks a load-history point on the map (same intent as selecting the sidebar card). */
+	onLoadHistoryPointMarkerClick?: (index: number) => void;
+	/** Fired on map pane click (not swallowed by a marker/route handle); clears sidebar + history highlight in parent. */
+	onMapBackgroundClick?: () => void;
+	/** Committed position after drag ends (card + route update then). */
+	historyEditDragPosition?: [number, number] | null;
+	onHistoryEditPointDragEnd?: (lat: number, lng: number) => void;
 }
 
 export default function TrackingDeliveryMap({
@@ -305,13 +371,23 @@ export default function TrackingDeliveryMap({
 	showEmptyMap = false,
 	initialCenter = [39.2904, -76.6122],
 	initialZoom = 18,
+	selectedLoadHistoryPointIndex = null,
+	editingLoadHistoryPointIndex = null,
+	onLoadHistoryPointMarkerClick,
+	onMapBackgroundClick,
+	historyEditDragPosition = null,
+	onHistoryEditPointDragEnd,
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
 	const [loadRoute, setLoadRoute] = useState<LoadRoute | null>(null);
 	const [driverMarkerSize, setDriverMarkerSize] = useState(MAX_DRIVER_MARKER_SIZE);
+	const [historyMarkerRadius, setHistoryMarkerRadius] = useState(
+		getHistoryMarkerRadiusByZoom(initialZoom)
+	);
 	const mapRef = useRef<L.Map | null>(null);
 	const hasFitInitialBoundsRef = useRef(false);
+	const lastHistoryFocusCenterKeyRef = useRef<string | null>(null);
 
 	// Check if dark theme is active
 	useEffect(() => {
@@ -377,8 +453,14 @@ export default function TrackingDeliveryMap({
 		});
 	}, [driverMarkerSize]);
 
+	const historyPointEditIcon = useMemo(
+		() => createHistoryPointEditIcon(historyMarkerRadius * 2),
+		[historyMarkerRadius]
+	);
+
 	const handleZoomChange = useCallback((zoom: number) => {
 		setDriverMarkerSize(getDriverMarkerSizeByZoom(zoom));
+		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
 	}, []);
 
 	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
@@ -435,16 +517,42 @@ export default function TrackingDeliveryMap({
 		let cancelled = false;
 
 		const buildLoadRoute = async () => {
-			if (!pickupAddressCandidates.length || !deliveryAddressCandidates.length) {
+			const serverRoute = driverData?.routeGeocode;
+			const serverPickup = serverRoute?.pickup;
+			const serverDelivery = serverRoute?.delivery;
+
+			const hasServerEndpoints = Boolean(serverPickup && serverDelivery);
+			if (
+				!hasServerEndpoints &&
+				(!pickupAddressCandidates.length || !deliveryAddressCandidates.length)
+			) {
 				setLoadRoute(null);
 				return;
 			}
 
 			try {
-				const [pickup, delivery] = await Promise.all([
-					geocodeAddressCandidates(pickupAddressCandidates),
-					geocodeAddressCandidates(deliveryAddressCandidates),
-				]);
+				let pickup: RoutePoint | null = null;
+				let delivery: RoutePoint | null = null;
+
+				if (serverPickup && serverDelivery) {
+					pickup = {
+						lat: serverPickup.lat,
+						lng: serverPickup.lng,
+						address: serverPickup.addressLabel,
+					};
+					delivery = {
+						lat: serverDelivery.lat,
+						lng: serverDelivery.lng,
+						address: serverDelivery.addressLabel,
+					};
+				} else {
+					const [pickupGeo, deliveryGeo] = await Promise.all([
+						geocodeAddressCandidates(pickupAddressCandidates),
+						geocodeAddressCandidates(deliveryAddressCandidates),
+					]);
+					pickup = pickupGeo;
+					delivery = deliveryGeo;
+				}
 
 				if (cancelled) return;
 
@@ -452,6 +560,7 @@ export default function TrackingDeliveryMap({
 					console.warn("[TrackingDeliveryMap] Pickup or delivery geocoding failed", {
 						pickupAddressCandidates,
 						deliveryAddressCandidates,
+						usedServerGeocode: hasServerEndpoints,
 					});
 					setLoadRoute(null);
 					return;
@@ -500,6 +609,7 @@ export default function TrackingDeliveryMap({
 			cancelled = true;
 		};
 	}, [
+		driverData?.routeGeocode,
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
 		historyMarkerPositions,
@@ -525,6 +635,48 @@ export default function TrackingDeliveryMap({
 		});
 		hasFitInitialBoundsRef.current = true;
 	}, [loadRoute, markerPosition, historyMarkerPositions]);
+
+	useEffect(() => {
+		const indexToFocus =
+			editingLoadHistoryPointIndex !== null
+				? editingLoadHistoryPointIndex
+				: selectedLoadHistoryPointIndex;
+
+		if (indexToFocus === null || !mapRef.current) {
+			lastHistoryFocusCenterKeyRef.current = null;
+			return;
+		}
+
+		const targetPoint = historyMarkerDetails[indexToFocus];
+		if (!targetPoint) return;
+
+		const useDraft =
+			editingLoadHistoryPointIndex === indexToFocus &&
+			historyEditDragPosition !== null;
+		const position = (
+			useDraft ? historyEditDragPosition : targetPoint.position
+		) as [number, number];
+
+		const focusKey = `${indexToFocus}|${position[0]},${position[1]}|${useDraft ? "d" : "s"}`;
+		if (lastHistoryFocusCenterKeyRef.current === focusKey) return;
+		lastHistoryFocusCenterKeyRef.current = focusKey;
+
+		const map = mapRef.current;
+		map.whenReady(() => {
+			if (mapRef.current !== map) return;
+
+			const currentZoom = map.getZoom();
+			map.setView(position, Math.max(currentZoom, SELECTED_HISTORY_POINT_ZOOM), {
+				animate: true,
+				duration: 0.5,
+			});
+		});
+	}, [
+		historyEditDragPosition,
+		historyMarkerDetails,
+		selectedLoadHistoryPointIndex,
+		editingLoadHistoryPointIndex,
+	]);
 
 	// Center map when lastLocationUpdateAt changes (every WebSocket update)
 	// This ensures map centers on driver location even if coordinates haven't changed
@@ -584,6 +736,32 @@ export default function TrackingDeliveryMap({
 
 	return (
 		<div className="w-full h-full bg-white dark:bg-gray-900 relative z-0">
+			<style>
+				{`
+					.tracking-history-point-editing {
+						transition: fill 0.65s ease-in-out, stroke 0.65s ease-in-out;
+					}
+					.tracking-history-point-edit-icon.leaflet-interactive {
+						cursor: move !important;
+					}
+					.tracking-history-edit-hit {
+						cursor: move !important;
+					}
+					.tracking-history-edit-marker-dot {
+						border-radius: 9999px;
+						border: 3px solid #1d4ed8;
+						animation: tracking-history-edit-blink 1.3s ease-in-out infinite;
+						cursor: move !important;
+					}
+					@keyframes tracking-history-edit-blink {
+						0%, 100% { background: #2563eb; border-color: #1d4ed8; }
+						50% { background: #dc2626; border-color: #991b1b; }
+					}
+					.leaflet-marker-draggable.leaflet-dragging .tracking-history-edit-hit {
+						cursor: move !important;
+					}
+				`}
+			</style>
 			<MapContainer
 				center={center}
 				zoom={initialZoom}
@@ -592,6 +770,7 @@ export default function TrackingDeliveryMap({
 				key={`map-${isDark ? "dark" : "light"}`}
 			>
 				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
+				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<TileLayer
 					key={`tiles-${isDark ? "dark" : "light"}`}
 					attribution={mapTiles.attribution}
@@ -608,6 +787,7 @@ export default function TrackingDeliveryMap({
 									color: "#2563eb",
 									weight: 5,
 									opacity: 0.85,
+									interactive: false,
 								}}
 							/>
 						)}
@@ -618,10 +798,14 @@ export default function TrackingDeliveryMap({
 									color: "#dc2626",
 									weight: 5,
 									opacity: 0.9,
+									interactive: false,
 								}}
 							/>
 						)}
-						<Marker position={[loadRoute.pickup.lat, loadRoute.pickup.lng]}>
+						<Marker
+							position={[loadRoute.pickup.lat, loadRoute.pickup.lng]}
+							eventHandlers={{ click: stopMapClickBubbling }}
+						>
 							<Popup>
 								<div className="text-sm dark:text-white">
 									<p className="font-semibold dark:text-white">Pick up</p>
@@ -631,7 +815,10 @@ export default function TrackingDeliveryMap({
 								</div>
 							</Popup>
 						</Marker>
-						<Marker position={[loadRoute.delivery.lat, loadRoute.delivery.lng]}>
+						<Marker
+							position={[loadRoute.delivery.lat, loadRoute.delivery.lng]}
+							eventHandlers={{ click: stopMapClickBubbling }}
+						>
 							<Popup>
 								<div className="text-sm dark:text-white">
 									<p className="font-semibold dark:text-white">Delivery</p>
@@ -641,18 +828,57 @@ export default function TrackingDeliveryMap({
 								</div>
 							</Popup>
 						</Marker>
-						{historyMarkerDetails.map((point, index) => (
-							<CircleMarker
-								key={`history-point-${index}-${point.position[0]}-${point.position[1]}`}
-								center={point.position}
-								radius={15}
-								pathOptions={{
-									color: "#991b1b",
-									fillColor: "#dc2626",
-									fillOpacity: 0.95,
-									weight: 3,
-								}}
-							>
+						{historyMarkerDetails.map((point, index) => {
+							const isSelected = index === selectedLoadHistoryPointIndex;
+							const isEditing = index === editingLoadHistoryPointIndex;
+							const showBlueAccent = isSelected;
+
+							if (isEditing) {
+								const position = (
+									historyEditDragPosition ?? point.position
+								) as [number, number];
+								return (
+									<Marker
+										key={`history-point-edit-${index}`}
+										position={position}
+										draggable
+										autoPan={false}
+										zIndexOffset={750}
+										icon={historyPointEditIcon}
+										eventHandlers={{
+											click: stopMapClickBubbling,
+											dragstart: () => {
+												document.body.style.cursor = "move";
+											},
+											dragend: e => {
+												document.body.style.cursor = "";
+												const ll = e.target.getLatLng();
+												onHistoryEditPointDragEnd?.(ll.lat, ll.lng);
+											},
+										}}
+									/>
+								);
+							}
+
+							return (
+								<CircleMarker
+									key={`history-point-${index}-${point.position[0]}-${point.position[1]}`}
+									center={point.position}
+									radius={historyMarkerRadius}
+									pathOptions={{
+										color: showBlueAccent ? "#1d4ed8" : "#991b1b",
+										fillColor: showBlueAccent ? "#2563eb" : "#dc2626",
+										fillOpacity: 0.95,
+										weight: isSelected ? 4 : 3,
+										className: "",
+									}}
+									eventHandlers={{
+										click: e => {
+											stopMapClickBubbling(e);
+											onLoadHistoryPointMarkerClick?.(index);
+										},
+									}}
+								>
 								<Popup>
 									<div className="text-sm dark:text-white">
 										<p className="font-semibold dark:text-white">
@@ -674,8 +900,9 @@ export default function TrackingDeliveryMap({
 										</p>
 									</div>
 								</Popup>
-							</CircleMarker>
-						))}
+								</CircleMarker>
+							);
+						})}
 					</>
 				)}
 				{markerPosition && (
@@ -683,6 +910,7 @@ export default function TrackingDeliveryMap({
 						position={markerPosition}
 						icon={carIcon}
 						zIndexOffset={1000}
+						eventHandlers={{ click: stopMapClickBubbling }}
 						// No key prop - react-leaflet will update position automatically without recreating marker
 					>
 						{driverData && (
