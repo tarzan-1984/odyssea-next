@@ -67,6 +67,7 @@ import UnreadIcon from "./unread.svg";
 import DriversMapIcon from "./drivers-map.svg";
 import WorldMapIcon from "./world-map-icon.svg";
 import MapSearchIcon from "./map-search-icon.svg";
+import LoadTrackingChatIcon from "./load-tracking-chat.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
@@ -132,6 +133,7 @@ export {
 	BackgroundCheck,
 	TankerEndorsement,
 	DriverListIcon,
+	LoadTrackingChatIcon,
 	OffersIcon,
 	WorkstationIcon,
 	BoxTapped,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverAuth } from "@/utils/auth";
 
 // PATCH /api/tms/load/[loadId]/tracking/[pointId] - update coordinates of one load history point.
 export async function PATCH(
@@ -6,6 +7,11 @@ export async function PATCH(
 	{ params }: { params: Promise<{ loadId: string; pointId: string }> }
 ) {
 	try {
+		const accessToken = serverAuth.getAccessToken(request);
+		if (!accessToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { loadId, pointId } = await params;
 
 		if (!loadId || !pointId) {
@@ -31,6 +37,7 @@ export async function PATCH(
 				method: "PATCH",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${accessToken}`,
 				},
 				body: JSON.stringify({ latitude, longitude }),
 			}
@@ -54,10 +61,15 @@ export async function PATCH(
 
 // DELETE /api/tms/load/[loadId]/tracking/[pointId] - delete one load history point.
 export async function DELETE(
-	_request: NextRequest,
+	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string; pointId: string }> }
 ) {
 	try {
+		const accessToken = serverAuth.getAccessToken(request);
+		if (!accessToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { loadId, pointId } = await params;
 
 		if (!loadId || !pointId) {
@@ -73,6 +85,7 @@ export async function DELETE(
 				method: "DELETE",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${accessToken}`,
 				},
 			}
 		);

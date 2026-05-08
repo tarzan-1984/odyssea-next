@@ -28,6 +28,9 @@ type LoadDetailsResponse = {
 				pick_up_location?: string | null;
 				delivery_location?: string | null;
 				load_status?: string | null;
+				attached_driver?: string | null;
+				attached_second_driver?: string | null;
+				attached_third_driver?: string | null;
 			};
 			drivers?: LoadDriver[];
 			trackingPoints?: LoadTrackingPoint[];
@@ -40,6 +43,9 @@ type LoadDetailsResponse = {
 			pick_up_location?: string | null;
 			delivery_location?: string | null;
 			load_status?: string | null;
+			attached_driver?: string | null;
+			attached_second_driver?: string | null;
+			attached_third_driver?: string | null;
 		};
 		drivers?: LoadDriver[];
 		trackingPoints?: LoadTrackingPoint[];
@@ -438,14 +444,20 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	]);
 
 	const currentTrackingDriver = useMemo(() => {
-		const lastTrackingPoint = sortedTrackingPoints[sortedTrackingPoints.length - 1];
-		const externalDriverId = lastTrackingPoint?.externalDriverId?.trim();
-		if (!externalDriverId) return null;
-
-		return (
-			loadDrivers.find((driver) => driver.externalId?.trim() === externalDriverId) ??
-			null
-		);
+		// Active driver = last history point that names a driver (by externalId).
+		// Scan backwards so a trailing point without externalDriverId does not hide the real active driver.
+		if (sortedTrackingPoints.length > 0) {
+			for (let i = sortedTrackingPoints.length - 1; i >= 0; i--) {
+				const externalId = sortedTrackingPoints[i]?.externalDriverId?.trim();
+				if (!externalId) continue;
+				const fromHistory = loadDrivers.find(
+					(driver) => driver.externalId?.trim() === externalId
+				);
+				if (fromHistory) return fromHistory;
+			}
+		}
+		// No history (or no resolvable driver on points): always use first attached driver on load.
+		return loadDrivers[0] ?? null;
 	}, [loadDrivers, sortedTrackingPoints]);
 
 	const currentDriverLatitude = Number(currentTrackingDriver?.latitude);

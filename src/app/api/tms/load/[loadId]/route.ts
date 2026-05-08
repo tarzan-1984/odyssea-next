@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverAuth } from "@/utils/auth";
 
-// GET /api/tms/load/[loadId] - public proxy for TMS load details.
+// GET /api/tms/load/[loadId] - TMS load details + drivers + tracking history (authenticated).
 export async function GET(
-	_request: NextRequest,
+	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string }> }
 ) {
 	try {
+		const accessToken = serverAuth.getAccessToken(request);
+		if (!accessToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { loadId } = await params;
 
 		if (!loadId) {
@@ -18,6 +24,7 @@ export async function GET(
 				method: "GET",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${accessToken}`,
 				},
 			}
 		);
