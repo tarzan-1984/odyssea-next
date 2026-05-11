@@ -402,19 +402,43 @@ function findClosestLimitedWaypointIndex(
 	return bestI;
 }
 
-async function geocodeAddress(address: string): Promise<RoutePoint | null> {
-	const url = new URL("https://nominatim.openstreetmap.org/search");
-	url.searchParams.set("q", address);
-	url.searchParams.set("format", "json");
-	url.searchParams.set("limit", "1");
-	url.searchParams.set("addressdetails", "0");
-	url.searchParams.set("accept-language", "en");
-	url.searchParams.set("countrycodes", "us");
+/** Nominatim usage policy: at most ~1 request per second for heavy use. */
+let nominatimNextAllowedAt = 0;
+const NOMINATIM_MIN_INTERVAL_MS = 1100;
 
-	const response = await fetch(url.toString());
+async function nominatimThrottle(): Promise<void> {
+	const now = Date.now();
+	if (now < nominatimNextAllowedAt) {
+		await new Promise((r) => setTimeout(r, nominatimNextAllowedAt - now));
+	}
+	nominatimNextAllowedAt = Date.now() + NOMINATIM_MIN_INTERVAL_MS;
+}
+
+async function geocodeAddress(address: string): Promise<RoutePoint | null> {
+	const params = new URLSearchParams({
+		q: address,
+		format: "json",
+		limit: "1",
+		addressdetails: "0",
+		"accept-language": "en",
+		countrycodes: "us",
+	});
+
+	await nominatimThrottle();
+
+	const response = await fetch(
+		`/api/geocode/nominatim-search?${params.toString()}`,
+		{ credentials: "include" }
+	);
 	if (!response.ok) return null;
 
-	const results = (await response.json()) as Array<{ lat?: string; lon?: string }>;
+	let results: Array<{ lat?: string; lon?: string }>;
+	try {
+		const parsed = (await response.json()) as unknown;
+		results = Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return null;
+	}
 	const first = results[0];
 	if (!first?.lat || !first?.lon) return null;
 
