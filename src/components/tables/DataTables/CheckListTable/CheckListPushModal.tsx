@@ -8,7 +8,7 @@ import Button from "@/components/ui/button/Button";
 import type { CheckListDriver } from "./checkListTypes";
 
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
-	"We have not received location updates from you for a while. Please check whether push notifications are enabled for the app.";
+	"We haven't received location updates from you in a while. Please check if the app is running.";
 
 type CheckListPushModalProps = {
 	isOpen: boolean;
