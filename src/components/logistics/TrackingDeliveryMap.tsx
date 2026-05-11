@@ -29,6 +29,8 @@ type LoadLocation = {
 	address?: string;
 	short_address?: string;
 	type?: string;
+	order?: number;
+	sort_order?: number;
 };
 
 type RoutePoint = {
@@ -37,9 +39,18 @@ type RoutePoint = {
 	address: string;
 };
 
+type LoadStopMarker = {
+	point: RoutePoint;
+	kind: "pickup" | "delivery";
+	title: string;
+	isFirstPickup: boolean;
+	isFinalDelivery: boolean;
+};
+
 type LoadRoute = {
 	pickup: RoutePoint;
 	delivery: RoutePoint;
+	stopMarkers: LoadStopMarker[];
 	completedPath: [number, number][];
 	remainingPath: [number, number][];
 };
@@ -48,8 +59,8 @@ const MIN_DRIVER_MARKER_SIZE = 34;
 const MAX_DRIVER_MARKER_SIZE = 78;
 const MIN_HISTORY_MARKER_RADIUS = 6;
 const MAX_HISTORY_MARKER_RADIUS = 15;
-const MAX_OSRM_WAYPOINTS = 25;
 const SELECTED_HISTORY_POINT_ZOOM = 8;
+const DRIVER_WAYPOINT_LABEL = "Current driver location";
 
 function getHistoryMarkerRadiusByZoom(zoom: number): number {
 	const minZoom = 4;
@@ -80,8 +91,19 @@ function normalizeLoadLocationType(type: unknown): string {
 function parseLoadLocation(value: unknown, preferredType: "pick_up_location" | "delivery_location"): LoadLocation | null {
 	if (!value) return null;
 
+	let parsed: unknown = value;
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed) return null;
+		try {
+			parsed = JSON.parse(trimmed);
+		} catch {
+			// TMS often stores a plain address string, not JSON.
+			return { address: trimmed };
+		}
+	}
+
 	try {
-		const parsed = typeof value === "string" ? JSON.parse(value) : value;
 		const locations = Array.isArray(parsed) ? parsed : [parsed];
 		const typedLocation = locations.find(
 			location =>
@@ -128,6 +150,258 @@ function getLoadLocationAddressCandidates(
 	return Array.from(new Set(candidates));
 }
 
+/** All location objects from TMS JSON (array or single object), or one synthetic object for a plain address string. */
+function parseLocationObjectsFromMeta(raw: unknown): LoadLocation[] {
+	if (!raw) return [];
+
+	let parsed: unknown = raw;
+	if (typeof raw === "string") {
+		const trimmed = raw.trim();
+		if (!trimmed) return [];
+		try {
+			parsed = JSON.parse(trimmed);
+		} catch {
+			return [{ address: trimmed }];
+		}
+	}
+
+	try {
+		const arr = Array.isArray(parsed) ? parsed : [parsed];
+		return arr.filter((item): item is LoadLocation => Boolean(item && typeof item === "object"));
+	} catch {
+		return [];
+	}
+}
+
+function stopSortKey(loc: LoadLocation, fallbackIndex: number): number {
+	const o = loc.order ?? loc.sort_order;
+	if (typeof o === "number" && Number.isFinite(o)) return o;
+	return fallbackIndex;
+}
+
+function addressCandidatesFromLocationObject(loc: LoadLocation): string[] {
+	const raw = [
+		loc.address?.trim(),
+		loc.address ? normalizeAddressForGeocoding(loc.address) : null,
+		loc.short_address?.trim(),
+	].filter((c): c is string => Boolean(c));
+	return Array.from(new Set(raw));
+}
+
+type StopKind = "pickup" | "delivery";
+
+type StopBuildRow = {
+	kind: StopKind;
+	candidates: string[];
+	title: string;
+};
+
+/**
+ * Ordered load stops: all pickups (pick_up_location), then all deliveries (delivery_location).
+ */
+function buildOrderedStopRows(pickUpRaw: unknown, deliveryRaw: unknown): StopBuildRow[] {
+	const pickObjs = parseLocationObjectsFromMeta(pickUpRaw)
+		.map((loc, i) => ({ loc, i }))
+		.sort((a, b) => stopSortKey(a.loc, a.i) - stopSortKey(b.loc, b.i));
+	const delObjs = parseLocationObjectsFromMeta(deliveryRaw)
+		.map((loc, i) => ({ loc, i }))
+		.sort((a, b) => stopSortKey(a.loc, a.i) - stopSortKey(b.loc, b.i));
+
+	const rows: StopBuildRow[] = [];
+	for (let p = 0; p < pickObjs.length; p++) {
+		const candidates = addressCandidatesFromLocationObject(pickObjs[p].loc);
+		if (candidates.length === 0) continue;
+		const n = rows.filter(r => r.kind === "pickup").length + 1;
+		rows.push({
+			kind: "pickup",
+			candidates,
+			title: pickObjs.length > 1 ? `Pick up ${n}` : "Pick up",
+		});
+	}
+	for (let d = 0; d < delObjs.length; d++) {
+		const candidates = addressCandidatesFromLocationObject(delObjs[d].loc);
+		if (candidates.length === 0) continue;
+		const n = rows.filter(r => r.kind === "delivery").length + 1;
+		rows.push({
+			kind: "delivery",
+			candidates,
+			title: delObjs.length > 1 ? `Delivery ${n}` : "Delivery",
+		});
+	}
+	return rows;
+}
+
+async function geocodeStopRows(
+	rows: StopBuildRow[]
+): Promise<{ chain: RoutePoint[]; rows: StopBuildRow[] }> {
+	const chain: RoutePoint[] = [];
+	const outRows: StopBuildRow[] = [];
+	for (const row of rows) {
+		const pt = await geocodeAddressCandidates(row.candidates);
+		if (pt) {
+			outRows.push(row);
+			chain.push({
+				lat: pt.lat,
+				lng: pt.lng,
+				address: `${row.title}: ${row.candidates[0] ?? pt.address}`,
+			});
+		}
+	}
+	return { chain, rows: outRows };
+}
+
+function applyServerEndpointsToChain(
+	chain: RoutePoint[],
+	serverPickup: { lat: number; lng: number; addressLabel: string } | null,
+	serverDelivery: { lat: number; lng: number; addressLabel: string } | null
+): RoutePoint[] {
+	if (chain.length === 0) return chain;
+	const next = [...chain];
+	if (serverPickup) {
+		next[0] = {
+			lat: serverPickup.lat,
+			lng: serverPickup.lng,
+			address: next[0].address.startsWith("Pick up")
+				? `${next[0].address.split(":")[0]}: ${serverPickup.addressLabel}`
+				: `Pick up: ${serverPickup.addressLabel}`,
+		};
+	}
+	if (serverDelivery && next.length > 0) {
+		const lastI = next.length - 1;
+		next[lastI] = {
+			lat: serverDelivery.lat,
+			lng: serverDelivery.lng,
+			address: next[lastI].address.startsWith("Delivery")
+				? `${next[lastI].address.split(":")[0]}: ${serverDelivery.addressLabel}`
+				: `Delivery: ${serverDelivery.addressLabel}`,
+		};
+	}
+	return next;
+}
+
+function buildStopMarkersFromChain(chain: RoutePoint[], rows: StopBuildRow[]): LoadStopMarker[] {
+	if (chain.length === 0) return [];
+	if (rows.length !== chain.length) {
+		return chain.map((point, index) => ({
+			point,
+			kind: index === 0 ? "pickup" : index === chain.length - 1 ? "delivery" : "pickup",
+			title: index === 0 ? "Pick up" : index === chain.length - 1 ? "Delivery" : `Stop ${index + 1}`,
+			isFirstPickup: index === 0,
+			isFinalDelivery: index === chain.length - 1,
+		}));
+	}
+	return chain.map((point, index) => ({
+		point,
+		kind: rows[index].kind,
+		title: rows[index].title,
+		isFirstPickup: index === 0,
+		isFinalDelivery: index === chain.length - 1,
+	}));
+}
+
+/**
+ * Commercial route for OSRM: all stops except the final, then history, live driver, final stop.
+ */
+function buildOsrmWaypointSequence(
+	chain: RoutePoint[],
+	historyPoints: RoutePoint[],
+	currentDriverPoint: RoutePoint | null
+): RoutePoint[] {
+	if (chain.length < 2) return [];
+	const head = chain.slice(0, -1);
+	const finalStop = chain[chain.length - 1];
+	return uniqueSequentialRoutePoints([
+		...head,
+		...historyPoints,
+		...(currentDriverPoint ? [currentDriverPoint] : []),
+		finalStop,
+	]);
+}
+
+/** Deduplicate consecutive near-identical coordinates; send all waypoints to OSRM (no cap). */
+function limitOsrmWaypointSequence(seq: RoutePoint[]): RoutePoint[] {
+	return uniqueSequentialRoutePoints(seq);
+}
+
+type OsrmDrivingRouteResult = {
+	path: [number, number][];
+	waypointSnapsLngLat: [number, number][];
+	limitedRequestPoints: RoutePoint[];
+};
+
+async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingRouteResult | null> {
+	const cleanPoints = uniqueSequentialRoutePoints(points);
+	if (cleanPoints.length < 2) return null;
+
+	const limitedPoints = limitOsrmWaypointSequence(cleanPoints);
+	const fallbackPath = cleanPoints.map(point => [point.lat, point.lng] as [number, number]);
+
+	try {
+		const coordinatesParam = limitedPoints.map(point => `${point.lng},${point.lat}`).join(";");
+		const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinatesParam}`);
+		url.searchParams.set("overview", "full");
+		url.searchParams.set("geometries", "geojson");
+
+		const response = await fetch(url.toString());
+		if (!response.ok) throw new Error(`OSRM ${response.status}`);
+
+		const data = (await response.json()) as {
+			waypoints?: Array<{ location?: [number, number] }>;
+			routes?: Array<{
+				geometry?: {
+					coordinates?: [number, number][];
+				};
+			}>;
+		};
+		const coordinates = data.routes?.[0]?.geometry?.coordinates;
+		if (!coordinates?.length) throw new Error("OSRM route is empty");
+
+		const rawSnaps = data.waypoints?.map(w => w.location) ?? [];
+		const snaps = rawSnaps.filter(
+			(loc): loc is [number, number] => Array.isArray(loc) && loc.length >= 2
+		);
+
+		return {
+			path: coordinates.map(([lng, lat]) => [lat, lng]),
+			waypointSnapsLngLat:
+				snaps.length === limitedPoints.length
+					? snaps
+					: limitedPoints.map(p => [p.lng, p.lat] as [number, number]),
+			limitedRequestPoints: limitedPoints,
+		};
+	} catch (error) {
+		console.warn(
+			"[TrackingDeliveryMap] Failed to build road route, using straight line:",
+			error
+		);
+		return {
+			path: fallbackPath,
+			waypointSnapsLngLat: limitedPoints.map(p => [p.lng, p.lat] as [number, number]),
+			limitedRequestPoints: limitedPoints,
+		};
+	}
+}
+
+function findClosestLimitedWaypointIndex(
+	limitedPoints: RoutePoint[],
+	target: RoutePoint | null
+): number {
+	if (!target || limitedPoints.length < 2) return -1;
+	let bestI = 0;
+	let bestD = Infinity;
+	for (let i = 0; i < limitedPoints.length; i++) {
+		const p = limitedPoints[i];
+		const d =
+			(p.lat - target.lat) * (p.lat - target.lat) +
+			(p.lng - target.lng) * (p.lng - target.lng);
+		if (d < bestD) {
+			bestD = d;
+			bestI = i;
+		}
+	}
+	return bestI;
+}
+
 async function geocodeAddress(address: string): Promise<RoutePoint | null> {
 	const url = new URL("https://nominatim.openstreetmap.org/search");
 	url.searchParams.set("q", address);
@@ -171,63 +445,41 @@ function toRoutePoint(value: [number, number], address: string): RoutePoint | nu
 }
 
 function uniqueSequentialRoutePoints(points: RoutePoint[]): RoutePoint[] {
-	return points.reduce<RoutePoint[]>((acc, point) => {
+	return points.reduce<RoutePoint[]>((acc, point, index) => {
 		const prev = acc[acc.length - 1];
+		const isLast = index === points.length - 1;
 		if (!prev || !areRoutePointsClose(prev, point)) {
+			acc.push(point);
+		} else if (points.length === 2 && isLast) {
+			// Pickup and delivery can legally share the same coordinates (same yard / TMS duplicate);
+			// keep both so the chain stays length 2 and routing + stop markers still work.
 			acc.push(point);
 		}
 		return acc;
 	}, []);
 }
 
-function limitRouteWaypoints(points: RoutePoint[]): RoutePoint[] {
-	if (points.length <= MAX_OSRM_WAYPOINTS) return points;
-
-	const first = points[0];
-	const last = points[points.length - 1];
-	const middle = points.slice(1, -1);
-	const slots = MAX_OSRM_WAYPOINTS - 2;
-	const step = Math.max(1, Math.ceil(middle.length / slots));
-	const sampledMiddle = middle.filter((_, index) => index % step === 0).slice(0, slots);
-
-	return [first, ...sampledMiddle, last].filter((point): point is RoutePoint => Boolean(point));
+function clampSplitIndex(splitIdx: number, pathLen: number): number {
+	if (pathLen < 2) return 0;
+	return Math.min(Math.max(splitIdx, 1), pathLen - 2);
 }
 
-async function fetchRoutePath(points: RoutePoint[]): Promise<[number, number][]> {
-	const cleanPoints = uniqueSequentialRoutePoints(points);
-	if (cleanPoints.length < 2) return [];
-
-	const limitedPoints = limitRouteWaypoints(cleanPoints);
-
-	const fallbackPath = cleanPoints.map(point => [point.lat, point.lng] as [number, number]);
-
-	try {
-		const coordinatesParam = limitedPoints.map(point => `${point.lng},${point.lat}`).join(";");
-		const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinatesParam}`);
-		url.searchParams.set("overview", "full");
-		url.searchParams.set("geometries", "geojson");
-
-		const response = await fetch(url.toString());
-		if (!response.ok) throw new Error(`OSRM ${response.status}`);
-
-		const data = (await response.json()) as {
-			routes?: Array<{
-				geometry?: {
-					coordinates?: [number, number][];
-				};
-			}>;
-		};
-		const coordinates = data.routes?.[0]?.geometry?.coordinates;
-		if (!coordinates?.length) throw new Error("OSRM route is empty");
-
-		return coordinates.map(([lng, lat]) => [lat, lng]);
-	} catch (error) {
-		console.warn(
-			"[TrackingDeliveryMap] Failed to build road route, using straight line:",
-			error
-		);
-		return fallbackPath;
+/** Vertex on the route polyline closest to the driver's coordinates (for splitting completed vs remaining). */
+function findClosestPolylineVertexIndex(path: [number, number][], target: [number, number]): number {
+	if (path.length === 0) return 0;
+	const [tLat, tLng] = target;
+	let bestI = 0;
+	let bestD = Infinity;
+	for (let i = 0; i < path.length; i++) {
+		const d =
+			(path[i][0] - tLat) * (path[i][0] - tLat) +
+			(path[i][1] - tLng) * (path[i][1] - tLng);
+		if (d < bestD) {
+			bestD = d;
+			bestI = i;
+		}
 	}
+	return bestI;
 }
 
 // Component to set map reference using useMap hook
@@ -518,8 +770,8 @@ export default function TrackingDeliveryMap({
 
 		const buildLoadRoute = async () => {
 			const serverRoute = driverData?.routeGeocode;
-			const serverPickup = serverRoute?.pickup;
-			const serverDelivery = serverRoute?.delivery;
+			const serverPickup = serverRoute?.pickup ?? null;
+			const serverDelivery = serverRoute?.delivery ?? null;
 
 			const hasServerEndpoints = Boolean(serverPickup && serverDelivery);
 			if (
@@ -531,66 +783,127 @@ export default function TrackingDeliveryMap({
 			}
 
 			try {
-				let pickup: RoutePoint | null = null;
-				let delivery: RoutePoint | null = null;
+				const rows = buildOrderedStopRows(
+					driverData?.pick_up_location,
+					driverData?.delivery_location
+				);
 
-				if (serverPickup && serverDelivery) {
-					pickup = {
-						lat: serverPickup.lat,
-						lng: serverPickup.lng,
-						address: serverPickup.addressLabel,
-					};
-					delivery = {
-						lat: serverDelivery.lat,
-						lng: serverDelivery.lng,
-						address: serverDelivery.addressLabel,
-					};
-				} else {
-					const [pickupGeo, deliveryGeo] = await Promise.all([
-						geocodeAddressCandidates(pickupAddressCandidates),
-						geocodeAddressCandidates(deliveryAddressCandidates),
-					]);
-					pickup = pickupGeo;
-					delivery = deliveryGeo;
+				let chain: RoutePoint[] = [];
+				let stopRows: StopBuildRow[] = rows;
+
+				if (rows.length >= 2) {
+					const { chain: geoChain, rows: geoRows } = await geocodeStopRows(rows);
+					stopRows = geoRows;
+					chain = applyServerEndpointsToChain(geoChain, serverPickup, serverDelivery);
+					chain = uniqueSequentialRoutePoints(chain);
+				}
+
+				if (chain.length < 2) {
+					if (!serverPickup || !serverDelivery) {
+						const [pickupGeo, deliveryGeo] = await Promise.all([
+							geocodeAddressCandidates(pickupAddressCandidates),
+							geocodeAddressCandidates(deliveryAddressCandidates),
+						]);
+						if (!pickupGeo || !deliveryGeo) {
+							console.warn("[TrackingDeliveryMap] Pickup or delivery geocoding failed", {
+								pickupAddressCandidates,
+								deliveryAddressCandidates,
+								usedServerGeocode: Boolean(serverPickup && serverDelivery),
+							});
+							setLoadRoute(null);
+							return;
+						}
+						chain = uniqueSequentialRoutePoints([
+							{ ...pickupGeo, address: `Pick up: ${pickupGeo.address}` },
+							{ ...deliveryGeo, address: `Delivery: ${deliveryGeo.address}` },
+						]);
+					} else {
+						chain = uniqueSequentialRoutePoints([
+							{
+								lat: serverPickup.lat,
+								lng: serverPickup.lng,
+								address: `Pick up: ${serverPickup.addressLabel}`,
+							},
+							{
+								lat: serverDelivery.lat,
+								lng: serverDelivery.lng,
+								address: `Delivery: ${serverDelivery.addressLabel}`,
+							},
+						]);
+					}
+					stopRows = [
+						{ kind: "pickup", candidates: [], title: "Pick up" },
+						{ kind: "delivery", candidates: [], title: "Delivery" },
+					];
 				}
 
 				if (cancelled) return;
 
-				if (!pickup || !delivery) {
-					console.warn("[TrackingDeliveryMap] Pickup or delivery geocoding failed", {
-						pickupAddressCandidates,
-						deliveryAddressCandidates,
-						usedServerGeocode: hasServerEndpoints,
-					});
+				if (chain.length < 2) {
 					setLoadRoute(null);
 					return;
 				}
 
+				const pickupMarker = chain[0];
+				const deliveryMarker = chain[chain.length - 1];
+				const stopMarkers = buildStopMarkersFromChain(chain, stopRows);
+
 				const historyPoints = historyMarkerPositions
 					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
 					.filter((point): point is RoutePoint => point !== null);
-				const currentDriverPoint = markerPosition
-					? toRoutePoint(markerPosition, "Current driver location")
-					: null;
-				const completedWaypoints = uniqueSequentialRoutePoints([
-					pickup,
-					...historyPoints,
-					...(currentDriverPoint ? [currentDriverPoint] : []),
-				]);
-				const remainingStart =
-					currentDriverPoint ??
-					completedWaypoints[completedWaypoints.length - 1] ??
-					pickup;
 
-				const [completedPath, remainingPath] = await Promise.all([
-					completedWaypoints.length > 1
-						? fetchRoutePath(completedWaypoints)
-						: Promise.resolve([]),
-					fetchRoutePath([remainingStart, delivery]),
-				]);
+				const currentDriverPoint = markerPosition
+					? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
+					: null;
+
+				const splitTarget: RoutePoint | null = currentDriverPoint
+					? currentDriverPoint
+					: historyPoints.length > 0
+						? historyPoints[historyPoints.length - 1]
+						: null;
+
+				const osrmSeq = buildOsrmWaypointSequence(chain, historyPoints, currentDriverPoint);
+
+				let completedPath: [number, number][] = [];
+				let remainingPath: [number, number][] = [];
+
+				const osrmResult = await fetchOsrmDrivingRoute(osrmSeq);
 				if (cancelled) return;
 
-				setLoadRoute({ pickup, delivery, completedPath, remainingPath });
+				if (!osrmResult || osrmResult.path.length < 2) {
+					completedPath = [];
+					remainingPath = [];
+				} else {
+					const fullPath = osrmResult.path;
+					if (!splitTarget) {
+						completedPath = [];
+						remainingPath = fullPath;
+					} else {
+						const { limitedRequestPoints, waypointSnapsLngLat } = osrmResult;
+						const splitWI = findClosestLimitedWaypointIndex(limitedRequestPoints, splitTarget);
+						const snap =
+							splitWI >= 0 && splitWI < waypointSnapsLngLat.length
+								? waypointSnapsLngLat[splitWI]
+								: null;
+						const targetLatLng: [number, number] = snap
+							? [snap[1], snap[0]]
+							: [splitTarget.lat, splitTarget.lng];
+						const rawSplit = findClosestPolylineVertexIndex(fullPath, targetLatLng);
+						const splitIdx = clampSplitIndex(rawSplit, fullPath.length);
+						completedPath = fullPath.slice(0, splitIdx + 1);
+						remainingPath = fullPath.slice(splitIdx);
+					}
+				}
+
+				if (cancelled) return;
+
+				setLoadRoute({
+					pickup: pickupMarker,
+					delivery: deliveryMarker,
+					stopMarkers,
+					completedPath,
+					remainingPath,
+				});
 			} catch (error) {
 				if (!cancelled) {
 					console.warn("[TrackingDeliveryMap] Failed to build load route:", error);
@@ -610,6 +923,8 @@ export default function TrackingDeliveryMap({
 		};
 	}, [
 		driverData?.routeGeocode,
+		driverData?.pick_up_location,
+		driverData?.delivery_location,
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
 		historyMarkerPositions,
@@ -620,10 +935,10 @@ export default function TrackingDeliveryMap({
 		if (!loadRoute || !mapRef.current) return;
 		if (hasFitInitialBoundsRef.current) return;
 
-		const boundsPoints: [number, number][] = [
-			[loadRoute.pickup.lat, loadRoute.pickup.lng],
-			[loadRoute.delivery.lat, loadRoute.delivery.lng],
-		];
+		const boundsPoints: [number, number][] = loadRoute.stopMarkers.map(s => [
+			s.point.lat,
+			s.point.lng,
+		]);
 		if (markerPosition) {
 			boundsPoints.push(markerPosition);
 		}
@@ -780,17 +1095,7 @@ export default function TrackingDeliveryMap({
 				/>
 				{loadRoute && (
 					<>
-						{loadRoute.remainingPath.length > 1 && (
-							<Polyline
-								positions={loadRoute.remainingPath}
-								pathOptions={{
-									color: "#2563eb",
-									weight: 5,
-									opacity: 0.85,
-									interactive: false,
-								}}
-							/>
-						)}
+						{/* Completed (red) drawn first; remaining (blue) on top — same geometry, no overlapping segments. */}
 						{loadRoute.completedPath.length > 1 && (
 							<Polyline
 								positions={loadRoute.completedPath}
@@ -802,32 +1107,35 @@ export default function TrackingDeliveryMap({
 								}}
 							/>
 						)}
-						<Marker
-							position={[loadRoute.pickup.lat, loadRoute.pickup.lng]}
-							eventHandlers={{ click: stopMapClickBubbling }}
-						>
-							<Popup>
-								<div className="text-sm dark:text-white">
-									<p className="font-semibold dark:text-white">Pick up</p>
-									<p className="text-gray-600 dark:text-gray-300">
-										{loadRoute.pickup.address}
-									</p>
-								</div>
-							</Popup>
-						</Marker>
-						<Marker
-							position={[loadRoute.delivery.lat, loadRoute.delivery.lng]}
-							eventHandlers={{ click: stopMapClickBubbling }}
-						>
-							<Popup>
-								<div className="text-sm dark:text-white">
-									<p className="font-semibold dark:text-white">Delivery</p>
-									<p className="text-gray-600 dark:text-gray-300">
-										{loadRoute.delivery.address}
-									</p>
-								</div>
-							</Popup>
-						</Marker>
+						{loadRoute.remainingPath.length > 1 && (
+							<Polyline
+								positions={loadRoute.remainingPath}
+								pathOptions={{
+									color: "#2563eb",
+									weight: 5,
+									opacity: 0.85,
+									interactive: false,
+								}}
+							/>
+						)}
+						{loadRoute.stopMarkers.map((stop, index) => (
+							<Marker
+								key={`load-stop-${index}-${stop.point.lat}-${stop.point.lng}`}
+								position={[stop.point.lat, stop.point.lng]}
+								eventHandlers={{ click: stopMapClickBubbling }}
+							>
+								<Popup>
+									<div className="text-sm dark:text-white">
+										<p className="font-semibold dark:text-white">{stop.title}</p>
+										<p className="text-gray-600 dark:text-gray-300">
+											{stop.point.address.includes(": ")
+												? stop.point.address.split(": ").slice(1).join(": ")
+												: stop.point.address}
+										</p>
+									</div>
+								</Popup>
+							</Marker>
+						))}
 						{historyMarkerDetails.map((point, index) => {
 							const isSelected = index === selectedLoadHistoryPointIndex;
 							const isEditing = index === editingLoadHistoryPointIndex;
