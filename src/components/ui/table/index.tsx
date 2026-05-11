@@ -30,6 +30,8 @@ interface TableCellProps {
 	isHeader?: boolean; // If true, renders as <th>, otherwise <td>
 	className?: string; // Optional className for styling
 	style?: React.CSSProperties; // Optional inline style
+	colSpan?: number;
+	rowSpan?: number;
 	onMouseEnter?: React.MouseEventHandler<HTMLTableCellElement>;
 	onMouseLeave?: React.MouseEventHandler<HTMLTableCellElement>;
 	onMouseDown?: React.MouseEventHandler<HTMLTableCellElement>;
@@ -62,6 +64,8 @@ const TableCell: React.FC<TableCellProps> = ({
 	isHeader = false,
 	className,
 	style,
+	colSpan,
+	rowSpan,
 	onMouseEnter,
 	onMouseLeave,
 	onMouseDown,
@@ -72,6 +76,8 @@ const TableCell: React.FC<TableCellProps> = ({
 		<CellTag
 			className={` ${className}`}
 			style={style}
+			colSpan={colSpan}
+			rowSpan={rowSpan}
 			onMouseEnter={onMouseEnter}
 			onMouseLeave={onMouseLeave}
 			onMouseDown={onMouseDown}

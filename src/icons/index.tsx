@@ -71,6 +71,7 @@ import LoadTrackingChatIcon from "./load-tracking-chat.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
+import CheckListIcon from "./check-list.svg";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
 import Hazmat2Icon from "./additional/hazmat2.svg";
@@ -136,6 +137,7 @@ export {
 	LoadTrackingChatIcon,
 	OffersIcon,
 	WorkstationIcon,
+	CheckListIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,

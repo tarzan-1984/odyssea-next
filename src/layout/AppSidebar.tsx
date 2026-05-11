@@ -20,6 +20,7 @@ import {
 	DriverListIcon,
 	OffersIcon,
 	WorkstationIcon,
+	CheckListIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
@@ -81,6 +82,11 @@ const navItems: NavItem[] = [
 		name: "App settings",
 		path: "/app-settings",
 		adminOnly: true,
+	},
+	{
+		icon: <CheckListIcon className="h-5 w-5" />,
+		name: "Check list",
+		path: "/check-list",
 	},
 	// {
 	//   name: "AI Assistant",

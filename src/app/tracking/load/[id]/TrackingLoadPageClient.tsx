@@ -100,6 +100,14 @@ function formatHistoryDate(dateString: string | null) {
 	}
 }
 
+/** Align with TMS / Nest: loaded-enroute → loaded_enroute */
+function normalizeTrackingStatus(value: string | null | undefined): string {
+	return String(value ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/-/g, "_");
+}
+
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const queryClient = useQueryClient();
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -233,8 +241,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		const details = loadDetails as LoadDetailsResponse | undefined;
 		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
 	}, [loadDetails]);
-	const isDeliveredLoad =
-		loadMetaData?.load_status?.trim().toLowerCase() === "delivered";
+	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
+	const isDeliveredLoad = normalizedLoadStatus === "delivered";
+	const isLoadLoadedEnroute = normalizedLoadStatus === "loaded_enroute";
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
@@ -464,6 +473,13 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const currentDriverLongitude = Number(currentTrackingDriver?.longitude);
 	const hasCurrentDriverCoordinates =
 		Number.isFinite(currentDriverLatitude) && Number.isFinite(currentDriverLongitude);
+	const isDriverLoadedEnroute =
+		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "loaded_enroute";
+	const showDriverLiveMarker =
+		!isDeliveredLoad &&
+		isLoadLoadedEnroute &&
+		isDriverLoadedEnroute &&
+		hasCurrentDriverCoordinates;
 
 	const mapLoadData = useMemo(() => ({
 		externalId: currentTrackingDriver?.externalId ?? null,
@@ -476,8 +492,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		city: currentTrackingDriver?.city ?? null,
 		state: currentTrackingDriver?.state ?? null,
 		zip: currentTrackingDriver?.zip ?? null,
-		latitude: !isDeliveredLoad && hasCurrentDriverCoordinates ? currentDriverLatitude : null,
-		longitude: !isDeliveredLoad && hasCurrentDriverCoordinates ? currentDriverLongitude : null,
+		latitude: showDriverLiveMarker ? currentDriverLatitude : null,
+		longitude: showDriverLiveMarker ? currentDriverLongitude : null,
 		lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
 		pick_up_location: loadMetaData?.pick_up_location ?? null,
 		delivery_location: loadMetaData?.delivery_location ?? null,
@@ -491,8 +507,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		currentDriverLatitude,
 		currentDriverLongitude,
 		currentTrackingDriver,
-		hasCurrentDriverCoordinates,
-		isDeliveredLoad,
+		showDriverLiveMarker,
 		loadMetaData,
 		routeGeocodeFromApi,
 		loadHistoryForMap,
