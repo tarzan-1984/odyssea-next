@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
+import { AngleDownIcon, AngleUpIcon, LoadTrackingChatIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "../DriversTable/PaginationWithIcon";
 import type { CheckListDriver, CheckListResponse } from "./checkListTypes";
@@ -38,18 +40,21 @@ function formatInNy(isoOrNyWall: string | null | undefined): string {
 
 export const CHECK_LIST_DRIVER_STATUS_VALUES = ["all", "available", "loaded_enroute"] as const;
 export type CheckListDriverStatusFilter = (typeof CHECK_LIST_DRIVER_STATUS_VALUES)[number];
+export type CheckListLastLocationSort = "asc" | "desc";
 
 async function fetchCheckListPage(
 	page: number,
 	perPage: number,
 	driverStatus: CheckListDriverStatusFilter,
 	search: string,
+	lastLocationSort: CheckListLastLocationSort,
 ): Promise<CheckListResponse> {
 	const q = search.trim();
 	const res = await axios.get<CheckListResponse>("/api/users/drivers/check-list", {
 		params: {
 			page,
 			limit: perPage,
+			lastLocationSort,
 			...(driverStatus !== "all" ? { driverStatus } : {}),
 			...(q ? { search: q } : {}),
 		},
@@ -73,6 +78,8 @@ export default function CheckListTable() {
 	const [statusFilter, setStatusFilter] = useState<CheckListDriverStatusFilter>("all");
 	const [searchInput, setSearchInput] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
+	const [lastLocationSort, setLastLocationSort] =
+		useState<CheckListLastLocationSort>("asc");
 	const [pushDriver, setPushDriver] = useState<CheckListDriver | null>(null);
 
 	useEffect(() => {
@@ -85,8 +92,22 @@ export default function CheckListTable() {
 	}, [debouncedSearch]);
 
 	const query = useQuery({
-		queryKey: ["drivers-check-list", currentPage, itemsPerPage, statusFilter, debouncedSearch],
-		queryFn: () => fetchCheckListPage(currentPage, itemsPerPage, statusFilter, debouncedSearch),
+		queryKey: [
+			"drivers-check-list",
+			currentPage,
+			itemsPerPage,
+			statusFilter,
+			debouncedSearch,
+			lastLocationSort,
+		],
+		queryFn: () =>
+			fetchCheckListPage(
+				currentPage,
+				itemsPerPage,
+				statusFilter,
+				debouncedSearch,
+				lastLocationSort,
+			),
 		placeholderData: keepPreviousData,
 	});
 
@@ -100,6 +121,11 @@ export default function CheckListTable() {
 	const drivers = query.data?.drivers ?? [];
 	const totalItems = query.data?.pagination?.total_count ?? 0;
 	const totalPages = query.data?.pagination?.total_pages ?? 0;
+
+	const toggleLastLocationSort = () => {
+		setLastLocationSort((prev) => (prev === "asc" ? "desc" : "asc"));
+		setCurrentPage(1);
+	};
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -124,7 +150,7 @@ export default function CheckListTable() {
 				<div className="w-full min-w-0 lg:flex-1 lg:max-w-xl lg:px-2">
 					<Input
 						type="text"
-						placeholder="Search by name, ID, email…"
+						placeholder="Search by name, driver ID, email, load ID…"
 						value={searchInput}
 						onChange={e => setSearchInput(e.target.value)}
 						className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
@@ -178,7 +204,36 @@ export default function CheckListTable() {
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Last location update
+									<div
+										role="button"
+										tabIndex={0}
+										className="flex cursor-pointer items-center justify-between gap-2 text-left"
+										onClick={toggleLastLocationSort}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												toggleLastLocationSort();
+											}
+										}}
+									>
+										<span>Last location update</span>
+										<span className="flex flex-col gap-0.5 shrink-0" aria-hidden>
+											<AngleUpIcon
+												className={
+													lastLocationSort === "asc"
+														? "text-brand-500"
+														: "text-gray-300 dark:text-gray-700"
+												}
+											/>
+											<AngleDownIcon
+												className={
+													lastLocationSort === "desc"
+														? "text-brand-500"
+														: "text-gray-300 dark:text-gray-700"
+												}
+											/>
+										</span>
+									</div>
 								</TableCell>
 								<TableCell
 									isHeader
@@ -240,7 +295,21 @@ export default function CheckListTable() {
 										{formatInNy(row.lastLocationUpdateAt)}
 									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs">
-										{row.trackingLoadId?.trim() ? row.trackingLoadId : "—"}
+										{row.trackingLoadId?.trim() ? (
+											<span className="inline-flex items-center gap-2">
+												<span>{row.trackingLoadId.trim()}</span>
+												<Link
+													href={`/tracking/load/${encodeURIComponent(row.trackingLoadId.trim())}`}
+													className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400"
+													aria-label="Track load on map"
+													title="Track load"
+												>
+													<LoadTrackingChatIcon className="h-[22px] w-[22px]" />
+												</Link>
+											</span>
+										) : (
+											"—"
+										)}
 									</TableCell>
 									<TableCell className="px-4 py-3 text-right whitespace-nowrap">
 										<Button
@@ -271,7 +340,7 @@ export default function CheckListTable() {
 					</div>
 					{totalPages > 1 && (
 						<PaginationWithIcon
-							key={`${currentPage}-${totalPages}-${itemsPerPage}-${statusFilter}-${debouncedSearch}`}
+							key={`${currentPage}-${totalPages}-${itemsPerPage}-${statusFilter}-${debouncedSearch}-${lastLocationSort}`}
 							totalPages={totalPages}
 							initialPage={currentPage}
 							onPageChange={setCurrentPage}

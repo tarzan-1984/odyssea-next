@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
 		if (search && search.trim() !== "") {
 			queryParams.set("search", search.trim());
 		}
+		const sortParam = searchParams.get("lastLocationSort")?.trim().toLowerCase();
+		if (sortParam === "desc" || sortParam === "asc") {
+			queryParams.set("lastLocationSort", sortParam);
+		}
 
 		const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/drivers/check-list?${queryParams.toString()}`;
 

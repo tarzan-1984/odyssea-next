@@ -16,7 +16,9 @@ export default function CheckListPage() {
 			<ComponentCard title="Check list">
 				<p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
 					ACTIVE drivers (loaded en route or available) whose last location update is older than 3
-					hours. Timestamps use America/New_York wall time in YYYY-MM-DD HH:mm:ss form.
+					hours. Default sort is oldest location first; use the &quot;Last location update&quot;
+					column header to toggle. Timestamps use America/New_York wall time in YYYY-MM-DD HH:mm:ss
+					form.
 				</p>
 				<CheckListTable />
 			</ComponentCard>
