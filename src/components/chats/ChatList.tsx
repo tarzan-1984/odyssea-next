@@ -22,6 +22,13 @@ interface ChatListProps {
 type FilterType = "all" | "muted" | "unread" | "favorite";
 type ChatTab = "chats" | "shipments" | "offers";
 
+/** These roles do not see the Offers tab in the chat sidebar. */
+const ROLES_WITHOUT_OFFERS_CHAT_TAB = new Set([
+	"RECRUITER",
+	"RECRUITER_TL",
+	"HR_MANAGER",
+]);
+
 interface FilterOption {
 	value: FilterType;
 	label: string;
@@ -39,6 +46,11 @@ export default function ChatList({
 
 	const currentUser = useCurrentUser();
 	const { updateChatRoom, updateMessage } = useChatStore();
+
+	const showOffersTab = useMemo(() => {
+		const role = (currentUser?.role || "").trim().toUpperCase();
+		return !ROLES_WITHOUT_OFFERS_CHAT_TAB.has(role);
+	}, [currentUser?.role]);
 
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 	const headerDropdownAnchorRef = useRef<HTMLButtonElement>(null);
@@ -83,6 +95,12 @@ export default function ChatList({
 			setSelectedFilter("all");
 		}
 	}, [activeTab, selectedFilter]);
+
+	useEffect(() => {
+		if (!showOffersTab && activeTab === "offers") {
+			setActiveTab("chats");
+		}
+	}, [showOffersTab, activeTab]);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT chats, always show the other participant's name
@@ -497,28 +515,30 @@ export default function ChatList({
 							</span>
 						)}
 					</button>
-					<button
-						type="button"
-						onClick={() => setActiveTab("offers")}
-						className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
-							activeTab === "offers"
-								? "bg-brand-500 text-white"
-								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
-						}`}
-					>
-						Offers
-						{tabUnreadCounts.offers > 0 && (
-							<span
-								className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
-									activeTab === "offers"
-										? "bg-white/25 text-white"
-										: "bg-red-500 text-white dark:bg-red-600"
-								}`}
-							>
-								{tabUnreadCounts.offers > 99 ? "99+" : tabUnreadCounts.offers}
-							</span>
-						)}
-					</button>
+					{showOffersTab && (
+						<button
+							type="button"
+							onClick={() => setActiveTab("offers")}
+							className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
+								activeTab === "offers"
+									? "bg-brand-500 text-white"
+									: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
+							}`}
+						>
+							Offers
+							{tabUnreadCounts.offers > 0 && (
+								<span
+									className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+										activeTab === "offers"
+											? "bg-white/25 text-white"
+											: "bg-red-500 text-white dark:bg-red-600"
+									}`}
+								>
+									{tabUnreadCounts.offers > 99 ? "99+" : tabUnreadCounts.offers}
+								</span>
+							)}
+						</button>
+					)}
 				</div>
 			</div>
 
