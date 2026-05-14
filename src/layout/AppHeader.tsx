@@ -36,6 +36,19 @@ function useTzClock(timeZone: string): string {
 	return formatter.format(now);
 }
 
+function TimeZoneClockCell({ label, time }: { label: string; time: string }) {
+	return (
+		<div className="flex min-w-max shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+			<span className="whitespace-nowrap text-sm font-semibold leading-tight text-gray-600 dark:text-gray-300">
+				{label}
+			</span>
+			<span className="whitespace-nowrap text-sm font-medium tabular-nums leading-tight text-gray-800 dark:text-gray-100">
+				{time}
+			</span>
+		</div>
+	);
+}
+
 const AppHeader: React.FC = () => {
 	const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
 
@@ -121,32 +134,14 @@ const AppHeader: React.FC = () => {
 						/>
 					</Link>
 
-					{/* Time widgets (desktop) */}
-					<div className="hidden xl:flex items-center gap-2 ml-2 max-w-[calc(100vw-540px)] overflow-x-auto">
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">New York (ET)</span>
-							<span className="tabular-nums">{nyTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Algeria</span>
-							<span className="tabular-nums">{dzTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Poland</span>
-							<span className="tabular-nums">{plTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Ukraine</span>
-							<span className="tabular-nums">{uaTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Georgia</span>
-							<span className="tabular-nums">{geTime}</span>
-						</div>
-						<div className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-							<span className="text-gray-500 dark:text-gray-400">Uzbekistan</span>
-							<span className="tabular-nums">{uzTime}</span>
-						</div>
+					{/* Time widgets (desktop): flex-1 + min-w-0 so row can shrink and scroll instead of clipping cells */}
+					<div className="hidden min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-visible py-0.5 [-ms-overflow-style:auto] [scrollbar-gutter:stable] xl:flex xl:ml-2">
+						<TimeZoneClockCell label="New York (ET)" time={nyTime} />
+						<TimeZoneClockCell label="Algeria" time={dzTime} />
+						<TimeZoneClockCell label="Poland" time={plTime} />
+						<TimeZoneClockCell label="Ukraine" time={uaTime} />
+						<TimeZoneClockCell label="Georgia" time={geTime} />
+						<TimeZoneClockCell label="Uzbekistan" time={uzTime} />
 					</div>
 
 					<button
