@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import users from "@/app-api/users";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import { AngleDownIcon, AngleUpIcon } from "@/icons";
@@ -81,6 +81,13 @@ export default function UserListTable() {
 	const totalItems = userList?.data?.data?.pagination?.total_count || 0;
 	const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+	// When filters or sort change the result size, avoid staying on a non-existent page.
+	useEffect(() => {
+		if (totalPages > 0 && currentPage > totalPages) {
+			setCurrentPage(1);
+		}
+	}, [totalPages, currentPage]);
+
 	// Handle column sorting
 	const handleSort = (key: "role" | "location" | "type") => {
 		// Determine new sort order
@@ -96,6 +103,7 @@ export default function UserListTable() {
 
 		// Update sort state
 		setSortState({ [key]: newSortOrder });
+		setCurrentPage(1);
 	};
 
 	const viewerRole = (currentUser?.role || "").trim().toUpperCase();
@@ -172,7 +180,10 @@ export default function UserListTable() {
 					<input
 						type="text"
 						value={searchTerm}
-						onChange={e => setSearchTerm(e.target.value)}
+						onChange={e => {
+							setSearchTerm(e.target.value);
+							setCurrentPage(1);
+						}}
 						placeholder="Search..."
 						className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-11 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[300px]"
 					/>
