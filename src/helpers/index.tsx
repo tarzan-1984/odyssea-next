@@ -2,6 +2,20 @@ import Image from "next/image";
 import { UserData, UserListItem } from "@/app-api/api-types";
 import { twMerge } from "tailwind-merge";
 
+/**
+ * Stable background color for LOAD/OFFER chat avatars when no image is set.
+ * Derived from room id so the same chat always gets the same color.
+ */
+export function chatRoomPlaceholderBg(chatRoomId: string): string {
+	let hash = 2166136261;
+	for (let i = 0; i < chatRoomId.length; i++) {
+		hash ^= chatRoomId.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	const hue = (hash >>> 0) % 360;
+	return `hsl(${hue} 52% 44%)`;
+}
+
 /** Human-readable labels for user roles (used in chat, modals, etc.) */
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
 	DRIVER_UPDATES: "Driver Updates",

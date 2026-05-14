@@ -5,7 +5,7 @@ import Button from "../ui/button/Button";
 import { ChatRoom, chatApi } from "@/app-api/chatApi";
 import { UserListItem } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
-import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel, chatRoomPlaceholderBg } from "@/helpers";
 import usersApi from "@/app-api/users";
 import { useWebSocketChatRooms } from "@/hooks/useWebSocketChatRooms";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -51,8 +51,9 @@ export default function ChatParticipantsModal({
 	const isCurrentUserAdmin = chatRoom?.adminId === currentUser?.id;
 	const isGroupChat = chatRoom?.type === "GROUP";
 	const isLoadChat = chatRoom?.type === "LOAD";
-	
-	// Roles that can manage LOAD chats (add/remove participants, change avatar)
+	const isOfferChat = chatRoom?.type === "OFFER";
+
+	// Roles that can manage LOAD chat participants and picture
 	const loadChatManagerRoles = [
 		'TRACKING_TL',
 		'EXPEDITE_MANAGER', 
@@ -64,9 +65,31 @@ export default function ChatParticipantsModal({
 		'ADMINISTRATOR'
 	];
 	
-	// Check if current user can manage this chat
-	const canManageChat = isGroupChat && isCurrentUserAdmin || 
-		isLoadChat && currentUser?.role && loadChatManagerRoles.includes(currentUser.role);
+	/** Who may change OFFER chat picture only (2-participant room; participant list managed elsewhere). */
+	const offerChatPictureRoles = [
+		'ADMINISTRATOR',
+		'MODERATOR',
+		'RECRUITER',
+		'RECRUITER_TL',
+		'HR_MANAGER',
+		'EXPEDITE_MANAGER',
+		'DISPATCHER',
+		'DISPATCHER_TL',
+	];
+	
+	const userRole = (currentUser?.role || "").trim().toUpperCase();
+
+	// Check if current user can manage this chat (participants + picture for GROUP / LOAD)
+	const canManageChat =
+		(isGroupChat && isCurrentUserAdmin) ||
+		(isLoadChat && !!userRole && loadChatManagerRoles.includes(userRole));
+
+	const canEditChatPicture =
+		canManageChat ||
+		(isOfferChat && !!userRole && offerChatPictureRoles.includes(userRole));
+
+	const showSaveButton =
+		canEditChatPicture && (!!avatarFile || canManageChat);
 
 	const addSectionRef = useRef<HTMLDivElement | null>(null);
 	const addSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -307,18 +330,18 @@ export default function ChatParticipantsModal({
 			className="max-w-[500px] w-full mx-auto p-4 sm:p-6"
 		>
 			<div className="pb-4 pt-16">
-				{/* Chat Avatar Section - Only for manageable chats */}
-				{canManageChat && (
+				{/* Chat picture — GROUP/LOAD (full manage) or OFFER (picture only for allowed roles) */}
+				{canEditChatPicture && (
 					<div className="mb-6">
 						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-							Chat Avatar
+							Chat picture
 						</label>
 						<div className="flex items-center gap-4">
 							<div className="relative group">
 								{avatarPreview ? (
 									<Image
 										src={avatarPreview}
-										alt="Chat avatar preview"
+										alt="Chat picture preview"
 										width={64}
 										height={64}
 										className="w-16 h-16 rounded-full object-cover"
@@ -326,10 +349,18 @@ export default function ChatParticipantsModal({
 								) : chatRoom?.avatar ? (
 									<Image
 										src={chatRoom.avatar}
-										alt="Current chat avatar"
+										alt="Current chat picture"
 										width={64}
 										height={64}
 										className="w-16 h-16 rounded-full object-cover"
+									/>
+								) : (chatRoom?.type === "LOAD" || chatRoom?.type === "OFFER") ? (
+									<div
+										className="h-16 w-16 shrink-0 rounded-full"
+										style={{
+											backgroundColor: chatRoom ? chatRoomPlaceholderBg(chatRoom.id) : "#888",
+										}}
+										aria-hidden
 									/>
 								) : (
 									<div className="w-16 h-16 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-lg font-semibold text-gray-800 dark:text-gray-100">
@@ -349,7 +380,7 @@ export default function ChatParticipantsModal({
 									</svg>
 								</div>
 								<input
-									id="chatAvatar"
+									id="chatPicture"
 									type="file"
 									accept="image/*"
 									onChange={handleAvatarPick}
@@ -358,11 +389,11 @@ export default function ChatParticipantsModal({
 							</div>
 							<div className="flex-1">
 								<p className="text-sm text-gray-500 dark:text-gray-400">
-									Click on the avatar to change it. Supported formats: JPG, PNG, GIF
+									Click on the picture to change it. Supported formats: JPG, PNG, GIF
 								</p>
 								{avatarFile && (
 									<p className="text-xs text-green-600 dark:text-green-400 mt-1">
-										New avatar selected: {avatarFile.name}
+										New picture selected: {avatarFile.name}
 									</p>
 								)}
 							</div>
@@ -564,7 +595,7 @@ export default function ChatParticipantsModal({
 					<Button size="sm" variant="outline" onClick={onClose}>
 						Close
 					</Button>
-			{canManageChat && (
+			{showSaveButton && (
 				<Button size="sm" variant="primary" onClick={handleSave} disabled={isUploadingAvatar || isSaving}>
 					{isSaving ? "Saving..." : "Save"}
 				</Button>

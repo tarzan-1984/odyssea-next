@@ -6,7 +6,7 @@ import Link from "next/link";
 import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon, LoadTrackingChatIcon } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
-import { renderAvatar } from "@/helpers";
+import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
@@ -107,23 +107,54 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								return renderAvatar(null, "w-12 h-12");
 							}
 
-		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
-			const otherParticipant = chatRoom.participants.find(
-				p => p.user.id !== currentUser?.id
-			);
-			if (otherParticipant) {
-				const userData = {
-					firstName: otherParticipant.user.firstName,
-					lastName: otherParticipant.user.lastName,
-					avatar:
-						otherParticipant.user.avatar ||
-						(otherParticipant.user as any).profilePhoto,
-				};
-				return renderAvatar(userData, "w-12 h-12");
-			}
-		}
+							if (chatRoom.type === "OFFER" && chatRoom.avatar) {
+								return (
+									// eslint-disable-next-line @next/next/no-img-element
+									<img
+										src={chatRoom.avatar}
+										alt="avatar"
+										className="w-12 h-12 rounded-full object-cover"
+									/>
+								);
+							}
 
-							// For GROUP/LOAD chats, prefer chat avatar when present
+							if (
+								(chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") &&
+								chatRoom.participants.length === 2
+							) {
+								const otherParticipant = chatRoom.participants.find(
+									p => p.user.id !== currentUser?.id
+								);
+								if (otherParticipant) {
+									const photo =
+										otherParticipant.user.avatar ||
+										(otherParticipant.user as { profilePhoto?: string }).profilePhoto;
+									if (photo) {
+										const userData = {
+											firstName: otherParticipant.user.firstName,
+											lastName: otherParticipant.user.lastName,
+											avatar: photo,
+										};
+										return renderAvatar(userData, "w-12 h-12");
+									}
+									if (chatRoom.type === "OFFER") {
+										return (
+											<div
+												className="h-12 w-12 shrink-0 rounded-full"
+												style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+												aria-hidden
+											/>
+										);
+									}
+									const userData = {
+										firstName: otherParticipant.user.firstName,
+										lastName: otherParticipant.user.lastName,
+										avatar: undefined as string | undefined,
+									};
+									return renderAvatar(userData, "w-12 h-12");
+								}
+							}
+
 							if (
 								(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") &&
 								chatRoom.avatar
@@ -138,8 +169,17 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								);
 							}
 
-							// Fallback for GROUP/LOAD chats without avatar
-							if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
+							if (chatRoom.type === "LOAD") {
+								return (
+									<div
+										className="h-12 w-12 shrink-0 rounded-full"
+										style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+										aria-hidden
+									/>
+								);
+							}
+
+							if (chatRoom.type === "GROUP") {
 								const name = getChatDisplayName();
 								const parts = name.trim().split(/\s+/).filter(Boolean);
 								const initials =
@@ -152,7 +192,16 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								);
 							}
 
-							// Final fallback
+							if (chatRoom.type === "OFFER") {
+								return (
+									<div
+										className="h-12 w-12 shrink-0 rounded-full"
+										style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+										aria-hidden
+									/>
+								);
+							}
+
 							return renderAvatar(null, "w-12 h-12");
 						})()}
 						{chatRoom &&

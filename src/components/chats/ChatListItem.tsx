@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { renderAvatar } from "@/helpers";
+import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -242,8 +242,13 @@ export default function ChatListItem({
 			</div>
 
 			<div className="relative flex-shrink-0">
-				{(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") &&
-				(!chatRoom.avatar || chatRoom.avatar === "") ? (
+				{chatRoom.type === "LOAD" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
+					<div
+						className="h-12 w-12 shrink-0 rounded-full"
+						style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+						aria-hidden
+					/>
+				) : chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
 					<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
 						{(() => {
 							const name = getChatDisplayName(chatRoom);
@@ -255,19 +260,48 @@ export default function ChatListItem({
 						})()}
 					</div>
 				) : (
-					// Use renderAvatar for DIRECT and OFFER chats (other participant)
+					// Use renderAvatar for DIRECT and OFFER chats (other participant), or room avatar image
 					(() => {
+						if (chatRoom.type === "OFFER" && chatRoom.avatar) {
+							return (
+								// eslint-disable-next-line @next/next/no-img-element
+								<img
+									src={chatRoom.avatar}
+									alt="avatar"
+									className="w-12 h-12 rounded-full object-cover"
+								/>
+							);
+						}
+
 						if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 							const otherParticipant = chatRoom.participants.find(
 								p => p.user.id !== currentUser?.id
 							);
 							if (otherParticipant) {
+								const photo =
+									otherParticipant.user.avatar ||
+									(otherParticipant.user as { profilePhoto?: string }).profilePhoto;
+								if (photo) {
+									const userData = {
+										firstName: otherParticipant.user.firstName,
+										lastName: otherParticipant.user.lastName,
+										avatar: photo,
+									};
+									return renderAvatar(userData, "w-12 h-12");
+								}
+								if (chatRoom.type === "OFFER") {
+									return (
+										<div
+											className="h-12 w-12 shrink-0 rounded-full"
+											style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+											aria-hidden
+										/>
+									);
+								}
 								const userData = {
 									firstName: otherParticipant.user.firstName,
 									lastName: otherParticipant.user.lastName,
-									avatar:
-										otherParticipant.user.avatar ||
-										(otherParticipant.user as any).profilePhoto,
+									avatar: undefined as string | undefined,
 								};
 								return renderAvatar(userData, "w-12 h-12");
 							}
@@ -285,7 +319,16 @@ export default function ChatListItem({
 							);
 						}
 
-						// Final fallback - should not happen
+						if (chatRoom.type === "OFFER") {
+							return (
+								<div
+									className="h-12 w-12 shrink-0 rounded-full"
+									style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
+									aria-hidden
+								/>
+							);
+						}
+
 						return renderAvatar(null, "w-12 h-12");
 					})()
 				)}
