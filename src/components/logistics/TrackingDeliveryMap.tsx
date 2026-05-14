@@ -621,6 +621,7 @@ interface DriverData {
 		updatedAt: string | null;
 		externalDriverId?: string | null;
 		driverName?: string | null;
+		placeLabel?: string | null;
 	}[];
 }
 
@@ -779,6 +780,7 @@ export default function TrackingDeliveryMap({
 			updatedAt: null,
 			externalDriverId: null,
 			driverName: null,
+			placeLabel: null,
 		}));
 	}, [driverData?.load_history_details, historyMarkerPositions]);
 
@@ -1219,6 +1221,11 @@ export default function TrackingDeliveryMap({
 										<p className="text-gray-600 dark:text-gray-300">
 											{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
 										</p>
+										{point.placeLabel?.trim() ? (
+											<p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+												{point.placeLabel.trim()}
+											</p>
+										) : null}
 										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
 											Driver:{" "}
 											{point.driverName ||

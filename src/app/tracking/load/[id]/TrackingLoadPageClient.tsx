@@ -77,6 +77,7 @@ type LoadTrackingPoint = {
 	externalDriverId?: string | null;
 	latitude?: number | string | null;
 	longitude?: number | string | null;
+	placeLabel?: string | null;
 	createdAt?: string | null;
 	updatedAt?: string | null;
 };
@@ -311,6 +312,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					updatedAt: point.updatedAt ?? null,
 					externalDriverId,
 					driverName: driverName || null,
+					placeLabel: point.placeLabel?.trim() || null,
 				};
 			})
 			.filter(
@@ -323,6 +325,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					updatedAt: string | null;
 					externalDriverId: string | null;
 					driverName: string | null;
+					placeLabel: string | null;
 				} => point !== null
 			);
 	}, [loadDrivers, sortedTrackingPoints]);
@@ -683,6 +686,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 												<span className="font-medium">Coordinates:</span>{" "}
 												{displayCoords[0].toFixed(6)}, {displayCoords[1].toFixed(6)}
 											</p>
+											{point.placeLabel ? (
+												<p>
+													<span className="font-medium">Place:</span>{" "}
+													{point.placeLabel}
+												</p>
+											) : null}
 											<p>
 												<span className="font-medium">Created:</span>{" "}
 												{formatHistoryDate(point.createdAt)}

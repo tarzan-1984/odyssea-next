@@ -59,7 +59,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 
 	// Handle avatar upload
 	const handleAvatarUpload = async (file: File) => {
-		if (!file || !user?.id) return;
+		if (!file || !user?.id || user.id !== currentUser?.id) return;
 
 		setIsUploading(true);
 		setUploadError(null);
@@ -150,6 +150,8 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 		return (<></>);
 	}
 
+	const canEditOwnAvatar = Boolean(currentUser?.id && user.id === currentUser.id);
+
 	return (
 		<>
 			<div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -157,58 +159,62 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 					<div className="flex flex-col items-center w-full gap-6 xl:flex-row justify-between">
 						<div className="flex flex-col items-center w-full gap-6 xl:flex-row">
 							<div className="flex flex-col items-center gap-3">
-								<form
-									onSubmit={handleSubmit(onSubmit)}
-									className="overflow-hidden relative group rounded-full"
-								>
-									{/* Show preview if file selected, otherwise show current avatar */}
-									{previewUrl ? (
-										<Image
-											src={previewUrl}
-											alt="Preview"
-											width={20}
-											height={20}
-											className="w-20 h-20 rounded-full object-cover"
-										/>
-									) : (
-										user && renderAvatar(user, "w-20 h-20")
-									)}
-
-									<Controller
-										name="upload"
-										control={control}
-										render={({ field }) => (
-											<UploadFile
-												value={field.value}
-												onChange={file => {
-													if (!isUploading) {
-														field.onChange(file);
-														handleFileSelect(file);
-													}
-												}}
-												className={`absolute top-0 left-0 w-full h-full bg-red z-1 hidden group-hover:flex items-center justify-center bg-gray-900/25 cursor-pointer ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
-												allowedTypes={[
-													"image/jpeg",
-													"image/jpg",
-													"image/png",
-													"image/gif",
-													"image/webp",
-												]}
-											>
-												{isUploading ? (
-													<div className="text-white text-xs">
-														Uploading...
-													</div>
-												) : (
-													<Camera size={16} className="text-white" />
-												)}
-											</UploadFile>
+								{canEditOwnAvatar ? (
+									<form
+										onSubmit={handleSubmit(onSubmit)}
+										className="overflow-hidden relative group rounded-full"
+									>
+										{/* Show preview if file selected, otherwise show current avatar */}
+										{previewUrl ? (
+											<Image
+												src={previewUrl}
+												alt="Preview"
+												width={20}
+												height={20}
+												className="w-20 h-20 rounded-full object-cover"
+											/>
+										) : (
+											user && renderAvatar(user, "w-20 h-20")
 										)}
-									/>
-								</form>
+
+										<Controller
+											name="upload"
+											control={control}
+											render={({ field }) => (
+												<UploadFile
+													value={field.value}
+													onChange={file => {
+														if (!isUploading) {
+															field.onChange(file);
+															handleFileSelect(file);
+														}
+													}}
+													className={`absolute top-0 left-0 w-full h-full bg-red z-1 hidden group-hover:flex items-center justify-center bg-gray-900/25 cursor-pointer ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+													allowedTypes={[
+														"image/jpeg",
+														"image/jpg",
+														"image/png",
+														"image/gif",
+														"image/webp",
+													]}
+												>
+													{isUploading ? (
+														<div className="text-white text-xs">
+															Uploading...
+														</div>
+													) : (
+														<Camera size={16} className="text-white" />
+													)}
+												</UploadFile>
+											)}
+										/>
+									</form>
+								) : (
+									<div className="rounded-full">{user && renderAvatar(user, "w-20 h-20")}</div>
+								)}
 
 								{/* Save/Cancel buttons when file is selected */}
-								{selectedFile && !isUploading && (
+								{canEditOwnAvatar && selectedFile && !isUploading && (
 									<div className="flex gap-2">
 										<Button
 											variant="outline"
@@ -237,7 +243,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 								)}
 
 								{/* Error message */}
-								{uploadError && (
+								{canEditOwnAvatar && uploadError && (
 									<div className="text-sm text-red-500 text-center">
 										{uploadError}
 									</div>
