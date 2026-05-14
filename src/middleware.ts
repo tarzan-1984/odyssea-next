@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { tokenEncoder } from "@/utils/tokenEncoder";
-import { canAccessDriversAndOffers } from "@/utils/roleAccess";
+import { canAccessDriversAndOffers, canAccessUserListAndCheckList, getAppHomePath } from "@/utils/roleAccess";
 
 const USER_DATA_COOKIE = "userData";
+
+function getUserRoleFromCookie(request: NextRequest): string | undefined {
+	const userDataCookie = request.cookies.get(USER_DATA_COOKIE)?.value;
+	if (!userDataCookie) return undefined;
+	try {
+		const decoded = tokenEncoder.decode(userDataCookie);
+		const userData = JSON.parse(decoded) as { role?: string };
+		return userData.role;
+	} catch {
+		return undefined;
+	}
+}
 
 // Public pages that don't require authentication
 const publicPages = [
@@ -70,7 +82,8 @@ export function middleware(request: NextRequest) {
 	// If it's a public page and user is authenticated, redirect to app home
 	// Exception: tracking, test, privacy-policy are accessible to everyone
 	if (isPublicPage && hasToken && !isTrackingPage && !isTestPage && !isPrivacyPolicyPage) {
-		return NextResponse.redirect(new URL("/user-list", request.url));
+		const role = getUserRoleFromCookie(request);
+		return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 	}
 
 	// These pages are always accessible (no redirect needed)
@@ -88,20 +101,9 @@ export function middleware(request: NextRequest) {
 		pathname === "/drivers-list" || pathname.startsWith("/drivers-list/") ||
 		pathname === "/offers" || pathname.startsWith("/offers/");
 	if (isDriversOrOffersPage && hasToken) {
-		const userDataCookie = request.cookies.get(USER_DATA_COOKIE)?.value;
-		if (userDataCookie) {
-			try {
-				const decoded = tokenEncoder.decode(userDataCookie);
-				const userData = JSON.parse(decoded) as { role?: string };
-				if (!canAccessDriversAndOffers(userData.role)) {
-					return NextResponse.redirect(new URL("/user-list", request.url));
-				}
-			} catch {
-				// If we can't decode user data, deny access to these pages
-				return NextResponse.redirect(new URL("/user-list", request.url));
-			}
-		} else {
-			return NextResponse.redirect(new URL("/user-list", request.url));
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessDriversAndOffers(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}
 
@@ -109,20 +111,22 @@ export function middleware(request: NextRequest) {
 	const isAppSettingsPage =
 		pathname === "/app-settings" || pathname.startsWith("/app-settings/");
 	if (isAppSettingsPage && hasToken) {
-		const userDataCookie = request.cookies.get(USER_DATA_COOKIE)?.value;
-		if (userDataCookie) {
-			try {
-				const decoded = tokenEncoder.decode(userDataCookie);
-				const userData = JSON.parse(decoded) as { role?: string };
-				const role = (userData.role || "").trim().toUpperCase();
-				if (role !== "ADMINISTRATOR") {
-					return NextResponse.redirect(new URL("/user-list", request.url));
-				}
-			} catch {
-				return NextResponse.redirect(new URL("/user-list", request.url));
-			}
-		} else {
-			return NextResponse.redirect(new URL("/user-list", request.url));
+		const role = getUserRoleFromCookie(request);
+		if ((role || "").trim().toUpperCase() !== "ADMINISTRATOR") {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+	}
+
+	const isUserListOrCheckListPage =
+		pathname === "/user-list" ||
+		pathname.startsWith("/user-list/") ||
+		pathname === "/check-list" ||
+		pathname.startsWith("/check-list/") ||
+		pathname.startsWith("/users/");
+	if (isUserListOrCheckListPage && hasToken) {
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessUserListAndCheckList(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}
 

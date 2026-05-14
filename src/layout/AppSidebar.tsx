@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { clientAuth } from "@/utils/auth";
-import { canAccessDriversAndOffers } from "@/utils/roleAccess";
+import { canAccessDriversAndOffers, canAccessUserListAndCheckList, getAppHomePath } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
 import authentication from "@/app-api/authentication";
 import {
@@ -255,6 +255,7 @@ const supportItems: NavItem[] = [
 ];
 
 const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
+const USER_LIST_CHECK_LIST_PATHS = ["/user-list", "/check-list"];
 
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -263,12 +264,17 @@ const AppSidebar: React.FC = () => {
 	const currentUser = useCurrentUser();
 	const isAdmin = (currentUser?.role || "").trim().toUpperCase() === "ADMINISTRATOR";
 	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
+	const canSeeUserListCheckList = canAccessUserListAndCheckList(currentUser?.role);
+	const appHomePath = getAppHomePath(currentUser?.role);
 	const menuNavItems = navItems.filter(
-		(item) =>
+		item =>
 			(!item.adminOnly || isAdmin) &&
 			(!item.path ||
 				!DRIVERS_OFFERS_PATHS.includes(item.path) ||
-				canAccessDriversOffers)
+				canAccessDriversOffers) &&
+			(!item.path ||
+				!USER_LIST_CHECK_LIST_PATHS.includes(item.path) ||
+				canSeeUserListCheckList),
 	);
 
 	const handleSignOut = async () => {
@@ -527,7 +533,7 @@ const AppSidebar: React.FC = () => {
 					!isExpanded && !isHovered ? "xl:justify-center" : "justify-start"
 				}`}
 			>
-				<Link href="/user-list">
+				<Link href={appHomePath}>
 					{isExpanded || isHovered || isMobileOpen ? (
 						<>
 							{/*<Image*/}

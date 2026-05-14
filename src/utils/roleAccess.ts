@@ -33,3 +33,25 @@ export function canViewRestrictedDriverStatusesOnMap(role: string | undefined | 
 	const normalized = role.trim().toUpperCase();
 	return (DRIVERS_MAP_RESTRICTED_STATUS_VIEWER_ROLES as readonly string[]).includes(normalized);
 }
+
+/** User List + Check list sidebar and routes: admin, moderator, HR (recruiter family). */
+export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
+	"ADMINISTRATOR",
+	"MODERATOR",
+	"RECRUITER",
+	"RECRUITER_TL",
+	"HR_MANAGER",
+] as const;
+
+export function canAccessUserListAndCheckList(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
+}
+
+/** Default in-app landing path after login / generic "home" redirects. */
+export function getAppHomePath(role: string | undefined | null): string {
+	if (canAccessUserListAndCheckList(role)) return "/user-list";
+	if (canAccessDriversAndOffers(role)) return "/drivers-list";
+	return "/chat";
+}

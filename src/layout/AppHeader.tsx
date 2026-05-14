@@ -7,6 +7,8 @@ import { useSidebar } from "@/context/SidebarContext";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
+import { getAppHomePath } from "@/utils/roleAccess";
+import { useCurrentUser } from "@/stores/userStore";
 
 function useTzClock(timeZone: string): string {
 	const [now, setNow] = useState<Date | null>(null);
@@ -51,6 +53,8 @@ function TimeZoneClockCell({ label, time }: { label: string; time: string }) {
 
 const AppHeader: React.FC = () => {
 	const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
+	const currentUser = useCurrentUser();
+	const mobileLogoHref = getAppHomePath(currentUser?.role);
 
 	const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 	const nyTime = useTzClock("America/New_York");
@@ -117,7 +121,7 @@ const AppHeader: React.FC = () => {
 						{/* Cross Icon */}
 					</button>
 
-					<Link href="/user-list" className="xl:hidden">
+					<Link href={mobileLogoHref} className="xl:hidden">
 						<Image
 							width={154}
 							height={32}

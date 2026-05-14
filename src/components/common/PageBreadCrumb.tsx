@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import React from "react";
+import { useCurrentUser } from "@/stores/userStore";
+import { getAppHomePath } from "@/utils/roleAccess";
 
 interface BreadcrumbProps {
 	pageTitle: string;
@@ -7,6 +11,9 @@ interface BreadcrumbProps {
 }
 
 const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle, actions }) => {
+	const currentUser = useCurrentUser();
+	const homeHref = getAppHomePath(currentUser?.role);
+
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3 mb-6">
 			<div className="flex items-center gap-4">
@@ -23,7 +30,7 @@ const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle, actions }) => {
 					<li>
 						<Link
 							className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
-							href="/user-list"
+							href={homeHref}
 						>
 							Home
 							<svg
