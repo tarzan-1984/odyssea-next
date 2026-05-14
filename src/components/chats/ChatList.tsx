@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
-import { MoreDotIcon, SoundOffIcon, UnreadIcon, PushPinIcon, ChevronDownIcon, ChevronUpIcon } from "@/icons";
+import { SoundOffIcon, UnreadIcon, PushPinIcon, ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import ChatListItem from "./ChatListItem";
 import { useChatModal } from "@/context/ChatModalContext";
@@ -381,10 +381,11 @@ export default function ChatList({
 					<div>
 						<button
 							ref={headerDropdownAnchorRef}
-							className="dropdown-toggle d-block"
+							type="button"
+							className="dropdown-toggle text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
 							onClick={toggleDropdownTwo}
 						>
-							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+							Add chat
 						</button>
 						<Dropdown
 							isOpen={isOpenTwo}
