@@ -13,7 +13,8 @@ export function chatRoomPlaceholderBg(chatRoomId: string): string {
 		hash = Math.imul(hash, 16777619);
 	}
 	const hue = (hash >>> 0) % 360;
-	return `hsl(${hue} 52% 44%)`;
+	// Saturated, mid–high lightness so placeholders read as bright, not dark
+	return `hsl(${hue} 78% 62%)`;
 }
 
 /** Human-readable labels for user roles (used in chat, modals, etc.) */
