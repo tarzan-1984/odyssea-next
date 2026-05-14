@@ -160,7 +160,7 @@ export default function OtpForm() {
 					if (typeof window !== "undefined") {
 						window.location.href = "/";
 					} else {
-						router.push("/");
+						router.push("/user-list");
 					}
 				} else {
 					setMessage({

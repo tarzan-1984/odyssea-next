@@ -67,10 +67,10 @@ export function middleware(request: NextRequest) {
 	const isTestPage = pathname.startsWith("/test");
 	const isPrivacyPolicyPage = pathname.startsWith("/privacy-policy");
 
-	// If it's a public page and user is authenticated, redirect to admin dashboard
+	// If it's a public page and user is authenticated, redirect to app home
 	// Exception: tracking, test, privacy-policy are accessible to everyone
 	if (isPublicPage && hasToken && !isTrackingPage && !isTestPage && !isPrivacyPolicyPage) {
-		return NextResponse.redirect(new URL("/", request.url));
+		return NextResponse.redirect(new URL("/user-list", request.url));
 	}
 
 	// These pages are always accessible (no redirect needed)
@@ -94,14 +94,14 @@ export function middleware(request: NextRequest) {
 				const decoded = tokenEncoder.decode(userDataCookie);
 				const userData = JSON.parse(decoded) as { role?: string };
 				if (!canAccessDriversAndOffers(userData.role)) {
-					return NextResponse.redirect(new URL("/", request.url));
+					return NextResponse.redirect(new URL("/user-list", request.url));
 				}
 			} catch {
 				// If we can't decode user data, deny access to these pages
-				return NextResponse.redirect(new URL("/", request.url));
+				return NextResponse.redirect(new URL("/user-list", request.url));
 			}
 		} else {
-			return NextResponse.redirect(new URL("/", request.url));
+			return NextResponse.redirect(new URL("/user-list", request.url));
 		}
 	}
 
@@ -116,13 +116,13 @@ export function middleware(request: NextRequest) {
 				const userData = JSON.parse(decoded) as { role?: string };
 				const role = (userData.role || "").trim().toUpperCase();
 				if (role !== "ADMINISTRATOR") {
-					return NextResponse.redirect(new URL("/", request.url));
+					return NextResponse.redirect(new URL("/user-list", request.url));
 				}
 			} catch {
-				return NextResponse.redirect(new URL("/", request.url));
+				return NextResponse.redirect(new URL("/user-list", request.url));
 			}
 		} else {
-			return NextResponse.redirect(new URL("/", request.url));
+			return NextResponse.redirect(new URL("/user-list", request.url));
 		}
 	}
 

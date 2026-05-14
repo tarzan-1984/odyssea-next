@@ -11,7 +11,6 @@ import authentication from "@/app-api/authentication";
 import {
 	BoxCubeIcon,
 	ChevronDownIcon,
-	GridIcon,
 	HorizontaLDots,
 	PieChartIcon,
 	PlugInIcon,
@@ -23,7 +22,7 @@ import {
 	CheckListIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
-import { Search, Weight, Users, BellRing, LogOut, MessageCircle } from "lucide-react";
+import { Users, LogOut, MessageCircle } from "lucide-react";
 import { UnreadCountBadge } from "@/components/common/UnreadCountBadge";
 
 type NavItem = {
@@ -37,21 +36,6 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-	{
-		icon: <GridIcon />,
-		name: "Dashboard",
-		path: "/",
-	},
-	{
-		icon: <Search />,
-		name: "Search Loads",
-		path: "/search-loads",
-	},
-	{
-		icon: <Weight />,
-		name: "My Loads",
-		path: "/my-loads",
-	},
 	{
 		icon: <Users />,
 		name: "User List",
@@ -543,7 +527,7 @@ const AppSidebar: React.FC = () => {
 					!isExpanded && !isHovered ? "xl:justify-center" : "justify-start"
 				}`}
 			>
-				<Link href="/">
+				<Link href="/user-list">
 					{isExpanded || isHovered || isMobileOpen ? (
 						<>
 							{/*<Image*/}
