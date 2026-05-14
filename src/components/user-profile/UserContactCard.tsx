@@ -104,7 +104,6 @@ export default function UserContactCard({user}: IUserContactCardProp) {
 		contactFields = [
 			{ label: "Phone", value: user?.organized_data?.contact.driver_phone },
 			{ label: "Email", value: user?.email },
-			{ label: "Home Location", value: user?.location}
 		];
 	}
 
