@@ -103,7 +103,7 @@ export default function ChatBoxSendForm({
 			return;
 		}
 		e.preventDefault();
-		void handleSendMessage();
+		handleSendMessage();
 	};
 
 	const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
