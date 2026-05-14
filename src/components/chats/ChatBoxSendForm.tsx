@@ -39,8 +39,20 @@ export default function ChatBoxSendForm({
 	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const TEXTAREA_MIN_PX = 36;
+	const TEXTAREA_MAX_PX = 120;
+
+	const adjustTextareaHeight = () => {
+		const el = textareaRef.current;
+		if (!el) {
+			return;
+		}
+		el.style.height = "auto";
+		el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_PX), TEXTAREA_MAX_PX)}px`;
+	};
 
 	const handleSendMessage = async () => {
 		if (!message.trim() && !attachedFile) return;
@@ -73,7 +85,8 @@ export default function ChatBoxSendForm({
 
 			// Focus back to input after sending message
 			requestAnimationFrame(() => {
-				inputRef.current?.focus();
+				textareaRef.current?.focus();
+				adjustTextareaHeight();
 			});
 		} catch (error) {
 			console.error("Failed to send message:", error);
@@ -82,14 +95,18 @@ export default function ChatBoxSendForm({
 		}
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleSendMessage();
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (e.key !== "Enter" || e.shiftKey) {
+			return;
 		}
+		if (e.nativeEvent.isComposing) {
+			return;
+		}
+		e.preventDefault();
+		void handleSendMessage();
 	};
 
-	const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		const value = e.target.value;
 		setMessage(value);
 
@@ -162,7 +179,8 @@ export default function ChatBoxSendForm({
 		setMessage(prev => prev + emoji);
 		// Focus back to input after emoji selection
 		requestAnimationFrame(() => {
-			inputRef.current?.focus();
+			textareaRef.current?.focus();
+			adjustTextareaHeight();
 		});
 	};
 
@@ -190,6 +208,10 @@ export default function ChatBoxSendForm({
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, [showEmojiPicker]);
+
+	useEffect(() => {
+		adjustTextareaHeight();
+	}, [message]);
 
 	const removeAttachedFile = () => {
 		setAttachedFile(null);
@@ -268,18 +290,18 @@ export default function ChatBoxSendForm({
 			)}
 
 			<form
-				className="flex items-center justify-between"
+				className="flex items-end justify-between gap-2"
 				onSubmit={e => {
 					e.preventDefault();
 					handleSendMessage();
 				}}
 			>
-				<div className="relative w-full">
+				<div className="relative w-full min-w-0">
 					<button
 						ref={emojiButtonRef}
 						type="button"
 						onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-						className="absolute text-gray-500 -translate-y-1/2 left-1 top-1/2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3"
+						className="absolute text-gray-500 left-1 top-2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3 z-10"
 					>
 						<svg
 							className="fill-current"
@@ -306,19 +328,19 @@ export default function ChatBoxSendForm({
 						onEmojiSelect={handleEmojiSelect}
 					/>
 
-					<input
-						ref={inputRef}
-						type="text"
+					<textarea
+						ref={textareaRef}
 						placeholder="Type a message"
+						rows={1}
 						value={message}
 						onChange={handleMessageChange}
 						onKeyDown={handleKeyDown}
 						disabled={disabled || isSending}
-						className="w-full pl-12 pr-5 text-sm text-gray-800 bg-transparent border-none outline-hidden h-9 placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50"
+						className="w-full min-h-9 max-h-[7.5rem] py-2 pl-12 pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto"
 					/>
 				</div>
 
-				<div className="flex items-center">
+				<div className="flex flex-shrink-0 items-center pb-0.5">
 					{/* File attachment button */}
 					<button
 						type="button"

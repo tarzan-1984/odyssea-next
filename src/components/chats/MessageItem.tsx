@@ -185,7 +185,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 							{message.replyData && (
 								<MessageReply replyData={message.replyData} />
 							)}
-							<p className="text-sm">{message.content}</p>
+							<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
 						</div>
 						{/* Message dropdown */}
 						<MessageDropdown
