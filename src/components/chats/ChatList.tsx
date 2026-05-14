@@ -382,7 +382,7 @@ export default function ChatList({
 						<button
 							ref={headerDropdownAnchorRef}
 							type="button"
-							className="dropdown-toggle text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+							className="dropdown-toggle text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
 							onClick={toggleDropdownTwo}
 						>
 							Add chat
