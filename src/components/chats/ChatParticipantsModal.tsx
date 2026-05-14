@@ -53,7 +53,7 @@ export default function ChatParticipantsModal({
 	const isLoadChat = chatRoom?.type === "LOAD";
 	const isOfferChat = chatRoom?.type === "OFFER";
 
-	// Roles that can manage LOAD chat participants and picture
+	// Roles that can manage LOAD chat participants (not chat picture — see below)
 	const loadChatManagerRoles = [
 		'TRACKING_TL',
 		'EXPEDITE_MANAGER', 
@@ -65,7 +65,7 @@ export default function ChatParticipantsModal({
 		'ADMINISTRATOR'
 	];
 	
-	/** Who may change OFFER chat picture only (2-participant room; participant list managed elsewhere). */
+	/** Who may see the OFFER chat picture block (view; upload restricted separately). */
 	const offerChatPictureRoles = [
 		'ADMINISTRATOR',
 		'MODERATOR',
@@ -78,18 +78,33 @@ export default function ChatParticipantsModal({
 	];
 	
 	const userRole = (currentUser?.role || "").trim().toUpperCase();
+	const isAdminOrModerator = userRole === "ADMINISTRATOR" || userRole === "MODERATOR";
 
-	// Check if current user can manage this chat (participants + picture for GROUP / LOAD)
+	// GROUP: admin manages participants; LOAD: managers + moderator may open settings
 	const canManageChat =
 		(isGroupChat && isCurrentUserAdmin) ||
 		(isLoadChat && !!userRole && loadChatManagerRoles.includes(userRole));
 
-	const canEditChatPicture =
-		canManageChat ||
+	/** Who sees "Chat picture" (LOAD/OFFER: view-only for most roles). */
+	const canSeeChatPictureSection =
+		(isGroupChat && isCurrentUserAdmin) ||
+		(isLoadChat &&
+			!!userRole &&
+			(loadChatManagerRoles.includes(userRole) || userRole === "MODERATOR")) ||
 		(isOfferChat && !!userRole && offerChatPictureRoles.includes(userRole));
 
+	/**
+	 * Who may upload/replace chat picture: GROUP admin unchanged;
+	 * for LOAD and OFFER only ADMINISTRATOR and MODERATOR.
+	 */
+	const canUploadChatPicture =
+		(isGroupChat && isCurrentUserAdmin) ||
+		((isLoadChat || isOfferChat) && isAdminOrModerator);
+
+	const hasParticipantChanges = addedUserIds.length > 0 || removedUserIds.length > 0;
+
 	const showSaveButton =
-		canEditChatPicture && (!!avatarFile || canManageChat);
+		(canUploadChatPicture && !!avatarFile) || (canManageChat && hasParticipantChanges);
 
 	const addSectionRef = useRef<HTMLDivElement | null>(null);
 	const addSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -330,14 +345,14 @@ export default function ChatParticipantsModal({
 			className="max-w-[500px] w-full mx-auto p-4 sm:p-6"
 		>
 			<div className="pb-4 pt-16">
-				{/* Chat picture — GROUP/LOAD (full manage) or OFFER (picture only for allowed roles) */}
-				{canEditChatPicture && (
+				{/* Chat picture — GROUP admin; LOAD/OFFER: view for managers/recruiters etc., upload only ADMIN/MODERATOR */}
+				{canSeeChatPictureSection && (
 					<div className="mb-6">
 						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
 							Chat picture
 						</label>
 						<div className="flex items-center gap-4">
-							<div className="relative group">
+							<div className={`relative group ${canUploadChatPicture ? "" : "cursor-default"}`}>
 								{avatarPreview ? (
 									<Image
 										src={avatarPreview}
@@ -372,24 +387,31 @@ export default function ChatParticipantsModal({
 										})()}
 									</div>
 								)}
-								{/* Overlay with camera icon on hover */}
-								<div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-									<svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-									</svg>
-								</div>
-								<input
-									id="chatPicture"
-									type="file"
-									accept="image/*"
-									onChange={handleAvatarPick}
-									className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-								/>
+								{canUploadChatPicture && (
+									<>
+										<div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+											<svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+											</svg>
+										</div>
+										<input
+											id="chatPicture"
+											type="file"
+											accept="image/*"
+											onChange={handleAvatarPick}
+											className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+										/>
+									</>
+								)}
 							</div>
 							<div className="flex-1">
 								<p className="text-sm text-gray-500 dark:text-gray-400">
-									Click on the picture to change it. Supported formats: JPG, PNG, GIF
+									{canUploadChatPicture
+										? "Click on the picture to change it. Supported formats: JPG, PNG, GIF"
+										: (isLoadChat || isOfferChat)
+											? "Only Administrators and Moderators can change the chat picture."
+											: ""}
 								</p>
 								{avatarFile && (
 									<p className="text-xs text-green-600 dark:text-green-400 mt-1">
