@@ -4,6 +4,7 @@ import {
 	CdlIcon,
 	Change9Icon,
 	HazmatIcon,
+	Hazmat2Icon,
 	TsaIcon,
 	TwicIcon,
 	TankerEndorsement,
@@ -20,6 +21,7 @@ import {
 	Printer,
 	Sleeper,
 	TeamIcon,
+	WorldMapIcon,
 } from "@/icons";
 import macroPointIcon from "@/icons/additional/macropoint.png";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
@@ -35,9 +37,26 @@ export interface CapabilityOption {
 
 export const CAPABILITIES_OPTIONS: CapabilityOption[] = [
 	{ value: "cdl", text: "CDL", selected: false, icon: <CdlIcon className="h-4 w-4" /> },
-	{ value: "hazmat", text: "Hazmat", selected: false, icon: <HazmatIcon className="h-4 w-4" /> },
+	{
+		value: "hazmat_certificate",
+		text: "Hazmat Certificate",
+		selected: false,
+		icon: <HazmatIcon className="h-4 w-4" />,
+	},
+	{
+		value: "hazmat_endorsement",
+		text: "Hazmat Endorsement",
+		selected: false,
+		icon: <Hazmat2Icon className="h-4 w-4" />,
+	},
 	{ value: "tsa", text: "TSA", selected: false, icon: <TsaIcon className="h-4 w-4" /> },
 	{ value: "twic", text: "TWIC", selected: false, icon: <TwicIcon className="h-4 w-4" /> },
+	{
+		value: "global_entry",
+		text: "Global Entry",
+		selected: false,
+		icon: <WorldMapIcon className="h-4 w-4" />,
+	},
 	{
 		value: "tanker-endorsement",
 		text: "Tanker endorsement",
