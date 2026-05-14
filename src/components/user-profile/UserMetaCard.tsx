@@ -29,6 +29,11 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null);
+
+	useEffect(() => {
+		setLocalAvatarUrl(null);
+	}, [user?.id]);
 
 	// Cleanup preview URL on component unmount
 	useEffect(() => {
@@ -57,9 +62,14 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 		}
 	};
 
+	const isAdministrator =
+		(currentUser?.role || "").trim().toUpperCase() === "ADMINISTRATOR";
+	const isOwnProfile = Boolean(currentUser?.id && user?.id === currentUser.id);
+	const canEditAvatar = isOwnProfile || isAdministrator;
+
 	// Handle avatar upload
 	const handleAvatarUpload = async (file: File) => {
-		if (!file || !user?.id || user.id !== currentUser?.id) return;
+		if (!file || !user?.id || !canEditAvatar) return;
 
 		setIsUploading(true);
 		setUploadError(null);
@@ -74,14 +84,19 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 			const { fileUrl } = await uploader.upload(new File([file], fileName, { type: file.type }));
 
 			// Step 2: Update user profile with new avatar URL
+			const payload: { avatarUrl: string; targetUserId?: string } = {
+				avatarUrl: fileUrl,
+			};
+			if (user.id !== currentUser?.id) {
+				payload.targetUserId = user.id;
+			}
+
 			const updateResponse = await fetch("/api/users/update-avatar", {
 				method: "PUT",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					avatarUrl: fileUrl,
-				}),
+				body: JSON.stringify(payload),
 			});
 
 			const updateData = await updateResponse.json();
@@ -90,26 +105,26 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 				throw new Error(updateData.error || "Failed to update avatar");
 			}
 
-			if(user.id === currentUser?.id) {
+			if (user.id === currentUser?.id) {
 				// Step 3: Update local state (Zustand)
 				updateUserField("avatar", fileUrl);
 
 				// Step 4: Update cookies with new avatar URL
-				if (user) {
-					const updatedUserData = {
-						id: user.id,
-						email: user.email || "",
-						firstName: user.firstName,
-						lastName: user.lastName,
-						role: user.role || "",
-						status: user.status || "",
-						avatar: fileUrl, // Update avatar in cookies
-						externalId: user.externalId || "",
-						phone: user.phone || "",
-						location: user.location || "",
-					};
-					clientAuth.setUserData(updatedUserData);
-				}
+				const updatedUserData = {
+					id: user.id,
+					email: user.email || "",
+					firstName: user.firstName,
+					lastName: user.lastName,
+					role: user.role || "",
+					status: user.status || "",
+					avatar: fileUrl,
+					externalId: user.externalId || "",
+					phone: user.phone || "",
+					location: user.location || "",
+				};
+				clientAuth.setUserData(updatedUserData);
+			} else {
+				setLocalAvatarUrl(fileUrl);
 			}
 
 			// Step 5: Clear preview and selected file
@@ -150,7 +165,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 		return (<></>);
 	}
 
-	const canEditOwnAvatar = Boolean(currentUser?.id && user.id === currentUser.id);
+	const userForAvatar = localAvatarUrl ? { ...user, avatar: localAvatarUrl } : user;
 
 	return (
 		<>
@@ -159,7 +174,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 					<div className="flex flex-col items-center w-full gap-6 xl:flex-row justify-between">
 						<div className="flex flex-col items-center w-full gap-6 xl:flex-row">
 							<div className="flex flex-col items-center gap-3">
-								{canEditOwnAvatar ? (
+								{canEditAvatar ? (
 									<form
 										onSubmit={handleSubmit(onSubmit)}
 										className="overflow-hidden relative group rounded-full"
@@ -174,7 +189,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 												className="w-20 h-20 rounded-full object-cover"
 											/>
 										) : (
-											user && renderAvatar(user, "w-20 h-20")
+											renderAvatar(userForAvatar, "w-20 h-20")
 										)}
 
 										<Controller
@@ -210,11 +225,11 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 										/>
 									</form>
 								) : (
-									<div className="rounded-full">{user && renderAvatar(user, "w-20 h-20")}</div>
+									<div className="rounded-full">{renderAvatar(userForAvatar, "w-20 h-20")}</div>
 								)}
 
 								{/* Save/Cancel buttons when file is selected */}
-								{canEditOwnAvatar && selectedFile && !isUploading && (
+								{canEditAvatar && selectedFile && !isUploading && (
 									<div className="flex gap-2">
 										<Button
 											variant="outline"
@@ -243,7 +258,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 								)}
 
 								{/* Error message */}
-								{canEditOwnAvatar && uploadError && (
+								{canEditAvatar && uploadError && (
 									<div className="text-sm text-red-500 text-center">
 										{uploadError}
 									</div>

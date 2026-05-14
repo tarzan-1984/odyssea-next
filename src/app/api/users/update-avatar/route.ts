@@ -16,15 +16,24 @@ export async function PUT(request: NextRequest) {
 		}
 
 		const body = await request.json();
-		const { avatarUrl } = body;
+		const { avatarUrl, targetUserId } = body;
 
 		if (!avatarUrl) {
 			return NextResponse.json({ error: "Avatar URL is required" }, { status: 400 });
 		}
 
+		let backendUserId = userData.id;
+		if (targetUserId && targetUserId !== userData.id) {
+			const role = (userData.role || "").trim().toUpperCase();
+			if (role !== "ADMINISTRATOR") {
+				return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+			}
+			backendUserId = targetUserId;
+		}
+
 		// Send request to backend to update user avatar
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/${userData.id}`,
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/${backendUserId}`,
 			{
 				method: "PUT",
 				headers: {
