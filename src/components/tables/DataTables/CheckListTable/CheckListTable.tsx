@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
@@ -80,7 +80,9 @@ export default function CheckListTable() {
 	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [lastLocationSort, setLastLocationSort] =
 		useState<CheckListLastLocationSort>("asc");
-	const [pushDriver, setPushDriver] = useState<CheckListDriver | null>(null);
+	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
+	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
+	const selectAllPageRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
@@ -90,6 +92,10 @@ export default function CheckListTable() {
 	useEffect(() => {
 		setCurrentPage(1);
 	}, [debouncedSearch]);
+
+	useEffect(() => {
+		setSelectedDriverIds(new Set());
+	}, [currentPage, itemsPerPage, statusFilter, debouncedSearch, lastLocationSort]);
 
 	const query = useQuery({
 		queryKey: [
@@ -122,6 +128,51 @@ export default function CheckListTable() {
 	const totalItems = query.data?.pagination?.total_count ?? 0;
 	const totalPages = query.data?.pagination?.total_pages ?? 0;
 
+	useEffect(() => {
+		const allowed = new Set(drivers.map(d => d.id));
+		setSelectedDriverIds(prev => {
+			if (prev.size === 0) return prev;
+			const next = new Set([...prev].filter(id => allowed.has(id)));
+			return next.size === prev.size ? prev : next;
+		});
+	}, [drivers]);
+
+	const allPageSelected =
+		drivers.length > 0 && drivers.every(d => selectedDriverIds.has(d.id));
+	const somePageSelected = drivers.some(d => selectedDriverIds.has(d.id));
+
+	useEffect(() => {
+		const el = selectAllPageRef.current;
+		if (el) {
+			el.indeterminate = somePageSelected && !allPageSelected;
+		}
+	}, [somePageSelected, allPageSelected, drivers]);
+
+	const toggleSelectAllOnPage = () => {
+		if (allPageSelected) {
+			setSelectedDriverIds(prev => {
+				const next = new Set(prev);
+				drivers.forEach(d => next.delete(d.id));
+				return next;
+			});
+		} else {
+			setSelectedDriverIds(prev => {
+				const next = new Set(prev);
+				drivers.forEach(d => next.add(d.id));
+				return next;
+			});
+		}
+	};
+
+	const toggleRowSelected = (id: string, checked: boolean) => {
+		setSelectedDriverIds(prev => {
+			const next = new Set(prev);
+			if (checked) next.add(id);
+			else next.delete(id);
+			return next;
+		});
+	};
+
 	const toggleLastLocationSort = () => {
 		setLastLocationSort((prev) => (prev === "asc" ? "desc" : "asc"));
 		setCurrentPage(1);
@@ -147,14 +198,32 @@ export default function CheckListTable() {
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
-				<div className="w-full min-w-0 lg:flex-1 lg:max-w-xl lg:px-2">
-					<Input
-						type="text"
-						placeholder="Search by name, driver ID, email, load ID…"
-						value={searchInput}
-						onChange={e => setSearchInput(e.target.value)}
-						className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
-					/>
+				<div className="flex w-full min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
+					<div className="min-w-0 flex-1 lg:max-w-xl lg:px-2">
+						<Input
+							type="text"
+							placeholder="Search by name, driver ID, email, load ID…"
+							value={searchInput}
+							onChange={e => setSearchInput(e.target.value)}
+							className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
+						/>
+					</div>
+					{selectedDriverIds.size > 0 && (
+						<Button
+							type="button"
+							size="sm"
+							variant="primary"
+							className="h-10 shrink-0 whitespace-nowrap"
+							onClick={() => {
+								const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+								if (selected.length > 0) {
+									setPushModalDrivers(selected);
+								}
+							}}
+						>
+							Send push
+						</Button>
+					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-2 shrink-0 lg:justify-end">
 					<span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -182,6 +251,22 @@ export default function CheckListTable() {
 					<Table>
 						<TableHeader className="border-b border-gray-100 bg-gray-50 text-gray-700 dark:border-white/[0.05] dark:bg-gray-900 dark:text-gray-300">
 							<TableRow>
+								<TableCell
+									isHeader
+									className="w-12 px-3 py-3 sm:px-4"
+									aria-label="Select rows"
+								>
+									<input
+										ref={selectAllPageRef}
+										type="checkbox"
+										className="h-4 w-4 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+										checked={allPageSelected}
+										onChange={toggleSelectAllOnPage}
+										disabled={drivers.length === 0 || query.isPending}
+										title="Select all on this page"
+										aria-label="Select all drivers on this page"
+									/>
+								</TableCell>
 								<TableCell
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
@@ -252,7 +337,7 @@ export default function CheckListTable() {
 						<TableBody className="text-sm divide-y divide-gray-100 dark:divide-white/[0.05]">
 							{query.isError && (
 								<TableRow>
-									<TableCell colSpan={6} className="px-5 py-8 text-center text-red-500">
+									<TableCell colSpan={7} className="px-5 py-8 text-center text-red-500">
 										{(query.error as Error)?.message || "Failed to load check list"}
 									</TableCell>
 								</TableRow>
@@ -260,7 +345,7 @@ export default function CheckListTable() {
 							{!query.isError && !query.isPending && drivers.length === 0 && (
 								<TableRow>
 									<TableCell
-										colSpan={6}
+										colSpan={7}
 										className="px-5 py-8 text-center text-gray-500 dark:text-gray-400"
 									>
 										No drivers match the criteria
@@ -269,6 +354,15 @@ export default function CheckListTable() {
 							)}
 							{drivers.map(row => (
 								<TableRow key={row.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+									<TableCell className="px-3 py-3 sm:px-4 align-middle">
+										<input
+											type="checkbox"
+											className="h-4 w-4 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+											checked={selectedDriverIds.has(row.id)}
+											onChange={e => toggleRowSelected(row.id, e.target.checked)}
+											aria-label={`Select ${`${row.firstName} ${row.lastName}`.trim() || "driver"}`}
+										/>
+									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 whitespace-nowrap font-mono text-xs">
 										{row.driverStatus ?? "—"}
 									</TableCell>
@@ -317,7 +411,7 @@ export default function CheckListTable() {
 											variant="primary"
 											type="button"
 											className="h-9"
-											onClick={() => setPushDriver(row)}
+											onClick={() => setPushModalDrivers([row])}
 										>
 											Send push
 										</Button>
@@ -358,9 +452,9 @@ export default function CheckListTable() {
 				</div>
 			)}
 			<CheckListPushModal
-				isOpen={pushDriver !== null}
-				onClose={() => setPushDriver(null)}
-				driver={pushDriver}
+				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
+				onClose={() => setPushModalDrivers(null)}
+				drivers={pushModalDrivers}
 			/>
 		</div>
 	);

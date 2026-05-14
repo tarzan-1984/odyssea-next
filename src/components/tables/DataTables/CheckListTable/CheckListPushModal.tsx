@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, useMemo } from "react";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
@@ -10,17 +10,42 @@ import type { CheckListDriver } from "./checkListTypes";
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
 	"We haven't received location updates from you in a while. Please check if the app is running.";
 
+function buildPushBody(driver: CheckListDriver, message: string): Record<string, unknown> {
+	const text = message.trim();
+	const ext = driver.externalId?.trim();
+	const body: Record<string, unknown> = {
+		message: text,
+		platform: null,
+	};
+	if (ext) {
+		body.externalId = ext;
+		body.userId = null;
+	} else {
+		body.userId = driver.id;
+	}
+	return body;
+}
+
+function driverShortLabel(driver: CheckListDriver): string {
+	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
+	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
+}
+
 type CheckListPushModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
-	driver: CheckListDriver | null;
+	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
+	drivers: CheckListDriver[] | null;
 };
 
-export default function CheckListPushModal({ isOpen, onClose, driver }: CheckListPushModalProps) {
+export default function CheckListPushModal({ isOpen, onClose, drivers }: CheckListPushModalProps) {
 	const [message, setMessage] = useState(CHECK_LIST_PUSH_DEFAULT_MESSAGE);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
+
+	const targets = drivers ?? [];
+	const targetKey = useMemo(() => targets.map((d) => d.id).join(","), [targets]);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -28,7 +53,7 @@ export default function CheckListPushModal({ isOpen, onClose, driver }: CheckLis
 			setError(null);
 			setSuccess(null);
 		}
-	}, [isOpen, driver?.id]);
+	}, [isOpen, targetKey]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -39,45 +64,52 @@ export default function CheckListPushModal({ isOpen, onClose, driver }: CheckLis
 			setError("Please enter a message.");
 			return;
 		}
-		if (!driver) return;
-
-		const ext = driver.externalId?.trim();
-		const body: Record<string, unknown> = {
-			message: text,
-			platform: null,
-		};
-		if (ext) {
-			body.externalId = ext;
-			body.userId = null;
-		} else {
-			body.userId = driver.id;
-		}
+		if (targets.length === 0) return;
 
 		setSending(true);
+		const failures: string[] = [];
+
 		try {
-			const res = await fetch("/api/v1/notifications/push", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-				body: JSON.stringify(body),
-			});
-			const json = (await res.json().catch(() => ({}))) as {
-				error?: string;
-				message?: string;
-				success?: boolean;
-			};
-			if (!res.ok) {
-				const msg =
-					(typeof json.error === "string" ? json.error : null) ??
-					(typeof json.message === "string" ? json.message : null) ??
-					"Failed to send push notification.";
-				setError(msg);
-				return;
+			for (const driver of targets) {
+				const res = await fetch("/api/v1/notifications/push", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					credentials: "include",
+					body: JSON.stringify(buildPushBody(driver, text)),
+				});
+				const json = (await res.json().catch(() => ({}))) as {
+					error?: string;
+					message?: string;
+					success?: boolean;
+				};
+				if (!res.ok) {
+					const msg =
+						(typeof json.error === "string" ? json.error : null) ??
+						(typeof json.message === "string" ? json.message : null) ??
+						"Failed to send push notification.";
+					failures.push(`${driverShortLabel(driver)}: ${msg}`);
+				}
 			}
-			setSuccess("Push sent.");
-			window.setTimeout(() => {
-				onClose();
-			}, 800);
+
+			if (failures.length === 0) {
+				setSuccess(
+					targets.length === 1
+						? "Push sent."
+						: `Push sent to ${targets.length} drivers.`,
+				);
+				window.setTimeout(() => {
+					onClose();
+				}, 800);
+			} else if (failures.length === targets.length) {
+				setError(failures.join(" "));
+			} else {
+				const ok = targets.length - failures.length;
+				setSuccess(`Push sent to ${ok} of ${targets.length} drivers.`);
+				setError(`Failed for some: ${failures.join(" ")}`);
+				window.setTimeout(() => {
+					onClose();
+				}, 1200);
+			}
 		} catch {
 			setError("Network error while sending push.");
 		} finally {
@@ -85,10 +117,8 @@ export default function CheckListPushModal({ isOpen, onClose, driver }: CheckLis
 		}
 	}
 
-	const driverLabel =
-		driver &&
-		`${driver.firstName} ${driver.lastName}`.trim() +
-			(driver.externalId ? ` · ID: ${driver.externalId}` : "");
+	const summaryLabel =
+		targets.length === 1 ? driverShortLabel(targets[0]) : `${targets.length} drivers selected`;
 
 	return (
 		<Modal
@@ -101,8 +131,19 @@ export default function CheckListPushModal({ isOpen, onClose, driver }: CheckLis
 				<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
 					Send push notification
 				</h2>
-				{driverLabel && (
-					<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{driverLabel}</p>
+				{targets.length > 0 && (
+					<>
+						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{summaryLabel}</p>
+						{targets.length > 1 && (
+							<ul className="mt-2 max-h-28 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+								{targets.map((d) => (
+									<li key={d.id} className="truncate py-0.5">
+										{driverShortLabel(d)}
+									</li>
+								))}
+							</ul>
+						)}
+					</>
 				)}
 
 				<div className="mt-5">
@@ -133,7 +174,7 @@ export default function CheckListPushModal({ isOpen, onClose, driver }: CheckLis
 					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
 						Cancel
 					</Button>
-					<Button type="submit" variant="primary" size="sm" disabled={sending || !driver}>
+					<Button type="submit" variant="primary" size="sm" disabled={sending || targets.length === 0}>
 						{sending ? "Sending…" : "Send"}
 					</Button>
 				</div>
