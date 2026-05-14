@@ -51,3 +51,24 @@ export function getStatusLabelForFilter(status: string | null | undefined): stri
 	};
 	return labels[key] ?? status;
 }
+
+/**
+ * Map filter may be a UI label (e.g. "Loaded & Enroute") or raw TMS value (e.g. loaded_enroute).
+ */
+export function driverMapStatusMatchesFilter(
+	driverStatus: string | null | undefined,
+	filterValue: string
+): boolean {
+	if (!filterValue || filterValue === "all") return true;
+	const raw = (driverStatus ?? "").toString().trim().toLowerCase();
+	const fv = filterValue.trim().toLowerCase();
+	if (raw && raw === fv) return true;
+	return getStatusLabelForFilter(driverStatus).trim().toLowerCase() === fv;
+}
+
+/** Raw TMS driver_status values hidden on /drivers-map for users without recruiter/admin-style roles. */
+export function isRestrictedDriverStatusForMap(status: string | null | undefined): boolean {
+	if (!status) return false;
+	const key = status.toString().toLowerCase();
+	return key === "blocked" || key === "banned" || key === "expired_documents";
+}
