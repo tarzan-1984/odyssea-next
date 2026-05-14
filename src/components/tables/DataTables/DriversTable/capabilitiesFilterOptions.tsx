@@ -128,7 +128,12 @@ export const CAPABILITIES_OPTIONS: CapabilityOption[] = [
 			</span>
 		),
 	},
-	{ value: "team", text: "Team", selected: false, icon: <TeamIcon className="h-4 w-4" /> },
+	{
+		value: "team_driver_enabled",
+		text: "Team Driver",
+		selected: false,
+		icon: <TeamIcon className="h-4 w-4" />,
+	},
 	{ value: "canada", text: "Canada", selected: false, icon: <Canada className="h-4 w-4" /> },
 	{ value: "mexico", text: "Mexico", selected: false, icon: <Mexico className="h-4 w-4" /> },
 	{ value: "alaska", text: "Alaska", selected: false, icon: <AlaskaIcon className="h-4 w-4" /> },
