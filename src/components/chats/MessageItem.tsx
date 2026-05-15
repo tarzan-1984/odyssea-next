@@ -50,6 +50,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 
+	const senderFullName = [message.sender.firstName, message.sender.lastName]
+		.map((p) => (p == null ? "" : String(p).trim()))
+		.filter(Boolean)
+		.join(" ")
+		.trim();
+
+	const incomingRoleAndTime = !isSender ? (
+		<p className="text-gray-500 text-theme-xs dark:text-gray-400">
+			{`${getRoleDisplayLabel(message.sender.role)}, ${formatTime(message.createdAt)}`}
+		</p>
+	) : null;
+
 	return (
 		<div
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
@@ -69,6 +81,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			)}
 
 			<div className={`${isSender ? "text-right" : ""}`}>
+				{/* Incoming: full name once above attachments and/or text bubble */}
+				{!isSender &&
+					senderFullName &&
+					(message.fileUrl || message.content) ? (
+					<p className="mb-1.5 text-sm font-medium text-gray-800 dark:text-white/90">
+						{senderFullName}
+					</p>
+				) : null}
+
 				{/* Image preview */}
 				{message.fileUrl && isImageFile(message.fileName) && (
 					<div className="mb-2">
@@ -172,48 +193,65 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				)}
 
 				{/* Message content */}
-				{message.content && (
-					<div className="flex items-center gap-2">
-						<div
-							className={`px-3 py-2 rounded-lg ${
-								isSender
-									? "bg-brand-500 text-white dark:bg-brand-500"
-									: "bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90"
-							} ${isSender ? "rounded-tr-sm" : "rounded-tl-sm"}`}
-						>
-							{/* Reply to message */}
-							{message.replyData && (
-								<MessageReply replyData={message.replyData} />
-							)}
-							<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+				{message.content &&
+					(isSender ? (
+						<div className="flex items-center gap-2">
+							<div
+								className={`px-3 py-2 rounded-lg bg-brand-500 text-white dark:bg-brand-500 rounded-tr-sm`}
+							>
+								{message.replyData && (
+									<MessageReply replyData={message.replyData} />
+								)}
+								<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+							</div>
+							<MessageDropdown
+								message={message}
+								currentUser={currentUser}
+								onDelete={onDelete}
+								onReply={onReply}
+								onMarkUnread={onMarkUnread}
+							/>
 						</div>
-						{/* Message dropdown */}
-						<MessageDropdown
-							message={message}
-							currentUser={currentUser}
-							onDelete={onDelete}
-							onReply={onReply}
-							onMarkUnread={onMarkUnread}
-						/>
-					</div>
-				)}
+					) : (
+						<>
+							<div className="flex items-center gap-2">
+								<div
+									className={`px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90 rounded-tl-sm`}
+								>
+									{message.replyData && (
+										<MessageReply replyData={message.replyData} />
+									)}
+									<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+								</div>
+								<MessageDropdown
+									message={message}
+									currentUser={currentUser}
+									onDelete={onDelete}
+									onReply={onReply}
+									onMarkUnread={onMarkUnread}
+								/>
+							</div>
+							<div className="mt-2">{incomingRoleAndTime}</div>
+						</>
+					))}
 
-				{/* Timestamp and read status */}
-				<div
-					className={`mt-2 flex items-center gap-1 ${isSender ? "justify-end" : ""}`}
-				>
-					{isSender && (
+				{/* Incoming file-only: role + time under attachments */}
+				{!isSender && !message.content && message.fileUrl ? (
+					<div className="mt-2">{incomingRoleAndTime}</div>
+				) : null}
+
+				{/* Timestamp and read status (outgoing only) */}
+				{isSender && (
+					<div className="mt-2 flex items-center gap-1 justify-end">
 						<MessageReadStatus
 							isRead={message.isRead}
 							className="flex-shrink-0"
 						/>
-					)}
-					<p className="text-gray-500 text-theme-xs dark:text-gray-400">
-						{isSender
-							? formatTime(message.createdAt)
-							: `${getRoleDisplayLabel(message.sender.role)}, ${formatTime(message.createdAt)}`}
-					</p>
-				</div>
+						<p className="text-gray-500 text-theme-xs dark:text-gray-400">
+							{formatTime(message.createdAt)}
+						</p>
+					</div>
+				)}
 			</div>
 		</div>
 	);

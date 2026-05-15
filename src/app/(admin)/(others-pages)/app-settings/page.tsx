@@ -28,6 +28,12 @@ type TmsBatchSettingsPayload = {
 	updatedAt?: string;
 };
 
+type DeliveredLoadChatSettingsPayload = {
+	id: string;
+	deliveredLoadChatArchiveAfterHours: number;
+	updatedAt?: string;
+};
+
 type LocationEnvironmentPayload = {
 	id: string;
 	locationEnvironmentMode: "live" | "test";
@@ -144,6 +150,26 @@ function parseTmsBatchSettings(json: unknown): TmsBatchSettingsPayload | null {
 	return raw;
 }
 
+function parseDeliveredLoadChatSettings(
+	json: unknown
+): DeliveredLoadChatSettingsPayload | null {
+	if (!json || typeof json !== "object") return null;
+	const root = json as ApiEnvelope<DeliveredLoadChatSettingsPayload> &
+		DeliveredLoadChatSettingsPayload;
+	const raw =
+		root.data &&
+		typeof root.data === "object" &&
+		"deliveredLoadChatArchiveAfterHours" in root.data
+			? root.data
+			: "deliveredLoadChatArchiveAfterHours" in root
+				? (root as DeliveredLoadChatSettingsPayload)
+				: null;
+	if (!raw || typeof raw.deliveredLoadChatArchiveAfterHours !== "number") {
+		return null;
+	}
+	return raw;
+}
+
 function parseLocationEnvironment(json: unknown): LocationEnvironmentPayload | null {
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<LocationEnvironmentPayload> & LocationEnvironmentPayload;
@@ -210,6 +236,7 @@ export default function AppSettingsPage() {
 	const [driverTrackingIntervalMin, setDriverTrackingIntervalMin] = useState("");
 	const [tmsCronIntervalMin, setTmsCronIntervalMin] = useState("");
 	const [tmsBatchSize, setTmsBatchSize] = useState("");
+	const [deliveredLoadArchiveHours, setDeliveredLoadArchiveHours] = useState("5");
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
 	const [locationTestDriverExternalId, setLocationTestDriverExternalId] = useState("3343");
 	const [maxOpenOfferParticipationsInput, setMaxOpenOfferParticipationsInput] = useState("2");
@@ -217,21 +244,25 @@ export default function AppSettingsPage() {
 
 	const [loadingMobile, setLoadingMobile] = useState(true);
 	const [loadingTms, setLoadingTms] = useState(true);
+	const [loadingLoadChat, setLoadingLoadChat] = useState(true);
 	const [loadingEnv, setLoadingEnv] = useState(true);
 	const [loadingOffers, setLoadingOffers] = useState(true);
 	const [loadingDeletion, setLoadingDeletion] = useState(true);
 	const [savingMobile, setSavingMobile] = useState(false);
 	const [savingTms, setSavingTms] = useState(false);
+	const [savingLoadChat, setSavingLoadChat] = useState(false);
 	const [savingEnv, setSavingEnv] = useState(false);
 	const [savingOffers, setSavingOffers] = useState(false);
 	const [savingDeletion, setSavingDeletion] = useState(false);
 	const [errorMobile, setErrorMobile] = useState<string | null>(null);
 	const [errorTms, setErrorTms] = useState<string | null>(null);
+	const [errorLoadChat, setErrorLoadChat] = useState<string | null>(null);
 	const [errorEnv, setErrorEnv] = useState<string | null>(null);
 	const [errorOffers, setErrorOffers] = useState<string | null>(null);
 	const [errorDeletion, setErrorDeletion] = useState<string | null>(null);
 	const [successMobile, setSuccessMobile] = useState<string | null>(null);
 	const [successTms, setSuccessTms] = useState<string | null>(null);
+	const [successLoadChat, setSuccessLoadChat] = useState<string | null>(null);
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
 	const [successDeletion, setSuccessDeletion] = useState<string | null>(null);
@@ -453,6 +484,33 @@ export default function AppSettingsPage() {
 		}
 	}, []);
 
+	const loadLoadChat = useCallback(async () => {
+		setLoadingLoadChat(true);
+		setErrorLoadChat(null);
+		try {
+			const res = await fetch("/api/app-settings/delivered-load-chat", { method: "GET" });
+			const json = await res.json();
+			if (!res.ok) {
+				setErrorLoadChat(
+					typeof json.error === "string"
+						? json.error
+						: "Failed to load delivered LOAD chat settings"
+				);
+				return;
+			}
+			const s = parseDeliveredLoadChatSettings(json);
+			if (!s) {
+				setErrorLoadChat("Unexpected response from server");
+				return;
+			}
+			setDeliveredLoadArchiveHours(String(s.deliveredLoadChatArchiveAfterHours));
+		} catch {
+			setErrorLoadChat("Network error while loading delivered LOAD chat settings");
+		} finally {
+			setLoadingLoadChat(false);
+		}
+	}, []);
+
 	const loadEnv = useCallback(async () => {
 		setLoadingEnv(true);
 		setErrorEnv(null);
@@ -532,10 +590,18 @@ export default function AppSettingsPage() {
 	}, []);
 
 	useEffect(() => {
-		Promise.all([loadUsage(), loadMobile(), loadTms(), loadEnv(), loadOffers(), loadDeletion()]).catch(() => {
+		Promise.all([
+			loadUsage(),
+			loadMobile(),
+			loadTms(),
+			loadLoadChat(),
+			loadEnv(),
+			loadOffers(),
+			loadDeletion(),
+		]).catch(() => {
 			/* errors surfaced via per-loader setError* */
 		});
-	}, [loadUsage, loadMobile, loadTms, loadEnv, loadOffers, loadDeletion]);
+	}, [loadUsage, loadMobile, loadTms, loadLoadChat, loadEnv, loadOffers, loadDeletion]);
 
 	async function onSubmitDeletion(e: FormEvent) {
 		e.preventDefault();
@@ -763,6 +829,59 @@ export default function AppSettingsPage() {
 		}
 	}
 
+	async function onSubmitLoadChat(e: FormEvent) {
+		e.preventDefault();
+		setSavingLoadChat(true);
+		setErrorLoadChat(null);
+		setSuccessLoadChat(null);
+
+		const deliveredLoadChatArchiveAfterHours = Number.parseInt(
+			deliveredLoadArchiveHours,
+			10
+		);
+		if (
+			!Number.isFinite(deliveredLoadChatArchiveAfterHours) ||
+			deliveredLoadChatArchiveAfterHours < 1 ||
+			deliveredLoadChatArchiveAfterHours > 720
+		) {
+			setErrorLoadChat("Enter whole hours from 1 to 720 (30 days).");
+			setSavingLoadChat(false);
+			return;
+		}
+
+		try {
+			const res = await fetch("/api/app-settings/delivered-load-chat", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ deliveredLoadChatArchiveAfterHours }),
+			});
+			const json = await res.json();
+			if (!res.ok) {
+				const msg =
+					typeof json.error === "string"
+						? json.error
+						: typeof json.message === "string"
+							? json.message
+							: Array.isArray(json.message)
+								? json.message.join(", ")
+								: "Failed to save delivered LOAD chat settings";
+				setErrorLoadChat(msg);
+				return;
+			}
+			const s = parseDeliveredLoadChatSettings(json);
+			if (s) {
+				setDeliveredLoadArchiveHours(String(s.deliveredLoadChatArchiveAfterHours));
+			}
+			setSuccessLoadChat(
+				"Saved. Backend cleanup cron uses this delay after deliveryAt before archiving and deleting LOAD chats."
+			);
+		} catch {
+			setErrorLoadChat("Network error while saving");
+		} finally {
+			setSavingLoadChat(false);
+		}
+	}
+
 	async function onSubmitEnv(e: FormEvent) {
 		e.preventDefault();
 		setSavingEnv(true);
@@ -815,7 +934,8 @@ export default function AppSettingsPage() {
 		}
 	}
 
-	const pageLoading = loadingMobile || loadingTms || loadingEnv || loadingOffers;
+	const pageLoading =
+		loadingMobile || loadingTms || loadingLoadChat || loadingEnv || loadingOffers;
 
 	return (
 		<div>
@@ -1276,7 +1396,13 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingMobile || savingEnv || savingOffers}
+							disabled={
+								pageLoading ||
+								savingMobile ||
+								savingEnv ||
+								savingOffers ||
+								savingLoadChat
+							}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingMobile ? "Saving…" : "Save mobile app settings"}
@@ -1577,10 +1703,87 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingTms || savingEnv || savingOffers}
+							disabled={
+								pageLoading ||
+								savingTms ||
+								savingEnv ||
+								savingOffers ||
+								savingLoadChat
+							}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingTms ? "Saving…" : "Save TMS batch settings"}
+						</button>
+					</div>
+				</form>
+
+				<form
+					onSubmit={onSubmitLoadChat}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Backend — delivered LOAD chat cleanup
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						After a LOAD chat gets <code className="text-xs">deliveryAt</code> from the
+						webhook, the server waits this many hours, then archives messages to storage,
+						deletes the chat, and notifies participants (same as manual delete). The cron
+						runs every 3 hours.
+					</p>
+
+					{loadingLoadChat ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
+					) : (
+						<div className="max-w-xl">
+							<Label htmlFor="deliveredLoadChatArchiveAfterHours" className="mb-1">
+								Hours after delivery before archive &amp; delete
+							</Label>
+							<Input
+								id="deliveredLoadChatArchiveAfterHours"
+								name="deliveredLoadChatArchiveAfterHours"
+								type="number"
+								min="1"
+								max="720"
+								step={1}
+								value={deliveredLoadArchiveHours}
+								onChange={e => setDeliveredLoadArchiveHours(e.target.value)}
+								placeholder="5"
+								required
+								className="!h-9 !min-h-0 !py-1.5"
+							/>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Compared to <code className="text-xs">deliveryAt</code> as stored (no extra
+								timezone). Range 1–720 hours (30 days). Default 5.
+							</p>
+						</div>
+					)}
+
+					{errorLoadChat ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorLoadChat}
+						</p>
+					) : null}
+					{successLoadChat ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successLoadChat}
+						</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={
+								pageLoading ||
+								savingLoadChat ||
+								savingTms ||
+								savingEnv ||
+								savingOffers
+							}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{savingLoadChat ? "Saving…" : "Save LOAD chat cleanup setting"}
 						</button>
 					</div>
 				</form>
