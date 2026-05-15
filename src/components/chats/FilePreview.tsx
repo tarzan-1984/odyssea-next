@@ -360,9 +360,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileName, fileSize, 
 				<Modal
 					isOpen={isImageModalOpen}
 					onClose={() => setIsImageModalOpen(false)}
-					className="w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] flex items-center justify-center bg-black/90 shadow-none border-none p-8 overflow-hidden"
+					className="w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] flex items-center justify-center !bg-black/90 shadow-none border-none p-8 overflow-hidden"
 					showCloseButton={true}
-					closeButtonClassName="absolute right-3 top-3 z-[100001] flex h-9.5 w-9.5 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25 hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
+					closeButtonClassName="absolute right-3 top-3 z-[100001] flex h-9.5 w-9.5 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 [&_path]:fill-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
 					closeOnBackdropClick={true}
 				>
 					{/* Image Container */}
