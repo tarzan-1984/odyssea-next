@@ -15,6 +15,8 @@ export interface User {
 	lastName: string;
 	avatar?: string;
 	role?: string;
+	/** TMS / external user id (drivers in LOAD chats). */
+	externalId?: string | null;
 }
 
 export interface ChatRoom {

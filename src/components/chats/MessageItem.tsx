@@ -13,6 +13,8 @@ import FilePreview from "./FilePreview";
 interface MessageItemProps {
 	message: Message;
 	currentUser: UserData | null;
+	/** When `"LOAD"`, driver role line shows `(externalId) Driver, time`. */
+	chatRoomType?: string;
 	onDelete: (messageId: string) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
@@ -21,6 +23,7 @@ interface MessageItemProps {
 const MessageItem: React.FC<MessageItemProps> = ({
 	message,
 	currentUser,
+	chatRoomType,
 	onDelete,
 	onReply,
 	onMarkUnread,
@@ -50,15 +53,22 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 
-	const senderFullName = [message.sender.firstName, message.sender.lastName]
-		.map((p) => (p == null ? "" : String(p).trim()))
-		.filter(Boolean)
-		.join(" ")
-		.trim();
+	const senderFirstName = String(message.sender.firstName ?? "").trim();
+
+	const incomingRoleLabel = (() => {
+		const roleLabel = getRoleDisplayLabel(message.sender.role);
+		const ext = message.sender.externalId?.trim();
+		const showDriverExt =
+			chatRoomType === "LOAD" &&
+			message.sender.role?.toUpperCase().trim() === "DRIVER" &&
+			Boolean(ext);
+		const prefix = showDriverExt ? `(${ext}) ` : "";
+		return `${prefix}${roleLabel}`;
+	})();
 
 	const incomingRoleAndTime = !isSender ? (
 		<p className="text-gray-500 text-theme-xs dark:text-gray-400">
-			{`${getRoleDisplayLabel(message.sender.role)}, ${formatTime(message.createdAt)}`}
+			{`${incomingRoleLabel}, ${formatTime(message.createdAt)}`}
 		</p>
 	) : null;
 
@@ -81,12 +91,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			)}
 
 			<div className={`${isSender ? "text-right" : ""}`}>
-				{/* Incoming: full name once above attachments and/or text bubble */}
+				{/* Incoming: first name above attachments and/or text bubble */}
 				{!isSender &&
-					senderFullName &&
+					senderFirstName &&
 					(message.fileUrl || message.content) ? (
 					<p className="mb-1.5 text-sm font-medium text-gray-800 dark:text-white/90">
-						{senderFullName}
+						{senderFirstName}
 					</p>
 				) : null}
 
