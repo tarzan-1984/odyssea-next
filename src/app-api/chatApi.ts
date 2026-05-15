@@ -17,6 +17,8 @@ export interface User {
 	role?: string;
 	/** TMS / external user id (drivers in LOAD chats). */
 	externalId?: string | null;
+	/** When present (e.g. LOAD chat drivers), shown under role/time. */
+	phone?: string | null;
 }
 
 export interface ChatRoom {

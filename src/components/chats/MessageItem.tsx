@@ -75,6 +75,31 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		</p>
 	) : null;
 
+	const isLoadChatDriver =
+		chatRoomType === "LOAD" &&
+		message.sender.role?.toUpperCase().trim() === "DRIVER";
+	const driverPhoneDisplay = String(message.sender.phone ?? "").trim();
+
+	const telHref = (displayPhone: string) => {
+		const cleaned = displayPhone.replace(/[^\d+]/g, "");
+		return cleaned ? `tel:${cleaned}` : `tel:${encodeURIComponent(displayPhone.trim())}`;
+	};
+
+	const incomingMessageFooter =
+		!isSender && incomingRoleAndTime ? (
+			<div className="mt-2 space-y-0.5">
+				{incomingRoleAndTime}
+				{isLoadChatDriver && driverPhoneDisplay ? (
+					<a
+						href={telHref(driverPhoneDisplay)}
+						className="block text-theme-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+					>
+						{driverPhoneDisplay}
+					</a>
+				) : null}
+			</div>
+		) : null;
+
 	return (
 		<div
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
@@ -244,14 +269,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									onMarkUnread={onMarkUnread}
 								/>
 							</div>
-							<div className="mt-2">{incomingRoleAndTime}</div>
+							{incomingMessageFooter}
 						</>
 					))}
 
-				{/* Incoming file-only: role + time under attachments */}
-				{!isSender && !message.content && message.fileUrl ? (
-					<div className="mt-2">{incomingRoleAndTime}</div>
-				) : null}
+				{/* Incoming file-only: role + time (+ driver phone in LOAD) under attachments */}
+				{!isSender && !message.content && message.fileUrl ? incomingMessageFooter : null}
 
 				{/* Timestamp and read status (outgoing only) */}
 				{isSender && (
