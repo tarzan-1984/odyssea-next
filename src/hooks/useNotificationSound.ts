@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { useAdminNotificationSoundStore } from '@/stores/adminNotificationSoundStore';
+import { isNotificationSoundMuted } from '@/stores/adminNotificationSoundStore';
 
 export const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -7,7 +7,7 @@ export const useNotificationSound = () => {
 
   const playNotificationSound = useCallback(() => {
     try {
-      if (useAdminNotificationSoundStore.getState().notificationSoundsMuted) {
+      if (isNotificationSoundMuted()) {
         return;
       }
 
