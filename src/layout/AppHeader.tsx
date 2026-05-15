@@ -1,6 +1,7 @@
 "use client";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import WebSocketStatusIndicator from "@/components/common/WebSocketStatusIndicator";
+import AdminNotificationSoundToggle from "@/components/header/AdminNotificationSoundToggle";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
@@ -176,6 +177,7 @@ const AppHeader: React.FC = () => {
 					<div className="flex items-center gap-2 2xsm:gap-3">
 						{/* WebSocket connection status */}
 						<WebSocketStatusIndicator />
+						{currentUser?.role === "ADMINISTRATOR" && <AdminNotificationSoundToggle />}
 						{/* <!-- Dark Mode Toggler --> */}
 						<ThemeToggleButton />
 						{/* <!-- Dark Mode Toggler --> */}

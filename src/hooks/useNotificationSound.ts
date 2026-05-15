@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useAdminNotificationSoundStore } from '@/stores/adminNotificationSoundStore';
 
 export const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -6,6 +7,10 @@ export const useNotificationSound = () => {
 
   const playNotificationSound = useCallback(() => {
     try {
+      if (useAdminNotificationSoundStore.getState().notificationSoundsMuted) {
+        return;
+      }
+
       // Check if user has interacted with the page
       if (!hasUserInteracted.current) {
         return;
