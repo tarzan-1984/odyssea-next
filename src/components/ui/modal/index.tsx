@@ -7,6 +7,8 @@ interface ModalProps {
 	className?: string;
 	children: React.ReactNode;
 	showCloseButton?: boolean; // New prop to control close button visibility
+	/** Overrides default close button colors (e.g. light icon on dark modal). */
+	closeButtonClassName?: string;
 	isFullscreen?: boolean; // Default to false for backwards compatibility
 	closeOnBackdropClick?: boolean; // Close modal when clicking outside the content area
 }
@@ -17,6 +19,7 @@ export const Modal: React.FC<ModalProps> = ({
 	children,
 	className,
 	showCloseButton = true, // Default to true for backwards compatibility
+	closeButtonClassName,
 	isFullscreen = false,
 	closeOnBackdropClick = false, // Default to false for backwards compatibility
 }) => {
@@ -71,8 +74,13 @@ export const Modal: React.FC<ModalProps> = ({
 			>
 				{showCloseButton && (
 					<button
+						type="button"
 						onClick={onClose}
-						className="absolute right-3 top-3 z-[100001] flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
+						aria-label="Close"
+						className={
+							closeButtonClassName ??
+							"absolute right-3 top-3 z-[100001] flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
+						}
 					>
 						<svg
 							width="24"
