@@ -485,6 +485,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 							message={message}
 							currentUser={currentUser}
 							chatRoomType={selectedChatRoom?.type}
+							chatParticipants={selectedChatRoom?.participants ?? []}
 							onDelete={handleDeleteMessage}
 							onReply={handleReplyToMessage}
 							onMarkUnread={handleMarkMessageUnread}

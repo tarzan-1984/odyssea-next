@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Message } from "@/app-api/chatApi";
+import { Message, ChatRoomParticipant } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -15,6 +15,8 @@ interface MessageItemProps {
 	currentUser: UserData | null;
 	/** When `"LOAD"`, driver role line shows `(externalId) Driver, time`. */
 	chatRoomType?: string;
+	/** Room participants for resolving read receipt names */
+	chatParticipants?: ChatRoomParticipant[];
 	onDelete: (messageId: string) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
@@ -24,6 +26,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	message,
 	currentUser,
 	chatRoomType,
+	chatParticipants = [],
 	onDelete,
 	onReply,
 	onMarkUnread,
@@ -255,6 +258,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					<div className="mt-2 flex items-center gap-1 justify-end">
 						<MessageReadStatus
 							isRead={message.isRead}
+							readBy={message.readBy}
+							participants={chatParticipants}
+							currentUserId={currentUser?.id ?? null}
+							senderId={message.senderId}
 							className="flex-shrink-0"
 						/>
 						<p className="text-gray-500 text-theme-xs dark:text-gray-400">
