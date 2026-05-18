@@ -7,15 +7,23 @@ export const DRIVERS_AND_OFFERS_ALLOWED_ROLES = [
 	"DISPATCHER_TL",
 	"EXPEDITE_MANAGER",
 	"ADMINISTRATOR",
+	"TRACKING",
+	"TRACKING_TL",
+	"DRIVER_UPDATES",
 	"MORNING_TRACKING",
 	"NIGHTSHIFT_TRACKING",
+	"RECRUITER",
+	"RECRUITER_TL",
+	"HR_MANAGER",
+	"MODERATOR",
 ] as const;
 
 export type DriversAndOffersRole = (typeof DRIVERS_AND_OFFERS_ALLOWED_ROLES)[number];
 
 export function canAccessDriversAndOffers(role: string | undefined | null): boolean {
 	if (!role) return false;
-	return DRIVERS_AND_OFFERS_ALLOWED_ROLES.includes(role as DriversAndOffersRole);
+	const normalized = role.trim().toUpperCase();
+	return (DRIVERS_AND_OFFERS_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
 /** Roles that may see drivers with blocked / banned / expired_documents on the drivers map. */

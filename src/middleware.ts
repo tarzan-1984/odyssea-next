@@ -96,7 +96,7 @@ export function middleware(request: NextRequest) {
 		return NextResponse.redirect(new URL("/signin", request.url));
 	}
 
-	// Drivers list and My offers: only for DISPATCHER, DISPATCHER_TL, EXPEDITE_MANAGER, ADMINISTRATOR, MORNING_TRACKING, NIGHTSHIFT_TRACKING
+	// Drivers list and My offers: role list in utils/roleAccess (DRIVERS_AND_OFFERS_ALLOWED_ROLES)
 	const isDriversOrOffersPage =
 		pathname === "/drivers-list" || pathname.startsWith("/drivers-list/") ||
 		pathname === "/offers" || pathname.startsWith("/offers/");
