@@ -6,10 +6,17 @@ import ReplyPreview from "./ReplyPreview";
 import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
 
+export type ChatAttachmentPayload = {
+	fileUrl: string;
+	key: string;
+	fileName: string;
+	fileSize: number;
+};
+
 interface ChatBoxSendFormProps {
 	onSendMessage?: (message: {
 		content: string;
-		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+		fileData?: ChatAttachmentPayload[];
 		replyData?: Message["replyData"];
 	}) => void;
 	onTyping?: (isTyping: boolean) => void;
@@ -30,12 +37,10 @@ export default function ChatBoxSendForm({
 	const [message, setMessage] = useState<string>("");
 	const [isSending, setIsSending] = useState(false);
 
-	const [attachedFile, setAttachedFile] = useState<{
-		fileUrl: string;
-		key: string;
-		fileName: string;
-		fileSize: number;
-	} | null>(null);
+	const [attachedFiles, setAttachedFiles] = useState<
+		(ChatAttachmentPayload & { localId: string })[]
+	>([]);
+	const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -55,15 +60,18 @@ export default function ChatBoxSendForm({
 	};
 
 	const handleSendMessage = async () => {
-		if (!message.trim() && !attachedFile) return;
+		if (!message.trim() && attachedFiles.length === 0) return;
 
 		try {
 			setIsSending(true);
 
 			if (onSendMessage) {
+				const filePayload: ChatAttachmentPayload[] = attachedFiles.map(
+					({ localId: _id, ...rest }) => rest
+				);
 				await onSendMessage({
 					content: message,
-					fileData: attachedFile || undefined,
+					fileData: filePayload.length > 0 ? filePayload : undefined,
 					replyData: replyingTo,
 				});
 			}
@@ -75,7 +83,7 @@ export default function ChatBoxSendForm({
 
 			// Reset form
 			setMessage("");
-			setAttachedFile(null);
+			setAttachedFiles([]);
 			setShowEmojiPicker(false);
 
 			// Cancel reply if we were replying
@@ -116,25 +124,13 @@ export default function ChatBoxSendForm({
 		}
 	};
 
-	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
-
-		// Validate file size (10MB max)
-		const maxSize = 10 * 1024 * 1024; // 10MB
-		if (file.size > maxSize) {
-			alert(`File size must be less than 10MB`);
-			return;
-		}
-
-		// Validate file type
+	const isFileAllowed = (file: File): boolean => {
 		const acceptedTypes = ["image/*", "application/pdf", ".doc", ".docx", ".txt"];
 		const fileType = file.type;
-		const fileName = file.name.toLowerCase();
-
-		const isAllowed = acceptedTypes.some(type => {
+		const lowerName = file.name.toLowerCase();
+		return acceptedTypes.some(type => {
 			if (type.startsWith(".")) {
-				return fileName.endsWith(type);
+				return lowerName.endsWith(type);
 			}
 			if (type.endsWith("/*")) {
 				const baseType = type.slice(0, -2);
@@ -142,27 +138,57 @@ export default function ChatBoxSendForm({
 			}
 			return fileType === type;
 		});
+	};
 
-		if (!isAllowed) {
-			alert("File type not allowed");
+	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const list = e.target.files;
+		if (!list?.length) return;
+
+		const maxSize = 10 * 1024 * 1024; // 10MB
+		const picked = Array.from(list);
+		const toUpload: File[] = [];
+		const errors: string[] = [];
+
+		for (const file of picked) {
+			if (file.size > maxSize) {
+				errors.push(`${file.name}: max 10MB`);
+				continue;
+			}
+			if (!isFileAllowed(file)) {
+				errors.push(`${file.name}: type not allowed`);
+				continue;
+			}
+			toUpload.push(file);
+		}
+
+		if (errors.length > 0) {
+			alert(errors.join("\n"));
+		}
+		if (toUpload.length === 0) {
+			if (fileInputRef.current) fileInputRef.current.value = "";
 			return;
 		}
 
+		setIsUploadingAttachments(true);
 		try {
 			const uploader = new S3Uploader();
-			const { fileUrl, key } = await uploader.upload(file);
-
-			setAttachedFile({
-				fileUrl,
-				key,
-				fileName: file.name,
-				fileSize: file.size,
-			});
+			const uploaded: (ChatAttachmentPayload & { localId: string })[] = [];
+			for (const file of toUpload) {
+				const { fileUrl, key } = await uploader.upload(file);
+				uploaded.push({
+					localId: crypto.randomUUID(),
+					fileUrl,
+					key,
+					fileName: file.name,
+					fileSize: file.size,
+				});
+			}
+			setAttachedFiles(prev => [...prev, ...uploaded]);
 		} catch (error) {
 			console.error("Upload error:", error);
 			alert(error instanceof Error ? error.message : "Upload failed");
 		} finally {
-			// Reset input to allow selecting the same file again
+			setIsUploadingAttachments(false);
 			if (fileInputRef.current) {
 				fileInputRef.current.value = "";
 			}
@@ -213,8 +239,8 @@ export default function ChatBoxSendForm({
 		adjustTextareaHeight();
 	}, [message]);
 
-	const removeAttachedFile = () => {
-		setAttachedFile(null);
+	const removeAttachedFile = (localId: string) => {
+		setAttachedFiles(prev => prev.filter(f => f.localId !== localId));
 	};
 
 	return (
@@ -228,64 +254,101 @@ export default function ChatBoxSendForm({
 			<input
 				ref={fileInputRef}
 				type="file"
+				multiple
 				onChange={handleFileSelect}
 				accept="image/*,application/pdf,.doc,.docx,.txt"
 				className="hidden"
 			/>
 
-			{/* Attached file preview */}
-			{attachedFile && (
-				<div className="mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-between">
-					<div className="flex items-center space-x-2">
-						<svg
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							/>
-							<polyline
-								points="14,2 14,8 20,8"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							/>
-						</svg>
-						<span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-xs">
-							{attachedFile.fileName}
-						</span>
-						<span className="text-xs text-gray-500 dark:text-gray-400">
-							({Math.round(attachedFile.fileSize / 1024)}KB)
-						</span>
+			{(attachedFiles.length > 0 || isUploadingAttachments) && (
+				<div className="mb-2 min-w-0 rounded-lg bg-gray-100 p-2 dark:bg-gray-700">
+					<div className="flex max-w-full flex-nowrap gap-2 overflow-x-auto">
+						{isUploadingAttachments && (
+							<div className="flex shrink-0 items-center gap-2 rounded-md border border-gray-200 bg-white/80 px-2 py-1.5 text-xs text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+								<svg
+									className="h-3.5 w-3.5 animate-spin"
+									viewBox="0 0 24 24"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<circle
+										className="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										strokeWidth="4"
+									/>
+									<path
+										className="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									/>
+								</svg>
+								Uploading…
+							</div>
+						)}
+						{attachedFiles.map(af => (
+							<div
+								key={af.localId}
+								className="flex max-w-[14rem] shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-800"
+							>
+								<svg
+									className="shrink-0 text-gray-500 dark:text-gray-400"
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+								>
+									<path
+										d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+									<polyline
+										points="14,2 14,8 20,8"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
+								</svg>
+								<div className="min-w-0 flex-1">
+									<p className="truncate text-sm text-gray-800 dark:text-gray-200" title={af.fileName}>
+										{af.fileName}
+									</p>
+									<p className="text-xs text-gray-500 dark:text-gray-400">
+										{Math.round(af.fileSize / 1024)}KB
+									</p>
+								</div>
+								<button
+									type="button"
+									onClick={() => removeAttachedFile(af.localId)}
+									disabled={isUploadingAttachments}
+									className="shrink-0 text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M18 6L6 18M6 6L18 18"
+											stroke="currentColor"
+											strokeWidth="2"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										/>
+									</svg>
+								</button>
+							</div>
+						))}
 					</div>
-					<button
-						onClick={removeAttachedFile}
-						className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-					>
-						<svg
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								d="M18 6L6 18M6 6L18 18"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							/>
-						</svg>
-					</button>
 				</div>
 			)}
 
@@ -300,8 +363,9 @@ export default function ChatBoxSendForm({
 					<button
 						ref={emojiButtonRef}
 						type="button"
+						disabled={disabled || isSending || isUploadingAttachments}
 						onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-						className="absolute text-gray-500 left-1 top-2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3 z-10"
+						className="absolute text-gray-500 left-1 top-2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3 z-10 disabled:opacity-50"
 					>
 						<svg
 							className="fill-current"
@@ -335,7 +399,7 @@ export default function ChatBoxSendForm({
 						value={message}
 						onChange={handleMessageChange}
 						onKeyDown={handleKeyDown}
-						disabled={disabled || isSending}
+						disabled={disabled || isSending || isUploadingAttachments}
 						className="w-full min-h-9 max-h-[7.5rem] py-2 pl-12 pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto"
 					/>
 				</div>
@@ -345,7 +409,7 @@ export default function ChatBoxSendForm({
 					<button
 						type="button"
 						onClick={handleFileButtonClick}
-						disabled={disabled || isSending}
+						disabled={disabled || isSending || isUploadingAttachments}
 						className="mr-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 					>
 						<svg
@@ -368,7 +432,12 @@ export default function ChatBoxSendForm({
 					{/* Send button */}
 					<button
 						type="submit"
-						disabled={disabled || isLoading || (!message.trim() && !attachedFile)}
+						disabled={
+							disabled ||
+							isLoading ||
+							isUploadingAttachments ||
+							(!message.trim() && attachedFiles.length === 0)
+						}
 						className="flex items-center justify-center ml-3 text-white rounded-lg h-9 w-9 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-400 disabled:cursor-not-allowed xl:ml-5"
 					>
 						{isLoading ? (

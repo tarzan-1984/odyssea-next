@@ -118,9 +118,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				</div>
 			)}
 
-			<div
-				className={`min-w-0 max-w-[50%] ${isSender ? "text-right" : ""}`}
-			>
+			<div className="min-w-0 max-w-[50%]">
 				{/* Incoming: first name above attachments and/or text bubble */}
 				{!isSender &&
 					senderFirstName &&

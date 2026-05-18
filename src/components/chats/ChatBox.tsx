@@ -229,7 +229,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const handleSendMessage = async (messageData: {
 		content: string;
-		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number }[];
 		replyData?: Message['replyData'];
 	}) => {
 		if (!selectedChatRoom) return;
@@ -238,8 +238,21 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			// Stop typing indicator before sending message
 			sendTyping(false);
 
-			// Use WebSocket-enabled send message
-			await sendMessage(messageData);
+			const files = messageData.fileData ?? [];
+			if (files.length === 0) {
+				await sendMessage({
+					content: messageData.content,
+					replyData: messageData.replyData,
+				});
+			} else {
+				for (let i = 0; i < files.length; i++) {
+					await sendMessage({
+						content: i === 0 ? messageData.content : "",
+						fileData: files[i],
+						replyData: i === 0 ? messageData.replyData : undefined,
+					});
+				}
+			}
 
 			// Always scroll to the new message when user sends it
 			setTimeout(() => {
