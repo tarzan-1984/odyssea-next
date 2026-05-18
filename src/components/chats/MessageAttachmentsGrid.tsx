@@ -54,10 +54,10 @@ export default function MessageAttachmentsGrid({ items, isOutgoing = false }: Me
 		"flex w-full shrink-0 items-center justify-center gap-0.5 px-1 py-1 text-[10px] font-medium bg-brand-500 text-white hover:bg-brand-600 transition-colors";
 
 	const gridClass = [
-		"grid items-stretch gap-2 w-max max-w-full",
+		"grid w-full items-stretch gap-2",
 		useThreeColumns
-			? "grid-cols-2 md:grid-cols-3 max-w-[min(100%,14rem)] md:max-w-[min(100%,20rem)]"
-			: "grid-cols-2 max-w-[min(100%,14rem)]",
+			? "grid-cols-2 max-w-[32rem] md:grid-cols-3 md:max-w-[48rem]"
+			: "grid-cols-2 max-w-[32rem]",
 	].join(" ");
 
 	return (

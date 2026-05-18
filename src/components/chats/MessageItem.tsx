@@ -110,7 +110,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
 		>
 			{!isSender && (
-				<div className="relative w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+				<div className="relative w-10 h-10 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
 					{renderAvatar({
 						avatar: message.sender.avatar,
 						firstName: message.sender.firstName,
@@ -123,7 +123,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				</div>
 			)}
 
-			<div className="min-w-0 max-w-[50%]">
+			<div
+				className={
+					isSender
+						? "min-w-0 w-full max-w-[50%] shrink-0"
+						: "min-w-0 w-full max-w-[50%] flex-1"
+				}
+			>
 				{/* Incoming: first name above attachments and/or text bubble */}
 				{!isSender &&
 					senderFirstName &&
@@ -135,8 +141,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 				{multiAttachments &&
 					(isSender ? (
-						<div className="mb-2 flex items-start gap-2">
-							<div className="min-w-0 w-fit max-w-full space-y-2 rounded-lg rounded-tr-sm bg-brand-500 px-3 py-2 text-white dark:bg-brand-500">
+						<div className="mb-2 flex min-w-0 items-start justify-end gap-2">
+							<div className="max-w-[32rem] min-w-0 space-y-2 rounded-lg rounded-tr-sm bg-brand-500 px-3 py-2 text-white dark:bg-brand-500">
 								{message.replyData && <MessageReply replyData={message.replyData} />}
 								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
 								{message.content?.trim() ? (
@@ -153,8 +159,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						</div>
 					) : (
 						<>
-							<div className="mb-2 flex items-start gap-2">
-								<div className="min-w-0 w-fit max-w-full space-y-2 rounded-lg rounded-tl-sm bg-gray-100 px-3 py-2 text-gray-800 dark:bg-white/5 dark:text-white/90">
+							<div className="mb-2 flex min-w-0 items-start gap-2">
+								<div className="w-full max-w-[32rem] min-w-0 space-y-2 rounded-lg rounded-tl-sm bg-gray-100 px-3 py-2 text-gray-800 dark:bg-white/5 dark:text-white/90">
 									{message.replyData && <MessageReply replyData={message.replyData} />}
 									<MessageAttachmentsGrid items={multiAttachments} />
 									{message.content?.trim() ? (
