@@ -1218,14 +1218,20 @@ export default function TrackingDeliveryMap({
 										<p className="font-semibold dark:text-white">
 											History point {index + 1}
 										</p>
-										<p className="text-gray-600 dark:text-gray-300">
-											{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
-										</p>
 										{point.placeLabel?.trim() ? (
-											<p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+											<p className="font-semibold text-gray-600 dark:text-gray-300">
 												{point.placeLabel.trim()}
 											</p>
 										) : null}
+										<p
+											className={
+												point.placeLabel?.trim()
+													? "text-xs text-gray-600 dark:text-gray-300 mt-1"
+													: "text-xs text-gray-600 dark:text-gray-300"
+											}
+										>
+											{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
+										</p>
 										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
 											Driver:{" "}
 											{point.driverName ||
