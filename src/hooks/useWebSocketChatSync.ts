@@ -137,15 +137,18 @@ export const useWebSocketChatSync = () => {
 		async (messageData: {
 			content: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
 			replyData?: { avatar?: string; time: string; content: string; senderName: string };
 		}) => {
 			if (isConnected && chatSync.currentChatRoom) {
+				const multi = messageData.attachments && messageData.attachments.length >= 2 ? messageData.attachments : null;
 				// Use WebSocket for real-time messaging
 				webSocketMessages.sendMessage({
 					content: messageData.content,
-					fileUrl: messageData.fileData?.fileUrl,
-					fileName: messageData.fileData?.fileName,
-					fileSize: messageData.fileData?.fileSize,
+					fileUrl: multi ? multi[0].fileUrl : messageData.fileData?.fileUrl,
+					fileName: multi ? multi[0].fileName : messageData.fileData?.fileName,
+					fileSize: multi ? multi[0].fileSize : messageData.fileData?.fileSize,
+					attachments: multi ?? undefined,
 					replyData: messageData.replyData,
 				});
 			} else {

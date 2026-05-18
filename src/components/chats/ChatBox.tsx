@@ -244,14 +244,22 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 					content: messageData.content,
 					replyData: messageData.replyData,
 				});
+			} else if (files.length === 1) {
+				await sendMessage({
+					content: messageData.content,
+					fileData: files[0],
+					replyData: messageData.replyData,
+				});
 			} else {
-				for (let i = 0; i < files.length; i++) {
-					await sendMessage({
-						content: i === 0 ? messageData.content : "",
-						fileData: files[i],
-						replyData: i === 0 ? messageData.replyData : undefined,
-					});
-				}
+				await sendMessage({
+					content: messageData.content,
+					attachments: files.map(f => ({
+						fileUrl: f.fileUrl,
+						fileName: f.fileName,
+						fileSize: f.fileSize,
+					})),
+					replyData: messageData.replyData,
+				});
 			}
 
 			// Always scroll to the new message when user sends it

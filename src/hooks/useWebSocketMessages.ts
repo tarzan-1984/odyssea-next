@@ -200,11 +200,12 @@ export const useWebSocketMessages = ({
 
 	// Send message function
 	const sendMessageHandler = useCallback(
-		(data: { 
-			content: string; 
-			fileUrl?: string; 
-			fileName?: string; 
-			fileSize?: number; 
+		(data: {
+			content: string;
+			fileUrl?: string;
+			fileName?: string;
+			fileSize?: number;
+			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
 			replyData?: { avatar?: string; time: string; content: string; senderName: string };
 		}) => {
 			sendMessage({

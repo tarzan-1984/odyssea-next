@@ -11,12 +11,20 @@ export async function POST(request: NextRequest) {
 		}
 
 		const body = await request.json();
-		const { chatRoomId, content, fileUrl, fileName, fileSize } = body;
+		const { chatRoomId, content, fileUrl, fileName, fileSize, attachments, replyData } = body;
+
+		const text = typeof content === "string" ? content.trim() : "";
+		const hasFile = Boolean(fileUrl);
+		const hasMulti =
+			Array.isArray(attachments) && attachments.length > 0;
 
 		// Validate required fields
-		if (!chatRoomId || !content) {
+		if (!chatRoomId || (!text && !hasFile && !hasMulti)) {
 			return NextResponse.json(
-				{ error: "Missing required fields: chatRoomId, content" },
+				{
+					error:
+						"Missing required fields: chatRoomId and non-empty content or file attachment(s)",
+				},
 				{ status: 400 }
 			);
 		}
@@ -30,10 +38,12 @@ export async function POST(request: NextRequest) {
 			},
 			body: JSON.stringify({
 				chatRoomId,
-				content,
+				content: typeof content === "string" ? content : "",
 				fileUrl,
 				fileName,
 				fileSize,
+				attachments,
+				replyData,
 			}),
 		});
 

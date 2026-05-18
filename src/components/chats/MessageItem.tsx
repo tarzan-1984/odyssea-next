@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Message, ChatRoomParticipant } from "@/app-api/chatApi";
+import { Message, ChatRoomParticipant, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -9,6 +9,7 @@ import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
 import MessageReply from "./MessageReply";
 import FilePreview from "./FilePreview";
+import MessageAttachmentsGrid from "./MessageAttachmentsGrid";
 
 interface MessageItemProps {
 	message: Message;
@@ -100,6 +101,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			</div>
 		) : null;
 
+	const multiAttachments = getMessageMultiAttachments(message);
+	const legacyFileUrl = !multiAttachments ? message.fileUrl : undefined;
+	const showLegacySingleFile = Boolean(legacyFileUrl);
+
 	return (
 		<div
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
@@ -122,17 +127,57 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{/* Incoming: first name above attachments and/or text bubble */}
 				{!isSender &&
 					senderFirstName &&
-					(message.fileUrl || message.content) ? (
+					(showLegacySingleFile || message.content || multiAttachments) ? (
 					<p className="mb-1.5 text-sm font-medium text-gray-800 dark:text-white/90">
 						{senderFirstName}
 					</p>
 				) : null}
 
+				{multiAttachments &&
+					(isSender ? (
+						<div className="mb-2 flex items-start gap-2">
+							<div className="min-w-0 w-fit max-w-full space-y-2 rounded-lg rounded-tr-sm bg-brand-500 px-3 py-2 text-white dark:bg-brand-500">
+								{message.replyData && <MessageReply replyData={message.replyData} />}
+								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
+								{message.content?.trim() ? (
+									<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+								) : null}
+							</div>
+							<MessageDropdown
+								message={message}
+								currentUser={currentUser}
+								onDelete={onDelete}
+								onReply={onReply}
+								onMarkUnread={onMarkUnread}
+							/>
+						</div>
+					) : (
+						<>
+							<div className="mb-2 flex items-start gap-2">
+								<div className="min-w-0 w-fit max-w-full space-y-2 rounded-lg rounded-tl-sm bg-gray-100 px-3 py-2 text-gray-800 dark:bg-white/5 dark:text-white/90">
+									{message.replyData && <MessageReply replyData={message.replyData} />}
+									<MessageAttachmentsGrid items={multiAttachments} />
+									{message.content?.trim() ? (
+										<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+									) : null}
+								</div>
+								<MessageDropdown
+									message={message}
+									currentUser={currentUser}
+									onDelete={onDelete}
+									onReply={onReply}
+									onMarkUnread={onMarkUnread}
+								/>
+							</div>
+							{incomingMessageFooter}
+						</>
+					))}
+
 				{/* Image preview */}
-				{message.fileUrl && isImageFile(message.fileName) && (
+				{showLegacySingleFile && legacyFileUrl && isImageFile(message.fileName) && (
 					<div className="mb-2">
 						<FilePreview
-							fileUrl={message.fileUrl}
+							fileUrl={legacyFileUrl}
 							fileName={message.fileName || "Unknown file"}
 							fileSize={message.fileSize}
 							messageId={message.id}
@@ -141,10 +186,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				)}
 
 				{/* File preview for PDF, DOCX, TXT */}
-				{message.fileUrl && isPreviewableFile(message.fileName) && (
+				{showLegacySingleFile && legacyFileUrl && isPreviewableFile(message.fileName) && (
 					<div className="mb-2">
 						<FilePreview
-							fileUrl={message.fileUrl}
+							fileUrl={legacyFileUrl}
 							fileName={message.fileName || "Unknown file"}
 							fileSize={message.fileSize}
 							messageId={message.id}
@@ -153,10 +198,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				)}
 
 				{/* File attachment for other files */}
-				{message.fileUrl && !isImageFile(message.fileName) && !isPreviewableFile(message.fileName) && (
+				{showLegacySingleFile &&
+					legacyFileUrl &&
+					!isImageFile(message.fileName) &&
+					!isPreviewableFile(message.fileName) && (
 					<div className="mb-2 w-full max-w-[270px]">
 						<a
-							href={message.fileUrl}
+							href={legacyFileUrl}
 							download={message.fileName}
 							target="_blank"
 							rel="noopener noreferrer"
@@ -231,7 +279,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				)}
 
 				{/* Message content */}
-				{message.content &&
+				{message.content?.trim() && !multiAttachments &&
 					(isSender ? (
 						<div className="flex items-center gap-2">
 							<div
@@ -273,8 +321,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						</>
 					))}
 
-				{/* Incoming file-only: role + time (+ driver phone in LOAD) under attachments */}
-				{!isSender && !message.content && message.fileUrl ? incomingMessageFooter : null}
+				{/* Incoming: role + time under legacy file-only messages (multi-attachment footer is inside block above) */}
+				{!isSender && !message.content?.trim() && showLegacySingleFile ? incomingMessageFooter : null}
 
 				{/* Timestamp and read status (outgoing only) */}
 				{isSender && (

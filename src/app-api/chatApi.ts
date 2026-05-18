@@ -47,6 +47,12 @@ export interface ChatRoomParticipant {
 	user: User;
 }
 
+export type ChatMessageAttachment = {
+	fileUrl: string;
+	fileName: string;
+	fileSize?: number;
+};
+
 export interface Message {
 	id: string;
 	chatRoomId: string;
@@ -56,6 +62,8 @@ export interface Message {
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
+	/** Legacy DB rows: JSON array. New multi-file messages use "|" in fileUrl/fileName instead. */
+	attachments?: ChatMessageAttachment[] | null;
 	isRead: boolean; // Global read status (true when any participant reads)
 	readBy?: string[]; // Array of user IDs who read the message
 	replyData?: {
@@ -69,12 +77,51 @@ export interface Message {
 	receiver?: User;
 }
 
+/** Pipe-delimited multiple files in one message (fileUrl and fileName aligned by index). */
+export const MESSAGE_MULTI_FILE_SEPARATOR = '|';
+
+/** Normalized list for UI when a message has 2+ attachments; otherwise null (use fileUrl). */
+export function getMessageMultiAttachments(message: Message): ChatMessageAttachment[] | null {
+	const raw = message.attachments;
+	if (Array.isArray(raw) && raw.length >= 2) {
+		const out: ChatMessageAttachment[] = [];
+		for (const item of raw) {
+			if (!item || typeof item !== "object") continue;
+			const o = item as Record<string, unknown>;
+			const fileUrl = typeof o.fileUrl === "string" ? o.fileUrl : "";
+			const fileName = typeof o.fileName === "string" ? o.fileName : "";
+			if (!fileUrl || !fileName) continue;
+			const fileSize = typeof o.fileSize === "number" ? o.fileSize : undefined;
+			out.push({ fileUrl, fileName, fileSize });
+		}
+		if (out.length >= 2) return out;
+	}
+
+	const urlStr = message.fileUrl?.trim();
+	const nameStr = message.fileName?.trim();
+	if (!urlStr || !nameStr) return null;
+	const urls = urlStr.split(MESSAGE_MULTI_FILE_SEPARATOR);
+	const names = nameStr.split(MESSAGE_MULTI_FILE_SEPARATOR);
+	if (urls.length < 2 || urls.length !== names.length) return null;
+
+	const out: ChatMessageAttachment[] = [];
+	for (let i = 0; i < urls.length; i++) {
+		const fileUrl = urls[i]?.trim() ?? "";
+		const fileName = names[i]?.trim() ?? "";
+		if (!fileUrl || !fileName) continue;
+		const fileSize = i === 0 && typeof message.fileSize === "number" ? message.fileSize : undefined;
+		out.push({ fileUrl, fileName, fileSize });
+	}
+	return out.length >= 2 ? out : null;
+}
+
 export interface SendMessageDto {
 	chatRoomId: string;
 	content: string;
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
+	attachments?: ChatMessageAttachment[];
 	replyData?: {
 		avatar?: string;
 		time: string;

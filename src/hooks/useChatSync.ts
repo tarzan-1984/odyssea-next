@@ -401,17 +401,37 @@ export const useChatSync = () => {
 		async (messageData: {
 			content: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
+			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
+			replyData?: {
+				avatar?: string;
+				time: string;
+				content: string;
+				senderName: string;
+			};
 		}) => {
 			if (!currentChatRoom || !currentUser) return;
 
 			try {
+				const attachments = messageData.attachments;
+				const multi = attachments && attachments.length >= 2 ? attachments : null;
+
 				// Send message via API
 				const newMessage = await chatApi.sendMessage({
 					chatRoomId: currentChatRoom.id,
 					content: messageData.content,
-					fileUrl: messageData.fileData?.fileUrl,
-					fileName: messageData.fileData?.fileName,
-					fileSize: messageData.fileData?.fileSize,
+					replyData: messageData.replyData,
+					...(multi
+						? {
+								attachments: multi,
+								fileUrl: multi[0].fileUrl,
+								fileName: multi[0].fileName,
+								fileSize: multi[0].fileSize,
+							}
+						: {
+								fileUrl: messageData.fileData?.fileUrl,
+								fileName: messageData.fileData?.fileName,
+								fileSize: messageData.fileData?.fileSize,
+							}),
 				});
 
 				// Add message to store

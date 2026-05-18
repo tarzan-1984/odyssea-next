@@ -8,7 +8,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import { MoreDotIcon, SoundOnIcon, SoundOffIcon, PinIcon, PushPinIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
-import { chatApi } from "@/app-api/chatApi";
+import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -65,6 +65,10 @@ export default function ChatListItem({
 
 	const getChatLastMessage = (chatRoom: ChatRoom): string => {
 		if (chatRoom.lastMessage) {
+			const multi = getMessageMultiAttachments(chatRoom.lastMessage);
+			if (multi) {
+				return `📎 ${multi.length} files`;
+			}
 			if (chatRoom.lastMessage.fileUrl) {
 				return `📎 ${chatRoom.lastMessage.fileName || "File"}`;
 			}
