@@ -658,6 +658,7 @@ export default function TrackingDeliveryMap({
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
 	const [loadRoute, setLoadRoute] = useState<LoadRoute | null>(null);
+	const [isRouteBuilding, setIsRouteBuilding] = useState(false);
 	const [driverMarkerSize, setDriverMarkerSize] = useState(MAX_DRIVER_MARKER_SIZE);
 	const [historyMarkerRadius, setHistoryMarkerRadius] = useState(
 		getHistoryMarkerRadiusByZoom(initialZoom)
@@ -831,9 +832,11 @@ export default function TrackingDeliveryMap({
 				(!pickupAddressCandidates.length || !deliveryAddressCandidates.length)
 			) {
 				setLoadRoute(null);
+				setIsRouteBuilding(false);
 				return;
 			}
 
+			setIsRouteBuilding(true);
 			try {
 				const rows = buildOrderedStopRows(
 					driverData?.pick_up_location,
@@ -960,6 +963,10 @@ export default function TrackingDeliveryMap({
 				if (!cancelled) {
 					console.warn("[TrackingDeliveryMap] Failed to build load route:", error);
 					setLoadRoute(null);
+				}
+			} finally {
+				if (!cancelled) {
+					setIsRouteBuilding(false);
 				}
 			}
 		};
@@ -1320,6 +1327,25 @@ export default function TrackingDeliveryMap({
 					</Marker>
 				)}
 			</MapContainer>
+
+			{/* Route/OSRM/geocode in progress */}
+			{isRouteBuilding && (
+				<div
+					className="absolute inset-0 z-[2000] flex items-center justify-center bg-white/45 backdrop-blur-sm dark:bg-gray-950/50"
+					aria-busy="true"
+					aria-live="polite"
+				>
+					<div className="flex flex-col items-center gap-3 rounded-xl border border-gray-200/80 bg-white/95 px-8 py-6 shadow-xl dark:border-gray-700 dark:bg-gray-900/95">
+						<div
+							className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500 dark:border-gray-600 dark:border-t-brand-400"
+							aria-hidden
+						/>
+						<p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+							Drawing route...
+						</p>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
