@@ -735,6 +735,32 @@ export default function TrackingDeliveryMap({
 		[historyMarkerRadius]
 	);
 
+	/** Pickup / load pin — matches driver marker pattern (divIcon + img) for reliable Leaflet + RHL v5. */
+	const pickupStopIcon = useMemo(
+		() =>
+			L.divIcon({
+				className: "tracking-pickup-stop-marker-icon",
+				html: `<img src="/images/pickUp.png" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
+				iconSize: [52, 72],
+				iconAnchor: [26, 72],
+				popupAnchor: [0, -64],
+			}),
+		[]
+	);
+
+	/** Delivery / unload pin — same divIcon pattern as pickup (filename: deliveryMarcer.png). */
+	const deliveryStopIcon = useMemo(
+		() =>
+			L.divIcon({
+				className: "tracking-delivery-stop-marker-icon",
+				html: `<img src="/images/deliveryMarcer.png" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
+				iconSize: [52, 72],
+				iconAnchor: [26, 72],
+				popupAnchor: [0, -64],
+			}),
+		[]
+	);
+
 	const handleZoomChange = useCallback((zoom: number) => {
 		setDriverMarkerSize(getDriverMarkerSizeByZoom(zoom));
 		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
@@ -1101,6 +1127,14 @@ export default function TrackingDeliveryMap({
 					.leaflet-marker-draggable.leaflet-dragging .tracking-history-edit-hit {
 						cursor: move !important;
 					}
+					.tracking-pickup-stop-marker-icon {
+						background: transparent !important;
+						border: none !important;
+					}
+					.tracking-delivery-stop-marker-icon {
+						background: transparent !important;
+						border: none !important;
+					}
 				`}
 			</style>
 			<MapContainer
@@ -1148,6 +1182,9 @@ export default function TrackingDeliveryMap({
 							<Marker
 								key={`load-stop-${index}-${stop.point.lat}-${stop.point.lng}`}
 								position={[stop.point.lat, stop.point.lng]}
+								{...(stop.kind === "pickup"
+									? { icon: pickupStopIcon }
+									: { icon: deliveryStopIcon })}
 								eventHandlers={{ click: stopMapClickBubbling }}
 							>
 								<Popup>

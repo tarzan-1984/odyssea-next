@@ -391,7 +391,16 @@ export default function CheckListTable() {
 									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs">
 										{row.trackingLoadId?.trim() ? (
 											<span className="inline-flex items-center gap-2">
-												<span>{row.trackingLoadId.trim()}</span>
+												<a
+													href={`https://www.endurance-tms.com/add-load/?post_id=${encodeURIComponent(
+														row.trackingLoadId.trim()
+													)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="text-brand-500 hover:underline dark:text-brand-400"
+												>
+													{row.trackingLoadId.trim()}
+												</a>
 												<Link
 													href={`/tracking/load/${encodeURIComponent(row.trackingLoadId.trim())}`}
 													className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400"
