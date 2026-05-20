@@ -11,6 +11,8 @@ interface ModalProps {
 	closeButtonClassName?: string;
 	isFullscreen?: boolean; // Default to false for backwards compatibility
 	closeOnBackdropClick?: boolean; // Close modal when clicking outside the content area
+	/** When false, Escape does not close this modal (useful when a nested modal handles Escape). */
+	closeOnEscape?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -22,24 +24,25 @@ export const Modal: React.FC<ModalProps> = ({
 	closeButtonClassName,
 	isFullscreen = false,
 	closeOnBackdropClick = false, // Default to false for backwards compatibility
+	closeOnEscape = true,
 }) => {
 	const modalRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
+			if (event.key === "Escape" && closeOnEscape) {
 				onClose();
 			}
 		};
 
-		if (isOpen) {
+		if (isOpen && closeOnEscape) {
 			document.addEventListener("keydown", handleEscape);
 		}
 
 		return () => {
 			document.removeEventListener("keydown", handleEscape);
 		};
-	}, [isOpen, onClose]);
+	}, [isOpen, onClose, closeOnEscape]);
 
 	useEffect(() => {
 		if (isOpen) {

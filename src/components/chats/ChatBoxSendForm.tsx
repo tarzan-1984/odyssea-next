@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "../ui/EmojiPicker";
 import ReplyPreview from "./ReplyPreview";
+import MessageTemplatesModal from "./MessageTemplatesModal";
 import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
 
@@ -42,6 +43,7 @@ export default function ChatBoxSendForm({
 	>([]);
 	const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+	const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
 	const emojiButtonRef = useRef<HTMLButtonElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -360,29 +362,56 @@ export default function ChatBoxSendForm({
 				}}
 			>
 				<div className="relative w-full min-w-0">
-					<button
-						ref={emojiButtonRef}
-						type="button"
-						disabled={disabled || isSending || isUploadingAttachments}
-						onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-						className="absolute text-gray-500 left-1 top-2 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 sm:left-3 z-10 disabled:opacity-50"
-					>
-						<svg
-							className="fill-current"
-							width="24"
-							height="24"
-							viewBox="0 0 24 24"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
+					<div className="absolute left-1 top-2 z-10 flex items-center gap-2 sm:left-3">
+						<button
+							ref={emojiButtonRef}
+							type="button"
+							disabled={disabled || isSending || isUploadingAttachments}
+							onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+							className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 						>
-							<path
+							<svg
+								className="fill-current"
+								width="24"
+								height="24"
+								viewBox="0 0 24 24"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM3.5 12C3.5 7.30558 7.30558 3.5 12 3.5C16.6944 3.5 20.5 7.30558 20.5 12C20.5 16.6944 16.6944 20.5 12 20.5C7.30558 20.5 3.5 16.6944 3.5 12ZM10.0001 9.23256C10.0001 8.5422 9.44042 7.98256 8.75007 7.98256C8.05971 7.98256 7.50007 8.5422 7.50007 9.23256V9.23266C7.50007 9.92301 8.05971 10.4827 8.75007 10.4827C9.44042 10.4827 10.0001 9.92301 10.0001 9.23266V9.23256ZM15.2499 7.98256C15.9403 7.98256 16.4999 8.5422 16.4999 9.23256V9.23266C16.4999 9.92301 15.9403 10.4827 15.2499 10.4827C14.5596 10.4827 13.9999 9.92301 13.9999 9.23266V9.23256C13.9999 8.5422 14.5596 7.98256 15.2499 7.98256ZM9.23014 13.7116C8.97215 13.3876 8.5003 13.334 8.17625 13.592C7.8522 13.85 7.79865 14.3219 8.05665 14.6459C8.97846 15.8037 10.4026 16.5481 12 16.5481C13.5975 16.5481 15.0216 15.8037 15.9434 14.6459C16.2014 14.3219 16.1479 13.85 15.8238 13.592C15.4998 13.334 15.0279 13.3876 14.7699 13.7116C14.1205 14.5274 13.1213 15.0481 12 15.0481C10.8788 15.0481 9.87961 14.5274 9.23014 13.7116Z"
+									fill=""
+								/>
+							</svg>
+						</button>
+						<button
+							type="button"
+							disabled={disabled || isSending || isUploadingAttachments}
+							onClick={() => setTemplatesModalOpen(true)}
+							className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
+							aria-label="Message templates"
+						>
+							<svg
+								className="fill-current"
+								xmlns="http://www.w3.org/2000/svg"
+								shapeRendering="geometricPrecision"
+								textRendering="geometricPrecision"
+								imageRendering="optimizeQuality"
 								fillRule="evenodd"
 								clipRule="evenodd"
-								d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM3.5 12C3.5 7.30558 7.30558 3.5 12 3.5C16.6944 3.5 20.5 7.30558 20.5 12C20.5 16.6944 16.6944 20.5 12 20.5C7.30558 20.5 3.5 16.6944 3.5 12ZM10.0001 9.23256C10.0001 8.5422 9.44042 7.98256 8.75007 7.98256C8.05971 7.98256 7.50007 8.5422 7.50007 9.23256V9.23266C7.50007 9.92301 8.05971 10.4827 8.75007 10.4827C9.44042 10.4827 10.0001 9.92301 10.0001 9.23266V9.23256ZM15.2499 7.98256C15.9403 7.98256 16.4999 8.5422 16.4999 9.23256V9.23266C16.4999 9.92301 15.9403 10.4827 15.2499 10.4827C14.5596 10.4827 13.9999 9.92301 13.9999 9.23266V9.23256C13.9999 8.5422 14.5596 7.98256 15.2499 7.98256ZM9.23014 13.7116C8.97215 13.3876 8.5003 13.334 8.17625 13.592C7.8522 13.85 7.79865 14.3219 8.05665 14.6459C8.97846 15.8037 10.4026 16.5481 12 16.5481C13.5975 16.5481 15.0216 15.8037 15.9434 14.6459C16.2014 14.3219 16.1479 13.85 15.8238 13.592C15.4998 13.334 15.0279 13.3876 14.7699 13.7116C14.1205 14.5274 13.1213 15.0481 12 15.0481C10.8788 15.0481 9.87961 14.5274 9.23014 13.7116Z"
-								fill=""
-							/>
-						</svg>
-					</button>
+								viewBox="0 0 438 511.52"
+								width={22}
+								height={22}
+							>
+								<path
+									fillRule="nonzero"
+									d="M141.44 0h172.68c4.71 0 8.91 2.27 11.54 5.77L434.11 123.1a14.37 14.37 0 0 1 3.81 9.75l.08 251.18c0 17.62-7.25 33.69-18.9 45.36l-.07.07c-11.67 11.64-27.73 18.87-45.33 18.87h-20.06c-.3 17.24-7.48 32.9-18.88 44.29-11.66 11.66-27.75 18.9-45.42 18.9H64.3c-17.67 0-33.76-7.24-45.41-18.9C7.24 480.98 0 464.9 0 447.22V135.87c0-17.68 7.23-33.78 18.88-45.42C30.52 78.8 46.62 71.57 64.3 71.57h12.84V64.3c0-17.68 7.23-33.78 18.88-45.42C107.66 7.23 123.76 0 141.44 0zm30.53 250.96c-7.97 0-14.43-6.47-14.43-14.44 0-7.96 6.46-14.43 14.43-14.43h171.2c7.97 0 14.44 6.47 14.44 14.43 0 7.97-6.47 14.44-14.44 14.44h-171.2zm0 76.86c-7.97 0-14.43-6.46-14.43-14.43 0-7.96 6.46-14.43 14.43-14.43h136.42c7.97 0 14.43 6.47 14.43 14.43 0 7.97-6.46 14.43-14.43 14.43H171.97zM322.31 44.44v49.03c.96 12.3 5.21 21.9 12.65 28.26 7.8 6.66 19.58 10.41 35.23 10.69l33.39-.04-81.27-87.94zm86.83 116.78-39.17-.06c-22.79-.35-40.77-6.5-53.72-17.57-13.48-11.54-21.1-27.86-22.66-48.03l-.14-2v-64.7H141.44c-9.73 0-18.61 4-25.03 10.41C110 45.69 106 54.57 106 64.3v319.73c0 9.74 4.01 18.61 10.42 25.02 6.42 6.42 15.29 10.42 25.02 10.42H373.7c9.75 0 18.62-3.98 25.01-10.38 6.45-6.44 10.43-15.3 10.43-25.06V161.22zm-84.38 287.11H141.44c-17.68 0-33.77-7.24-45.41-18.88-11.65-11.65-18.89-27.73-18.89-45.42v-283.6H64.3c-9.74 0-18.61 4-25.03 10.41-6.41 6.42-10.41 15.29-10.41 25.03v311.35c0 9.73 4.01 18.59 10.42 25.01 6.43 6.43 15.3 10.43 25.02 10.43h225.04c9.72 0 18.59-4 25.02-10.43 6.17-6.17 10.12-14.61 10.4-23.9z"
+								/>
+							</svg>
+						</button>
+					</div>
 
 					{/* Emoji Picker */}
 					<EmojiPicker
@@ -400,7 +429,7 @@ export default function ChatBoxSendForm({
 						onChange={handleMessageChange}
 						onKeyDown={handleKeyDown}
 						disabled={disabled || isSending || isUploadingAttachments}
-						className="w-full min-h-9 max-h-[7.5rem] py-2 pl-12 pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto"
+						className="w-full min-h-9 max-h-[7.5rem] py-2 pl-[4.85rem] pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto sm:pl-[5rem]"
 					/>
 				</div>
 
@@ -484,6 +513,27 @@ export default function ChatBoxSendForm({
 					</button>
 				</div>
 			</form>
+
+			<MessageTemplatesModal
+				isOpen={templatesModalOpen}
+				onClose={() => setTemplatesModalOpen(false)}
+				onInsertContent={text => {
+					const t = text.trim();
+					if (!t) return;
+					setMessage(prev => {
+						const p = prev.trim();
+						return p ? `${p}\n${t}` : t;
+					});
+					setTemplatesModalOpen(false);
+					if (onTyping) {
+						onTyping(true);
+					}
+					requestAnimationFrame(() => {
+						textareaRef.current?.focus();
+						adjustTextareaHeight();
+					});
+				}}
+			/>
 		</div>
 	);
 }
