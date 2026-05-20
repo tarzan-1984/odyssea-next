@@ -71,7 +71,13 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		return "Unknown Chat";
 	};
 
-	const getChatUserData = (): { firstName: string; lastName: string; avatar?: string } => {
+	const getChatUserData = (): {
+		firstName: string;
+		lastName: string;
+		avatar?: string;
+		role?: string;
+		userColor?: string | null;
+	} => {
 		if (!chatRoom) return { firstName: "Unknown", lastName: "User" };
 
 		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
@@ -81,6 +87,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					firstName: otherParticipant.user.firstName,
 					lastName: otherParticipant.user.lastName,
 					avatar: otherParticipant.user.avatar,
+					role: otherParticipant.user.role,
+					userColor: otherParticipant.user.userColor ?? null,
 				};
 			}
 		}
@@ -92,6 +100,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 				firstName: firstParticipant.user.firstName,
 				lastName: firstParticipant.user.lastName,
 				avatar: firstParticipant.user.avatar,
+				role: firstParticipant.user.role,
+				userColor: firstParticipant.user.userColor ?? null,
 			};
 		}
 
@@ -135,6 +145,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 											firstName: otherParticipant.user.firstName,
 											lastName: otherParticipant.user.lastName,
 											avatar: photo,
+											role: otherParticipant.user.role,
+											userColor: otherParticipant.user.userColor ?? null,
 										};
 										return renderAvatar(userData, "w-12 h-12");
 									}
@@ -151,6 +163,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 										firstName: otherParticipant.user.firstName,
 										lastName: otherParticipant.user.lastName,
 										avatar: undefined as string | undefined,
+										role: otherParticipant.user.role,
+										userColor: otherParticipant.user.userColor ?? null,
 									};
 									return renderAvatar(userData, "w-12 h-12");
 								}

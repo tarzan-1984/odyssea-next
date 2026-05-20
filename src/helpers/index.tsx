@@ -48,6 +48,29 @@ export function getRoleDisplayLabel(role: string | null | undefined): string {
 	return ROLE_DISPLAY_LABELS[normalized] ?? role.replace(/_/g, " ");
 }
 
+const DEFAULT_AVATAR_BG = "#465fff";
+
+/** Normalize TMS / DB hex color for CSS background (supports #RGB and #RRGGBB). */
+function normalizeHexColor(raw?: string | null): string | null {
+	if (raw == null || typeof raw !== "string") return null;
+	let s = raw.trim();
+	if (!s) return null;
+	if (!s.startsWith("#")) s = `#${s}`;
+	if (/^#[0-9A-Fa-f]{6}$/.test(s)) return s;
+	if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
+		const r = s[1];
+		const g = s[2];
+		const b = s[3];
+		return `#${r}${r}${g}${g}${b}${b}`;
+	}
+	return null;
+}
+
+function resolveAvatarBackground(role?: string | null, userColor?: string | null): string {
+	if (role?.toUpperCase().trim() === "DRIVER") return DEFAULT_AVATAR_BG;
+	return normalizeHexColor(userColor) ?? DEFAULT_AVATAR_BG;
+}
+
 /**
  * Renders a user's avatar. If the user has an avatar image, it displays the image.
  * Otherwise, it generates a circle with the user's initials.
@@ -105,12 +128,15 @@ export function renderAvatar(item?: UserData | UserListItem | null, className?: 
 		return 'text-xs'; // default for 15px
 	};
 
+	const u = item as UserData | UserListItem;
+
 	return (
 		<div
 			className={twMerge(
-				`flex items-center justify-center rounded-full bg-[#465fff] text-white font-semibold ${getTextSize(className)} w-[15px] h-[15px]`,
+				`flex items-center justify-center rounded-full text-white font-semibold ${getTextSize(className)} w-[15px] h-[15px]`,
 				className
 			)}
+			style={{ backgroundColor: resolveAvatarBackground(u.role, u.userColor ?? null) }}
 		>
 			{initials}
 		</div>

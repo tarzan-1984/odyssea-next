@@ -290,6 +290,8 @@ export default function ChatListItem({
 										firstName: otherParticipant.user.firstName,
 										lastName: otherParticipant.user.lastName,
 										avatar: photo,
+										role: otherParticipant.user.role,
+										userColor: otherParticipant.user.userColor ?? null,
 									};
 									return renderAvatar(userData, "w-12 h-12");
 								}
@@ -306,6 +308,8 @@ export default function ChatListItem({
 									firstName: otherParticipant.user.firstName,
 									lastName: otherParticipant.user.lastName,
 									avatar: undefined as string | undefined,
+									role: otherParticipant.user.role,
+									userColor: otherParticipant.user.userColor ?? null,
 								};
 								return renderAvatar(userData, "w-12 h-12");
 							}

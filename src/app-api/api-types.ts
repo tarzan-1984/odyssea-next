@@ -115,6 +115,8 @@ export interface UserOrganizedData {
 export interface UserData {
 	id?: string;
 	role?: string;
+	/** Profile accent / initials background for internal roles (maps from user_color). */
+	userColor?: string | null;
 	status?: string;
 	externalId?: string;
 	avatar?: string;
@@ -342,6 +344,7 @@ export interface UserListItem {
 	vin: string;
 	profilePhoto?: string;
 	avatar?: string;
+	userColor?: string | null;
 	status: string;
 	externalId?: string;
 }

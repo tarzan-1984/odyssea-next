@@ -14,6 +14,8 @@ export interface User {
 	firstName: string;
 	lastName: string;
 	avatar?: string;
+	/** Accent color for initials avatar (non-driver); ignored when role is DRIVER. */
+	userColor?: string | null;
 	role?: string;
 	/** TMS / external user id (drivers in LOAD chats). */
 	externalId?: string | null;
