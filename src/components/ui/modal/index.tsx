@@ -1,5 +1,6 @@
 "use client";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
 	isOpen: boolean;
@@ -27,6 +28,11 @@ export const Modal: React.FC<ModalProps> = ({
 	closeOnEscape = true,
 }) => {
 	const modalRef = useRef<HTMLDivElement>(null);
+	const [mounted, setMounted] = useState(false);
+
+	useLayoutEffect(() => {
+		setMounted(true);
+	}, []);
 
 	useEffect(() => {
 		const handleEscape = (event: KeyboardEvent) => {
@@ -62,11 +68,11 @@ export const Modal: React.FC<ModalProps> = ({
 		? "w-full h-full"
 		: "relative w-full rounded-3xl bg-white dark:bg-gray-900 shadow-sm";
 
-	return (
-		<div className="fixed inset-0 flex items-center justify-center overflow-y-auto z-[99999] p-4">
+	const modalMarkup = (
+		<div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto p-4">
 			{(!isFullscreen || closeOnBackdropClick) && (
 				<div
-					className="fixed inset-0 h-full w-full bg-primary/70 backdrop-blur-[3px] z-[99999]"
+					className="fixed inset-0 z-[99999] h-full w-full bg-primary/70 backdrop-blur-[3px]"
 					onClick={closeOnBackdropClick ? onClose : undefined}
 				/>
 			)}
@@ -105,4 +111,7 @@ export const Modal: React.FC<ModalProps> = ({
 			</div>
 		</div>
 	);
+
+	// Portal avoids z-index/stacking-context issues when Modal is rendered under sticky/transform parents (e.g. chat input bar).
+	return mounted ? createPortal(modalMarkup, document.body) : null;
 };
