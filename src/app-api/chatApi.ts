@@ -14,6 +14,7 @@ export interface User {
 	firstName: string;
 	lastName: string;
 	avatar?: string;
+	profilePhoto?: string | null;
 	/** Accent color for initials avatar (non-driver); ignored when role is DRIVER. */
 	userColor?: string | null;
 	role?: string;

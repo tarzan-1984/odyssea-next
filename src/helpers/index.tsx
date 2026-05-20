@@ -66,10 +66,23 @@ function normalizeHexColor(raw?: string | null): string | null {
 	return null;
 }
 
-function resolveAvatarBackground(role?: string | null, userColor?: string | null): string {
+/** Background for initials / plate behind photo (non-driver uses userColor when valid). */
+export function resolveAvatarBackground(role?: string | null, userColor?: string | null): string {
 	if (role?.toUpperCase().trim() === "DRIVER") return DEFAULT_AVATAR_BG;
 	return normalizeHexColor(userColor) ?? DEFAULT_AVATAR_BG;
 }
+
+function pickAvatarPhotoUrl(item: UserData | UserListItem): string {
+	const loose = item as UserData & UserListItem & { profilePhoto?: string };
+	const fromAvatar = typeof loose.avatar === "string" ? loose.avatar.trim() : "";
+	const fromPhoto = typeof loose.profilePhoto === "string" ? loose.profilePhoto.trim() : "";
+	return fromAvatar || fromPhoto;
+}
+
+export type RenderAvatarOptions = {
+	/** Parent element already sets backgroundColor (e.g. chat row wrapper); skip duplicate fill. */
+	parentProvidesBackground?: boolean;
+};
 
 /**
  * Renders a user's avatar. If the user has an avatar image, it displays the image.
@@ -81,18 +94,37 @@ function resolveAvatarBackground(role?: string | null, userColor?: string | null
  * @param className - Optional Tailwind CSS classes to override default styling.
  * @returns The avatar element (either an Image or a div with initials).
  */
-export function renderAvatar(item?: UserData | UserListItem | null, className?: string) {
+export function renderAvatar(
+	item?: UserData | UserListItem | null,
+	className?: string,
+	options?: RenderAvatarOptions,
+) {
 	if (!item) return <div className={twMerge("w-10 h-10 bg-gray-300 rounded-full", className)} />;
 
-	if ("avatar" in item && item.avatar) {
+	const u = item as UserData | UserListItem;
+	const bg = resolveAvatarBackground(u.role, u.userColor ?? null);
+	const photoUrl = pickAvatarPhotoUrl(item);
+	const parentBg = options?.parentProvidesBackground === true;
+
+	if (photoUrl) {
+		if (parentBg) {
+			return (
+				<Image
+					src={photoUrl}
+					alt="user"
+					fill
+					className={twMerge("object-cover", className)}
+					sizes="40px"
+				/>
+			);
+		}
 		return (
-			<Image
-				width={15}
-				height={15}
-				src={item.avatar}
-				alt="user"
-				className={twMerge("rounded-full object-cover", className)}
-			/>
+			<div
+				className={twMerge("relative shrink-0 overflow-hidden rounded-full", className)}
+				style={{ backgroundColor: bg }}
+			>
+				<Image src={photoUrl} alt="user" fill className="object-cover" sizes="96px" />
+			</div>
 		);
 	}
 
@@ -128,15 +160,27 @@ export function renderAvatar(item?: UserData | UserListItem | null, className?: 
 		return 'text-xs'; // default for 15px
 	};
 
-	const u = item as UserData | UserListItem;
+	if (parentBg) {
+		return (
+			<span
+				className={twMerge(
+					"relative z-[1] font-semibold text-white",
+					getTextSize(className),
+					className,
+				)}
+			>
+				{initials}
+			</span>
+		);
+	}
 
 	return (
 		<div
 			className={twMerge(
 				`flex items-center justify-center rounded-full text-white font-semibold ${getTextSize(className)} w-[15px] h-[15px]`,
-				className
+				className,
 			)}
-			style={{ backgroundColor: resolveAvatarBackground(u.role, u.userColor ?? null) }}
+			style={{ backgroundColor: bg }}
 		>
 			{initials}
 		</div>
