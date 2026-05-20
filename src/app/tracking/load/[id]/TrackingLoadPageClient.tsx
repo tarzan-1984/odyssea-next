@@ -693,7 +693,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 												</p>
 											) : null}
 											<p>
-												<span className="font-medium">Created:</span>{" "}
+												<span className="font-medium">Tracked:</span>{" "}
 												{formatHistoryDate(point.createdAt)}
 											</p>
 											<p>
