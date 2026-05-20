@@ -113,6 +113,7 @@ export default function UserListTable() {
 
 	return (
 		<div className="relative overflow-hidden bg-white dark:bg-white/[0.03] rounded-xl">
+
 			{/* Header section with pagination controls and search */}
 			<div className="flex flex-col gap-2 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl sm:flex-row sm:items-center sm:justify-between">
 				{/* Items per page selector */}
