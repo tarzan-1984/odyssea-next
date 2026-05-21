@@ -53,9 +53,14 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Get error, chat room, and pagination state from store
 	const error = useChatStore(state => state.error);
-	const selectedChatRoom = useChatStore(state =>
-		state.chatRooms.find(r => r.id === selectedChatRoomId)
-	);
+	const currentChatRoom = useChatStore(state => state.currentChatRoom);
+	const selectedChatRoom = useChatStore(state => {
+		if (!selectedChatRoomId) return undefined;
+		if (state.currentChatRoom?.id === selectedChatRoomId) {
+			return state.currentChatRoom as ChatRoom;
+		}
+		return state.chatRooms.find(r => r.id === selectedChatRoomId);
+	});
 	const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
 	const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
 

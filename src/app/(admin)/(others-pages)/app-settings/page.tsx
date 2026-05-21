@@ -873,7 +873,7 @@ export default function AppSettingsPage() {
 				setDeliveredLoadArchiveHours(String(s.deliveredLoadChatArchiveAfterHours));
 			}
 			setSuccessLoadChat(
-				"Saved. Backend cleanup cron uses this delay after deliveryAt before archiving and deleting LOAD chats."
+				"Saved. The cleanup cron will set isLoadArchived on LOAD chats after this many hours past deliveryAt."
 			);
 		} catch {
 			setErrorLoadChat("Network error while saving");
@@ -1722,13 +1722,13 @@ export default function AppSettingsPage() {
 					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 				>
 					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-						Backend — delivered LOAD chat cleanup
+						Backend — delivered LOAD chat flag
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						After a LOAD chat gets <code className="text-xs">deliveryAt</code> from the
-						webhook, the server waits this many hours, then archives messages to storage,
-						deletes the chat, and notifies participants (same as manual delete). The cron
-						runs every 3 hours.
+						After a LOAD chat has <code className="text-xs">deliveryAt</code> set, the server
+						waits this many hours, then the cron (every 3 hours) sets{" "}
+						<code className="text-xs">isLoadArchived=true</code> on that chat room. The chat and
+						messages stay in the database; clients receive <code className="text-xs">chatRoomUpdated</code>.
 					</p>
 
 					{loadingLoadChat ? (
@@ -1738,7 +1738,7 @@ export default function AppSettingsPage() {
 					) : (
 						<div className="max-w-xl">
 							<Label htmlFor="deliveredLoadChatArchiveAfterHours" className="mb-1">
-								Hours after delivery before archive &amp; delete
+								Hours after delivery before isLoadArchived
 							</Label>
 							<Input
 								id="deliveredLoadChatArchiveAfterHours"

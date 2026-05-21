@@ -93,9 +93,19 @@ export const useChatSync = () => {
 			// Helper: ensure currentChatRoom points to an existing room
 			const ensureCurrentRoomValidity = (rooms: ChatRoom[]) => {
 				const current = useChatStore.getState().currentChatRoom;
-				if (current && !rooms.find(r => r.id === current.id)) {
-					setCurrentChatRoom(null);
+				if (!current || rooms.some(r => r.id === current.id)) {
+					return;
 				}
+				if (
+					current.type === "LOAD" &&
+					(current.isLoadArchived === true ||
+						useChatStore.getState().chatRooms.some(
+							r => r.id === current.id && r.isLoadArchived === true
+						))
+				) {
+					return;
+				}
+				setCurrentChatRoom(null);
 			};
 
 			// Check if we have cached chat rooms first

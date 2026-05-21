@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { useChatStore } from "@/stores/chatStore";
 import { ChatRoom } from "@/app-api/chatApi";
+import { useQueryClient } from "@tanstack/react-query";
+import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
 interface UseWebSocketChatRoomsProps {
 	onChatRoomCreated?: (chatRoom: ChatRoom) => void;
@@ -39,6 +41,7 @@ export const useWebSocketChatRooms = ({
 }: UseWebSocketChatRoomsProps) => {
 	const { socket, isConnected } = useWebSocket();
 	const { addChatRoom, updateChatRoom } = useChatStore();
+	const queryClient = useQueryClient();
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Set up event listeners
@@ -64,6 +67,14 @@ export const useWebSocketChatRooms = ({
 		}) => {
 			// Update chat room in store
 			updateChatRoom(data.chatRoomId, data.updatedChatRoom);
+
+			const patch = data.updatedChatRoom as Partial<ChatRoom> & { isLoadArchived?: boolean };
+			if (patch.isLoadArchived === true) {
+				queryClient
+					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
+					.catch(() => {});
+			}
+
 			onChatRoomUpdated?.(data);
 		};
 
@@ -122,6 +133,7 @@ export const useWebSocketChatRooms = ({
 		socket,
 		addChatRoom,
 		updateChatRoom,
+		queryClient,
 		onChatRoomCreated,
 		onChatRoomUpdated,
 		onParticipantsAdded,

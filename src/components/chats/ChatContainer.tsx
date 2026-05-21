@@ -21,22 +21,40 @@ export default function ChatContainer() {
 	const webSocketChatSync = useWebSocketChatSync();
 	const chatRooms = useChatStore(s => s.chatRooms);
 
-	// When navigating with ?room=xxx, select that chat when rooms are loaded
 	useEffect(() => {
-		if (!roomFromUrl || chatRooms.length === 0) return;
-		const room = chatRooms.find(r => r.id === roomFromUrl);
-		if (room) {
-			setSelectedChatRoomId(roomFromUrl);
-			webSocketChatSync.setCurrentChatRoom(room);
-		}
-	}, [roomFromUrl, chatRooms]);
-	// Get modal states
+		if (!roomFromUrl) return;
+
+		const trySelect = async () => {
+			const fromList = chatRooms.find(r => r.id === roomFromUrl);
+			if (fromList) {
+				setSelectedChatRoomId(roomFromUrl);
+				webSocketChatSync.setCurrentChatRoom(fromList);
+				return;
+			}
+			const curr = useChatStore.getState().currentChatRoom;
+			if (curr?.id === roomFromUrl) {
+				setSelectedChatRoomId(roomFromUrl);
+				return;
+			}
+			try {
+				const { chatApi } = await import("@/app-api/chatApi");
+				const room = await chatApi.getChatRoom(roomFromUrl);
+				if (room?.type === "LOAD" && room.isLoadArchived) {
+					useChatStore.getState().addChatRoom(room);
+				} else if (!chatRooms.some(r => r.id === roomFromUrl)) {
+					useChatStore.getState().addChatRoom(room);
+				}
+				setSelectedChatRoomId(roomFromUrl);
+				webSocketChatSync.setCurrentChatRoom(room);
+			} catch {
+				// ignore — room inaccessible
+			}
+		};
+
+		trySelect().catch(() => {});
+	}, [roomFromUrl, chatRooms, webSocketChatSync]);
 	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } =
 		useChatModal();
-	const selectedChatRoom = useChatStore(state =>
-		state.chatRooms.find(r => r.id === selectedChatRoomId)
-	);
-
 	// Clear active chat when component unmounts (user leaves chat page)
 	useEffect(() => {
 		return () => {

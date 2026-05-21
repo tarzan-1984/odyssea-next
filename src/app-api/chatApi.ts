@@ -33,6 +33,8 @@ export interface ChatRoom {
 	avatar?: string;
 	adminId?: string;
 	isArchived: boolean;
+	/** LOAD chat: load-specific archive flag (cron after deliveryAt + configured hours). */
+	isLoadArchived?: boolean;
 	createdAt: string;
 	updatedAt: string;
 	participants: ChatRoomParticipant[];
@@ -187,6 +189,34 @@ class ChatApiClient {
 	async getChatRooms(): Promise<ChatRoom[]> {
 		const response = await this.request<ChatRoom[]>("/chat-rooms");
 		return response || [];
+	}
+
+	/** Paginated LOAD chats where is_load_archived (main list excludes these). */
+	async getArchivedLoadChatRooms(
+		page: number = 1,
+		limit: number = 10
+	): Promise<{
+		chatRooms: ChatRoom[];
+		pagination: { page: number; limit: number; hasMore: boolean };
+	}> {
+		const params = new URLSearchParams({
+			page: page.toString(),
+			limit: limit.toString(),
+		});
+
+		const response = await this.request<{
+			chatRooms: ChatRoom[];
+			pagination: { page: number; limit: number; hasMore: boolean };
+		}>(`/chat-rooms/load-archived?${params}`);
+
+		return {
+			chatRooms: Array.isArray(response?.chatRooms) ? response.chatRooms : [],
+			pagination: response?.pagination ?? {
+				page,
+				limit,
+				hasMore: false,
+			},
+		};
 	}
 
 	getChatRoom(chatRoomId: string): Promise<ChatRoom> {

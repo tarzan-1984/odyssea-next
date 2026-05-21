@@ -10,6 +10,7 @@ import ChatListItem from "./ChatListItem";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { chatApi } from "@/app-api/chatApi";
+import LoadChatsArchiveSection from "./LoadChatsArchiveSection";
 import { useChatStore } from "@/stores/chatStore";
 // WebSocket functionality is now passed via props
 
@@ -165,7 +166,7 @@ export default function ChatList({
 			.filter((r) => r.type !== "LOAD" && r.type !== "OFFER")
 			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
 		const shipments = chatRooms
-			.filter((r) => r.type === "LOAD")
+			.filter((r) => r.type === "LOAD" && r.isLoadArchived !== true)
 			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
 		const offers = chatRooms
 			.filter((r) => r.type === "OFFER")
@@ -179,7 +180,8 @@ export default function ChatList({
 	// - Offers tab: show only OFFER chats
 	const tabScopedChatRooms = chatRooms.filter((room) => {
 		if (activeTab === "chats") return room.type !== "LOAD" && room.type !== "OFFER";
-		if (activeTab === "shipments") return room.type === "LOAD";
+		if (activeTab === "shipments")
+			return room.type === "LOAD" && !(room.isLoadArchived === true);
 		if (activeTab === "offers") return room.type === "OFFER";
 		return false;
 	});
@@ -618,8 +620,9 @@ export default function ChatList({
 				</div>
 			</div>
 
-			{/* Chat List - fills remaining space with scroll */}
-			<div className="min-h-0 flex-1 overflow-y-auto pb-4">
+			{/* Main list + archived LOAD (Shipments) */}
+			<div className="flex min-h-0 flex-1 flex-col pb-4">
+				<div className="min-h-0 flex-1 overflow-y-auto">
 				{!filteredChatRooms || filteredChatRooms.length === 0 ? (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-gray-500 text-center">
@@ -690,7 +693,7 @@ export default function ChatList({
 																		: "offline";
 																}
 																return "offline";
-															})()
+														  })()
 														: "offline";
 												return (
 													<ChatListItem
@@ -735,7 +738,7 @@ export default function ChatList({
 													: "offline";
 											}
 											return "offline";
-										})()
+									  })()
 									: "offline";
 
 							return (
@@ -755,6 +758,16 @@ export default function ChatList({
 							);
 						})}
 					</div>
+				)}
+				</div>
+				{activeTab === "shipments" && (
+					<LoadChatsArchiveSection
+						tabActive={activeTab === "shipments"}
+						selectedChatId={selectedChatId}
+						onChatSelect={onChatSelect}
+						webSocketChatSync={webSocketChatSync}
+						loadChatRooms={opts => webSocketChatSync.loadChatRooms(opts)}
+					/>
 				)}
 			</div>
 		</div>
