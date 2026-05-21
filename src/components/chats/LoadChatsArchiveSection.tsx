@@ -41,10 +41,46 @@ export default function LoadChatsArchiveSection({
 }: LoadChatsArchiveSectionProps) {
 	const currentUser = useCurrentUser();
 	const [expanded, setExpanded] = useState(false);
+	const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
+	const [debouncedArchiveSearch, setDebouncedArchiveSearch] = useState("");
 	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
 
 	const scrollRootRef = useRef<HTMLDivElement>(null);
 	const sentinelRef = useRef<HTMLDivElement>(null);
+
+	const clearArchiveSearch = () => {
+		setArchiveSearchQuery("");
+		setDebouncedArchiveSearch("");
+	};
+
+	/** Mirrors `ChatList.getChatDisplayName` + LOAD fallback like GROUP (archived shipments are LOAD). */
+	const getArchiveChatDisplayName = React.useCallback(
+		(chatRoom: ChatRoom): string => {
+			if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+				const otherParticipant = chatRoom.participants.find(
+					p => p.user.id !== currentUser?.id
+				);
+				if (otherParticipant) {
+					return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
+				}
+			}
+
+			if (chatRoom.name) {
+				return chatRoom.name;
+			}
+
+			if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
+				const participantNames = chatRoom.participants
+					.slice(0, 2)
+					.map(p => p.user.firstName)
+					.join(", ");
+				return participantNames + (chatRoom.participants.length > 2 ? "..." : "");
+			}
+
+			return "Unknown Chat";
+		},
+		[currentUser?.id]
+	);
 
 	const {
 		data,
@@ -90,6 +126,14 @@ export default function LoadChatsArchiveSection({
 		data?.pages?.length,
 	]);
 
+	useEffect(() => {
+		const timer = window.setTimeout(() => {
+			setDebouncedArchiveSearch(archiveSearchQuery);
+		}, 300);
+
+		return () => window.clearTimeout(timer);
+	}, [archiveSearchQuery]);
+
 	const archivedRooms = React.useMemo(
 		() =>
 			Array.isArray(data?.pages)
@@ -97,6 +141,14 @@ export default function LoadChatsArchiveSection({
 				: [],
 		[data]
 	);
+
+	const filteredArchivedRooms = React.useMemo(() => {
+		const q = debouncedArchiveSearch.trim().toLowerCase();
+		if (!q) return archivedRooms;
+		return archivedRooms.filter(room =>
+			getArchiveChatDisplayName(room).toLowerCase().includes(q)
+		);
+	}, [archivedRooms, debouncedArchiveSearch, getArchiveChatDisplayName]);
 
 	return (
 		<div className="mt-auto flex min-h-0 shrink-0 flex-col pt-2">
@@ -120,11 +172,62 @@ export default function LoadChatsArchiveSection({
 				</button>
 
 				{expanded && (
-					<div className="border-t border-gray-200 bg-gray-50/90 dark:border-white/10 dark:bg-white/[0.03]">
-				<div
-					ref={scrollRootRef}
-					className="max-h-[min(20rem,42vh)] min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
-				>
+					<div className="flex max-h-[min(26rem,52vh)] min-h-0 flex-col border-t border-gray-200 bg-gray-50/90 dark:border-white/10 dark:bg-white/[0.03]">
+						<div className="shrink-0 border-b border-gray-200 bg-gray-50/90 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+							<div className="relative">
+								<button
+									type="button"
+									className="absolute -translate-y-1/2 left-3 top-1/2"
+									aria-hidden
+								>
+									<svg
+										className="fill-gray-500 dark:fill-gray-400"
+										width="16"
+										height="16"
+										viewBox="0 0 20 20"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											fillRule="evenodd"
+											clipRule="evenodd"
+											d="M3.04199 9.37381C3.04199 5.87712 5.87735 3.04218 9.37533 3.04218C12.8733 3.04218 15.7087 5.87712 15.7087 9.37381C15.7087 12.8705 12.8733 15.7055 9.37533 15.7055C5.87735 15.7055 3.04199 12.8705 3.04199 9.37381ZM9.37533 1.54218C5.04926 1.54218 1.54199 5.04835 1.54199 9.37381C1.54199 13.6993 5.04926 17.2055 9.37533 17.2055C11.2676 17.2055 13.0032 16.5346 14.3572 15.4178L17.1773 18.2381C17.4702 18.531 17.945 18.5311 18.2379 18.2382C18.5308 17.9453 18.5309 17.4704 18.238 17.1775L15.4182 14.3575C16.5367 13.0035 17.2087 11.2671 17.2087 9.37381C17.2087 5.04835 13.7014 1.54218 9.37533 1.54218Z"
+											fill=""
+										/>
+									</svg>
+								</button>
+								<input
+									type="search"
+									autoComplete="off"
+									placeholder="Search chats..."
+									value={archiveSearchQuery}
+									onChange={e => setArchiveSearchQuery(e.target.value)}
+									className="dark:bg-dark-900 h-9 w-full rounded-lg border border-gray-300 bg-transparent pl-9 pr-9 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+									aria-label="Search archived chats"
+								/>
+								{archiveSearchQuery !== "" ? (
+									<button
+										type="button"
+										onClick={clearArchiveSearch}
+										className="absolute -translate-y-1/2 right-3 top-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+										aria-label="Clear archived chat search"
+									>
+										<svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+											<path
+												fillRule="evenodd"
+												clipRule="evenodd"
+												d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+												fill="currentColor"
+											/>
+										</svg>
+									</button>
+								) : null}
+							</div>
+						</div>
+						<div
+							ref={scrollRootRef}
+							className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+						>
 					{isLoading && archivedRooms.length === 0 ? (
 						<div className="px-3 py-4 text-center text-sm text-gray-500">
 							Loading archived…
@@ -137,9 +240,17 @@ export default function LoadChatsArchiveSection({
 						<div className="px-3 py-4 text-center text-sm text-gray-500">
 							No archived shipments yet
 						</div>
+					) : filteredArchivedRooms.length === 0 ? (
+						<div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+							{debouncedArchiveSearch.trim() ? (
+								<>No chats found</>
+							) : (
+								<>No archived shipments yet</>
+							)}
+						</div>
 					) : (
 						<ul className="divide-y divide-gray-200 py-1 dark:divide-white/10">
-							{archivedRooms.map(chatRoom => {
+							{filteredArchivedRooms.map(chatRoom => {
 								const isSelected = selectedChatId === chatRoom.id;
 								const title = archivedChatTitle(chatRoom);
 								const displayRoom =
@@ -186,7 +297,7 @@ export default function LoadChatsArchiveSection({
 							Loading more…
 						</div>
 					)}
-				</div>
+						</div>
 					</div>
 				)}
 			</div>
