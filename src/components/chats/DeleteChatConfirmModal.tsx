@@ -1,11 +1,13 @@
 "use client";
 import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import { ChatRoom } from "@/app-api/chatApi";
 import { TrashDeleteIcon } from "@/icons";
 import { useCurrentUser } from "@/stores/userStore";
 import { useWebSocketChatRooms } from "@/hooks/useWebSocketChatRooms";
+import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "./loadArchivedChatsQueryKey";
 
 interface DeleteChatConfirmModalProps {
 	isOpen: boolean;
@@ -22,6 +24,7 @@ export default function DeleteChatConfirmModal({
 }: DeleteChatConfirmModalProps) {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const currentUser = useCurrentUser();
+	const queryClient = useQueryClient();
 	const { removeParticipant } = useWebSocketChatRooms({});
 
 	const handleDelete = async () => {
@@ -53,6 +56,18 @@ export default function DeleteChatConfirmModal({
 				// For direct chats or admin deleting group chat, use the existing delete API
 				const { chatApi } = await import("@/app-api/chatApi");
 				await chatApi.deleteChatRoom(chatRoom.id);
+			}
+
+			if (chatRoom.type === "LOAD") {
+				queryClient
+					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
+					.then(() =>
+						queryClient.refetchQueries({
+							queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY],
+							type: "active",
+						})
+					)
+					.catch(() => {});
 			}
 
 			// Clear current chat room if it was the deleted one

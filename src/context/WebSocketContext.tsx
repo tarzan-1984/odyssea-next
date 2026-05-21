@@ -17,6 +17,7 @@ import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
+import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
 // WebSocket context interface
 interface WebSocketContextType {
@@ -477,6 +478,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle chat room deletion
 		newSocket.on("chatRoomDeleted", (data: { chatRoomId: string; deletedBy: string }) => {
 			const state = useChatStore.getState();
+			const roomBefore =
+				state.chatRooms.find(r => r.id === data.chatRoomId) ??
+				(state.currentChatRoom?.id === data.chatRoomId ? state.currentChatRoom : undefined);
+
+			if (roomBefore?.type === "LOAD") {
+				queryClient
+					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
+					.catch(() => {});
+			}
+
 			state.removeChatRoom(data.chatRoomId);
 
 			// Clear currentChatRoom if it was the deleted chat

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { serverAuth } from '@/utils/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const accessToken = serverAuth.getAccessToken(request);
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // Forward request to backend
     const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/delete_load_chat`;
 
@@ -19,7 +25,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ load_id }),
     });
