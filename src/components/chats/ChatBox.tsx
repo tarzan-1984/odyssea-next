@@ -61,6 +61,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		}
 		return state.chatRooms.find(r => r.id === selectedChatRoomId);
 	});
+
+	const isLoadArchivedReadOnlyChat =
+		selectedChatRoom?.type === "LOAD" && selectedChatRoom.isLoadArchived === true;
 	const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
 	const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
 
@@ -567,15 +570,17 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				<div ref={messagesEndRef} />
 			</div>
 
-			{/* Send Form */}
-			<ChatBoxSendForm
-				onSendMessage={handleSendMessage}
-				onTyping={sendTyping}
-				isLoading={sending}
-				disabled={sending}
-				replyingTo={replyingTo || undefined}
-				onCancelReply={handleCancelReply}
-			/>
+			{/* Send form hidden for archived LOAD shipments (read-only history) */}
+			{!isLoadArchivedReadOnlyChat && (
+				<ChatBoxSendForm
+					onSendMessage={handleSendMessage}
+					onTyping={sendTyping}
+					isLoading={sending}
+					disabled={sending}
+					replyingTo={replyingTo || undefined}
+					onCancelReply={handleCancelReply}
+				/>
+			)}
 		</div>
 	);
 }
