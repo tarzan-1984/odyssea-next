@@ -302,7 +302,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{/* Message content */}
 				{message.content?.trim() && !multiAttachments &&
 					(isSender ? (
-						<div className="flex items-center gap-2">
+						<div className="flex items-center justify-end gap-2">
 							<div
 								className={`px-3 py-2 rounded-lg bg-brand-500 text-white dark:bg-brand-500 rounded-tr-sm`}
 							>

@@ -1,8 +1,19 @@
 export type MessageTemplateScope = "personal" | "company";
 
+/** Stored template category (matches DB message_templates.type). */
+export type MessageTemplateKind = "personal" | "company";
+
+/** Stored template department (matches DB message_templates.group). */
+export type MessageTemplateGroupDto = "Expedite" | "HR" | "Tracking";
+
+/** Admin company-tab subgroup filter (Nest query `companyGroup`). */
+export type AdminCompanyGroupFilter = "all" | "Expedite" | "HR" | "Tracking";
+
 export interface MessageTemplateDto {
 	id: number;
 	externalId: string;
+	type: MessageTemplateKind;
+	group: MessageTemplateGroupDto | null;
 	title: string | null;
 	content: string | null;
 	createdAt: string;
@@ -34,6 +45,7 @@ export async function fetchMessageTemplatesPage(params: {
 	page: number;
 	limit?: number;
 	search?: string;
+	companyGroup?: AdminCompanyGroupFilter;
 }): Promise<MessageTemplatesPageDto> {
 	const limit = params.limit ?? 10;
 	const qs = new URLSearchParams({
@@ -42,6 +54,9 @@ export async function fetchMessageTemplatesPage(params: {
 		limit: String(limit),
 	});
 	if (params.search?.trim()) qs.set("search", params.search.trim());
+	if (params.companyGroup && params.companyGroup !== "all") {
+		qs.set("companyGroup", params.companyGroup);
+	}
 
 	const res = await fetch(`/api/message-templates?${qs.toString()}`, {
 		method: "GET",
@@ -67,8 +82,16 @@ export async function fetchMessageTemplatesPage(params: {
 
 export interface UpsertMessageTemplatePayload {
 	id?: number;
+	type?: MessageTemplateKind;
+	group?: MessageTemplateGroupDto;
 	title?: string;
 	content?: string;
+}
+
+function parseTemplateGroup(raw: unknown): MessageTemplateGroupDto | null {
+	if (raw === null || raw === undefined) return null;
+	if (raw === "HR" || raw === "Tracking" || raw === "Expedite") return raw;
+	return null;
 }
 
 function parseTemplateDto(raw: Record<string, unknown>): MessageTemplateDto {
@@ -80,6 +103,8 @@ function parseTemplateDto(raw: Record<string, unknown>): MessageTemplateDto {
 	return {
 		id,
 		externalId,
+		type: raw.type === "company" ? "company" : "personal",
+		group: parseTemplateGroup(raw.group),
 		title: typeof raw.title === "string" ? raw.title : null,
 		content: typeof raw.content === "string" ? raw.content : null,
 		createdAt:

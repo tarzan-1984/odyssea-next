@@ -54,12 +54,14 @@ export async function GET(request: NextRequest) {
 		const page = searchParams.get("page") ?? "1";
 		const limit = searchParams.get("limit") ?? "10";
 		const search = searchParams.get("search");
+		const companyGroup = searchParams.get("companyGroup");
 
 		const qs = new URLSearchParams();
 		if (scope) qs.set("scope", scope);
 		qs.set("page", page);
 		qs.set("limit", limit);
 		if (search && search.trim()) qs.set("search", search.trim());
+		if (companyGroup && companyGroup.trim()) qs.set("companyGroup", companyGroup.trim());
 
 		const response = await fetch(
 			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/message-templates?${qs.toString()}`,

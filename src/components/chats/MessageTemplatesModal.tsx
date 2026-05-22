@@ -9,21 +9,103 @@ import {
 	upsertMessageTemplate,
 	deleteMessageTemplate,
 	type MessageTemplateDto,
+	type MessageTemplateKind,
+	type MessageTemplateGroupDto,
 	type MessageTemplateScope,
+	type AdminCompanyGroupFilter,
 } from "@/app-api/messageTemplatesApi";
 import type { UserData } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
 
 const PER_PAGE = 10;
 
-function canShowDeleteTemplate(tpl: MessageTemplateDto, user: UserData | null): boolean {
-	if (!user) return false;
-	const role = (user.role ?? "").trim().toUpperCase();
-	if (role === "ADMINISTRATOR") return true;
-	const ext = user.externalId?.trim();
+function normRole(user: UserData | null): string {
+	return (user?.role ?? "").trim().toUpperCase();
+}
+
+/** Roles that may open the Company tab. */
+function canSeeCompanyTab(user: UserData | null): boolean {
+	const r = normRole(user);
+	return (
+		r === "ADMINISTRATOR" ||
+		r === "EXPEDITE_MANAGER" ||
+		r === "TRACKING_TL" ||
+		r === "RECRUITER_TL" ||
+		r === "RECRUITER" ||
+		r === "DISPATCHER" ||
+		r === "DISPATCHER_TL" ||
+		r === "NIGHTSHIFT_TRACKING" ||
+		r === "MORNING_TRACKING" ||
+		r === "TRACKING"
+	);
+}
+
+function isAdminUser(user: UserData | null): boolean {
+	return normRole(user) === "ADMINISTRATOR";
+}
+
+function isCompanyCreatorUser(user: UserData | null): boolean {
+	const r = normRole(user);
+	return (
+		r === "EXPEDITE_MANAGER" ||
+		r === "TRACKING_TL" ||
+		r === "RECRUITER_TL" ||
+		r === "ADMINISTRATOR"
+	);
+}
+
+/** Shown only on Company tab (+). */
+function canCreateCompanyTemplate(user: UserData | null): boolean {
+	const r = normRole(user);
+	return (
+		r === "ADMINISTRATOR" ||
+		r === "EXPEDITE_MANAGER" ||
+		r === "TRACKING_TL" ||
+		r === "RECRUITER_TL"
+	);
+}
+
+function isOwnerTemplate(tpl: MessageTemplateDto, user: UserData | null): boolean {
+	const ext = user?.externalId?.trim();
 	if (!ext) return false;
 	return tpl.externalId === ext;
 }
+
+function canEditTemplate(tpl: MessageTemplateDto, user: UserData | null): boolean {
+	if (!user) return false;
+	const r = normRole(user);
+	if (tpl.type === "personal") {
+		return isOwnerTemplate(tpl, user) || r === "ADMINISTRATOR";
+	}
+	if (r === "ADMINISTRATOR") return true;
+	if (
+		r !== "EXPEDITE_MANAGER" &&
+		r !== "TRACKING_TL" &&
+		r !== "RECRUITER_TL"
+	) {
+		return false;
+	}
+	return isOwnerTemplate(tpl, user);
+}
+
+function canDeleteTemplate(tpl: MessageTemplateDto, user: UserData | null): boolean {
+	return canEditTemplate(tpl, user);
+}
+
+function managerDefaultGroup(user: UserData | null): MessageTemplateGroupDto {
+	const r = normRole(user);
+	if (r === "EXPEDITE_MANAGER") return "Expedite";
+	if (r === "TRACKING_TL") return "Tracking";
+	if (r === "RECRUITER_TL") return "HR";
+	return "Expedite";
+}
+
+const ADMIN_GROUP_TABS: Array<{ id: AdminCompanyGroupFilter; label: string }> = [
+	{ id: "all", label: "All" },
+	{ id: "Tracking", label: "Tracking" },
+	{ id: "HR", label: "HR" },
+	{ id: "Expedite", label: "Expedite" },
+];
 
 /** Uniform hit area for insert / edit / delete on template rows */
 const templateRowActionBtnClass =
@@ -109,13 +191,20 @@ export default function MessageTemplatesModal({
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
 	const [tab, setTab] = useState<MessageTemplateScope>("personal");
+	const [companyGroupFilter, setCompanyGroupFilter] =
+		useState<AdminCompanyGroupFilter>("all");
 	const [searchInput, setSearchInput] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [editorOpen, setEditorOpen] = useState(false);
 	const [draftId, setDraftId] = useState<number | undefined>(undefined);
+	const [draftType, setDraftType] = useState<MessageTemplateKind>("personal");
+	const [draftGroup, setDraftGroup] = useState<MessageTemplateGroupDto>("Expedite");
 	const [draftTitle, setDraftTitle] = useState("");
 	const [draftMessage, setDraftMessage] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+
+	const showCompanyTab = useMemo(() => canSeeCompanyTab(currentUser), [currentUser]);
+	const adminUser = useMemo(() => isAdminUser(currentUser), [currentUser]);
 
 	useEffect(() => {
 		const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 300);
@@ -127,13 +216,21 @@ export default function MessageTemplatesModal({
 			setSearchInput("");
 			setDebouncedSearch("");
 			setTab("personal");
+			setCompanyGroupFilter("all");
 			setEditorOpen(false);
 			setDraftId(undefined);
 			setDraftTitle("");
+			setDraftType("personal");
+			setDraftGroup("Expedite");
 			setDraftMessage("");
 			setFormError(null);
 		}
 	}, [isOpen]);
+
+	useEffect(() => {
+		if (!isOpen || !currentUser) return;
+		if (tab === "company" && !showCompanyTab) setTab("personal");
+	}, [isOpen, currentUser, tab, showCompanyTab]);
 
 	const saveMutation = useMutation({
 		mutationFn: upsertMessageTemplate,
@@ -177,16 +274,29 @@ export default function MessageTemplatesModal({
 		setDraftTitle("");
 		setDraftMessage("");
 		setFormError(null);
+		if (tab === "personal") {
+			setDraftType("personal");
+			setDraftGroup(managerDefaultGroup(currentUser));
+		} else {
+			setDraftType("company");
+			if (isAdminUser(currentUser)) {
+				setDraftGroup("Expedite");
+			} else {
+				setDraftGroup(managerDefaultGroup(currentUser));
+			}
+		}
 		setEditorOpen(true);
-	}, []);
+	}, [tab, currentUser]);
 
 	const openEditEditor = useCallback((tpl: MessageTemplateDto) => {
 		setDraftId(tpl.id);
 		setDraftTitle(tpl.title ?? "");
 		setDraftMessage(tpl.content ?? "");
+		setDraftType(tpl.type);
+		setDraftGroup(tpl.group ?? managerDefaultGroup(currentUser));
 		setFormError(null);
 		setEditorOpen(true);
-	}, []);
+	}, [currentUser]);
 
 	const handleSubmitTemplate = useCallback(() => {
 		const msg = draftMessage.trim();
@@ -195,14 +305,43 @@ export default function MessageTemplatesModal({
 			return;
 		}
 		setFormError(null);
-		saveMutation.mutate({
+
+		if (draftType === "personal") {
+			saveMutation.mutate({
+				...(draftId != null ? { id: draftId } : {}),
+				type: "personal",
+				title: draftTitle.trim() || undefined,
+				content: msg,
+			});
+			return;
+		}
+
+		// Company
+		const base = {
 			...(draftId != null ? { id: draftId } : {}),
+			type: "company" as const,
 			title: draftTitle.trim() || undefined,
 			content: msg,
-		});
-	}, [draftId, draftTitle, draftMessage, saveMutation]);
+		};
+		if (isAdminUser(currentUser)) {
+			saveMutation.mutate({ ...base, group: draftGroup });
+		} else {
+			saveMutation.mutate(base);
+		}
+	}, [
+		draftId,
+		draftType,
+		draftGroup,
+		draftTitle,
+		draftMessage,
+		saveMutation,
+		currentUser,
+	]);
 
 	const scope = tab;
+
+	const listQueryEnabled =
+		isOpen && (scope === "personal" || (scope === "company" && showCompanyTab));
 
 	const {
 		data,
@@ -213,18 +352,25 @@ export default function MessageTemplatesModal({
 		isError,
 		error,
 	} = useInfiniteQuery({
-		queryKey: ["message-templates", scope, debouncedSearch],
+		queryKey: [
+			"message-templates",
+			scope,
+			debouncedSearch,
+			scope === "company" && adminUser ? companyGroupFilter : "na",
+		],
 		queryFn: ({ pageParam }) =>
 			fetchMessageTemplatesPage({
 				scope,
 				page: pageParam as number,
 				limit: PER_PAGE,
 				search: debouncedSearch || undefined,
+				companyGroup:
+					scope === "company" && adminUser ? companyGroupFilter : undefined,
 			}),
 		initialPageParam: 1,
 		getNextPageParam: lastPage =>
 			lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined,
-		enabled: isOpen,
+		enabled: listQueryEnabled,
 	});
 
 	const items: MessageTemplateDto[] = useMemo(
@@ -257,232 +403,308 @@ export default function MessageTemplatesModal({
 	const searchPlaceholder =
 		tab === "personal" ? "Search personal templates" : "Search company templates";
 
+	const showHeaderAdd =
+		tab === "personal" || (tab === "company" && canCreateCompanyTemplate(currentUser));
+
+	const editorCompany = draftType === "company";
+	const editorShowAdminGroupPicker =
+		editorCompany && isAdminUser(currentUser);
+	const editorShowManagerGroupHint =
+		editorCompany &&
+		isCompanyCreatorUser(currentUser) &&
+		!isAdminUser(currentUser);
+
 	return (
 		<>
-		<Modal
-			isOpen={isOpen}
-			onClose={onClose}
-			showCloseButton={false}
-			closeOnBackdropClick={!editorOpen}
-			closeOnEscape={!editorOpen}
-			className="flex max-h-[min(85vh,560px)] w-full max-w-lg flex-col overflow-hidden p-0"
-		>
-			<div className="flex min-h-0 flex-1 flex-col">
-				<div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-					<div className="flex min-w-0 flex-1 items-center gap-2">
-						<h2 className="min-w-0 text-lg font-semibold leading-tight text-gray-900 dark:text-white">
-							Text message templates
-						</h2>
+			<Modal
+				isOpen={isOpen}
+				onClose={onClose}
+				showCloseButton={false}
+				closeOnBackdropClick={!editorOpen}
+				closeOnEscape={!editorOpen}
+				className="flex max-h-[min(85vh,560px)] w-full max-w-lg flex-col overflow-hidden p-0"
+			>
+				<div className="flex min-h-0 flex-1 flex-col">
+					<div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+						<div className="flex min-w-0 flex-1 items-center gap-2">
+							<h2 className="min-w-0 text-lg font-semibold leading-tight text-gray-900 dark:text-white">
+								Text message templates
+							</h2>
+							{showHeaderAdd ? (
+								<button
+									type="button"
+									className="shrink-0 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+									aria-label="Add template"
+									title="Add template"
+									onClick={openCreateEditor}
+								>
+									<IconAddTemplate className="block shrink-0" />
+								</button>
+							) : null}
+						</div>
 						<button
 							type="button"
-							className="shrink-0 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
-							aria-label="Add template"
-							title="Add template"
-							onClick={openCreateEditor}
+							onClick={onClose}
+							className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+							aria-label="Close"
 						>
-							<IconAddTemplate className="block shrink-0" />
+							<X className="h-3.5 w-3.5" strokeWidth={2.25} />
 						</button>
 					</div>
-					<button
-						type="button"
-						onClick={onClose}
-						className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-						aria-label="Close"
-					>
-						<X className="h-3.5 w-3.5" strokeWidth={2.25} />
-					</button>
-				</div>
 
-				<div className="flex shrink-0 border-b border-gray-200 dark:border-gray-800">
-					<button
-						type="button"
-						onClick={() => setTab("personal")}
-						className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-							tab === "personal"
-								? "text-brand-600 dark:text-brand-400"
-								: "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
-						}`}
-					>
-						Personal
-						{tab === "personal" ? (
-							<span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+					<div className="flex shrink-0 border-b border-gray-200 dark:border-gray-800">
+						<button
+							type="button"
+							onClick={() => {
+								setTab("personal");
+								setCompanyGroupFilter("all");
+							}}
+							className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+								tab === "personal"
+									? "text-brand-600 dark:text-brand-400"
+									: "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+							}`}
+						>
+							Personal
+							{tab === "personal" ? (
+								<span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+							) : null}
+						</button>
+						{showCompanyTab ? (
+							<button
+								type="button"
+								onClick={() => setTab("company")}
+								className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+									tab === "company"
+										? "text-brand-600 dark:text-brand-400"
+										: "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+								}`}
+							>
+								Company
+								{tab === "company" ? (
+									<span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+								) : null}
+							</button>
 						) : null}
-					</button>
-					<button
-						type="button"
-						onClick={() => setTab("company")}
-						className={`relative flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-							tab === "company"
-								? "text-brand-600 dark:text-brand-400"
-								: "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
-						}`}
-					>
-						Company
-						{tab === "company" ? (
-							<span className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
-						) : null}
-					</button>
-				</div>
-
-				<div className="shrink-0 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-					<div className="relative">
-						<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-						<input
-							type="search"
-							value={searchInput}
-							onChange={e => setSearchInput(e.target.value)}
-							placeholder={searchPlaceholder}
-							className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
-						/>
 					</div>
-				</div>
 
-				<div
-					ref={scrollRef}
-					className="min-h-[200px] flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2"
-				>
-					{isPending ? (
-						<p className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-							Loading templates…
-						</p>
-					) : isError ? (
-						<p className="px-3 py-8 text-center text-sm text-red-600 dark:text-red-400">
-							{error instanceof Error ? error.message : "Failed to load templates"}
-						</p>
-					) : items.length === 0 ? (
-						<p className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-							No templates yet.
-						</p>
-					) : (
-						<ul className="space-y-0">
-							{items.map(tpl => (
-								<li
-									key={`${tpl.id}-${tpl.updatedAt}`}
-									className="border-b border-gray-100 last:border-b-0 dark:border-gray-800"
-								>
-									<div className="flex items-start gap-2 px-3 py-3">
-										<div className="min-w-0 flex-1">
-											<p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-												{tpl.title?.trim() ? tpl.title : "Untitled"}
-											</p>
-											<p className="truncate text-sm text-gray-500 dark:text-gray-400">
-												{tpl.content?.trim()
-													? tpl.content.replace(/\s+/g, " ").trim()
-													: "—"}
-											</p>
-										</div>
-										<div className="flex shrink-0 items-center gap-1">
-											<button
-												type="button"
-												className={templateRowActionBtnClass}
-												aria-label="Insert template into message"
-												title="Insert"
-												onClick={() => handleInsert(tpl)}
-											>
-												<IconInsertTemplate className="block shrink-0" />
-											</button>
-											{tab === "personal" ? (
+					<div className="shrink-0 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+						<div className="relative">
+							<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+							<input
+								type="search"
+								value={searchInput}
+								onChange={e => setSearchInput(e.target.value)}
+								placeholder={searchPlaceholder}
+								className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
+							/>
+						</div>
+					</div>
+
+					{tab === "company" && adminUser ? (
+						<div className="shrink-0 border-b border-gray-200 px-3 py-2 dark:border-gray-800">
+							<div className="flex flex-wrap gap-1.5">
+								{ADMIN_GROUP_TABS.map(t => (
+									<button
+										key={t.id}
+										type="button"
+										onClick={() => setCompanyGroupFilter(t.id)}
+										className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+											companyGroupFilter === t.id
+												? "bg-brand-600 text-white dark:bg-brand-500"
+												: "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-white/10"
+										}`}
+									>
+										{t.label}
+									</button>
+								))}
+							</div>
+						</div>
+					) : null}
+
+					<div
+						ref={scrollRef}
+						className="min-h-[200px] flex-1 overflow-y-auto overscroll-contain px-2 pb-4 pt-2"
+					>
+						{!listQueryEnabled ? null : isPending ? (
+							<p className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+								Loading templates…
+							</p>
+						) : isError ? (
+							<p className="px-3 py-8 text-center text-sm text-red-600 dark:text-red-400">
+								{error instanceof Error ? error.message : "Failed to load templates"}
+							</p>
+						) : items.length === 0 ? (
+							<p className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+								No templates yet.
+							</p>
+						) : (
+							<ul className="space-y-0">
+								{items.map(tpl => (
+									<li
+										key={`${tpl.id}-${tpl.updatedAt}`}
+										className="border-b border-gray-100 last:border-b-0 dark:border-gray-800"
+									>
+										<div className="flex items-start gap-2 px-3 py-3">
+											<div className="min-w-0 flex-1">
+												<p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+													{tpl.title?.trim() ? tpl.title : "Untitled"}
+												</p>
+												{tpl.type === "company" && tpl.group ? (
+													<p className="text-[11px] font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">
+														{tpl.group}
+													</p>
+												) : null}
+												<p className="truncate text-sm text-gray-500 dark:text-gray-400">
+													{tpl.content?.trim()
+														? tpl.content.replace(/\s+/g, " ").trim()
+														: "—"}
+												</p>
+											</div>
+											<div className="flex shrink-0 items-center gap-1">
 												<button
 													type="button"
 													className={templateRowActionBtnClass}
-													aria-label="Edit template"
-													title="Edit"
-													onClick={() => openEditEditor(tpl)}
+													aria-label="Insert template into message"
+													title="Insert"
+													onClick={() => handleInsert(tpl)}
 												>
-													<IconEditTemplate className="block shrink-0" />
+													<IconInsertTemplate className="block shrink-0" />
 												</button>
-											) : null}
-											{canShowDeleteTemplate(tpl, currentUser) ? (
-												<button
-													type="button"
-													className={templateRowDeleteBtnClass}
-													aria-label="Delete template"
-													title="Delete"
-													disabled={deleteMutation.isPending}
-													onClick={() => handleDeleteTemplate(tpl)}
-												>
-													<Trash2 className="h-[15px] w-[15px] shrink-0" strokeWidth={2} />
-												</button>
-											) : null}
+												{canEditTemplate(tpl, currentUser) ? (
+													<button
+														type="button"
+														className={templateRowActionBtnClass}
+														aria-label="Edit template"
+														title="Edit"
+														onClick={() => openEditEditor(tpl)}
+													>
+														<IconEditTemplate className="block shrink-0" />
+													</button>
+												) : null}
+												{canDeleteTemplate(tpl, currentUser) ? (
+													<button
+														type="button"
+														className={templateRowDeleteBtnClass}
+														aria-label="Delete template"
+														title="Delete"
+														disabled={deleteMutation.isPending}
+														onClick={() => handleDeleteTemplate(tpl)}
+													>
+														<Trash2 className="h-[15px] w-[15px] shrink-0" strokeWidth={2} />
+													</button>
+												) : null}
+											</div>
 										</div>
-									</div>
-								</li>
-							))}
-						</ul>
-					)}
-					<div ref={sentinelRef} className="h-4 w-full shrink-0" aria-hidden />
-					{isFetchingNextPage ? (
-						<p className="pb-4 text-center text-xs text-gray-500 dark:text-gray-400">
-							Loading more…
+									</li>
+								))}
+							</ul>
+						)}
+						<div ref={sentinelRef} className="h-4 w-full shrink-0" aria-hidden />
+						{isFetchingNextPage ? (
+							<p className="pb-4 text-center text-xs text-gray-500 dark:text-gray-400">
+								Loading more…
+							</p>
+						) : null}
+					</div>
+				</div>
+			</Modal>
+
+			<Modal
+				isOpen={editorOpen && isOpen}
+				onClose={() => {
+					if (!saveMutation.isPending) setEditorOpen(false);
+				}}
+				showCloseButton={false}
+				closeOnBackdropClick={!saveMutation.isPending}
+				className="flex w-full max-w-md flex-col overflow-hidden p-0"
+			>
+				<div className="flex flex-col gap-4 p-5">
+					<div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-gray-800">
+						<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+							{draftId != null ? "Edit message template" : "Add message template"}
+						</h2>
+						<button
+							type="button"
+							disabled={saveMutation.isPending}
+							onClick={() => setEditorOpen(false)}
+							className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+							aria-label="Close"
+						>
+							<X className="h-3.5 w-3.5" strokeWidth={2.25} />
+						</button>
+					</div>
+
+					{draftType === "personal" ? (
+						<p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800/80 dark:text-gray-400">
+							Personal template (only you). Not linked to a company group.
 						</p>
 					) : null}
-				</div>
-			</div>
-		</Modal>
 
-		<Modal
-			isOpen={editorOpen && isOpen}
-			onClose={() => {
-				if (!saveMutation.isPending) setEditorOpen(false);
-			}}
-			showCloseButton={false}
-			closeOnBackdropClick={!saveMutation.isPending}
-			className="flex w-full max-w-md flex-col overflow-hidden p-0"
-		>
-			<div className="flex flex-col gap-4 p-5">
-				<div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-gray-800">
-					<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-						{draftId != null ? "Edit message template" : "Add message template"}
-					</h2>
+					{editorShowAdminGroupPicker ? (
+						<label className="flex flex-col gap-1.5">
+							<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Group</span>
+							<select
+								value={draftGroup}
+								disabled={saveMutation.isPending}
+								onChange={e =>
+									setDraftGroup(e.target.value as MessageTemplateGroupDto)
+								}
+								className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white"
+							>
+								<option value="Expedite">Expedite</option>
+								<option value="HR">HR</option>
+								<option value="Tracking">Tracking</option>
+							</select>
+						</label>
+					) : null}
+
+					{editorShowManagerGroupHint ? (
+						<p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800/80 dark:text-gray-400">
+							Company template · Group:&nbsp;
+							<strong>{draftGroup}</strong>
+							{draftId == null ? " (assigned from your role)" : null}
+						</p>
+					) : null}
+
+					<label className="flex flex-col gap-1.5">
+						<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Title</span>
+						<input
+							type="text"
+							value={draftTitle}
+							onChange={e => setDraftTitle(e.target.value)}
+							placeholder="Optional title"
+							disabled={saveMutation.isPending}
+							className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
+						/>
+					</label>
+
+					<label className="flex flex-col gap-1.5">
+						<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Message</span>
+						<textarea
+							value={draftMessage}
+							onChange={e => setDraftMessage(e.target.value)}
+							placeholder="Template text"
+							rows={6}
+							disabled={saveMutation.isPending}
+							className="resize-y rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
+						/>
+					</label>
+
+					{formError ? (
+						<p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
+					) : null}
+
 					<button
 						type="button"
+						onClick={handleSubmitTemplate}
 						disabled={saveMutation.isPending}
-						onClick={() => setEditorOpen(false)}
-						className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-						aria-label="Close"
+						className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-60 dark:bg-brand-500 dark:hover:bg-brand-600"
 					>
-						<X className="h-3.5 w-3.5" strokeWidth={2.25} />
+						{saveMutation.isPending ? "Saving…" : "Save"}
 					</button>
 				</div>
-
-				<label className="flex flex-col gap-1.5">
-					<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Title</span>
-					<input
-						type="text"
-						value={draftTitle}
-						onChange={e => setDraftTitle(e.target.value)}
-						placeholder="Optional title"
-						disabled={saveMutation.isPending}
-						className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
-					/>
-				</label>
-
-				<label className="flex flex-col gap-1.5">
-					<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Message</span>
-					<textarea
-						value={draftMessage}
-						onChange={e => setDraftMessage(e.target.value)}
-						placeholder="Template text"
-						rows={6}
-						disabled={saveMutation.isPending}
-						className="resize-y rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-white dark:placeholder:text-gray-500"
-					/>
-				</label>
-
-				{formError ? (
-					<p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
-				) : null}
-
-				<button
-					type="button"
-					onClick={handleSubmitTemplate}
-					disabled={saveMutation.isPending}
-					className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-60 dark:bg-brand-500 dark:hover:bg-brand-600"
-				>
-					{saveMutation.isPending ? "Saving…" : "Save"}
-				</button>
-			</div>
-		</Modal>
+			</Modal>
 		</>
 	);
 }
