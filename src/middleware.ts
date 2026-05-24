@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { tokenEncoder } from "@/utils/tokenEncoder";
-import { canAccessDriversAndOffers, canAccessUserListAndCheckList, getAppHomePath } from "@/utils/roleAccess";
+import {
+	canAccessCheckList,
+	canAccessDriversAndOffers,
+	canAccessUserListAndCheckList,
+	getAppHomePath,
+} from "@/utils/roleAccess";
 
 const USER_DATA_COOKIE = "userData";
 
@@ -117,15 +122,18 @@ export function middleware(request: NextRequest) {
 		}
 	}
 
-	const isUserListOrCheckListPage =
+	const isUserListPage =
 		pathname === "/user-list" ||
 		pathname.startsWith("/user-list/") ||
-		pathname === "/check-list" ||
-		pathname.startsWith("/check-list/") ||
 		pathname.startsWith("/users/");
-	if (isUserListOrCheckListPage && hasToken) {
+	const isCheckListPage =
+		pathname === "/check-list" || pathname.startsWith("/check-list/");
+	if ((isUserListPage || isCheckListPage) && hasToken) {
 		const role = getUserRoleFromCookie(request);
-		if (!canAccessUserListAndCheckList(role)) {
+		if (isUserListPage && !canAccessUserListAndCheckList(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+		if (isCheckListPage && !canAccessCheckList(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}

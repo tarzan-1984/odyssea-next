@@ -42,7 +42,7 @@ export function canViewRestrictedDriverStatusesOnMap(role: string | undefined | 
 	return (DRIVERS_MAP_RESTRICTED_STATUS_VIEWER_ROLES as readonly string[]).includes(normalized);
 }
 
-/** User List + Check list sidebar and routes: admin, moderator, HR, driver updates. */
+/** User List sidebar and routes: admin, moderator, HR, driver updates. */
 export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"ADMINISTRATOR",
 	"MODERATOR",
@@ -52,10 +52,24 @@ export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"DRIVER_UPDATES",
 ] as const;
 
+/** Check list: user-list roles plus tracking shifts. */
+export const CHECK_LIST_ALLOWED_ROLES = [
+	...USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES,
+	"MORNING_TRACKING",
+	"NIGHTSHIFT_TRACKING",
+	"TRACKING_TL",
+] as const;
+
 export function canAccessUserListAndCheckList(role: string | undefined | null): boolean {
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
+}
+
+export function canAccessCheckList(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
 /** Default in-app landing path after login / generic "home" redirects. */

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { serverAuth } from "@/utils/auth";
-import { canAccessUserListAndCheckList } from "@/utils/roleAccess";
+import { canAccessCheckList } from "@/utils/roleAccess";
 
 type CheckListApiPayload = {
 	drivers: unknown[];
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 		}
 
 		const userData = serverAuth.getUserData(request);
-		if (!canAccessUserListAndCheckList(userData?.role)) {
+		if (!canAccessCheckList(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
