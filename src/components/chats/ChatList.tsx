@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
@@ -18,10 +19,23 @@ interface ChatListProps {
 	onChatSelect: (chatRoom: ChatRoom) => void;
 	selectedChatId?: string;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+	/** Open archive accordion when deep-linking to an archived LOAD chat. */
+	expandArchiveSection?: boolean;
 }
 
 type FilterType = "all" | "muted" | "unread" | "favorite";
 type ChatTab = "chats" | "shipments" | "offers";
+
+const CHAT_LIST_TAB_STORAGE_KEY = "odyssea-chat-list-active-tab";
+
+function readStoredChatTab(): ChatTab {
+	if (typeof window === "undefined") return "chats";
+	const stored = sessionStorage.getItem(CHAT_LIST_TAB_STORAGE_KEY);
+	if (stored === "chats" || stored === "shipments" || stored === "offers") {
+		return stored;
+	}
+	return "chats";
+}
 
 /** These roles do not see the Offers tab in the chat sidebar. */
 const ROLES_WITHOUT_OFFERS_CHAT_TAB = new Set([
@@ -40,7 +54,10 @@ export default function ChatList({
 	onChatSelect,
 	selectedChatId,
 	webSocketChatSync,
+	expandArchiveSection = false,
 }: ChatListProps) {
+	const searchParams = useSearchParams();
+	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
@@ -61,7 +78,24 @@ export default function ChatList({
 	// Filter state
 	const [selectedFilter, setSelectedFilter] = useState<FilterType>("all");
 	const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+	// Always "chats" on first render (SSR + hydration); restore tab after mount.
 	const [activeTab, setActiveTab] = useState<ChatTab>("chats");
+
+	useEffect(() => {
+		if (loadFromUrl) {
+			setActiveTab("shipments");
+			return;
+		}
+		setActiveTab(readStoredChatTab());
+	}, [loadFromUrl]);
+
+	useEffect(() => {
+		try {
+			sessionStorage.setItem(CHAT_LIST_TAB_STORAGE_KEY, activeTab);
+		} catch {
+			// ignore quota / private mode
+		}
+	}, [activeTab]);
 
 	// Track which chat menu is open (only one at a time)
 	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
@@ -767,6 +801,7 @@ export default function ChatList({
 						onChatSelect={onChatSelect}
 						webSocketChatSync={webSocketChatSync}
 						loadChatRooms={opts => webSocketChatSync.loadChatRooms(opts)}
+						expandArchive={expandArchiveSection}
 					/>
 				)}
 			</div>

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
+import { clientAuth } from "@/utils/auth";
 import DriverInfo from "../../[id]/DriverInfo";
 
 const TrackingDeliveryMap = dynamic(
@@ -57,6 +59,8 @@ type LoadDetailsResponse = {
 };
 
 type LoadDriver = {
+	id?: string | null;
+	email?: string | null;
 	externalId?: string | null;
 	firstName?: string | null;
 	lastName?: string | null;
@@ -110,7 +114,10 @@ function normalizeTrackingStatus(value: string | null | undefined): string {
 }
 
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
+	const router = useRouter();
 	const queryClient = useQueryClient();
+	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const [isAuthLoading, setIsAuthLoading] = useState(true);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [selectedHistoryPointIndex, setSelectedHistoryPointIndex] = useState<number | null>(null);
 	const [editingHistoryPointIndex, setEditingHistoryPointIndex] = useState<number | null>(null);
@@ -118,6 +125,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const [historyEditShowApplyCancel, setHistoryEditShowApplyCancel] = useState(false);
 	const [savingHistoryPointId, setSavingHistoryPointId] = useState<string | null>(null);
 	const historyCardRefs = useRef<(HTMLLIElement | null)[]>([]);
+
+	useEffect(() => {
+		const checkAuth = () => {
+			setIsAuthenticated(clientAuth.isAuthenticated());
+			setIsAuthLoading(false);
+		};
+		checkAuth();
+		const interval = setInterval(checkAuth, 1000);
+		return () => clearInterval(interval);
+	}, []);
 
 	useEffect(() => {
 		setHistoryDragDraft(null);
@@ -485,6 +502,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		hasCurrentDriverCoordinates;
 
 	const mapLoadData = useMemo(() => ({
+		id: currentTrackingDriver?.id ?? null,
+		email: currentTrackingDriver?.email ?? null,
 		externalId: currentTrackingDriver?.externalId ?? null,
 		firstName: currentTrackingDriver?.firstName ?? "",
 		lastName: currentTrackingDriver?.lastName ?? "",
@@ -519,6 +538,30 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	return (
 		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
+			{!isAuthLoading && isAuthenticated && (
+				<button
+					type="button"
+					onClick={() => router.back()}
+					className="absolute left-14 top-4 z-[1000] inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-500 bg-brand-500 px-3 py-1.5 text-xs font-medium leading-none text-white transition-colors hover:bg-brand-600 dark:border-brand-400 dark:bg-brand-400 dark:hover:bg-brand-500"
+					aria-label="Go back"
+				>
+					<svg
+						className="size-4 shrink-0"
+						viewBox="0 0 20 20"
+						fill="none"
+						aria-hidden
+					>
+						<path
+							d="M12.7083 5L7.5 10.2083L12.7083 15.4167"
+							stroke="currentColor"
+							strokeWidth="1.5"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						/>
+					</svg>
+					Back
+				</button>
+			)}
 			<TrackingDeliveryMap
 				driverData={mapLoadData}
 				showEmptyMap
@@ -714,8 +757,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				)}
 			</div>
 			{currentTrackingDriver && (
-				<div className="absolute bottom-[50px] left-1/2 transform -translate-x-1/2 z-[1000]">
-					<DriverInfo driverData={mapLoadData} />
+				<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
+					<DriverInfo driverData={mapLoadData} loadId={loadId} />
 				</div>
 			)}
 		</section>

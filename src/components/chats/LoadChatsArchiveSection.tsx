@@ -20,6 +20,8 @@ interface LoadChatsArchiveSectionProps {
 	onChatSelect: (chatRoom: ChatRoom) => void;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 	loadChatRooms: (options?: { force?: boolean }) => Promise<void>;
+	/** Expand archive list (e.g. deep link to archived LOAD chat). */
+	expandArchive?: boolean;
 }
 
 function archivedChatTitle(chatRoom: ChatRoom): string {
@@ -38,9 +40,16 @@ export default function LoadChatsArchiveSection({
 	onChatSelect,
 	webSocketChatSync,
 	loadChatRooms,
+	expandArchive = false,
 }: LoadChatsArchiveSectionProps) {
 	const currentUser = useCurrentUser();
 	const [expanded, setExpanded] = useState(false);
+
+	useEffect(() => {
+		if (expandArchive) {
+			setExpanded(true);
+		}
+	}, [expandArchive]);
 	const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
 	const [debouncedArchiveSearch, setDebouncedArchiveSearch] = useState("");
 	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);

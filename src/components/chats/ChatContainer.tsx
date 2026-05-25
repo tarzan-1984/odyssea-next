@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import ChatList from "./ChatList";
 import ChatBox from "./ChatBox";
@@ -10,58 +10,116 @@ import { ChatRoom } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useChatStore } from "@/stores/chatStore";
+import {
+	findActiveLoadChatInList,
+	findArchivedLoadChat,
+} from "@/utils/findLoadChatRoom";
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
 	const roomFromUrl = searchParams.get("room");
+	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const [selectedChatRoomId, setSelectedChatRoomId] = useState<string | null>(
 		roomFromUrl || null
 	);
+	const [expandArchiveSection, setExpandArchiveSection] = useState(false);
+	const loadResolvedRef = useRef<string | null>(null);
+	const roomResolvedRef = useRef<string | null>(null);
 	// Initialize WebSocket chat sync at the container level
 	const webSocketChatSync = useWebSocketChatSync();
 	const chatRooms = useChatStore(s => s.chatRooms);
+	const isLoadingChatRooms = useChatStore(s => s.isLoadingChatRooms);
+	const setCurrentChatRoom = useChatStore(s => s.setCurrentChatRoom);
+
+	const applySelectedRoom = useCallback(
+		(room: ChatRoom) => {
+			const { addChatRoom, chatRooms: rooms } = useChatStore.getState();
+			if (!rooms.some(r => r.id === room.id)) {
+				addChatRoom(room);
+			}
+			setSelectedChatRoomId(room.id);
+			setCurrentChatRoom(room);
+		},
+		[setCurrentChatRoom]
+	);
 
 	useEffect(() => {
-		if (!roomFromUrl) return;
+		if (!roomFromUrl) {
+			roomResolvedRef.current = null;
+			return;
+		}
+		if (isLoadingChatRooms) return;
+		if (roomResolvedRef.current === roomFromUrl) return;
 
 		const trySelect = async () => {
 			const fromList = chatRooms.find(r => r.id === roomFromUrl);
 			if (fromList) {
-				setSelectedChatRoomId(roomFromUrl);
-				webSocketChatSync.setCurrentChatRoom(fromList);
+				roomResolvedRef.current = roomFromUrl;
+				applySelectedRoom(fromList);
 				return;
 			}
 			const curr = useChatStore.getState().currentChatRoom;
 			if (curr?.id === roomFromUrl) {
+				roomResolvedRef.current = roomFromUrl;
 				setSelectedChatRoomId(roomFromUrl);
 				return;
 			}
 			try {
 				const { chatApi } = await import("@/app-api/chatApi");
 				const room = await chatApi.getChatRoom(roomFromUrl);
-				if (room?.type === "LOAD" && room.isLoadArchived) {
-					useChatStore.getState().addChatRoom(room);
-				} else if (!chatRooms.some(r => r.id === roomFromUrl)) {
-					useChatStore.getState().addChatRoom(room);
-				}
-				setSelectedChatRoomId(roomFromUrl);
-				webSocketChatSync.setCurrentChatRoom(room);
+				roomResolvedRef.current = roomFromUrl;
+				applySelectedRoom(room);
 			} catch {
 				// ignore — room inaccessible
 			}
 		};
 
 		trySelect().catch(() => {});
-	}, [roomFromUrl, chatRooms, webSocketChatSync]);
+	}, [roomFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom]);
+
+	useEffect(() => {
+		if (!loadFromUrl) {
+			loadResolvedRef.current = null;
+			setExpandArchiveSection(false);
+			return;
+		}
+		if (isLoadingChatRooms) return;
+		if (loadResolvedRef.current === loadFromUrl) return;
+
+		let cancelled = false;
+
+		const trySelectLoadChat = async () => {
+			const active = findActiveLoadChatInList(chatRooms, loadFromUrl);
+			if (active) {
+				if (cancelled) return;
+				loadResolvedRef.current = loadFromUrl;
+				setExpandArchiveSection(false);
+				applySelectedRoom(active);
+				return;
+			}
+
+			const archived = await findArchivedLoadChat(loadFromUrl);
+			if (cancelled || !archived) return;
+
+			loadResolvedRef.current = loadFromUrl;
+			setExpandArchiveSection(true);
+			applySelectedRoom(archived);
+		};
+
+		trySelectLoadChat().catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [loadFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom]);
+
 	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } =
 		useChatModal();
 	// Clear active chat when component unmounts (user leaves chat page)
 	useEffect(() => {
 		return () => {
-			// Clear current chat room from store when leaving the chat page
-			webSocketChatSync.setCurrentChatRoom(null);
+			setCurrentChatRoom(null);
 		};
-	}, []); // Empty dependency array to run only on unmount
+	}, [setCurrentChatRoom]);
 
 	const handleChatSelect = (chatRoom: ChatRoom) => {
 		setSelectedChatRoomId(chatRoom.id);
@@ -79,6 +137,7 @@ export default function ChatContainer() {
 						onChatSelect={handleChatSelect}
 						selectedChatId={selectedChatRoomId || undefined}
 						webSocketChatSync={webSocketChatSync}
+						expandArchiveSection={expandArchiveSection}
 					/>
 				</div>
 
