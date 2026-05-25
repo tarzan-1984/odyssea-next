@@ -767,9 +767,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					return room;
 				});
 
-				// Update store with new messages and rooms
+				// Update store with new messages and rooms (re-sort so read chats move down)
 				state.setMessages(updatedMessages);
-				useChatStore.setState({ chatRooms: updatedRooms }, false, "messagesMarkedAsRead");
+				state.setChatRooms(updatedRooms);
 			}
 		);
 

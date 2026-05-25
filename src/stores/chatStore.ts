@@ -4,39 +4,35 @@ import { ChatRoom, Message, User } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { useUserStore } from "./userStore";
 
-// Helper function to sort chat rooms by pin status, mute status, and last message date
+// Helper function to sort chat rooms by pin, unread, mute status, and last message date
 const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
+	const compareByDate = (a: ChatRoom, b: ChatRoom) => {
+		const aDate = a.lastMessage?.createdAt || a.createdAt;
+		const bDate = b.lastMessage?.createdAt || b.createdAt;
+		return new Date(bDate).getTime() - new Date(aDate).getTime();
+	};
+
+	const hasUnread = (room: ChatRoom) => (room.unreadCount ?? 0) > 0;
+
 	return [...chatRooms].sort((a, b) => {
-		// First priority: pin status - pinned chats go to top regardless of mute status
+		// 1. Pinned chats first
 		if (a.isPinned && !b.isPinned) return -1;
 		if (!a.isPinned && b.isPinned) return 1;
 
-		// If both have same pin status, then consider mute status
-		if (a.isPinned === b.isPinned) {
-			// If both are pinned, sort by last message date (mute doesn't matter)
-			if (a.isPinned && b.isPinned) {
-				const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
-				const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
-				return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
-			}
+		// 2. Unread chats before read (within the same pin group)
+		const aUnread = hasUnread(a);
+		const bUnread = hasUnread(b);
+		if (aUnread && !bUnread) return -1;
+		if (!aUnread && bUnread) return 1;
 
-			// If both are not pinned, then mute status matters
-			if (!a.isPinned && !b.isPinned) {
-				// Muted chats go to bottom
-				if (a.isMuted && !b.isMuted) return 1;
-				if (!a.isMuted && b.isMuted) return -1;
-
-				// If both have same mute status, sort by last message date
-				const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
-				const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
-				return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
-			}
+		// 3. Among non-pinned: muted chats go to the bottom
+		if (!a.isPinned && !b.isPinned) {
+			if (a.isMuted && !b.isMuted) return 1;
+			if (!a.isMuted && b.isMuted) return -1;
 		}
 
-		// Fallback - should not reach here
-		const aLastMessageDate = a.lastMessage?.createdAt || a.createdAt;
-		const bLastMessageDate = b.lastMessage?.createdAt || b.createdAt;
-		return new Date(bLastMessageDate).getTime() - new Date(aLastMessageDate).getTime();
+		// 4. Sort by last message date
+		return compareByDate(a, b);
 	});
 };
 
@@ -346,8 +342,9 @@ export const useChatStore = create<ChatState>()(
 									}
 									return room;
 								});
+								const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
 								set(
-									{ messages: updatedMessages, chatRooms: updatedRooms },
+									{ messages: updatedMessages, chatRooms: sortedRooms },
 									false,
 									"updateMessage"
 								);
@@ -873,6 +870,11 @@ export const useChatStore = create<ChatState>()(
 					// Note: currentChatRoom is NOT persisted - it should reset on page reload
 					// Note: archivedMessagesCache is not persisted as Map cannot be serialized
 				}),
+				onRehydrateStorage: () => state => {
+					if (state?.chatRooms?.length) {
+						state.chatRooms = sortChatRoomsByLastMessage(state.chatRooms);
+					}
+				},
 			}
 		),
 		{
