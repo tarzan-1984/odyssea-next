@@ -60,16 +60,24 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	};
 
 	const senderFirstName = String(message.sender.firstName ?? "").trim();
+	const senderExternalId = String(message.sender.externalId ?? "").trim();
+	const isDriverSender = message.sender.role?.toUpperCase().trim() === "DRIVER";
+	const isLoadTrackingRoleSender = ["TRACKING_TL", "TRACKING", "MORNING_TRACKING", "NIGHTSHIFT_TRACKING"].includes(
+		message.sender.role?.toUpperCase().trim() ?? ""
+	);
+	const shouldShowPhoneUnderName =
+		!isSender &&
+		Boolean(String(message.sender.phone ?? "").trim()) &&
+		(chatRoomType === "LOAD"
+			? isDriverSender || isLoadTrackingRoleSender
+			: isDriverSender);
+	const shouldShowDriverExternalId = isDriverSender && Boolean(senderExternalId);
+	const driverExternalIdPrefix = shouldShowDriverExternalId ? `(${senderExternalId}) ` : "";
+	const senderNameLabel = `${driverExternalIdPrefix}${senderFirstName}`.trim();
 
 	const incomingRoleLabel = (() => {
 		const roleLabel = getRoleDisplayLabel(message.sender.role);
-		const ext = message.sender.externalId?.trim();
-		const showDriverExt =
-			chatRoomType === "LOAD" &&
-			message.sender.role?.toUpperCase().trim() === "DRIVER" &&
-			Boolean(ext);
-		const prefix = showDriverExt ? `(${ext}) ` : "";
-		return `${prefix}${roleLabel}`;
+		return `${driverExternalIdPrefix}${roleLabel}`.trim();
 	})();
 
 	const incomingRoleAndTime = !isSender ? (
@@ -78,9 +86,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		</p>
 	) : null;
 
-	const isLoadChatDriver =
-		chatRoomType === "LOAD" &&
-		message.sender.role?.toUpperCase().trim() === "DRIVER";
 	const driverPhoneDisplay = String(message.sender.phone ?? "").trim();
 
 	const telHref = (displayPhone: string) => {
@@ -92,7 +97,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		!isSender && incomingRoleAndTime ? (
 			<div className="mt-2 space-y-0.5">
 				{incomingRoleAndTime}
-				{isLoadChatDriver && driverPhoneDisplay ? (
+				{shouldShowPhoneUnderName ? (
 					<a
 						href={telHref(driverPhoneDisplay)}
 						className="block text-theme-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
@@ -149,10 +154,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			>
 				{/* Incoming: first name above attachments and/or text bubble */}
 				{!isSender &&
-					senderFirstName &&
+					senderNameLabel &&
 					(showLegacySingleFile || message.content || multiAttachments) ? (
 					<p className="mb-1.5 text-sm font-medium text-gray-800 dark:text-white/90">
-						{senderFirstName}
+						{senderNameLabel}
 					</p>
 				) : null}
 
