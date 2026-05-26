@@ -1,10 +1,9 @@
 "use client";
-import React, { useEffect, useRef, useCallback, useState } from "react";
+import React, { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
-import { clientAuth } from "@/utils/auth";
 import {
 	canAccessCheckList,
 	canAccessDriversAndOffers,
@@ -12,14 +11,9 @@ import {
 	getAppHomePath,
 } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
-import authentication from "@/app-api/authentication";
 import {
-	BoxCubeIcon,
 	ChevronDownIcon,
 	HorizontaLDots,
-	PieChartIcon,
-	PlugInIcon,
-	UserCircleIcon,
 	DriversMapIcon,
 	DriverListIcon,
 	OffersIcon,
@@ -27,7 +21,7 @@ import {
 	CheckListIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
-import { Users, LogOut, MessageCircle } from "lucide-react";
+import { Users, MessageCircle } from "lucide-react";
 import { UnreadCountBadge } from "@/components/common/UnreadCountBadge";
 
 type NavItem = {
@@ -36,7 +30,6 @@ type NavItem = {
 	path?: string;
 	new?: boolean;
 	subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
-	isSignOut?: boolean; // Add this flag to identify the sign-out button
 	adminOnly?: boolean;
 };
 
@@ -164,101 +157,6 @@ const navItems: NavItem[] = [
 	// },
 ];
 
-const othersItems: NavItem[] = [
-	{
-		icon: <PieChartIcon />,
-		name: "Charts",
-		subItems: [
-			{ name: "Line Chart", path: "/line-chart", pro: true },
-			{ name: "Bar Chart", path: "/bar-chart", pro: true },
-			{ name: "Pie Chart", path: "/pie-chart", pro: true },
-		],
-	},
-	{
-		icon: <BoxCubeIcon />,
-		name: "UI Elements",
-		subItems: [
-			{ name: "Alerts", path: "/alerts" },
-			{ name: "Avatar", path: "/avatars" },
-			{ name: "Badge", path: "/badge" },
-			{ name: "Breadcrumb", path: "/breadcrumb" },
-			{ name: "Buttons", path: "/buttons" },
-			{ name: "Buttons Group", path: "/buttons-group" },
-			{ name: "Cards", path: "/cards" },
-			{ name: "Carousel", path: "/carousel" },
-			{ name: "Dropdowns", path: "/dropdowns" },
-			{ name: "Images", path: "/images" },
-			{ name: "Links", path: "/links" },
-			{ name: "List", path: "/list" },
-			{ name: "Modals", path: "/modals" },
-			{ name: "Notification", path: "/notifications" },
-			{ name: "Pagination", path: "/pagination" },
-			{ name: "Popovers", path: "/popovers" },
-			{ name: "Progressbar", path: "/progress-bar" },
-			{ name: "Ribbons", path: "/ribbons" },
-			{ name: "Spinners", path: "/spinners" },
-			{ name: "Tabs", path: "/tabs" },
-			{ name: "Tooltips", path: "/tooltips" },
-			{ name: "Videos", path: "/videos" },
-		],
-	},
-	{
-		icon: <PlugInIcon />,
-		name: "Authentication",
-		subItems: [
-			{ name: "Sign In", path: "/signin", pro: false },
-			{ name: "Sign Up", path: "/signup", pro: false },
-			{ name: "Reset Password", path: "/reset-password" },
-			{
-				name: "Two Step Verification",
-				path: "/two-step-verification",
-			},
-		],
-	},
-];
-
-const supportItems: NavItem[] = [
-	// {
-	//   icon: <ChatIcon />,
-	//   name: "Chat",
-	//   path: "/chat",
-	// },
-	// {
-	//   icon: <CallIcon />,
-	//   name: "Support",
-	//   new: true,
-	//   subItems: [
-	//     { name: "Support List", path: "/support-list" },
-	//     { name: "Support Reply", path: "/support-reply" },
-	//   ],
-	// },
-	// {
-	//   icon: <MailIcon />,
-	//   name: "Email",
-	//   subItems: [
-	//     { name: "Inbox", path: "/inbox" },
-	//     { name: "Details", path: "/inbox-details" },
-	//   ],
-	// },
-
-	// {
-	// 	icon: <BellRing />,
-	// 	name: "Notifications",
-	// 	path: "/notifications",
-	// },
-	{
-		icon: <UserCircleIcon />,
-		name: "My account",
-		path: "/profile",
-	},
-	{
-		icon: <LogOut />,
-		name: "Sign out",
-		path: "/signin",
-		isSignOut: true, // Add this flag to identify the sign-out button
-	},
-];
-
 const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
 const USER_LIST_PATHS = ["/user-list"];
 const CHECK_LIST_PATHS = ["/check-list"];
@@ -266,49 +164,27 @@ const CHECK_LIST_PATHS = ["/check-list"];
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
 	const pathname = usePathname();
-	const router = useRouter();
 	const currentUser = useCurrentUser();
 	const isAdmin = (currentUser?.role || "").trim().toUpperCase() === "ADMINISTRATOR";
 	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
 	const canSeeUserList = canAccessUserListAndCheckList(currentUser?.role);
 	const canSeeCheckList = canAccessCheckList(currentUser?.role);
 	const appHomePath = getAppHomePath(currentUser?.role);
-	const menuNavItems = navItems.filter(
-		item =>
-			(!item.adminOnly || isAdmin) &&
-			(!item.path ||
-				!DRIVERS_OFFERS_PATHS.includes(item.path) ||
-				canAccessDriversOffers) &&
-			(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
-			(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList),
+	const menuNavItems = useMemo(
+		() =>
+			navItems.filter(
+				item =>
+					(!item.adminOnly || isAdmin) &&
+					(!item.path ||
+						!DRIVERS_OFFERS_PATHS.includes(item.path) ||
+						canAccessDriversOffers) &&
+					(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
+					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList),
+			),
+		[isAdmin, canAccessDriversOffers, canSeeUserList, canSeeCheckList],
 	);
 
-	const handleSignOut = async () => {
-		try {
-			const refreshToken = clientAuth.getRefreshToken();
-			const accessToken = clientAuth.getAccessToken();
-
-			if (refreshToken) {
-				// Call backend logout endpoint with both tokens
-				await authentication.logout({ refreshToken, accessToken });
-			}
-		} catch {
-			// Continue with logout even if backend call fails
-		} finally {
-			// Clear tokens and user data from cookies
-			clientAuth.removeTokens();
-
-			// Also clear authToken from localStorage for ChatApi
-			if (typeof window !== "undefined") {
-				localStorage.removeItem("authToken");
-			}
-
-			// Redirect to signin page
-			router.push("/signin");
-		}
-	};
-
-	const renderMenuItems = (navItems: NavItem[], menuType: "main" | "support" | "others") => (
+	const renderMenuItems = (navItems: NavItem[], menuType: "main") => (
 		<ul className="flex flex-col gap-1">
 			{navItems.map((nav, index) => (
 				<li key={nav.name}>
@@ -356,17 +232,6 @@ const AppSidebar: React.FC = () => {
 											: ""
 									}`}
 								/>
-							)}
-						</button>
-					) : // Check if this is a sign-out button
-					nav.isSignOut ? (
-						<button
-							onClick={handleSignOut}
-							className={`menu-item group menu-item-inactive`}
-						>
-							<span className="menu-item-icon-inactive">{nav.icon}</span>
-							{(isExpanded || isHovered || isMobileOpen) && (
-								<span className={`menu-item-text`}>{nav.name}</span>
 							)}
 						</button>
 					) : (
@@ -458,7 +323,7 @@ const AppSidebar: React.FC = () => {
 	);
 
 	const [openSubmenu, setOpenSubmenu] = useState<{
-		type: "main" | "support" | "others";
+		type: "main";
 		index: number;
 	} | null>(null);
 	const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
@@ -471,33 +336,22 @@ const AppSidebar: React.FC = () => {
 	useEffect(() => {
 		// Check if the current path matches any submenu item
 		let submenuMatched = false;
-		["main", "support", "others"].forEach(menuType => {
-			const items =
-				menuType === "main"
-					? navItems
-					: menuType === "support"
-						? supportItems
-						: othersItems;
-			items.forEach((nav, index) => {
-				if (nav.subItems) {
-					nav.subItems.forEach(subItem => {
-						if (isActive(subItem.path)) {
-							setOpenSubmenu({
-								type: menuType as "main" | "support" | "others",
-								index,
-							});
-							submenuMatched = true;
-						}
-					});
-				}
-			});
+		menuNavItems.forEach((nav, index) => {
+			if (nav.subItems) {
+				nav.subItems.forEach(subItem => {
+					if (isActive(subItem.path)) {
+						setOpenSubmenu({ type: "main", index });
+						submenuMatched = true;
+					}
+				});
+			}
 		});
 
 		// If no submenu item matches, close the open submenu
 		if (!submenuMatched) {
 			setOpenSubmenu(null);
 		}
-	}, [pathname, isActive]);
+	}, [pathname, isActive, menuNavItems]);
 
 	useEffect(() => {
 		// Set the height of the submenu items when the submenu is opened
@@ -512,7 +366,7 @@ const AppSidebar: React.FC = () => {
 		}
 	}, [openSubmenu]);
 
-	const handleSubmenuToggle = (index: number, menuType: "main" | "support" | "others") => {
+	const handleSubmenuToggle = (index: number, menuType: "main") => {
 		setOpenSubmenu(prevOpenSubmenu => {
 			if (
 				prevOpenSubmenu &&
@@ -566,55 +420,21 @@ const AppSidebar: React.FC = () => {
 			</div>
 			<div className="flex flex-col overflow-y-auto  duration-300 ease-linear no-scrollbar grow-1">
 				<nav className="mb-6 h-full">
-					<div className="flex flex-col gap-4 h-full justify-between">
-						<div>
-							<h2
-								className={`mb-4 text-xs uppercase flex leading-5 text-gray-400 ${
-									!isExpanded && !isHovered
-										? "xl:justify-center"
-										: "justify-start"
-								}`}
-							>
-								{isExpanded || isHovered || isMobileOpen ? (
-									"Menu"
-								) : (
-									<HorizontaLDots />
-								)}
-							</h2>
-							{renderMenuItems(menuNavItems, "main")}
-						</div>
-						<div>
-							<h2
-								className={`mb-4 text-xs uppercase flex leading-5 text-gray-400 ${
-									!isExpanded && !isHovered
-										? "xl:justify-center"
-										: "justify-start"
-								}`}
-							>
-								{isExpanded || isHovered || isMobileOpen ? (
-									"Support"
-								) : (
-									<HorizontaLDots />
-								)}
-							</h2>
-							{renderMenuItems(supportItems, "support")}
-						</div>
-						{/*<div>*/}
-						{/*  <h2*/}
-						{/*    className={`mb-4 text-xs uppercase flex leading-5 text-gray-400 ${*/}
-						{/*      !isExpanded && !isHovered*/}
-						{/*        ? "xl:justify-center"*/}
-						{/*        : "justify-start"*/}
-						{/*    }`}*/}
-						{/*  >*/}
-						{/*    {isExpanded || isHovered || isMobileOpen ? (*/}
-						{/*      "Others"*/}
-						{/*    ) : (*/}
-						{/*      <HorizontaLDots />*/}
-						{/*    )}*/}
-						{/*  </h2>*/}
-						{/*  {renderMenuItems(othersItems, "others")}*/}
-						{/*</div>*/}
+					<div>
+						<h2
+							className={`mb-4 text-xs uppercase flex leading-5 text-gray-400 ${
+								!isExpanded && !isHovered
+									? "xl:justify-center"
+									: "justify-start"
+							}`}
+						>
+							{isExpanded || isHovered || isMobileOpen ? (
+								"Menu"
+							) : (
+								<HorizontaLDots />
+							)}
+						</h2>
+						{renderMenuItems(menuNavItems, "main")}
 					</div>
 				</nav>
 				{/*{isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}*/}

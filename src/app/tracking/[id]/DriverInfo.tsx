@@ -32,6 +32,8 @@ interface DriverInfoProps {
 	driverData: DriverData | null;
 	/** TMS load post id for "Show in TMS" link (tracking load page). */
 	loadId?: string;
+	/** Human-readable load status from TMS meta_data.load_status. */
+	loadStatusLabel?: string | null;
 }
 
 const TMS_DRIVER_PAGE_URL = "https://www.endurance-tms.com/add-driver/";
@@ -55,7 +57,7 @@ function DriverUserStatusIcon({ status }: { status: string | null }) {
 	return null;
 }
 
-export default function DriverInfo({ driverData, loadId }: DriverInfoProps) {
+export default function DriverInfo({ driverData, loadId, loadStatusLabel }: DriverInfoProps) {
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 
 	const pushModalDriver = useMemo((): CheckListDriver | null => {
@@ -201,16 +203,30 @@ export default function DriverInfo({ driverData, loadId }: DriverInfoProps) {
 							</p>
 						</div>
 						<div className="min-w-0">
-							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Status</p>
+							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
+								Driver Status
+							</p>
 							<p className="text-sm font-medium text-slate-900 dark:text-white">
 								{driverStatusLabel}
 							</p>
 						</div>
+						{loadId && (
+							<div className="min-w-0">
+								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
+									Load Status
+								</p>
+								<p className="text-sm font-medium text-slate-900 dark:text-white">
+									{loadStatusLabel ?? "N/A"}
+								</p>
+							</div>
+						)}
 					</div>
 
 					<div className="flex min-w-0 flex-col gap-4">
 						<div className="min-w-0">
-							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Last Update</p>
+							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
+								Last Driver Update
+							</p>
 							<p className="text-sm font-medium text-slate-900 dark:text-white">
 								{formatLastUpdate(driverData.lastLocationUpdateAt)}
 							</p>

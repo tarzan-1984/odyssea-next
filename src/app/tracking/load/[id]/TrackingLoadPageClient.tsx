@@ -113,6 +113,25 @@ function normalizeTrackingStatus(value: string | null | undefined): string {
 		.replace(/-/g, "_");
 }
 
+const LOAD_STATUS_LABELS: Record<string, string> = {
+	delivered: "Delivered",
+	loaded_enroute: "Loaded & Enroute",
+	available: "Available",
+	draft: "Draft",
+	cancelled: "Cancelled",
+	canceled: "Canceled",
+};
+
+function formatLoadStatusLabel(value: string | null | undefined): string {
+	const raw = String(value ?? "").trim();
+	if (!raw) return "N/A";
+	const normalized = normalizeTrackingStatus(raw);
+	return (
+		LOAD_STATUS_LABELS[normalized] ??
+		raw.replace(/_/g, " ").replace(/\b\w/g, char => char.toUpperCase())
+	);
+}
+
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
@@ -172,13 +191,21 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	);
 
 	const [deletingHistoryPointId, setDeletingHistoryPointId] = useState<string | null>(null);
-	const { data: loadDetails } = useQuery({
+	const {
+		data: loadDetails,
+		isPending: isLoadDetailsPending,
+		isError: isLoadDetailsError,
+		error: loadDetailsError,
+	} = useQuery({
 		queryKey: ["tracking-load-details", loadId],
 		queryFn: () => fetchTrackingLoadDetails(loadId),
-		enabled: Boolean(loadId),
+		enabled: Boolean(loadId) && !isAuthLoading,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 10 * 60 * 1000,
 	});
+
+	const isPageLoading = isAuthLoading || isLoadDetailsPending;
+	const isPageReady = !isPageLoading && Boolean(loadDetails);
 
 	const refreshLoadDetails = useCallback(() => {
 		return queryClient
@@ -244,6 +271,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
 	}, [loadDetails]);
 	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
+	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
 	const isDeliveredLoad = normalizedLoadStatus === "delivered";
 	const isLoadLoadedEnroute = normalizedLoadStatus === "loaded_enroute";
 
@@ -527,6 +555,34 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	return (
 		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
+			{isPageLoading && (
+				<div
+					className="absolute inset-0 z-[2000] flex items-center justify-center bg-white dark:bg-gray-950"
+					aria-busy="true"
+					aria-live="polite"
+				>
+					<div className="flex flex-col items-center gap-3 rounded-xl border border-gray-200/80 bg-white px-8 py-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+						<div
+							className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500 dark:border-gray-600 dark:border-t-brand-400"
+							aria-hidden
+						/>
+						<p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+							Loading load data...
+						</p>
+					</div>
+				</div>
+			)}
+
+			{isLoadDetailsError && !isPageLoading && (
+				<div className="absolute inset-0 z-[2000] flex items-center justify-center bg-white dark:bg-gray-950 px-6">
+					<p className="max-w-md text-center text-sm text-red-600 dark:text-red-400">
+						{loadDetailsError instanceof Error
+							? loadDetailsError.message
+							: "Failed to load data"}
+					</p>
+				</div>
+			)}
+
 			{!isAuthLoading && isAuthenticated && (
 				<button
 					type="button"
@@ -546,6 +602,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					Back
 				</button>
 			)}
+
+			{isPageReady && (
+				<>
 			<TrackingDeliveryMap
 				driverData={mapLoadData}
 				showEmptyMap
@@ -766,8 +825,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			</div>
 			{currentTrackingDriver && (
 				<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
-					<DriverInfo driverData={mapLoadData} loadId={loadId} />
+					<DriverInfo
+						driverData={mapLoadData}
+						loadId={loadId}
+						loadStatusLabel={loadStatusLabel}
+					/>
 				</div>
+			)}
+				</>
 			)}
 		</section>
 	);
