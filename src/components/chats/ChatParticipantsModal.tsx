@@ -59,10 +59,13 @@ export default function ChatParticipantsModal({
 		'EXPEDITE_MANAGER', 
 		'RECRUITER_TL',
 		'TRACKING',
+		'MORNING_TRACKING',
 		'NIGHTSHIFT_TRACKING',
+		'DISPATCHER',
 		'DISPATCHER_TL',
 		'BILLING',
-		'ADMINISTRATOR'
+		'ADMINISTRATOR',
+		'MODERATOR',
 	];
 	
 	/** Who may see the OFFER chat picture block (view; upload restricted separately). */
