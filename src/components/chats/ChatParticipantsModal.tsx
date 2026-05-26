@@ -42,6 +42,7 @@ export default function ChatParticipantsModal({
 	const [localParticipants, setLocalParticipants] = useState(chatRoom?.participants ?? []);
 	const [addedUserIds, setAddedUserIds] = useState<string[]>([]);
 	const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
+	const [chatNameDraft, setChatNameDraft] = useState("");
 	const currentUser = useCurrentUser();
 	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms({});
 	const { socket, isConnected } = useWebSocket();
@@ -105,9 +106,14 @@ export default function ChatParticipantsModal({
 		((isLoadChat || isOfferChat) && isAdminOrModerator);
 
 	const hasParticipantChanges = addedUserIds.length > 0 || removedUserIds.length > 0;
+	const trimmedChatName = chatNameDraft.trim();
+	const originalChatName = String(chatRoom?.name ?? "").trim();
+	const hasChatNameChange =
+		canManageChat && isLoadChat && trimmedChatName !== "" && trimmedChatName !== originalChatName;
 
 	const showSaveButton =
-		(canUploadChatPicture && !!avatarFile) || (canManageChat && hasParticipantChanges);
+		(canUploadChatPicture && !!avatarFile) ||
+		(canManageChat && (hasParticipantChanges || hasChatNameChange));
 
 	const addSectionRef = useRef<HTMLDivElement | null>(null);
 	const addSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -127,6 +133,7 @@ export default function ChatParticipantsModal({
 		setAddedUserIds([]);
 		setRemovedUserIds([]);
 		setAddingUserIds([]);
+		setChatNameDraft(String(chatRoom?.name ?? ""));
 	}, [isOpen, chatRoom?.participants]);
 
 	// Cleanup avatar preview URL
@@ -305,6 +312,12 @@ export default function ChatParticipantsModal({
 				updateChatRoom({ chatRoomId: chatRoom.id, updates: { avatar: newAvatarPath } });
 			}
 
+			// 2.5) Persist chat name update (LOAD chats only, managers)
+			if (hasChatNameChange) {
+				updateChatRoom({ chatRoomId: chatRoom.id, updates: { name: trimmedChatName } });
+				updateChatRoomInStore(chatRoom.id, { name: trimmedChatName });
+			}
+
 			// 3) Persist participants add/remove
 			if (addedUserIds.length > 0) {
 				const uniqueIds = Array.from(new Set(addedUserIds));
@@ -423,6 +436,22 @@ export default function ChatParticipantsModal({
 								)}
 							</div>
 						</div>
+					</div>
+				)}
+
+				{/* LOAD chat name — editable for managers only */}
+				{isLoadChat && canManageChat && (
+					<div className="mb-6">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+							Chat name
+						</label>
+						<input
+							type="text"
+							value={chatNameDraft}
+							onChange={e => setChatNameDraft(e.target.value)}
+							placeholder="Chat name"
+							className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+						/>
 					</div>
 				)}
 
