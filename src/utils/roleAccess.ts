@@ -72,6 +72,20 @@ export function canAccessCheckList(role: string | undefined | null): boolean {
 	return (CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
+/** Load tracking page: edit/delete history points on the map. */
+export const LOAD_TRACKING_HISTORY_EDIT_ROLES = [
+	"EXPEDITE_MANAGER",
+	"ADMINISTRATOR",
+	"MODERATOR",
+	"TRACKING_TL",
+] as const;
+
+export function canEditLoadTrackingHistory(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (LOAD_TRACKING_HISTORY_EDIT_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Default in-app landing path after login / generic "home" redirects. */
 export function getAppHomePath(role: string | undefined | null): string {
 	if (canAccessUserListAndCheckList(role)) return "/user-list";

@@ -59,14 +59,6 @@ export function middleware(request: NextRequest) {
 	// Get login success cookie for two-step-verification
 	const loginSuccess = request.cookies.get("login-success")?.value;
 
-	// Load tracking (DB drivers + history): require login before page/API cookies apply
-	if (pathname.startsWith("/tracking/load")) {
-		if (!hasToken) {
-			return NextResponse.redirect(new URL("/signin", request.url));
-		}
-		return NextResponse.next();
-	}
-
 	// Special handling for two-step-verification page
 	if (isTwoStepVerification) {
 		// Check if user has either valid tokens OR login success cookie

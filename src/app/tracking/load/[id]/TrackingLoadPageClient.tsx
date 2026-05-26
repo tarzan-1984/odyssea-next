@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { io } from "socket.io-client";
 import { clientAuth } from "@/utils/auth";
+import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
+import { useCurrentUser } from "@/stores/userStore";
 import DriverInfo from "../../[id]/DriverInfo";
 
 const TrackingDeliveryMap = dynamic(() => import("@/components/logistics/TrackingDeliveryMap"), {
@@ -135,6 +137,8 @@ function formatLoadStatusLabel(value: string | null | undefined): string {
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
+	const currentUser = useCurrentUser();
+	const canEditLoadHistory = canEditLoadTrackingHistory(currentUser?.role);
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [isAuthLoading, setIsAuthLoading] = useState(true);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -159,6 +163,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		setHistoryDragDraft(null);
 		setHistoryEditShowApplyCancel(false);
 	}, [editingHistoryPointIndex]);
+
+	useEffect(() => {
+		if (!canEditLoadHistory) {
+			setEditingHistoryPointIndex(null);
+			setHistoryDragDraft(null);
+			setHistoryEditShowApplyCancel(false);
+		}
+	}, [canEditLoadHistory]);
 
 	const clearHistoryPointSelection = useCallback(() => {
 		setSelectedHistoryPointIndex(null);
@@ -191,14 +203,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	);
 
 	const [deletingHistoryPointId, setDeletingHistoryPointId] = useState<string | null>(null);
+	const isPublicView = !isAuthLoading && !isAuthenticated;
+
 	const {
 		data: loadDetails,
 		isPending: isLoadDetailsPending,
 		isError: isLoadDetailsError,
 		error: loadDetailsError,
 	} = useQuery({
-		queryKey: ["tracking-load-details", loadId],
-		queryFn: () => fetchTrackingLoadDetails(loadId),
+		queryKey: ["tracking-load-details", loadId, isPublicView ? "public" : "auth"],
+		queryFn: () => fetchTrackingLoadDetails(loadId, { publicView: isPublicView }),
 		enabled: Boolean(loadId) && !isAuthLoading,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 10 * 60 * 1000,
@@ -609,13 +623,28 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				driverData={mapLoadData}
 				showEmptyMap
 				initialZoom={4}
-				selectedLoadHistoryPointIndex={selectedHistoryPointIndex}
-				editingLoadHistoryPointIndex={editingHistoryPointIndex}
-				onLoadHistoryPointMarkerClick={handleLoadHistoryPointMarkerClick}
-				onMapBackgroundClick={clearHistoryPointSelection}
-				historyEditDragPosition={historyDragDraft}
-				onHistoryEditPointDragEnd={handleHistoryEditDragEnd}
+				selectedLoadHistoryPointIndex={
+					isAuthenticated ? selectedHistoryPointIndex : null
+				}
+				editingLoadHistoryPointIndex={
+					isAuthenticated && canEditLoadHistory ? editingHistoryPointIndex : null
+				}
+				onLoadHistoryPointMarkerClick={
+					isAuthenticated ? handleLoadHistoryPointMarkerClick : undefined
+				}
+				onMapBackgroundClick={
+					isAuthenticated ? clearHistoryPointSelection : undefined
+				}
+				historyEditDragPosition={
+					isAuthenticated && canEditLoadHistory ? historyDragDraft : null
+				}
+				onHistoryEditPointDragEnd={
+					isAuthenticated && canEditLoadHistory
+						? handleHistoryEditDragEnd
+						: undefined
+				}
 			/>
+			{isAuthenticated && (
 			<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
 				<button
 					type="button"
@@ -693,6 +722,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 													>
 														Step {index + 1}
 													</p>
+													{canEditLoadHistory ? (
 													<div className="flex items-center gap-2">
 														{isEditingCard &&
 														historyEditShowApplyCancel ? (
@@ -788,6 +818,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 															</>
 														)}
 													</div>
+													) : null}
 												</div>
 												<p>
 													<span className="font-medium">
@@ -823,7 +854,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					</div>
 				)}
 			</div>
-			{currentTrackingDriver && (
+			)}
+			{isAuthenticated && currentTrackingDriver && (
 				<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
 					<DriverInfo
 						driverData={mapLoadData}

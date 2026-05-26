@@ -13,8 +13,9 @@ export async function GET(
 	const { loadId } = await params;
 
 	try {
+		const isPublicRequest = request.nextUrl.searchParams.get("public") === "1";
 		const accessToken = serverAuth.getAccessToken(request);
-		if (!accessToken) {
+		if (!accessToken && !isPublicRequest) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 

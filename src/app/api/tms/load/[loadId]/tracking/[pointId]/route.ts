@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
+import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
 
 // PATCH /api/tms/load/[loadId]/tracking/[pointId] - update coordinates of one load history point.
 export async function PATCH(
@@ -10,6 +11,11 @@ export async function PATCH(
 		const accessToken = serverAuth.getAccessToken(request);
 		if (!accessToken) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const userData = serverAuth.getUserData(request);
+		if (!canEditLoadTrackingHistory(userData?.role)) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
 		const { loadId, pointId } = await params;
@@ -68,6 +74,11 @@ export async function DELETE(
 		const accessToken = serverAuth.getAccessToken(request);
 		if (!accessToken) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const userData = serverAuth.getUserData(request);
+		if (!canEditLoadTrackingHistory(userData?.role)) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
 		const { loadId, pointId } = await params;

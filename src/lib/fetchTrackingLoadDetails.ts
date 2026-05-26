@@ -17,15 +17,15 @@ export type TrackingLoadDetailsPayload = {
 	data: TmsLoadBody;
 };
 
-export async function fetchTrackingLoadDetails(
-	loadId: string
-): Promise<TrackingLoadDetailsPayload> {
-	const tmsResponse = await fetch(`/api/tms/load/${encodeURIComponent(loadId)}`);
+async function fetchTmsLoad(loadId: string, publicView: boolean): Promise<TmsLoadBody> {
+	const tmsUrl = publicView
+		? `/api/tms/load/${encodeURIComponent(loadId)}?public=1`
+		: `/api/tms/load/${encodeURIComponent(loadId)}`;
+
+	const tmsResponse = await fetch(tmsUrl);
 	const tmsJson = (await tmsResponse.json().catch(() => null)) as
 		| TmsLoadBody
-		| {
-				error?: string;
-		  }
+		| { error?: string }
 		| null;
 
 	if (!tmsResponse.ok) {
@@ -39,10 +39,22 @@ export async function fetchTrackingLoadDetails(
 		throw new Error("TMS returned empty load data");
 	}
 
-	const enrichResponse = await fetch(`/api/tms/load/${encodeURIComponent(loadId)}/enrichment`, {
+	return tmsJson;
+}
+
+async function fetchLoadEnrichment(
+	loadId: string,
+	metaData: Record<string, unknown>,
+	publicView: boolean
+): Promise<LoadEnrichment> {
+	const enrichUrl = publicView
+		? `/api/public/tracking/load/${encodeURIComponent(loadId)}/enrichment`
+		: `/api/tms/load/${encodeURIComponent(loadId)}/enrichment`;
+
+	const enrichResponse = await fetch(enrichUrl, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ meta_data: tmsJson.data.meta_data ?? {} }),
+		body: JSON.stringify({ meta_data: metaData }),
 	});
 
 	const enrichWrapped = (await enrichResponse.json().catch(() => null)) as {
@@ -56,7 +68,21 @@ export async function fetchTrackingLoadDetails(
 		);
 	}
 
-	const enrichment = enrichWrapped?.data ?? {};
+	return enrichWrapped?.data ?? {};
+}
+
+export async function fetchTrackingLoadDetails(
+	loadId: string,
+	options?: { publicView?: boolean }
+): Promise<TrackingLoadDetailsPayload> {
+	const publicView = Boolean(options?.publicView);
+
+	const tmsJson = await fetchTmsLoad(loadId, publicView);
+	const enrichment = await fetchLoadEnrichment(
+		loadId,
+		tmsJson.data?.meta_data ?? {},
+		publicView
+	);
 
 	return {
 		data: {
