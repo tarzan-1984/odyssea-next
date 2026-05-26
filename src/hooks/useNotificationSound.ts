@@ -1,9 +1,30 @@
 import { useCallback, useRef } from 'react';
-import { isNotificationSoundMuted } from '@/stores/adminNotificationSoundStore';
+import {
+  getSelectedNotificationSoundFile,
+  isNotificationSoundMuted,
+} from '@/stores/adminNotificationSoundStore';
+import { notificationSoundUrl } from '@/constants/notificationSounds';
+
+const NOTIFICATION_SOUND_VOLUME = 0.7;
 
 export const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const loadedSoundFileRef = useRef<string | null>(null);
   const hasUserInteracted = useRef(false);
+
+  const ensureAudioElement = useCallback(() => {
+    const soundFile = getSelectedNotificationSoundFile();
+    const url = notificationSoundUrl(soundFile);
+
+    if (!audioRef.current || loadedSoundFileRef.current !== soundFile) {
+      audioRef.current = new Audio(url);
+      audioRef.current.volume = NOTIFICATION_SOUND_VOLUME;
+      audioRef.current.preload = 'auto';
+      loadedSoundFileRef.current = soundFile;
+    }
+
+    return audioRef.current;
+  }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
@@ -16,16 +37,11 @@ export const useNotificationSound = () => {
         return;
       }
 
-      // Create audio element if it doesn't exist
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/sounds/livechat.mp3');
-        audioRef.current.volume = 0.7; // 70% volume
-        audioRef.current.preload = 'auto';
-      }
+      const audio = ensureAudioElement();
 
       // Reset audio to beginning and play
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch((error) => {
+      audio.currentTime = 0;
+      audio.play().catch((error) => {
         // Silent fail for audio playback errors
         if (error.name === 'NotAllowedError') {
           // Audio blocked by browser policy
@@ -34,7 +50,7 @@ export const useNotificationSound = () => {
     } catch (error) {
       // Silent fail for audio creation errors
     }
-  }, []);
+  }, [ensureAudioElement]);
 
   // Function to enable audio after user interaction
   const enableAudio = useCallback(() => {

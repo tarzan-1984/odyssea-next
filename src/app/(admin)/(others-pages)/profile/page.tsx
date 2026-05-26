@@ -4,6 +4,7 @@ import UserMetaCard from "@/components/user-profile/UserMetaCard";
 import React from "react";
 import { useUserInit } from "@/hooks/useUserInit";
 import UserContactCard from "@/components/user-profile/UserContactCard";
+import NotificationSoundSettings from "@/components/user-profile/NotificationSoundSettings";
 import Link from "next/link";
 
 export default function Profile() {
@@ -37,6 +38,7 @@ export default function Profile() {
 				</div>
 				<div className="space-y-6">
 					<UserMetaCard user={currentUser} />
+					<NotificationSoundSettings />
 					<UserContactCard user={currentUser} />
 				</div>
 			</div>

@@ -58,6 +58,17 @@ export type ChatMessageAttachment = {
 	fileSize?: number;
 };
 
+export type MessageReactionUser = Pick<
+	User,
+	"id" | "firstName" | "lastName" | "avatar" | "userColor" | "role"
+>;
+
+export type MessageReactionGroup = {
+	emoji: string;
+	users: MessageReactionUser[];
+	hasCurrentUser: boolean;
+};
+
 export interface Message {
 	id: string;
 	chatRoomId: string;
@@ -80,6 +91,7 @@ export interface Message {
 	createdAt: string;
 	sender: User;
 	receiver?: User;
+	reactions?: MessageReactionGroup[];
 }
 
 /** Pipe-delimited multiple files in one message (fileUrl and fileName aligned by index). */
@@ -302,6 +314,30 @@ class ChatApiClient {
 			body: JSON.stringify(data),
 		});
 		return response;
+	}
+
+	setMessageReaction(
+		messageId: string,
+		emoji: string,
+	): Promise<{
+		messageId: string;
+		chatRoomId: string;
+		reactions: MessageReactionGroup[];
+	}> {
+		return this.request(`/messages/${messageId}/reactions`, {
+			method: "POST",
+			body: JSON.stringify({ emoji }),
+		});
+	}
+
+	removeMessageReaction(messageId: string): Promise<{
+		messageId: string;
+		chatRoomId: string;
+		reactions: MessageReactionGroup[];
+	}> {
+		return this.request(`/messages/${messageId}/reactions`, {
+			method: "DELETE",
+		});
 	}
 
 	markMessageAsRead(messageId: string): Promise<void> {

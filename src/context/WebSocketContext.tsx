@@ -496,6 +496,93 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		});
 
+		newSocket.on(
+			"messageReactionsUpdated",
+			(data: {
+				chatRoomId: string;
+				messageId: string;
+				reactions: Message["reactions"];
+				messageSenderId?: string;
+				actorUserId?: string;
+				actorFirstName?: string;
+				actorLastName?: string;
+				emoji?: string;
+				action?: "set" | "remove";
+			}) => {
+				const reactions = data.reactions ?? [];
+				const state = useChatStore.getState();
+
+				// Always patch cached message + in-memory list (same as newMessage → IndexedDB path)
+				state.updateMessage(data.messageId, { reactions });
+
+				// Keep chat list preview in sync when reactions are on lastMessage
+				const room = state.chatRooms.find(r => r.id === data.chatRoomId);
+				if (room?.lastMessage?.id === data.messageId) {
+					state.updateChatRoom(data.chatRoomId, {
+						lastMessage: { ...room.lastMessage, reactions },
+					});
+				}
+
+				// Toast + sound only for the author of the message that was reacted to
+				const isReactionOnMyMessage =
+					data.action === "set" &&
+					data.messageSenderId &&
+					data.actorUserId &&
+					data.messageSenderId === currentUser?.id &&
+					data.actorUserId !== currentUser?.id;
+
+				if (!isReactionOnMyMessage || !data.actorUserId) return;
+
+				const actorUserId = data.actorUserId;
+				const isCurrentChat =
+					state.currentChatRoom?.id === data.chatRoomId;
+				const chatRoom = room;
+
+				if (isCurrentChat || chatRoom?.isMuted) return;
+
+				playNotificationSound();
+
+				if (typeof window !== "undefined" && (window as any).addToastNotification) {
+					const actorName =
+						[data.actorFirstName, data.actorLastName]
+							.filter(Boolean)
+							.join(" ")
+							.trim() || "Someone";
+					const reactionEmoji =
+						data.emoji?.trim() ||
+						reactions.find(g =>
+							g.users.some(u => u.id === actorUserId),
+						)?.emoji ||
+						"";
+					const toastText = reactionEmoji
+						? `${actorName} reacted to your message ${reactionEmoji}`
+						: `${actorName} reacted to your message`;
+					const toastMessage: Message = {
+						id: `reaction-${data.messageId}-${Date.now()}`,
+						chatRoomId: data.chatRoomId,
+						senderId: actorUserId,
+						content: toastText,
+						isRead: true,
+						createdAt: new Date().toISOString(),
+						sender: {
+							id: actorUserId,
+							firstName: data.actorFirstName ?? "",
+							lastName: data.actorLastName ?? "",
+						},
+					};
+					const chatRoomForToast = chatRoom ?? {
+						id: data.chatRoomId,
+						type: "GROUP",
+						isArchived: false,
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+						participants: [],
+					};
+					(window as any).addToastNotification(toastMessage, chatRoomForToast);
+				}
+			},
+		);
+
 		// Handle message deletion
 		newSocket.on(
 			"messageDeleted",

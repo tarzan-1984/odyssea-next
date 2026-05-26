@@ -6,6 +6,8 @@ interface EmojiPickerProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onEmojiSelect: (emoji: string) => void;
+	/** `anchor` — above parent (default). `inline` — normal flow (e.g. in a fixed portal). */
+	variant?: "anchor" | "inline";
 }
 
 const EMOJI_CATEGORIES = [
@@ -106,13 +108,22 @@ const EMOJI_CATEGORIES = [
 	}
 ];
 
-const EmojiPicker = forwardRef<HTMLDivElement, EmojiPickerProps>(({ isOpen, onClose, onEmojiSelect }, ref) => {
+const EmojiPicker = forwardRef<HTMLDivElement, EmojiPickerProps>(
+	({ isOpen, onClose, onEmojiSelect, variant = "anchor" }, ref) => {
 	const [selectedCategory, setSelectedCategory] = useState(0);
 
 	if (!isOpen) return null;
 
+	const positionClass =
+		variant === "inline"
+			? "relative w-80"
+			: "absolute bottom-full left-0 mb-2 w-80";
+
 	return (
-		<div ref={ref} className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 w-80 max-h-96 overflow-hidden">
+		<div
+			ref={ref}
+			className={`${positionClass} max-h-96 overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800`}
+		>
 			{/* Header */}
 			<div className="flex items-center justify-between mb-3">
 				<h3 className="text-sm font-medium text-gray-900 dark:text-white">Choose emoji</h3>
@@ -160,7 +171,8 @@ const EmojiPicker = forwardRef<HTMLDivElement, EmojiPickerProps>(({ isOpen, onCl
 			</div>
 		</div>
 	);
-});
+},
+);
 
 EmojiPicker.displayName = "EmojiPicker";
 
