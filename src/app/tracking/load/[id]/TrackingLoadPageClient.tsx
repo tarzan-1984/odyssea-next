@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchTrackingLoadDetails } from "@/lib/fetchTrackingLoadDetails";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -8,10 +9,9 @@ import { io } from "socket.io-client";
 import { clientAuth } from "@/utils/auth";
 import DriverInfo from "../../[id]/DriverInfo";
 
-const TrackingDeliveryMap = dynamic(
-	() => import("@/components/logistics/TrackingDeliveryMap"),
-	{ ssr: false }
-);
+const TrackingDeliveryMap = dynamic(() => import("@/components/logistics/TrackingDeliveryMap"), {
+	ssr: false,
+});
 
 interface TrackingLoadPageClientProps {
 	loadId: string;
@@ -149,9 +149,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	}, []);
 
 	const applyHistoryPointSelection = useCallback((index: number) => {
-		setEditingHistoryPointIndex((prev) =>
-			prev !== null && prev !== index ? null : prev
-		);
+		setEditingHistoryPointIndex(prev => (prev !== null && prev !== index ? null : prev));
 		setSelectedHistoryPointIndex(index);
 	}, []);
 
@@ -160,12 +158,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			const wasClosed = !isHistoryOpen;
 			setIsHistoryOpen(true);
 			applyHistoryPointSelection(index);
-			window.setTimeout(() => {
-				historyCardRefs.current[index]?.scrollIntoView({
-					behavior: "smooth",
-					block: "start",
-				});
-			}, wasClosed ? 150 : 0);
+			window.setTimeout(
+				() => {
+					historyCardRefs.current[index]?.scrollIntoView({
+						behavior: "smooth",
+						block: "start",
+					});
+				},
+				wasClosed ? 150 : 0
+			);
 		},
 		[applyHistoryPointSelection, isHistoryOpen]
 	);
@@ -173,31 +174,21 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const [deletingHistoryPointId, setDeletingHistoryPointId] = useState<string | null>(null);
 	const { data: loadDetails } = useQuery({
 		queryKey: ["tracking-load-details", loadId],
-		queryFn: async () => {
-			const response = await fetch(`/api/tms/load/${encodeURIComponent(loadId)}`);
-			if (!response.ok) {
-				throw new Error(`Failed to fetch load details: ${response.status}`);
-			}
-			return response.json();
-		},
+		queryFn: () => fetchTrackingLoadDetails(loadId),
 		enabled: Boolean(loadId),
 		staleTime: 10 * 60 * 1000,
 		gcTime: 10 * 60 * 1000,
 	});
 
 	const refreshLoadDetails = useCallback(() => {
-		return queryClient.invalidateQueries({
-			queryKey: ["tracking-load-details", loadId],
-		}).catch(error => {
-			console.error("[TrackingLoadPage] Failed to refresh load details:", error);
-		});
+		return queryClient
+			.invalidateQueries({
+				queryKey: ["tracking-load-details", loadId],
+			})
+			.catch(error => {
+				console.error("[TrackingLoadPage] Failed to refresh load details:", error);
+			});
 	}, [loadId, queryClient]);
-
-	useEffect(() => {
-		if (loadDetails) {
-			console.log("[TrackingLoadPage] Load details:", loadDetails);
-		}
-	}, [loadDetails]);
 
 	useEffect(() => {
 		if (!loadId) return;
@@ -232,14 +223,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			}
 		});
 
-		socket.on(
-			"driverTrackingPointCreated",
-			(payload: DriverTrackingPointCreatedPayload) => {
-				if (payload.loadId?.trim() === loadId) {
-					refreshLoadDetails();
-				}
+		socket.on("driverTrackingPointCreated", (payload: DriverTrackingPointCreatedPayload) => {
+			if (payload.loadId?.trim() === loadId) {
+				refreshLoadDetails();
 			}
-		);
+		});
 
 		return () => {
 			socket.disconnect();
@@ -248,11 +236,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const routeGeocodeFromApi = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
-		return (
-			details?.data?.data?.routeGeocode ??
-			details?.data?.routeGeocode ??
-			null
-		);
+		return details?.data?.data?.routeGeocode ?? details?.data?.routeGeocode ?? null;
 	}, [loadDetails]);
 
 	const loadMetaData = useMemo(() => {
@@ -282,7 +266,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const loadHistory = useMemo(() => {
 		return sortedTrackingPoints
-			.map((point) => {
+			.map(point => {
 				const latitude = Number(point.latitude);
 				const longitude = Number(point.longitude);
 				if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
@@ -308,7 +292,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const loadHistoryDetails = useMemo(() => {
 		return sortedTrackingPoints
-			.map((point) => {
+			.map(point => {
 				const latitude = Number(point.latitude);
 				const longitude = Number(point.longitude);
 				if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
@@ -316,7 +300,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				}
 				const externalDriverId = point.externalDriverId?.trim() || null;
 				const driver = externalDriverId
-					? loadDrivers.find((item) => item.externalId?.trim() === externalDriverId)
+					? loadDrivers.find(item => item.externalId?.trim() === externalDriverId)
 					: null;
 				const driverName = [driver?.firstName, driver?.lastName]
 					.filter(Boolean)
@@ -416,16 +400,18 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		]
 	);
 
-	const handleHistoryEditDragEnd = useCallback((lat: number, lng: number) => {
-		setHistoryDragDraft([lat, lng]);
-		const idx = editingHistoryPointIndex;
-		if (idx === null) return;
-		const orig = loadHistoryDetailsRef.current[idx]?.position;
-		if (!orig) return;
-		const changed =
-			Math.abs(orig[0] - lat) > 1e-7 || Math.abs(orig[1] - lng) > 1e-7;
-		setHistoryEditShowApplyCancel(changed);
-	}, [editingHistoryPointIndex]);
+	const handleHistoryEditDragEnd = useCallback(
+		(lat: number, lng: number) => {
+			setHistoryDragDraft([lat, lng]);
+			const idx = editingHistoryPointIndex;
+			if (idx === null) return;
+			const orig = loadHistoryDetailsRef.current[idx]?.position;
+			if (!orig) return;
+			const changed = Math.abs(orig[0] - lat) > 1e-7 || Math.abs(orig[1] - lng) > 1e-7;
+			setHistoryEditShowApplyCancel(changed);
+		},
+		[editingHistoryPointIndex]
+	);
 
 	const handleCancelHistoryPointEdit = useCallback(() => {
 		setHistoryDragDraft(null);
@@ -480,7 +466,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				const externalId = sortedTrackingPoints[i]?.externalDriverId?.trim();
 				if (!externalId) continue;
 				const fromHistory = loadDrivers.find(
-					(driver) => driver.externalId?.trim() === externalId
+					driver => driver.externalId?.trim() === externalId
 				);
 				if (fromHistory) return fromHistory;
 			}
@@ -501,40 +487,43 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isDriverLoadedEnroute &&
 		hasCurrentDriverCoordinates;
 
-	const mapLoadData = useMemo(() => ({
-		id: currentTrackingDriver?.id ?? null,
-		email: currentTrackingDriver?.email ?? null,
-		externalId: currentTrackingDriver?.externalId ?? null,
-		firstName: currentTrackingDriver?.firstName ?? "",
-		lastName: currentTrackingDriver?.lastName ?? "",
-		phone: currentTrackingDriver?.phone ?? "",
-		profilePhoto: currentTrackingDriver?.profilePhoto ?? null,
-		driverStatus: currentTrackingDriver?.driverStatus ?? null,
-		status: currentTrackingDriver?.status ?? null,
-		city: currentTrackingDriver?.city ?? null,
-		state: currentTrackingDriver?.state ?? null,
-		zip: currentTrackingDriver?.zip ?? null,
-		latitude: showDriverLiveMarker ? currentDriverLatitude : null,
-		longitude: showDriverLiveMarker ? currentDriverLongitude : null,
-		lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
-		pick_up_location: loadMetaData?.pick_up_location ?? null,
-		delivery_location: loadMetaData?.delivery_location ?? null,
-		routeGeocode:
-			routeGeocodeFromApi?.pickup && routeGeocodeFromApi?.delivery
-				? routeGeocodeFromApi
-				: null,
-		load_history: loadHistoryForMap,
-		load_history_details: loadHistoryDetails,
-	}), [
-		currentDriverLatitude,
-		currentDriverLongitude,
-		currentTrackingDriver,
-		showDriverLiveMarker,
-		loadMetaData,
-		routeGeocodeFromApi,
-		loadHistoryForMap,
-		loadHistoryDetails,
-	]);
+	const mapLoadData = useMemo(
+		() => ({
+			id: currentTrackingDriver?.id ?? null,
+			email: currentTrackingDriver?.email ?? null,
+			externalId: currentTrackingDriver?.externalId ?? null,
+			firstName: currentTrackingDriver?.firstName ?? "",
+			lastName: currentTrackingDriver?.lastName ?? "",
+			phone: currentTrackingDriver?.phone ?? "",
+			profilePhoto: currentTrackingDriver?.profilePhoto ?? null,
+			driverStatus: currentTrackingDriver?.driverStatus ?? null,
+			status: currentTrackingDriver?.status ?? null,
+			city: currentTrackingDriver?.city ?? null,
+			state: currentTrackingDriver?.state ?? null,
+			zip: currentTrackingDriver?.zip ?? null,
+			latitude: showDriverLiveMarker ? currentDriverLatitude : null,
+			longitude: showDriverLiveMarker ? currentDriverLongitude : null,
+			lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
+			pick_up_location: loadMetaData?.pick_up_location ?? null,
+			delivery_location: loadMetaData?.delivery_location ?? null,
+			routeGeocode:
+				routeGeocodeFromApi?.pickup && routeGeocodeFromApi?.delivery
+					? routeGeocodeFromApi
+					: null,
+			load_history: loadHistoryForMap,
+			load_history_details: loadHistoryDetails,
+		}),
+		[
+			currentDriverLatitude,
+			currentDriverLongitude,
+			currentTrackingDriver,
+			showDriverLiveMarker,
+			loadMetaData,
+			routeGeocodeFromApi,
+			loadHistoryForMap,
+			loadHistoryDetails,
+		]
+	);
 
 	return (
 		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
@@ -545,12 +534,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					className="absolute left-14 top-4 z-[1000] inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-500 bg-brand-500 px-3 py-1.5 text-xs font-medium leading-none text-white transition-colors hover:bg-brand-600 dark:border-brand-400 dark:bg-brand-400 dark:hover:bg-brand-500"
 					aria-label="Go back"
 				>
-					<svg
-						className="size-4 shrink-0"
-						viewBox="0 0 20 20"
-						fill="none"
-						aria-hidden
-					>
+					<svg className="size-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
 						<path
 							d="M12.7083 5L7.5 10.2083L12.7083 15.4167"
 							stroke="currentColor"
@@ -577,7 +561,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				<button
 					type="button"
 					className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800"
-					onClick={() => setIsHistoryOpen((value) => !value)}
+					onClick={() => setIsHistoryOpen(value => !value)}
 				>
 					<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
 						Load history
@@ -614,137 +598,161 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 									}
 
 									return (
-									<li
-										key={point.id ?? `${point.position[0]}-${point.position[1]}-${point.createdAt ?? index}`}
-										ref={(el) => {
-											historyCardRefs.current[index] = el;
-										}}
-									>
-										<div
-											role="button"
-											tabIndex={0}
-											className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
-											onClick={() => {
-												applyHistoryPointSelection(index);
-											}}
-											onKeyDown={(event) => {
-												if (event.key === "Enter" || event.key === " ") {
-													event.preventDefault();
-													applyHistoryPointSelection(index);
-												}
+										<li
+											key={
+												point.id ??
+												`${point.position[0]}-${point.position[1]}-${point.createdAt ?? index}`
+											}
+											ref={el => {
+												historyCardRefs.current[index] = el;
 											}}
 										>
-											<div className="mb-2 flex items-center justify-between gap-2">
-												<p
-													className={`font-semibold ${
-														isEditingCard
-															? "text-blue-900 dark:text-blue-50"
-															: "text-gray-900 dark:text-white"
-													}`}
-												>
-													Step {index + 1}
-												</p>
-												<div className="flex items-center gap-2">
-													{isEditingCard && historyEditShowApplyCancel ? (
-														<>
-															<button
-																type="button"
-																className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
-																disabled={
-																	Boolean(savingHistoryPointId) ||
-																	!point.id
-																}
-																onClick={(event) => {
-																	event.stopPropagation();
-																	handleApplyHistoryPointEdit();
-																}}
-															>
-																Apply
-															</button>
-															<button
-																type="button"
-																className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-																disabled={Boolean(savingHistoryPointId)}
-																onClick={(event) => {
-																	event.stopPropagation();
-																	handleCancelHistoryPointEdit();
-																}}
-															>
-																Cancel
-															</button>
-														</>
-													) : (
-														<>
-													<button
-														type="button"
-														className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
-														aria-label="Edit history point"
-														onClick={(event) => {
-															event.stopPropagation();
-															setSelectedHistoryPointIndex(index);
-															setEditingHistoryPointIndex(index);
-														}}
+											<div
+												role="button"
+												tabIndex={0}
+												className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
+												onClick={() => {
+													applyHistoryPointSelection(index);
+												}}
+												onKeyDown={event => {
+													if (
+														event.key === "Enter" ||
+														event.key === " "
+													) {
+														event.preventDefault();
+														applyHistoryPointSelection(index);
+													}
+												}}
+											>
+												<div className="mb-2 flex items-center justify-between gap-2">
+													<p
+														className={`font-semibold ${
+															isEditingCard
+																? "text-blue-900 dark:text-blue-50"
+																: "text-gray-900 dark:text-white"
+														}`}
 													>
-														<svg
-															className="h-full w-full"
-															xmlns="http://www.w3.org/2000/svg"
-															viewBox="0 0 122.88 122.88"
-															aria-hidden="true"
-														>
-															<path
-																fill="currentColor"
-																fillRule="evenodd"
-																clipRule="evenodd"
-																d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
-															/>
-														</svg>
-													</button>
-													<button
-														type="button"
-														className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
-														aria-label="Delete history point"
-														disabled={!point.id || deletingHistoryPointId === point.id}
-														onClick={(event) => {
-															event.stopPropagation();
-															handleDeleteHistoryPoint(point.id, index);
-														}}
-													>
-														<svg
-															className="h-full w-full"
-															xmlns="http://www.w3.org/2000/svg"
-															viewBox="0 0 122.88 122.88"
-															aria-hidden="true"
-														>
-															<path
-																fill="currentColor"
-																d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
-															/>
-														</svg>
-													</button>
-														</>
-													)}
+														Step {index + 1}
+													</p>
+													<div className="flex items-center gap-2">
+														{isEditingCard &&
+														historyEditShowApplyCancel ? (
+															<>
+																<button
+																	type="button"
+																	className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+																	disabled={
+																		Boolean(
+																			savingHistoryPointId
+																		) || !point.id
+																	}
+																	onClick={event => {
+																		event.stopPropagation();
+																		handleApplyHistoryPointEdit();
+																	}}
+																>
+																	Apply
+																</button>
+																<button
+																	type="button"
+																	className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+																	disabled={Boolean(
+																		savingHistoryPointId
+																	)}
+																	onClick={event => {
+																		event.stopPropagation();
+																		handleCancelHistoryPointEdit();
+																	}}
+																>
+																	Cancel
+																</button>
+															</>
+														) : (
+															<>
+																<button
+																	type="button"
+																	className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
+																	aria-label="Edit history point"
+																	onClick={event => {
+																		event.stopPropagation();
+																		setSelectedHistoryPointIndex(
+																			index
+																		);
+																		setEditingHistoryPointIndex(
+																			index
+																		);
+																	}}
+																>
+																	<svg
+																		className="h-full w-full"
+																		xmlns="http://www.w3.org/2000/svg"
+																		viewBox="0 0 122.88 122.88"
+																		aria-hidden="true"
+																	>
+																		<path
+																			fill="currentColor"
+																			fillRule="evenodd"
+																			clipRule="evenodd"
+																			d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
+																		/>
+																	</svg>
+																</button>
+																<button
+																	type="button"
+																	className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
+																	aria-label="Delete history point"
+																	disabled={
+																		!point.id ||
+																		deletingHistoryPointId ===
+																			point.id
+																	}
+																	onClick={event => {
+																		event.stopPropagation();
+																		handleDeleteHistoryPoint(
+																			point.id,
+																			index
+																		);
+																	}}
+																>
+																	<svg
+																		className="h-full w-full"
+																		xmlns="http://www.w3.org/2000/svg"
+																		viewBox="0 0 122.88 122.88"
+																		aria-hidden="true"
+																	>
+																		<path
+																			fill="currentColor"
+																			d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
+																		/>
+																	</svg>
+																</button>
+															</>
+														)}
+													</div>
 												</div>
-											</div>
-											<p>
-												<span className="font-medium">Coordinates:</span>{" "}
-												{displayCoords[0].toFixed(6)}, {displayCoords[1].toFixed(6)}
-											</p>
-											{point.placeLabel ? (
 												<p>
-													<span className="font-medium">Place:</span>{" "}
-													{point.placeLabel}
+													<span className="font-medium">
+														Coordinates:
+													</span>{" "}
+													{displayCoords[0].toFixed(6)},{" "}
+													{displayCoords[1].toFixed(6)}
 												</p>
-											) : null}
-											<p>
-												<span className="font-medium">Tracked:</span>{" "}
-												{formatHistoryDate(point.createdAt)}
-											</p>
-											<p>
-												<span className="font-medium">Updated:</span>{" "}
-												{formatHistoryDate(point.updatedAt)}
-											</p>
-										</div>
-									</li>
+												{point.placeLabel ? (
+													<p>
+														<span className="font-medium">Place:</span>{" "}
+														{point.placeLabel}
+													</p>
+												) : null}
+												<p>
+													<span className="font-medium">Tracked:</span>{" "}
+													{formatHistoryDate(point.createdAt)}
+												</p>
+												<p>
+													<span className="font-medium">Updated:</span>{" "}
+													{formatHistoryDate(point.updatedAt)}
+												</p>
+											</div>
+										</li>
 									);
 								})}
 							</ol>

@@ -1,40 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
+import axios from "axios";
 import { serverAuth } from "@/utils/auth";
 
-// GET /api/tms/load/[loadId] - TMS load details + drivers + tracking history (authenticated).
+const TMS_LOAD_BASE_URL = "https://www.endurance-tms.com/wp-json/tms/v1/load";
+const TMS_API_KEY = process.env.TMS_API_KEY || "tms_api_key_2024_driver_access";
+
+// GET /api/tms/load/[loadId] — TMS load details only (same path as drivers/search → TMS).
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string }> }
 ) {
+	const { loadId } = await params;
+
 	try {
 		const accessToken = serverAuth.getAccessToken(request);
 		if (!accessToken) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const { loadId } = await params;
-
-		if (!loadId) {
+		if (!loadId?.trim()) {
 			return NextResponse.json({ error: "Load ID is required" }, { status: 400 });
 		}
 
-		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/tms/load/${encodeURIComponent(loadId)}`,
-			{
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
-				},
-			}
+		const url = new URL(
+			`${TMS_LOAD_BASE_URL.replace(/\/$/, "")}/${encodeURIComponent(loadId.trim())}`
 		);
+		url.searchParams.set("project", "odysseia");
+		url.searchParams.set("is_flt", "false");
 
-		const data = await response.json();
+		const response = await axios.get(url.toString(), {
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": TMS_API_KEY,
+			},
+			timeout: 30000,
+			validateStatus: () => true,
+		});
 
-		if (!response.ok) {
+		const { data, status } = response;
+
+		if (status < 200 || status >= 300) {
 			return NextResponse.json(
-				{ error: data.message || data.error || "Failed to get load details" },
-				{ status: response.status }
+				{
+					error:
+						(data as { message?: string })?.message ||
+						"Failed to get load details from TMS",
+				},
+				{ status }
 			);
 		}
 
