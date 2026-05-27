@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatBoxHeader from "./ChatBoxHeader";
-import ChatBoxSendForm from "./ChatBoxSendForm";
+import ChatBoxSendForm, { type ChatBoxSendFormHandle } from "./ChatBoxSendForm";
 import Image from "next/image";
 import { Message, ChatRoom, isMessageReadByUser } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
@@ -20,9 +20,12 @@ interface ChatBoxProps {
 
 export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatBoxProps) {
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
-	const [replyingTo, setReplyingTo] = useState<Message['replyData'] | null>(null);
+	const [isDragOver, setIsDragOver] = useState(false);
+	const [replyingTo, setReplyingTo] = useState<Message["replyData"] | null>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const messagesContainerRef = useRef<HTMLDivElement>(null);
+	const sendFormRef = useRef<ChatBoxSendFormHandle>(null);
+	const dragCounterRef = useRef(0);
 
 	// Get current user for message display
 	const currentUser = useCurrentUser();
@@ -64,6 +67,51 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const isLoadArchivedReadOnlyChat =
 		selectedChatRoom?.type === "LOAD" && selectedChatRoom.isLoadArchived === true;
+	const canAttachFiles = !isLoadArchivedReadOnlyChat && !sending;
+
+	const hasFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
+
+	const handleChatDragEnter = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!canAttachFiles || !hasFileDrag(e)) return;
+		dragCounterRef.current += 1;
+		setIsDragOver(true);
+	};
+
+	const handleChatDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!canAttachFiles) return;
+		dragCounterRef.current -= 1;
+		if (dragCounterRef.current <= 0) {
+			dragCounterRef.current = 0;
+			setIsDragOver(false);
+		}
+	};
+
+	const handleChatDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!canAttachFiles || !hasFileDrag(e)) return;
+		e.dataTransfer.dropEffect = "copy";
+	};
+
+	const handleChatDrop = async (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		dragCounterRef.current = 0;
+		setIsDragOver(false);
+		if (!canAttachFiles) return;
+		const files = Array.from(e.dataTransfer.files);
+		if (files.length === 0) return;
+		await sendFormRef.current?.addFiles(files);
+	};
+
+	useEffect(() => {
+		dragCounterRef.current = 0;
+		setIsDragOver(false);
+	}, [selectedChatRoomId]);
 	const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
 	const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
 
@@ -238,7 +286,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const handleSendMessage = async (messageData: {
 		content: string;
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number }[];
-		replyData?: Message['replyData'];
+		replyData?: Message["replyData"];
 	}) => {
 		if (!selectedChatRoom) return;
 
@@ -313,14 +361,17 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			const chatRoom = state.chatRooms.find(room => room.id === result.chatRoomId);
 			if (chatRoom && chatRoom.lastMessage?.id === messageId) {
 				// Find the new last message
-				const remainingMessages = updatedMessages.filter(msg => msg.chatRoomId === result.chatRoomId);
-				const newLastMessage = remainingMessages.length > 0 
-					? remainingMessages[remainingMessages.length - 1] 
-					: null;
+				const remainingMessages = updatedMessages.filter(
+					msg => msg.chatRoomId === result.chatRoomId
+				);
+				const newLastMessage =
+					remainingMessages.length > 0
+						? remainingMessages[remainingMessages.length - 1]
+						: null;
 
 				// Update chat room with new last message
-				const updatedChatRooms = state.chatRooms.map(room => 
-					room.id === result.chatRoomId 
+				const updatedChatRooms = state.chatRooms.map(room =>
+					room.id === result.chatRoomId
 						? { ...room, lastMessage: newLastMessage || undefined }
 						: room
 				);
@@ -354,25 +405,25 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			// Get chat room type to determine logic
 			const state = useChatStore.getState();
 			const chatRoom = state.chatRooms.find(room => room.id === result.chatRoomId);
-			const isDirectChat = chatRoom?.type === 'DIRECT';
+			const isDirectChat = chatRoom?.type === "DIRECT";
 
 			// Optimistically update UI and cache
 			const updatedMessages = state.messages.map(msg => {
 				if (msg.id === messageId) {
 					const currentReadBy = msg.readBy || [];
 					const updatedReadBy = currentReadBy.filter(id => id !== currentUser?.id);
-					
+
 					if (isDirectChat) {
 						// For DIRECT chats: set both isRead to false and remove user from readBy
-						return { 
-							...msg, 
+						return {
+							...msg,
 							isRead: false, // Global read status becomes false
-							readBy: updatedReadBy
+							readBy: updatedReadBy,
 						};
 					} else {
 						// For GROUP and LOAD chats: only remove user from readBy, keep isRead as true
-						return { 
-							...msg, 
+						return {
+							...msg,
 							readBy: updatedReadBy,
 							// Keep isRead as true (global status doesn't change)
 						};
@@ -395,29 +446,38 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			const message = updatedMessages.find(m => m.id === messageId);
 			if (message) {
 				if (isDirectChat) {
-					indexedDBChatService.updateMessage(messageId, { 
-						isRead: false,
-						readBy: message.readBy
-					}).catch((error: Error) => {
-						console.error("Failed to update message in IndexedDB:", error);
-					});
+					indexedDBChatService
+						.updateMessage(messageId, {
+							isRead: false,
+							readBy: message.readBy,
+						})
+						.catch((error: Error) => {
+							console.error("Failed to update message in IndexedDB:", error);
+						});
 				} else {
-					indexedDBChatService.updateMessage(messageId, { 
-						readBy: message.readBy
-					}).catch((error: Error) => {
-						console.error("Failed to update message in IndexedDB:", error);
-					});
+					indexedDBChatService
+						.updateMessage(messageId, {
+							readBy: message.readBy,
+						})
+						.catch((error: Error) => {
+							console.error("Failed to update message in IndexedDB:", error);
+						});
 				}
 			}
 
 			// Update chat room unread count in IndexedDB
 			const updatedRoom = updatedRooms.find(room => room.id === result.chatRoomId);
 			if (updatedRoom) {
-				indexedDBChatService.updateChatRoom(result.chatRoomId, {
-					unreadCount: updatedRoom.unreadCount
-				}).catch((error: Error) => {
-					console.error("Failed to update chat room unread count in IndexedDB:", error);
-				});
+				indexedDBChatService
+					.updateChatRoom(result.chatRoomId, {
+						unreadCount: updatedRoom.unreadCount,
+					})
+					.catch((error: Error) => {
+						console.error(
+							"Failed to update chat room unread count in IndexedDB:",
+							error
+						);
+					});
 			}
 		} catch (error) {
 			console.error("Failed to mark message as unread:", error);
@@ -454,7 +514,28 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	}
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4">
+		<div
+			className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4"
+			onDragEnter={handleChatDragEnter}
+			onDragLeave={handleChatDragLeave}
+			onDragOver={handleChatDragOver}
+			onDrop={handleChatDrop}
+		>
+			{isDragOver && (
+				<div
+					className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-brand-500/10 backdrop-blur-[1px]"
+					aria-hidden
+				>
+					<div className="rounded-xl border-2 border-dashed border-brand-500 bg-white/90 px-8 py-6 text-center shadow-lg dark:bg-gray-900/90">
+						<p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+							Drop files to attach
+						</p>
+						<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+							Images, PDF, DOC, DOCX, TXT — up to 10MB each
+						</p>
+					</div>
+				</div>
+			)}
 			{/* Header */}
 			<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
@@ -573,6 +654,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			{/* Send form hidden for archived LOAD shipments (read-only history) */}
 			{!isLoadArchivedReadOnlyChat && (
 				<ChatBoxSendForm
+					ref={sendFormRef}
 					onSendMessage={handleSendMessage}
 					onTyping={sendTyping}
 					isLoading={sending}

@@ -88,7 +88,10 @@ function normalizeLoadLocationType(type: unknown): string {
 		.replace(/[\s-]+/g, "_");
 }
 
-function parseLoadLocation(value: unknown, preferredType: "pick_up_location" | "delivery_location"): LoadLocation | null {
+function parseLoadLocation(
+	value: unknown,
+	preferredType: "pick_up_location" | "delivery_location"
+): LoadLocation | null {
 	if (!value) return null;
 
 	let parsed: unknown = value;
@@ -167,7 +170,9 @@ function parseLocationObjectsFromMeta(raw: unknown): LoadLocation[] {
 
 	try {
 		const arr = Array.isArray(parsed) ? parsed : [parsed];
-		return arr.filter((item): item is LoadLocation => Boolean(item && typeof item === "object"));
+		return arr.filter((item): item is LoadLocation =>
+			Boolean(item && typeof item === "object")
+		);
 	} catch {
 		return [];
 	}
@@ -285,7 +290,12 @@ function buildStopMarkersFromChain(chain: RoutePoint[], rows: StopBuildRow[]): L
 		return chain.map((point, index) => ({
 			point,
 			kind: index === 0 ? "pickup" : index === chain.length - 1 ? "delivery" : "pickup",
-			title: index === 0 ? "Pick up" : index === chain.length - 1 ? "Delivery" : `Stop ${index + 1}`,
+			title:
+				index === 0
+					? "Pick up"
+					: index === chain.length - 1
+						? "Delivery"
+						: `Stop ${index + 1}`,
 			isFirstPickup: index === 0,
 			isFinalDelivery: index === chain.length - 1,
 		}));
@@ -409,27 +419,34 @@ const NOMINATIM_MIN_INTERVAL_MS = 1100;
 async function nominatimThrottle(): Promise<void> {
 	const now = Date.now();
 	if (now < nominatimNextAllowedAt) {
-		await new Promise((r) => setTimeout(r, nominatimNextAllowedAt - now));
+		await new Promise(r => setTimeout(r, nominatimNextAllowedAt - now));
 	}
 	nominatimNextAllowedAt = Date.now() + NOMINATIM_MIN_INTERVAL_MS;
 }
 
+/** Default US; override when address explicitly mentions Canada or Mexico. */
+function resolveNominatimCountryCodes(address: string): string {
+	if (/\bcanada\b/i.test(address)) return "ca";
+	if (/\b(mexico|méxico)\b/i.test(address)) return "mx";
+	return "us";
+}
+
 async function geocodeAddress(address: string): Promise<RoutePoint | null> {
+	const trimmed = address.trim();
 	const params = new URLSearchParams({
-		q: address,
+		q: trimmed,
 		format: "json",
 		limit: "1",
 		addressdetails: "0",
 		"accept-language": "en",
-		countrycodes: "us",
+		countrycodes: resolveNominatimCountryCodes(trimmed),
 	});
 
 	await nominatimThrottle();
 
-	const response = await fetch(
-		`/api/geocode/nominatim-search?${params.toString()}`,
-		{ credentials: "include" }
-	);
+	const response = await fetch(`/api/geocode/nominatim-search?${params.toString()}`, {
+		credentials: "include",
+	});
 	if (!response.ok) return null;
 
 	let results: Array<{ lat?: string; lon?: string }>;
@@ -446,7 +463,7 @@ async function geocodeAddress(address: string): Promise<RoutePoint | null> {
 	const lng = Number(first.lon);
 	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-	return { lat, lng, address };
+	return { lat, lng, address: trimmed };
 }
 
 async function geocodeAddressCandidates(candidates: string[]): Promise<RoutePoint | null> {
@@ -489,15 +506,17 @@ function clampSplitIndex(splitIdx: number, pathLen: number): number {
 }
 
 /** Vertex on the route polyline closest to the driver's coordinates (for splitting completed vs remaining). */
-function findClosestPolylineVertexIndex(path: [number, number][], target: [number, number]): number {
+function findClosestPolylineVertexIndex(
+	path: [number, number][],
+	target: [number, number]
+): number {
 	if (path.length === 0) return 0;
 	const [tLat, tLng] = target;
 	let bestI = 0;
 	let bestD = Infinity;
 	for (let i = 0; i < path.length; i++) {
 		const d =
-			(path[i][0] - tLat) * (path[i][0] - tLat) +
-			(path[i][1] - tLng) * (path[i][1] - tLng);
+			(path[i][0] - tLat) * (path[i][0] - tLat) + (path[i][1] - tLng) * (path[i][1] - tLng);
 		if (d < bestD) {
 			bestD = d;
 			bestI = i;
@@ -783,9 +802,7 @@ export default function TrackingDeliveryMap({
 		() =>
 			(driverData?.load_history ?? []).filter(
 				(point): point is [number, number] =>
-					Array.isArray(point) &&
-					Number.isFinite(point[0]) &&
-					Number.isFinite(point[1])
+					Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1])
 			),
 		[driverData?.load_history]
 	);
@@ -794,14 +811,14 @@ export default function TrackingDeliveryMap({
 		const details = driverData?.load_history_details ?? [];
 		if (details.length > 0) {
 			return details.filter(
-				(point) =>
+				point =>
 					Array.isArray(point.position) &&
 					Number.isFinite(point.position[0]) &&
 					Number.isFinite(point.position[1])
 			);
 		}
 
-		return historyMarkerPositions.map((position) => ({
+		return historyMarkerPositions.map(position => ({
 			position,
 			createdAt: null,
 			updatedAt: null,
@@ -860,11 +877,14 @@ export default function TrackingDeliveryMap({
 							geocodeAddressCandidates(deliveryAddressCandidates),
 						]);
 						if (!pickupGeo || !deliveryGeo) {
-							console.warn("[TrackingDeliveryMap] Pickup or delivery geocoding failed", {
-								pickupAddressCandidates,
-								deliveryAddressCandidates,
-								usedServerGeocode: Boolean(serverPickup && serverDelivery),
-							});
+							console.warn(
+								"[TrackingDeliveryMap] Pickup or delivery geocoding failed",
+								{
+									pickupAddressCandidates,
+									deliveryAddressCandidates,
+									usedServerGeocode: Boolean(serverPickup && serverDelivery),
+								}
+							);
 							setLoadRoute(null);
 							return;
 						}
@@ -935,7 +955,10 @@ export default function TrackingDeliveryMap({
 						remainingPath = fullPath;
 					} else {
 						const { limitedRequestPoints, waypointSnapsLngLat } = osrmResult;
-						const splitWI = findClosestLimitedWaypointIndex(limitedRequestPoints, splitTarget);
+						const splitWI = findClosestLimitedWaypointIndex(
+							limitedRequestPoints,
+							splitTarget
+						);
 						const snap =
 							splitWI >= 0 && splitWI < waypointSnapsLngLat.length
 								? waypointSnapsLngLat[splitWI]
@@ -1025,11 +1048,11 @@ export default function TrackingDeliveryMap({
 		if (!targetPoint) return;
 
 		const useDraft =
-			editingLoadHistoryPointIndex === indexToFocus &&
-			historyEditDragPosition !== null;
-		const position = (
-			useDraft ? historyEditDragPosition : targetPoint.position
-		) as [number, number];
+			editingLoadHistoryPointIndex === indexToFocus && historyEditDragPosition !== null;
+		const position = (useDraft ? historyEditDragPosition : targetPoint.position) as [
+			number,
+			number,
+		];
 
 		const focusKey = `${indexToFocus}|${position[0]},${position[1]}|${useDraft ? "d" : "s"}`;
 		if (lastHistoryFocusCenterKeyRef.current === focusKey) return;
@@ -1196,7 +1219,9 @@ export default function TrackingDeliveryMap({
 							>
 								<Popup>
 									<div className="text-sm dark:text-white">
-										<p className="font-semibold dark:text-white">{stop.title}</p>
+										<p className="font-semibold dark:text-white">
+											{stop.title}
+										</p>
 										<p className="text-gray-600 dark:text-gray-300">
 											{stop.point.address.includes(": ")
 												? stop.point.address.split(": ").slice(1).join(": ")
@@ -1212,9 +1237,10 @@ export default function TrackingDeliveryMap({
 							const showBlueAccent = isSelected;
 
 							if (isEditing) {
-								const position = (
-									historyEditDragPosition ?? point.position
-								) as [number, number];
+								const position = (historyEditDragPosition ?? point.position) as [
+									number,
+									number,
+								];
 								return (
 									<Marker
 										key={`history-point-edit-${index}`}
@@ -1257,38 +1283,41 @@ export default function TrackingDeliveryMap({
 										},
 									}}
 								>
-								<Popup>
-									<div className="text-sm dark:text-white">
-										<p className="font-semibold dark:text-white">
-											History point {index + 1}
-										</p>
-										{point.placeLabel?.trim() ? (
-											<p className="font-semibold text-gray-600 dark:text-gray-300">
-												{point.placeLabel.trim()}
+									<Popup>
+										<div className="text-sm dark:text-white">
+											<p className="font-semibold dark:text-white">
+												History point {index + 1}
 											</p>
-										) : null}
-										<p
-											className={
-												point.placeLabel?.trim()
-													? "text-xs text-gray-600 dark:text-gray-300 mt-1"
-													: "text-xs text-gray-600 dark:text-gray-300"
-											}
-										>
-											{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
-										</p>
-										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-											Driver:{" "}
-											{point.driverName ||
-												(point.externalDriverId
-													? `(${point.externalDriverId})`
-													: "N/A")}
-										</p>
-										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-											Tracked:{" "}
-											{formatHistoryPointTime(point.createdAt ?? point.updatedAt)}
-										</p>
-									</div>
-								</Popup>
+											{point.placeLabel?.trim() ? (
+												<p className="font-semibold text-gray-600 dark:text-gray-300">
+													{point.placeLabel.trim()}
+												</p>
+											) : null}
+											<p
+												className={
+													point.placeLabel?.trim()
+														? "text-xs text-gray-600 dark:text-gray-300 mt-1"
+														: "text-xs text-gray-600 dark:text-gray-300"
+												}
+											>
+												{point.position[0].toFixed(6)},{" "}
+												{point.position[1].toFixed(6)}
+											</p>
+											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+												Driver:{" "}
+												{point.driverName ||
+													(point.externalDriverId
+														? `(${point.externalDriverId})`
+														: "N/A")}
+											</p>
+											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+												Tracked:{" "}
+												{formatHistoryPointTime(
+													point.createdAt ?? point.updatedAt
+												)}
+											</p>
+										</div>
+									</Popup>
 								</CircleMarker>
 							);
 						})}
