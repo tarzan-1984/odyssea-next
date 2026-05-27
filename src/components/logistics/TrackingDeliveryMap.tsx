@@ -659,6 +659,8 @@ interface TrackingDeliveryMapProps {
 	/** Committed position after drag ends (card + route update then). */
 	historyEditDragPosition?: [number, number] | null;
 	onHistoryEditPointDragEnd?: (lat: number, lng: number) => void;
+	/** When false, history point popups omit driver name (public load tracking). */
+	showDriverInHistoryPopup?: boolean;
 }
 
 export default function TrackingDeliveryMap({
@@ -673,6 +675,7 @@ export default function TrackingDeliveryMap({
 	onMapBackgroundClick,
 	historyEditDragPosition = null,
 	onHistoryEditPointDragEnd,
+	showDriverInHistoryPopup = true,
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
@@ -1304,13 +1307,15 @@ export default function TrackingDeliveryMap({
 												{point.position[0].toFixed(6)},{" "}
 												{point.position[1].toFixed(6)}
 											</p>
-											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-												Driver:{" "}
-												{point.driverName ||
-													(point.externalDriverId
-														? `(${point.externalDriverId})`
-														: "N/A")}
-											</p>
+											{showDriverInHistoryPopup ? (
+												<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+													Driver:{" "}
+													{point.driverName ||
+														(point.externalDriverId
+															? `(${point.externalDriverId})`
+															: "N/A")}
+												</p>
+											) : null}
 											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
 												Tracked:{" "}
 												{formatHistoryPointTime(
@@ -1335,9 +1340,11 @@ export default function TrackingDeliveryMap({
 						{driverData && (
 							<Popup>
 								<div className="text-sm dark:text-white">
-									<p className="font-semibold dark:text-white">
-										{driverData.firstName} {driverData.lastName}
-									</p>
+									{showDriverInHistoryPopup ? (
+										<p className="font-semibold dark:text-white">
+											{driverData.firstName} {driverData.lastName}
+										</p>
+									) : null}
 									{driverData.city && driverData.state && (
 										<p className="text-gray-600 dark:text-gray-300">
 											{driverData.city}, {driverData.state}

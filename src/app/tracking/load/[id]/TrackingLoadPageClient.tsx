@@ -643,6 +643,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						? handleHistoryEditDragEnd
 						: undefined
 				}
+				showDriverInHistoryPopup={isAuthenticated}
 			/>
 			{isAuthenticated && (
 			<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
