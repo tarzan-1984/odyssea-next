@@ -209,7 +209,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 				{/* Image preview */}
 				{showLegacySingleFile && legacyFileUrl && isImageFile(message.fileName) && (
-					<div className="mb-2">
+					<div className={isSender ? "mb-2 ml-auto max-w-[400px]" : "mb-2"}>
 						{!isSender ? (
 							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
 								<FilePreview
@@ -220,19 +220,28 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								/>
 							</IncomingMessageBubble>
 						) : (
-							<FilePreview
-								fileUrl={legacyFileUrl}
-								fileName={message.fileName || "Unknown file"}
-								fileSize={message.fileSize}
-								messageId={message.id}
-							/>
+							<div className="flex items-start justify-end gap-2">
+								<FilePreview
+									fileUrl={legacyFileUrl}
+									fileName={message.fileName || "Unknown file"}
+									fileSize={message.fileSize}
+									messageId={message.id}
+								/>
+								<MessageDropdown
+									message={message}
+									currentUser={currentUser}
+									onDelete={onDelete}
+									onReply={onReply}
+									onMarkUnread={onMarkUnread}
+								/>
+							</div>
 						)}
 					</div>
 				)}
 
 				{/* File preview for PDF, DOCX, TXT */}
 				{showLegacySingleFile && legacyFileUrl && isPreviewableFile(message.fileName) && (
-					<div className="mb-2">
+					<div className={isSender ? "mb-2 ml-auto max-w-[400px]" : "mb-2"}>
 						{!isSender ? (
 							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
 								<FilePreview
@@ -243,12 +252,21 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								/>
 							</IncomingMessageBubble>
 						) : (
-							<FilePreview
-								fileUrl={legacyFileUrl}
-								fileName={message.fileName || "Unknown file"}
-								fileSize={message.fileSize}
-								messageId={message.id}
-							/>
+							<div className="flex items-start justify-end gap-2">
+								<FilePreview
+									fileUrl={legacyFileUrl}
+									fileName={message.fileName || "Unknown file"}
+									fileSize={message.fileSize}
+									messageId={message.id}
+								/>
+								<MessageDropdown
+									message={message}
+									currentUser={currentUser}
+									onDelete={onDelete}
+									onReply={onReply}
+									onMarkUnread={onMarkUnread}
+								/>
+							</div>
 						)}
 					</div>
 				)}
@@ -258,7 +276,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					legacyFileUrl &&
 					!isImageFile(message.fileName) &&
 					!isPreviewableFile(message.fileName) && (
-					<div className="mb-2 w-full max-w-[270px]">
+					<div
+						className={
+							isSender ? "mb-2 ml-auto w-full max-w-[270px]" : "mb-2 w-full max-w-[270px]"
+						}
+					>
 						{!isSender ? (
 							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
 								<a
@@ -335,6 +357,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								</a>
 							</IncomingMessageBubble>
 						) : (
+							<div className="flex items-start justify-end gap-2">
 							<a
 								href={legacyFileUrl}
 								download={message.fileName}
@@ -407,6 +430,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									/>
 								</svg>
 							</a>
+							<MessageDropdown
+								message={message}
+								currentUser={currentUser}
+								onDelete={onDelete}
+								onReply={onReply}
+								onMarkUnread={onMarkUnread}
+							/>
+							</div>
 						)}
 					</div>
 				)}
