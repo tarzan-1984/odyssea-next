@@ -2,10 +2,9 @@ import { useCallback, useRef } from 'react';
 import {
   getSelectedNotificationSoundFile,
   isNotificationSoundMuted,
+  getNotificationSoundVolume,
 } from '@/stores/adminNotificationSoundStore';
 import { notificationSoundUrl } from '@/constants/notificationSounds';
-
-const NOTIFICATION_SOUND_VOLUME = 0.7;
 
 export const useNotificationSound = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -15,12 +14,17 @@ export const useNotificationSound = () => {
   const ensureAudioElement = useCallback(() => {
     const soundFile = getSelectedNotificationSoundFile();
     const url = notificationSoundUrl(soundFile);
+    const volume = getNotificationSoundVolume();
 
     if (!audioRef.current || loadedSoundFileRef.current !== soundFile) {
       audioRef.current = new Audio(url);
-      audioRef.current.volume = NOTIFICATION_SOUND_VOLUME;
+      audioRef.current.volume = volume;
       audioRef.current.preload = 'auto';
       loadedSoundFileRef.current = soundFile;
+    }
+    // Keep volume in sync even when reusing the same Audio instance.
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
     }
 
     return audioRef.current;

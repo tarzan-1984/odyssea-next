@@ -7,14 +7,17 @@ export const ADMIN_NOTIFICATION_SOUND_STORAGE_KEY = "odyssea-admin-notification-
 interface AdminNotificationSoundState {
 	notificationSoundsMuted: boolean;
 	selectedNotificationSound: string;
+	notificationSoundVolume: number; // 0..1
 	setNotificationSoundsMuted: (muted: boolean) => void;
 	toggleNotificationSoundsMuted: () => void;
 	setSelectedNotificationSound: (file: string) => void;
+	setNotificationSoundVolume: (volume: number) => void;
 }
 
 type PersistedNotificationSoundState = {
 	notificationSoundsMuted?: boolean;
 	selectedNotificationSound?: string;
+	notificationSoundVolume?: number;
 };
 
 function readPersistedStateFromLocalStorage(): PersistedNotificationSoundState | null {
@@ -40,6 +43,16 @@ function readMutedFlagFromLocalStorage(): boolean {
 function readSelectedSoundFromLocalStorage(): string | null {
 	const file = readPersistedStateFromLocalStorage()?.selectedNotificationSound;
 	return typeof file === "string" && file.length > 0 ? file : null;
+}
+
+function clampVolume(value: unknown): number | null {
+	const n = typeof value === "number" ? value : Number(value);
+	if (!Number.isFinite(n)) return null;
+	return Math.min(1, Math.max(0, n));
+}
+
+function readVolumeFromLocalStorage(): number | null {
+	return clampVolume(readPersistedStateFromLocalStorage()?.notificationSoundVolume);
 }
 
 /**
@@ -75,12 +88,31 @@ export function getSelectedNotificationSoundFile(): string {
 	return readSelectedSoundFromLocalStorage() ?? fromStore ?? DEFAULT_NOTIFICATION_SOUND;
 }
 
+/**
+ * Notification sound volume (0..1). Handles persist rehydration race.
+ */
+export function getNotificationSoundVolume(): number {
+	const DEFAULT_VOLUME = 0.7;
+	if (typeof window === "undefined") {
+		return DEFAULT_VOLUME;
+	}
+	const fromStore = useAdminNotificationSoundStore.getState().notificationSoundVolume;
+	if (useAdminNotificationSoundStore.persist.hasHydrated()) {
+		return clampVolume(fromStore) ?? DEFAULT_VOLUME;
+	}
+	return (
+		readVolumeFromLocalStorage() ??
+		(clampVolume(fromStore) ?? DEFAULT_VOLUME)
+	);
+}
+
 export const useAdminNotificationSoundStore = create<AdminNotificationSoundState>()(
 	devtools(
 		persist(
 			set => ({
 				notificationSoundsMuted: false,
 				selectedNotificationSound: DEFAULT_NOTIFICATION_SOUND,
+				notificationSoundVolume: 0.7,
 				setNotificationSoundsMuted: muted =>
 					set({ notificationSoundsMuted: muted }, false, "setNotificationSoundsMuted"),
 				toggleNotificationSoundsMuted: () =>
@@ -91,12 +123,19 @@ export const useAdminNotificationSoundStore = create<AdminNotificationSoundState
 					),
 				setSelectedNotificationSound: file =>
 					set({ selectedNotificationSound: file }, false, "setSelectedNotificationSound"),
+				setNotificationSoundVolume: volume =>
+					set(
+						{ notificationSoundVolume: clampVolume(volume) ?? 0.7 },
+						false,
+						"setNotificationSoundVolume"
+					),
 			}),
 			{
 				name: ADMIN_NOTIFICATION_SOUND_STORAGE_KEY,
 				partialize: state => ({
 					notificationSoundsMuted: state.notificationSoundsMuted,
 					selectedNotificationSound: state.selectedNotificationSound,
+					notificationSoundVolume: state.notificationSoundVolume,
 				}),
 			}
 		),

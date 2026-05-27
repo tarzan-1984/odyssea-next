@@ -7,9 +7,12 @@ import {
 } from "@/constants/notificationSounds";
 
 export type NotificationSoundOption = {
+	id?: string;
 	file: string;
 	url: string;
 	label: string;
+	isUserOwned?: boolean;
+	fileSize?: number;
 };
 
 export const notificationSoundsQueryKey = ["notification-sounds"] as const;

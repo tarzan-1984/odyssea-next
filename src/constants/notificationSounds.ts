@@ -7,7 +7,7 @@ export function formatNotificationSoundLabel(file: string): string {
 	if (file === DEFAULT_NOTIFICATION_SOUND) {
 		return "Live chat (default)";
 	}
-	const base = file.replace(/\.mp3$/i, "");
+	const base = file.replace(/\.(mp3|wav)$/i, "");
 	return base
 		.replace(/[-_]/g, " ")
 		.replace(/\b\w/g, c => c.toUpperCase())
@@ -15,7 +15,13 @@ export function formatNotificationSoundLabel(file: string): string {
 }
 
 export function notificationSoundUrl(file: string): string {
-	return `/sounds/${file}`;
+	const raw = String(file || "").trim();
+	// If we already have an absolute URL (cloud storage), use it as-is.
+	if (/^https?:\/\//i.test(raw)) {
+		return raw;
+	}
+	// Otherwise treat as bundled file under /public/sounds
+	return `/sounds/${raw.replace(/^\/+/, "")}`;
 }
 
 /** Fallback when /api/sounds is unavailable. */
