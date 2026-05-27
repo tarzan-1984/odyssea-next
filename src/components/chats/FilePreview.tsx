@@ -498,33 +498,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								e.preventDefault();
 								e.stopPropagation();
 
-								try {
-									// Download file directly from cloud storage
-									const response = await fetch(fileUrl, {
-										method: "GET",
-										mode: "cors",
-									});
-
-									if (!response.ok) {
-										throw new Error("Failed to download file");
-									}
-
-									// Get the file blob
-									const blob = await response.blob();
-
-									// Create download link
-									const url = window.URL.createObjectURL(blob);
-									const link = document.createElement("a");
-									link.href = url;
-									link.download = fileName;
-									document.body.appendChild(link);
-									link.click();
-									document.body.removeChild(link);
-									window.URL.revokeObjectURL(url);
-								} catch (error) {
-									// Fallback: try to open in new tab
-									window.open(fileUrl, "_blank");
-								}
+								// Always proxy downloads through our server to avoid CORS and force
+								// Content-Disposition: attachment (prevents opening in a new tab).
+								const link = document.createElement("a");
+								link.href = `/api/storage/download?url=${encodeURIComponent(
+									fileUrl
+								)}&name=${encodeURIComponent(fileName)}`;
+								link.download = fileName;
+								document.body.appendChild(link);
+								link.click();
+								document.body.removeChild(link);
 							}}
 							className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors"
 						>
