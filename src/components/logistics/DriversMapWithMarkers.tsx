@@ -451,6 +451,7 @@ export default function DriversMapWithMarkers({
 				<MapContainer
 					center={DEFAULT_CENTER}
 					zoom={DEFAULT_ZOOM}
+					attributionControl={false}
 					style={{ height: "100%", width: "100%" }}
 					scrollWheelZoom
 					key={`drivers-map-${isDark ? "dark" : "light"}`}
