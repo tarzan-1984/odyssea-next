@@ -42,6 +42,20 @@ const publicPages = [
 	"/privacy-policy",
 ];
 
+function buildSignInRedirectUrl(request: NextRequest): URL {
+	const signInUrl = new URL("/signin", request.url);
+	const returnPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+	if (
+		returnPath &&
+		returnPath !== "/" &&
+		returnPath.startsWith("/") &&
+		!returnPath.startsWith("//")
+	) {
+		signInUrl.searchParams.set("callbackUrl", returnPath);
+	}
+	return signInUrl;
+}
+
 export function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
@@ -64,7 +78,7 @@ export function middleware(request: NextRequest) {
 		// Check if user has either valid tokens OR login success cookie
 		if (!loginSuccess && !hasToken) {
 			// No valid authentication method, redirect to signin
-			return NextResponse.redirect(new URL("/signin", request.url));
+			return NextResponse.redirect(buildSignInRedirectUrl(request));
 		}
 
 		// User has valid authentication (either tokens or login success cookie)
@@ -90,7 +104,7 @@ export function middleware(request: NextRequest) {
 
 	// If it's not a public page and user is not authenticated, redirect to signin
 	if (!isPublicPage && !hasToken) {
-		return NextResponse.redirect(new URL("/signin", request.url));
+		return NextResponse.redirect(buildSignInRedirectUrl(request));
 	}
 
 	// Drivers list and My offers: role list in utils/roleAccess (DRIVERS_AND_OFFERS_ALLOWED_ROLES)

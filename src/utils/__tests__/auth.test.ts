@@ -34,7 +34,7 @@ describe("clientAuth", () => {
 
 			expect(mockCookies.set).toHaveBeenCalledWith("accessToken", token, {
 				expires: 7,
-				sameSite: "strict",
+				sameSite: "lax",
 				secure: true,
 			});
 		});
@@ -48,7 +48,7 @@ describe("clientAuth", () => {
 
 			expect(mockCookies.set).toHaveBeenCalledWith("refreshToken", token, {
 				expires: 30,
-				sameSite: "strict",
+				sameSite: "lax",
 				secure: true,
 			});
 		});
@@ -64,12 +64,12 @@ describe("clientAuth", () => {
 			expect(mockCookies.set).toHaveBeenCalledTimes(2);
 			expect(mockCookies.set).toHaveBeenCalledWith("accessToken", accessToken, {
 				expires: 7,
-				sameSite: "strict",
+				sameSite: "lax",
 				secure: true,
 			});
 			expect(mockCookies.set).toHaveBeenCalledWith("refreshToken", refreshToken, {
 				expires: 30,
-				sameSite: "strict",
+				sameSite: "lax",
 				secure: true,
 			});
 		});
@@ -95,7 +95,7 @@ describe("clientAuth", () => {
 				`encoded_${JSON.stringify(userData)}`,
 				{
 					expires: 30,
-					sameSite: "strict",
+					sameSite: "lax",
 					secure: true,
 				}
 			);
@@ -186,7 +186,7 @@ describe("clientAuth", () => {
 
 			expect(mockCookies.set).toHaveBeenCalledWith("login-success", email, {
 				expires: 1 / 24, // 1 hour
-				sameSite: "strict",
+				sameSite: "lax",
 				secure: true,
 			});
 		});

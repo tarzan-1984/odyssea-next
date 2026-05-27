@@ -8,6 +8,14 @@ export const REFRESH_TOKEN_COOKIE = "refreshToken";
 export const USER_DATA_COOKIE = "userData"; // Encrypted user data
 export const LOGIN_SUCCESS_COOKIE = "login-success"; // Temporary cookie for login confirmation
 
+/** Lax allows auth cookies on top-level navigations from external apps (e.g. TMS deep links). */
+export const AUTH_COOKIE_SAME_SITE = "lax" as const;
+
+const clientCookieOptions = {
+	secure: true,
+	sameSite: AUTH_COOKIE_SAME_SITE,
+};
+
 // Client-side functions using js-cookie
 // Note: Tokens are encoded by API routes before being sent to client
 export const clientAuth = {
@@ -15,8 +23,7 @@ export const clientAuth = {
 	setAccessToken: (encodedToken: string) => {
 		Cookies.set(ACCESS_TOKEN_COOKIE, encodedToken, {
 			expires: 7, // 7 days
-			sameSite: "strict",
-			secure: true,
+			...clientCookieOptions,
 		});
 	},
 
@@ -24,8 +31,7 @@ export const clientAuth = {
 	setRefreshToken: (encodedToken: string) => {
 		Cookies.set(REFRESH_TOKEN_COOKIE, encodedToken, {
 			expires: 30, // 30 days
-			sameSite: "strict",
-			secure: true,
+			...clientCookieOptions,
 		});
 	},
 
@@ -51,8 +57,7 @@ export const clientAuth = {
 		const encryptedUserData = tokenEncoder.encode(JSON.stringify(userData));
 		Cookies.set(USER_DATA_COOKIE, encryptedUserData, {
 			expires: 30, // 30 days
-			sameSite: "strict",
-			secure: true,
+			...clientCookieOptions,
 		});
 	},
 
@@ -91,8 +96,7 @@ export const clientAuth = {
 	setLoginSuccess: (email: string) => {
 		Cookies.set(LOGIN_SUCCESS_COOKIE, email, {
 			expires: 1 / 24, // 1 hour (temporary)
-			sameSite: "strict",
-			secure: true,
+			...clientCookieOptions,
 		});
 	},
 

@@ -6,8 +6,14 @@ import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
-import { clientAuth } from "@/utils/auth";
+import {
+	ACCESS_TOKEN_COOKIE,
+	REFRESH_TOKEN_COOKIE,
+	clientAuth,
+} from "@/utils/auth";
+import { getAppHomePath } from "@/utils/roleAccess";
 import { useRouter, useSearchParams } from "next/navigation";
+import Cookies from "js-cookie";
 import { useForm, useController } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -52,6 +58,28 @@ export default function SignInForm() {
 			}
 		}
 	}, [searchParams, router]);
+
+	// Session exists in this browser but middleware missed cookies (e.g. SameSite=Strict from TMS).
+	useEffect(() => {
+		const encodedAccess = Cookies.get(ACCESS_TOKEN_COOKIE);
+		const encodedRefresh = Cookies.get(REFRESH_TOKEN_COOKIE);
+		if (!encodedAccess && !encodedRefresh) return;
+
+		if (encodedAccess) clientAuth.setAccessToken(encodedAccess);
+		if (encodedRefresh) clientAuth.setRefreshToken(encodedRefresh);
+
+		const rawCallback = searchParams?.get("callbackUrl");
+		const callbackUrl =
+			rawCallback &&
+			rawCallback.startsWith("/") &&
+			!rawCallback.startsWith("//")
+				? rawCallback
+				: null;
+
+		const user = clientAuth.getUserData();
+		const target = callbackUrl ?? getAppHomePath(user?.role);
+		window.location.replace(target);
+	}, [searchParams]);
 
 	// Email form
 	const {

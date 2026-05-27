@@ -1,5 +1,6 @@
 import { tokenEncoder } from "./tokenEncoder";
 import Cookies from "js-cookie";
+import { AUTH_COOKIE_SAME_SITE } from "./auth";
 
 /**
  * Utility for managing authentication tokens in cookies
@@ -21,12 +22,12 @@ export const tokenStorage = {
 				// Use js-cookie library
 				Cookies.set("accessToken", encodedToken, {
 					expires: 7,
-					sameSite: "strict",
+					sameSite: AUTH_COOKIE_SAME_SITE,
 					secure: true,
 				});
 			} else {
 				// Use native cookies
-				document.cookie = `accessToken=${encodedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict; Secure`;
+				document.cookie = `accessToken=${encodedToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax; Secure`;
 			}
 		} catch {
 			// Silent error handling
@@ -46,12 +47,12 @@ export const tokenStorage = {
 				// Use js-cookie library
 				Cookies.set("refreshToken", encodedToken, {
 					expires: 30,
-					sameSite: "strict",
+					sameSite: AUTH_COOKIE_SAME_SITE,
 					secure: true,
 				});
 			} else {
 				// Use native cookies
-				document.cookie = `refreshToken=${encodedToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Strict; Secure`;
+				document.cookie = `refreshToken=${encodedToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax; Secure`;
 			}
 		} catch {
 			// Silent error handling
