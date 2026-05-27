@@ -86,27 +86,28 @@ class IndexedDBChatService {
 	// Messages operations
 	async saveMessages(chatRoomId: string, messages: Message[]): Promise<void> {
 		try {
-			// Check if we already have messages for this chat room
-			const hasExistingMessages = await this.hasMessages(chatRoomId);
-			const existingCount = await this.getMessageCount(chatRoomId);
+			const existing = await this.getMessages(chatRoomId);
+			const existingById = new Map(existing.map(m => [m.id, m]));
+			const now = Date.now();
 
-			// If we have the same or more messages, skip saving
-			if (hasExistingMessages && existingCount >= messages.length) {
-				return;
+			for (const message of messages) {
+				existingById.set(message.id, message);
 			}
+
+			const merged = Array.from(existingById.values()).sort(
+				(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+			);
 
 			const db = await this.ensureDB();
 			const transaction = db.transaction([MESSAGES_STORE], "readwrite");
 			const store = transaction.objectStore(MESSAGES_STORE);
 
-			// Convert messages to stored format
-			const storedMessages: StoredMessage[] = messages.map(message => ({
+			const storedMessages: StoredMessage[] = merged.map(message => ({
 				...message,
-				cachedAt: Date.now(),
+				cachedAt: now,
 				version: 1,
 			}));
 
-			// Save each message
 			for (const message of storedMessages) {
 				await new Promise<void>((resolve, reject) => {
 					const request = store.put(message);
@@ -115,9 +116,6 @@ class IndexedDBChatService {
 				});
 			}
 
-			//console.log(`Saved ${messages.length} messages for chat room ${chatRoomId}`);
-
-			// Cleanup old messages to prevent cache from growing too large
 			await this.cleanupOldMessages(chatRoomId);
 		} catch (error) {
 			console.error("Failed to save messages to IndexedDB:", error);

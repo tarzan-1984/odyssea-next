@@ -4,24 +4,14 @@ import { chatApi, ChatRoom, Message } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
+import {
+	filterMessagesForRoom,
+	mergeMessageLists,
+	shouldForceMessagesApiSync,
+} from "@/utils/chatMessagesMerge";
 
-// Helper function to merge cached messages with real-time updates from store
-const mergeMessagesWithUpdates = (
-	cachedMessages: Message[],
-	currentMessages: Message[]
-): Message[] => {
-	// Create a map of current messages by ID for quick lookup
-	const currentMessagesMap = new Map(currentMessages.map(msg => [msg.id, msg]));
-
-	// Merge cached messages with updates from current store
-	const mergedMessages = cachedMessages.map(cachedMsg => {
-		const currentMsg = currentMessagesMap.get(cachedMsg.id);
-		// If message exists in current store, use the updated version (especially for isRead status)
-		return currentMsg || cachedMsg;
-	});
-
-	return mergedMessages;
-};
+/** Ignore stale loadMessages responses after the user switches chats. */
+let loadMessagesGeneration = 0;
 
 /** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
 const mergeSourcesUnreadCount = (
@@ -271,105 +261,124 @@ export const useChatSync = () => {
 			syncOptions?: LoadMessagesOptions
 		) => {
 			const force = syncOptions?.force ?? false;
+			const requestGen = ++loadMessagesGeneration;
+
+			const isStaleRequest = () => {
+				if (requestGen !== loadMessagesGeneration) return true;
+				const { currentChatRoom } = useChatStore.getState();
+				return currentChatRoom?.id != null && currentChatRoom.id !== chatRoomId;
+			};
+
+			const applyMessagesForRoom = (lists: Message[][]) => {
+				if (isStaleRequest()) return;
+				const merged = mergeMessageLists(...lists);
+				setMessages(filterMessagesForRoom(merged, chatRoomId));
+			};
+
+			const getRoomFromStore = () =>
+				useChatStore.getState().chatRooms.find(r => r.id === chatRoomId);
+
+			const getStoreMessagesForRoom = () =>
+				filterMessagesForRoom(useChatStore.getState().messages, chatRoomId);
+
 			try {
 				setLoadingMessages(true);
 				setError(null);
 
-				// Check if we have cached messages first
+				const room = getRoomFromStore();
+				const storeForRoom = getStoreMessagesForRoom();
+
+				const fetchAndApplyFromApi = async (showStaleCacheFirst: boolean) => {
+					const response = await chatApi.getMessages(chatRoomId, page, limit);
+					if (isStaleRequest()) return;
+
+					const storeNow = getStoreMessagesForRoom();
+					applyMessagesForRoom([response.messages, storeNow]);
+
+					setCurrentPage(page);
+					setHasMoreMessages(response.hasMore);
+					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
+				};
+
 				const hasCachedMessages = await indexedDBChatService.hasMessages(chatRoomId);
+				let cachedMessages: Message[] = [];
 
 				if (hasCachedMessages) {
-					// Load from cache for immediate display
-					const cachedMessages = await indexedDBChatService.getMessages(
+					cachedMessages = await indexedDBChatService.getMessages(
 						chatRoomId,
 						limit,
 						(page - 1) * limit
 					);
-					if (cachedMessages.length > 0) {
-						// Merge cached messages with any real-time updates from store
-						const { messages: currentMessages } = useChatStore.getState();
-						const mergedMessages = mergeMessagesWithUpdates(
-							cachedMessages,
-							currentMessages
-						);
-						setMessages(mergedMessages);
+				}
+
+				if (cachedMessages.length > 0) {
+					applyMessagesForRoom([cachedMessages, storeForRoom]);
+					setCurrentPage(page);
+					setHasMoreMessages(cachedMessages.length >= limit);
+
+					const isCacheFresh = await indexedDBChatService.isMessagesCacheFresh(
+						chatRoomId,
+						5
+					);
+					const roomNow = getRoomFromStore();
+					const storeNow = getStoreMessagesForRoom();
+					const needsApi = shouldForceMessagesApiSync(roomNow, storeNow, {
+						force,
+						cacheFresh: isCacheFresh,
+					});
+
+					if (needsApi) {
+						try {
+							await fetchAndApplyFromApi(true);
+						} catch (apiError) {
+							console.warn("Background API update failed:", apiError);
+						}
+					}
+
+					if (!isStaleRequest()) {
 						setLoadingMessages(false);
+					}
+					return;
+				}
 
-						// Set initial pagination state for cached messages
-						setCurrentPage(page);
-						setHasMoreMessages(cachedMessages.length >= limit); // Assume there might be more if we got full page
-
-						// Check if cache is fresh for this specific chat room (less than 5 minutes old for messages)
-						const isCacheFresh = await indexedDBChatService.isMessagesCacheFresh(
-							chatRoomId,
-							5
-						);
-
-						// Only update from API if cache is not fresh (or WS reconnect forced catch-up)
-						if (force || !isCacheFresh) {
-							try {
-								const response = await chatApi.getMessages(chatRoomId, page, limit);
-								const apiDiffers =
-									response.messages.length !== cachedMessages.length ||
-									response.messages.some(
-										(msg, index) => msg.id !== cachedMessages[index]?.id
-									);
-								// WS reconnect: always apply API so new messages never skipped by shallow compare
-								if (force || apiDiffers) {
-									// Merge API messages with real-time updates from store
-									const { messages: currentMessages } = useChatStore.getState();
-									const mergedMessages = mergeMessagesWithUpdates(
-										response.messages,
-										currentMessages
-									);
-									setMessages(mergedMessages);
-									setCurrentPage(page);
-									setHasMoreMessages(response.hasMore);
-									await indexedDBChatService.saveMessages(
-										chatRoomId,
-										response.messages
-									);
-								}
-							} catch (apiError) {
-								console.warn("Background API update failed:", apiError);
+				// No usable cache — prefer API; keep in-memory tail if API fails
+				if (
+					shouldForceMessagesApiSync(room, storeForRoom, {
+						force: true,
+						cacheFresh: false,
+					}) ||
+					storeForRoom.length === 0
+				) {
+					try {
+						await fetchAndApplyFromApi(false);
+					} catch (apiError) {
+						console.warn("API unavailable:", apiError);
+						if (!isStaleRequest()) {
+							if (storeForRoom.length > 0) {
+								applyMessagesForRoom([storeForRoom]);
+							} else {
+								setError("Failed to load messages");
+								setMessages([]);
 							}
 						}
-
-						// Chat room loaded successfully
-						return;
 					}
-				}
-
-				// If no cached data, load from API
-				try {
-					const response = await chatApi.getMessages(chatRoomId, page, limit);
-					// Merge API messages with any real-time updates from store
-					const { messages: currentMessages } = useChatStore.getState();
-					const mergedMessages = mergeMessagesWithUpdates(
-						response.messages,
-						currentMessages
-					);
-					setMessages(mergedMessages);
-					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
-
-					// Update pagination state
+				} else if (storeForRoom.length > 0) {
+					applyMessagesForRoom([storeForRoom]);
 					setCurrentPage(page);
-					setHasMoreMessages(response.hasMore);
-				} catch (apiError) {
-					console.warn("API unavailable, no cached data available:", apiError);
-					setError("Failed to load messages");
-					setMessages([]);
+					setHasMoreMessages(storeForRoom.length >= limit);
 				}
-
-				// Chat room loaded successfully
 			} catch (error) {
 				console.error("Failed to load messages:", error);
-				setError("Failed to load messages");
+				if (!isStaleRequest()) {
+					setError("Failed to load messages");
+				}
 			} finally {
-				setLoadingMessages(false);
+				if (!isStaleRequest()) {
+					setLoadingMessages(false);
+				}
 			}
 		},
-		[setMessages, setLoadingMessages, setError]
+		[setMessages, setLoadingMessages, setError, setCurrentPage, setHasMoreMessages]
 	);
 
 	// Load more messages (pagination)

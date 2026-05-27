@@ -122,14 +122,18 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const getNextAvailableArchive = useChatStore(state => state.getNextAvailableArchive);
 	const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
-	// Deduplicate messages to prevent duplicate keys
+	// Only show messages for the selected room (store holds one active transcript)
 	const uniqueMessages = React.useMemo(() => {
-		const messageMap = new Map();
-		messages.forEach(message => {
+		if (!selectedChatRoomId) return [];
+		const messageMap = new Map<string, Message>();
+		for (const message of messages) {
+			if (message.chatRoomId !== selectedChatRoomId) continue;
 			messageMap.set(message.id, message);
-		});
-		return Array.from(messageMap.values());
-	}, [messages]);
+		}
+		return Array.from(messageMap.values()).sort(
+			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+		);
+	}, [messages, selectedChatRoomId]);
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
@@ -258,7 +262,15 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				isLoadingMoreRef.current = false;
 				isProgrammaticScrollRef.current = false;
 
-				await loadMessages(chatRoomId);
+				const room = useChatStore
+					.getState()
+					.chatRooms.find(r => r.id === chatRoomId);
+				await loadMessages(
+					chatRoomId,
+					1,
+					50,
+					(room?.unreadCount ?? 0) > 0 ? { force: true } : undefined
+				);
 				// Scroll to bottom instantly after messages are loaded
 				setTimeout(() => {
 					scrollToBottom();

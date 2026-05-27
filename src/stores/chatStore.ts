@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { ChatRoom, Message, User } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { mergeMessageLists } from "@/utils/chatMessagesMerge";
 import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin, unread, mute status, and last message date
@@ -272,29 +273,37 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				addMessage: message => {
-					const { messages, chatRooms } = get();
-					// Check if message already exists to avoid duplicates
-					const exists = messages.some(msg => msg.id === message.id);
-					if (!exists) {
-						const newMessages = [...messages, message];
+					const { messages, chatRooms, currentChatRoom } = get();
 
-						// Update the lastMessage in the corresponding chat room
-						const updatedRooms = chatRooms.map(room => {
-							if (room.id === message.chatRoomId) {
-								return {
-									...room,
-									lastMessage: message,
-								};
-							}
-							return room;
-						});
+					const updatedRooms = chatRooms.map(room => {
+						if (room.id === message.chatRoomId) {
+							return {
+								...room,
+								lastMessage: message,
+								updatedAt: message.createdAt,
+							};
+						}
+						return room;
+					});
+					const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
 
-						// Sort chat rooms by last message date
-						const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
-
-						set({ messages: newMessages, chatRooms: sortedRooms }, false, "addMessage");
-						// Note: IndexedDB saving is handled by the caller (WebSocketContext or other services)
+					// Only mutate the open chat transcript (avoid mixing rooms in one array)
+					if (currentChatRoom?.id !== message.chatRoomId) {
+						set({ chatRooms: sortedRooms }, false, "addMessage:roomOnly");
+						return;
 					}
+
+					const roomMessages = messages.filter(m => m.chatRoomId === message.chatRoomId);
+					if (roomMessages.some(msg => msg.id === message.id)) {
+						set({ chatRooms: sortedRooms }, false, "addMessage:duplicate");
+						return;
+					}
+
+					set(
+						{ messages: [...roomMessages, message], chatRooms: sortedRooms },
+						false,
+						"addMessage"
+					);
 				},
 
 				updateMessage: (messageId, updates) => {
@@ -404,7 +413,19 @@ export const useChatStore = create<ChatState>()(
 					try {
 						const cachedMessages = await indexedDBChatService.getMessages(chatRoomId);
 						if (cachedMessages.length > 0) {
-							set({ messages: cachedMessages }, false, "loadMessagesFromCache");
+							const { messages: currentMessages, currentChatRoom } = get();
+							if (currentChatRoom?.id === chatRoomId) {
+								const roomStore = currentMessages.filter(
+									m => m.chatRoomId === chatRoomId
+								);
+								set(
+									{
+										messages: mergeMessageLists(cachedMessages, roomStore),
+									},
+									false,
+									"loadMessagesFromCache"
+								);
+							}
 						}
 					} catch (error) {
 						console.error("Failed to load messages from cache:", error);
