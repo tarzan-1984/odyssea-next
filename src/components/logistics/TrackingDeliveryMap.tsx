@@ -1170,6 +1170,7 @@ export default function TrackingDeliveryMap({
 			<MapContainer
 				center={center}
 				zoom={initialZoom}
+				attributionControl={false}
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
 				key={`map-${isDark ? "dark" : "light"}`}
