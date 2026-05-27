@@ -83,6 +83,13 @@ export default function ChatParticipantsModal({
 	
 	const userRole = (currentUser?.role || "").trim().toUpperCase();
 	const isAdminOrModerator = userRole === "ADMINISTRATOR" || userRole === "MODERATOR";
+	const dispatcherProtectedRemovalRoles = new Set([
+		"EXPEDITE_MANAGER",
+		"TEAM_LEADER",
+		"TRACKING",
+		"NIGHTSHIFT_TRACKING",
+		"MORNING_TRACKING",
+	]);
 
 	// GROUP: admin manages participants; LOAD: managers + moderator may open settings
 	const canManageChat =
@@ -530,13 +537,27 @@ export default function ChatParticipantsModal({
 									if (isLoadChat && (participant as any).hideParticipant === true) {
 										return null;
 									}
+									// Never allow removing yourself (any role)
+									const participantUserId = participant.user?.id || participant.userId;
+									if (participantUserId && participantUserId === currentUser?.id) {
+										return null;
+									}
+									// DISPATCHER restriction for LOAD chats: cannot remove protected roles
+									const participantRole = String(safeUser.role || "").trim().toUpperCase();
+									if (
+										isLoadChat &&
+										userRole === "DISPATCHER" &&
+										dispatcherProtectedRemovalRoles.has(participantRole)
+									) {
+										return null;
+									}
 									return (
 										<button
 											type="button"
 											onClick={(e) => {
 												e.stopPropagation();
 												// Backend expects user.id from users table, not participant.userId
-												const userIdToRemove = participant.user?.id || participant.userId;
+												const userIdToRemove = participantUserId;
 												console.log("Removing participant:", { userId: userIdToRemove, participant });
 												if (userIdToRemove) {
 													handleRemoveParticipant(userIdToRemove);
