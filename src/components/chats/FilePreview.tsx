@@ -87,6 +87,23 @@ function RotateCwIcon({ className }: { className?: string }) {
 const MODAL_IMAGE_ZOOM_MIN = 0.5;
 const MODAL_IMAGE_ZOOM_MAX = 5;
 const MODAL_IMAGE_ZOOM_STEP = 1.25;
+/** Space reserved for filename badge at bottom of image modal */
+const MODAL_IMAGE_BOTTOM_CHROME_PX = 72;
+
+function computeModalFitScale(
+	naturalW: number,
+	naturalH: number,
+	viewportW: number,
+	viewportH: number,
+	rotationDeg: number
+): number {
+	if (!naturalW || !naturalH || !viewportW || !viewportH) return 1;
+	const rot = ((rotationDeg % 360) + 360) % 360;
+	const swapped = rot === 90 || rot === 270;
+	const effW = swapped ? naturalH : naturalW;
+	const effH = swapped ? naturalW : naturalH;
+	return Math.min(viewportW / effW, viewportH / effH, 1);
+}
 
 interface FilePreviewProps {
 	fileUrl: string;
@@ -118,7 +135,25 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		h: number;
 	} | null>(null);
 	const [modalZoomUsesPixelSizing, setModalZoomUsesPixelSizing] = useState(false);
+	const modalScrollViewportRef = useRef<HTMLDivElement>(null);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
+
+	const applyModalFitToViewport = useCallback(
+		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
+			const viewport = modalScrollViewportRef.current;
+			if (!viewport || !nat.w || !nat.h) return;
+
+			const vw = viewport.clientWidth;
+			const vh = Math.max(
+				120,
+				viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX
+			);
+			const fit = computeModalFitScale(nat.w, nat.h, vw, vh, rotationDeg);
+			setModalImageScale(fit);
+			setModalZoomUsesPixelSizing(true);
+		},
+		[modalImageRotationDeg]
+	);
 
 	const closeImageModal = useCallback(() => {
 		setModalImageRotationDeg(0);
@@ -134,6 +169,19 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		setModalImageRotationDeg(0);
 		setModalZoomUsesPixelSizing(false);
 	}, [fileUrl]);
+
+	useEffect(() => {
+		if (!isImageModalOpen || !modalImgNaturalSize) return;
+		const frame = requestAnimationFrame(() => {
+			applyModalFitToViewport(modalImgNaturalSize, modalImageRotationDeg);
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [
+		isImageModalOpen,
+		modalImgNaturalSize,
+		modalImageRotationDeg,
+		applyModalFitToViewport,
+	]);
 
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
@@ -523,22 +571,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							onClick={e => {
 								e.stopPropagation();
 								const nat = modalImgNaturalSize;
-								const box = modalImageViewportRef.current;
-								if (!nat?.w || !nat?.h || !box?.clientWidth) return;
-								if (!modalZoomUsesPixelSizing) {
-									const eq = Math.min(
-										box.clientWidth / nat.w,
-										box.clientHeight / nat.h
-									);
-									setModalImageScale(
-										Math.min(
-											MODAL_IMAGE_ZOOM_MAX,
-											eq * MODAL_IMAGE_ZOOM_STEP
-										)
-									);
-									setModalZoomUsesPixelSizing(true);
-									return;
-								}
+								if (!nat?.w || !nat?.h) return;
+								setModalZoomUsesPixelSizing(true);
 								setModalImageScale(s =>
 									Math.min(
 										MODAL_IMAGE_ZOOM_MAX,
@@ -562,22 +596,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							onClick={e => {
 								e.stopPropagation();
 								const nat = modalImgNaturalSize;
-								const box = modalImageViewportRef.current;
-								if (!nat?.w || !nat?.h || !box?.clientWidth) return;
-								if (!modalZoomUsesPixelSizing) {
-									const eq = Math.min(
-										box.clientWidth / nat.w,
-										box.clientHeight / nat.h
-									);
-									setModalImageScale(
-										Math.max(
-											MODAL_IMAGE_ZOOM_MIN,
-											eq / MODAL_IMAGE_ZOOM_STEP
-										)
-									);
-									setModalZoomUsesPixelSizing(true);
-									return;
-								}
+								if (!nat?.w || !nat?.h) return;
+								setModalZoomUsesPixelSizing(true);
 								setModalImageScale(s =>
 									Math.max(
 										MODAL_IMAGE_ZOOM_MIN,
@@ -620,10 +640,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					</div>
 
 					{/* Scrollable image area only */}
-					<div className="relative min-h-0 flex-1 overflow-auto">
+					<div
+						ref={modalScrollViewportRef}
+						className="relative min-h-0 flex-1 overflow-auto"
+					>
 						<div
 							ref={modalImageViewportRef}
-							className="relative box-border flex min-h-full min-w-full h-max w-max items-center justify-center p-4 sm:p-8"
+							className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8"
 						>
 							{/* Loader for HEIC conversion */}
 							{isModalImageLoading &&
@@ -641,13 +664,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								<img
 									src={previewContent}
 									alt={fileName}
-									className={`h-auto shrink-0 w-auto origin-center object-contain rounded-lg duration-200 ease-out ${
-										modalZoomUsesPixelSizing
-											? "max-w-none transition-[width,height]"
-											: "max-h-none max-w-full transition-transform"
+									className={`h-auto w-auto shrink-0 origin-center object-contain rounded-lg transition-[width,height] duration-200 ease-out ${
+										modalImgNaturalSize
+											? "max-w-none"
+											: "max-h-[calc(95vh-10rem)] max-w-full"
 									}`}
 									style={{
-										...(modalZoomUsesPixelSizing && modalImgNaturalSize
+										...(modalImgNaturalSize
 											? {
 													width:
 														modalImgNaturalSize.w * modalImageScale,
@@ -663,9 +686,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 										setIsModalImageLoading(false);
 										const target = e.target as HTMLImageElement;
 										if (target.naturalWidth && target.naturalHeight) {
-											setModalImgNaturalSize({
+											const nat = {
 												w: target.naturalWidth,
 												h: target.naturalHeight,
+											};
+											setModalImgNaturalSize(nat);
+											requestAnimationFrame(() => {
+												applyModalFitToViewport(
+													nat,
+													modalImageRotationDeg
+												);
 											});
 										}
 										if (target.complete && target.naturalHeight !== 0) {
