@@ -100,7 +100,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{shouldShowPhoneUnderName ? (
 					<a
 						href={telHref(driverPhoneDisplay)}
-						className="block text-theme-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+						className="inline-block text-theme-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
 					>
 						{driverPhoneDisplay}
 					</a>
