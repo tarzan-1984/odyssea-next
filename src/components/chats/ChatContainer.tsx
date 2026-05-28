@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ChatList from "./ChatList";
 import ChatBox from "./ChatBox";
 import AddNewRoomModal from "./AddNewRoomModal";
@@ -14,8 +14,10 @@ import { findActiveLoadChatInList, findArchivedLoadChat } from "@/utils/findLoad
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
+	const router = useRouter();
 	const roomFromUrl = searchParams.get("room");
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
+	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const [selectedChatRoomId, setSelectedChatRoomId] = useState<string | null>(
 		roomFromUrl || null
 	);
@@ -40,6 +42,13 @@ export default function ChatContainer() {
 		},
 		[setCurrentChatRoom]
 	);
+
+	const getOfferIdFromRoom = useCallback((room: ChatRoom): string | null => {
+		if (room.offerId) return String(room.offerId).trim();
+		if (!room.name) return null;
+		const match = room.name.match(/\(id:\s*([^)]+)\)/);
+		return match ? match[1].trim() : null;
+	}, []);
 
 	useEffect(() => {
 		if (!roomFromUrl) {
@@ -120,6 +129,32 @@ export default function ChatContainer() {
 		};
 	}, [loadFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom]);
 
+	useEffect(() => {
+		if (!offerFromUrl) {
+			return;
+		}
+		if (isLoadingChatRooms) return;
+
+		let cancelled = false;
+
+		const trySelectOfferChat = () => {
+			const active = chatRooms.find(r => {
+				if ((r.type || "").toUpperCase().trim() !== "OFFER") return false;
+				const id = getOfferIdFromRoom(r);
+				return id === offerFromUrl;
+			});
+			if (active) {
+				if (cancelled) return;
+				applySelectedRoom(active);
+			}
+		};
+
+		trySelectOfferChat();
+		return () => {
+			cancelled = true;
+		};
+	}, [offerFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom, getOfferIdFromRoom]);
+
 	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } =
 		useChatModal();
 	// Clear active chat when component unmounts (user leaves chat page)
@@ -134,6 +169,28 @@ export default function ChatContainer() {
 		// Also set in the store for WebSocket functionality
 		webSocketChatSync.setCurrentChatRoom(chatRoom);
 		// Note: WebSocket room joining is handled automatically by useWebSocketMessages
+
+		// Keep URL in sync for LOAD/OFFER chats and direct/group room selection.
+		try {
+			const isLoadChat = (chatRoom.type || "").toUpperCase().trim() === "LOAD";
+			const isOfferChat = (chatRoom.type || "").toUpperCase().trim() === "OFFER";
+			const loadId = String(chatRoom.loadId ?? "").trim();
+			const url =
+				isLoadChat && loadId
+					? `/chat?load=${encodeURIComponent(loadId)}`
+					: isOfferChat
+						? (() => {
+								const offerId = getOfferIdFromRoom(chatRoom);
+								return offerId
+									? `/chat?offer=${encodeURIComponent(offerId)}`
+									: `/chat?room=${encodeURIComponent(chatRoom.id)}`;
+							})()
+						: `/chat?room=${encodeURIComponent(chatRoom.id)}`;
+
+			router.replace(url, { scroll: false });
+		} catch {
+			// ignore url sync errors
+		}
 	};
 
 	return (

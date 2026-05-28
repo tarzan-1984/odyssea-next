@@ -58,6 +58,8 @@ export default function ChatList({
 }: ChatListProps) {
 	const searchParams = useSearchParams();
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
+	const roomFromUrl = searchParams.get("room")?.trim() ?? null;
+	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
@@ -82,12 +84,20 @@ export default function ChatList({
 	const [activeTab, setActiveTab] = useState<ChatTab>("chats");
 
 	useEffect(() => {
+		if (offerFromUrl) {
+			setActiveTab("offers");
+			return;
+		}
+		if (roomFromUrl) {
+			setActiveTab("chats");
+			return;
+		}
 		if (loadFromUrl) {
 			setActiveTab("shipments");
 			return;
 		}
 		setActiveTab(readStoredChatTab());
-	}, [loadFromUrl]);
+	}, [loadFromUrl, roomFromUrl, offerFromUrl]);
 
 	useEffect(() => {
 		try {
