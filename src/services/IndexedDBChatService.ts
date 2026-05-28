@@ -5,6 +5,7 @@ const DB_NAME = "OdysseaChatDB";
 const DB_VERSION = 1;
 const MESSAGES_STORE = "messages";
 const CHAT_ROOMS_STORE = "chatRooms";
+const MAX_CACHED_MESSAGES_PER_ROOM = 150;
 
 // Interface for stored message with additional metadata
 interface StoredMessage extends Message {
@@ -116,7 +117,7 @@ class IndexedDBChatService {
 				});
 			}
 
-			await this.cleanupOldMessages(chatRoomId);
+			await this.cleanupOldMessages(chatRoomId, MAX_CACHED_MESSAGES_PER_ROOM);
 		} catch (error) {
 			console.error("Failed to save messages to IndexedDB:", error);
 			throw error;
@@ -243,6 +244,9 @@ class IndexedDBChatService {
 				request.onsuccess = () => resolve();
 				request.onerror = () => reject(request.error);
 			});
+
+			// Prevent unbounded growth when messages arrive via WebSocket.
+			await this.cleanupOldMessages(message.chatRoomId, MAX_CACHED_MESSAGES_PER_ROOM);
 		} catch (error) {
 			console.error("Failed to add message to IndexedDB:", error);
 			throw error;
@@ -627,8 +631,11 @@ class IndexedDBChatService {
 		}
 	}
 
-	// Clear old messages (keep only last 1000 messages per chat room)
-	async cleanupOldMessages(chatRoomId: string, keepCount: number = 1000): Promise<void> {
+	// Clear old messages (keep only last N messages per chat room)
+	async cleanupOldMessages(
+		chatRoomId: string,
+		keepCount: number = MAX_CACHED_MESSAGES_PER_ROOM
+	): Promise<void> {
 		try {
 			const db = await this.ensureDB();
 			const transaction = db.transaction([MESSAGES_STORE], "readwrite");
