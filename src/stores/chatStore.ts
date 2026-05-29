@@ -84,6 +84,12 @@ interface ChatState {
 
 	// Actions for managing messages
 	setMessages: (messages: Message[]) => void;
+	/** WebSocket `messagesMarkedAsRead` — single atomic update, skips when nothing changed. */
+	applyMessagesMarkedAsRead: (data: {
+		chatRoomId: string;
+		messageIds: string[];
+		userId: string;
+	}) => boolean;
 	addMessage: (message: Message) => void;
 	updateMessage: (messageId: string, updates: Partial<Message>) => void;
 	prependMessages: (messages: Message[]) => void;
@@ -272,6 +278,71 @@ export const useChatStore = create<ChatState>()(
 					set({ messages, error: null }, false, "setMessages");
 				},
 
+				applyMessagesMarkedAsRead: data => {
+					const { messages, chatRooms } = get();
+					const currentUserId = useUserStore.getState().currentUser?.id;
+					const messageIdSet = new Set(data.messageIds);
+					let messagesChanged = false;
+
+					const nextMessages =
+						messageIdSet.size === 0
+							? messages
+							: messages.map(msg => {
+									if (!messageIdSet.has(msg.id)) {
+										return msg;
+									}
+									const currentReadBy = msg.readBy || [];
+									if (currentReadBy.includes(data.userId) && msg.isRead) {
+										return msg;
+									}
+									messagesChanged = true;
+									const updatedReadBy = currentReadBy.includes(data.userId)
+										? currentReadBy
+										: [...currentReadBy, data.userId];
+									return {
+										...msg,
+										isRead: true,
+										readBy: updatedReadBy,
+									};
+								});
+
+					let roomsChanged = false;
+					const nextRooms = chatRooms.map(room => {
+						if (room.id !== data.chatRoomId || data.userId !== currentUserId) {
+							return room;
+						}
+						const newUnreadCount = Math.max(
+							0,
+							(room.unreadCount ?? 0) - data.messageIds.length
+						);
+						if (newUnreadCount === (room.unreadCount ?? 0)) {
+							return room;
+						}
+						roomsChanged = true;
+						indexedDBChatService
+							.updateChatRoom(room.id, { unreadCount: newUnreadCount })
+							.catch((error: Error) => {
+								console.error("Failed to update chat room in IndexedDB:", error);
+							});
+						return { ...room, unreadCount: newUnreadCount };
+					});
+
+					if (!messagesChanged && !roomsChanged) {
+						return false;
+					}
+
+					const patch: Partial<ChatState> = { error: null };
+					if (messagesChanged) {
+						patch.messages = nextMessages;
+					}
+					if (roomsChanged) {
+						patch.chatRooms = sortChatRoomsByLastMessage(nextRooms);
+					}
+
+					set(patch, false, "applyMessagesMarkedAsRead");
+					return true;
+				},
+
 				addMessage: message => {
 					const { messages, chatRooms, currentChatRoom } = get();
 
@@ -309,6 +380,15 @@ export const useChatStore = create<ChatState>()(
 				updateMessage: (messageId, updates) => {
 					const { messages, chatRooms } = get();
 					const message = messages.find(msg => msg.id === messageId);
+					if (!message) {
+						return;
+					}
+					const hasChanges = (Object.keys(updates) as (keyof Message)[]).some(
+						key => !Object.is(message[key], updates[key])
+					);
+					if (!hasChanges) {
+						return;
+					}
 					const updatedMessages = messages.map(msg =>
 						msg.id === messageId ? { ...msg, ...updates } : msg
 					);
@@ -928,6 +1008,7 @@ export const useChatActions = () =>
 		addChatRoom: state.addChatRoom,
 		updateChatRoom: state.updateChatRoom,
 		setMessages: state.setMessages,
+		applyMessagesMarkedAsRead: state.applyMessagesMarkedAsRead,
 		addMessage: state.addMessage,
 		updateMessage: state.updateMessage,
 		prependMessages: state.prependMessages,

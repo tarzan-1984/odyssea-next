@@ -65,7 +65,7 @@ export default function ChatList({
 		webSocketChatSync;
 
 	const currentUser = useCurrentUser();
-	const { updateChatRoom, updateMessage } = useChatStore();
+	const updateChatRoom = useChatStore(s => s.updateChatRoom);
 
 	const showOffersTab = useMemo(() => {
 		const role = (currentUser?.role || "").trim().toUpperCase();

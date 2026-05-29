@@ -35,7 +35,8 @@ export const useWebSocketMessages = ({
 		markMessageAsRead,
 		markChatRoomAsRead,
 	} = useWebSocket();
-	const { addMessage, updateMessage } = useChatStore();
+	const addMessage = useChatStore(s => s.addMessage);
+	const updateMessage = useChatStore(s => s.updateMessage);
 	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string; role?: string }>>({});
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const currentRoomRef = useRef<string | null>(null);
@@ -115,9 +116,11 @@ export const useWebSocketMessages = ({
 			const message = messages.find(msg => msg.id === data.messageId);
 			if (message) {
 				const currentReadBy = message.readBy || [];
-				const updatedReadBy = currentReadBy.includes(data.readBy) 
-					? currentReadBy 
-					: [...currentReadBy, data.readBy];
+				if (currentReadBy.includes(data.readBy) && message.isRead) {
+					onMessageRead?.(data);
+					return;
+				}
+				const updatedReadBy = [...currentReadBy, data.readBy];
 				updateMessage(data.messageId, { 
 					isRead: true, // Global read status
 					readBy: updatedReadBy // Per-user read status

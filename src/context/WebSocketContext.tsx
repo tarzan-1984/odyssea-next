@@ -146,8 +146,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	/** After first successful connect, further connects are reconnects → trigger chat catch-up sync. */
 	const hadSuccessfulSocketConnectionRef = useRef(false);
 
-	// Get store actions
-	const { addMessage, addChatRoom, updateChatRoom, updateMessage } = useChatStore();
+	// Stable action selectors — avoid subscribing to messages/chatRooms (prevents re-render loops on read receipts)
+	const addMessage = useChatStore(state => state.addMessage);
+	const addChatRoom = useChatStore(state => state.addChatRoom);
+	const updateChatRoom = useChatStore(state => state.updateChatRoom);
+	const updateMessage = useChatStore(state => state.updateMessage);
 	const currentUser = useUserStore(state => state.currentUser);
 	const addNotification = useAddNotification();
 	const updateUnreadCount = useUpdateUnreadCount();
@@ -786,77 +789,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			"messagesMarkedAsRead",
 			(data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
 				const state = useChatStore.getState();
+				const didUpdate = state.applyMessagesMarkedAsRead(data);
+				if (!didUpdate) {
+					return;
+				}
 
-				// Update all messages in the store
-				const updatedMessages = state.messages.map(msg => {
-					if (data.messageIds.includes(msg.id)) {
-						const currentReadBy = msg.readBy || [];
-						const updatedReadBy = currentReadBy.includes(data.userId)
-							? currentReadBy
-							: [...currentReadBy, data.userId];
-						return {
-							...msg,
-							isRead: true, // Global read status
-							readBy: updatedReadBy, // Per-user read status
-						};
-					}
-					return msg;
-				});
-
-				// Update all messages as read in IndexedDB cache immediately
+				// Sync read receipts to IndexedDB only when store data actually changed
+				const messagesAfter = useChatStore.getState().messages;
 				data.messageIds.forEach(messageId => {
-					const message = state.messages.find(m => m.id === messageId);
-					if (message) {
-						const currentReadBy = message.readBy || [];
-						const updatedReadBy = currentReadBy.includes(data.userId)
-							? currentReadBy
-							: [...currentReadBy, data.userId];
-						indexedDBChatService
-							.updateMessage(messageId, {
-								isRead: true,
-								readBy: updatedReadBy,
-							})
-							.catch((error: Error) => {
-								console.error(
-									"Failed to update message as read in IndexedDB:",
-									error
-								);
-							});
+					const message = messagesAfter.find(m => m.id === messageId);
+					if (!message) {
+						return;
 					}
+					indexedDBChatService
+						.updateMessage(messageId, {
+							isRead: true,
+							readBy: message.readBy,
+						})
+						.catch((error: Error) => {
+							console.error(
+								"Failed to update message as read in IndexedDB:",
+								error
+							);
+						});
 				});
-
-				// Calculate how many messages were marked as read
-				const readCount = data.messageIds.length;
-
-				// Use getState() to get fresh currentUser (avoids stale closure in socket handler)
-				const currentUserId = useUserStore.getState().currentUser?.id;
-
-				// Update chat room's unreadCount when the current user read the messages
-				// For GROUP/LOAD chats: each user has their own unreadCount based on readBy
-				const updatedRooms = state.chatRooms.map(room => {
-					if (
-						room.id === data.chatRoomId &&
-						data.userId === currentUserId
-					) {
-						const currentUnread = room.unreadCount ?? 0;
-						const newUnreadCount = Math.max(0, currentUnread - readCount);
-						const updatedRoom = { ...room, unreadCount: newUnreadCount };
-
-						// Save updated room to IndexedDB
-						indexedDBChatService
-							.updateChatRoom(room.id, { unreadCount: newUnreadCount })
-							.catch((error: Error) => {
-								console.error("Failed to update chat room in IndexedDB:", error);
-							});
-
-						return updatedRoom;
-					}
-					return room;
-				});
-
-				// Update store with new messages and rooms (re-sort so read chats move down)
-				state.setMessages(updatedMessages);
-				state.setChatRooms(updatedRooms);
 			}
 		);
 
@@ -1174,18 +1130,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 	const markChatRoomAsRead = useCallback(
 		async (chatRoomId: string) => {
+			const room = useChatStore.getState().chatRooms.find(r => r.id === chatRoomId);
+			const alreadyRead = (room?.unreadCount ?? 0) === 0;
+
 			if (socket && isConnected) {
 				socket.emit("markChatRoomAsRead", { chatRoomId });
 				// Same as HTTP path: DB may already have readBy filled, so the server often
 				// returns no messageIds and skips messagesMarkedAsRead — UI would keep a stale badge.
-				useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+				if (!alreadyRead) {
+					useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+				}
 				return;
 			}
 			// Fallback to HTTP when WebSocket is not connected
 			try {
 				await chatApi.markChatRoomAsRead(chatRoomId);
-				// Optimistically set unreadCount to 0 (we just marked all as read)
-				useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+				if (!alreadyRead) {
+					useChatStore.getState().updateChatRoom(chatRoomId, { unreadCount: 0 });
+				}
 			} catch (err) {
 				console.warn("[WebSocket] HTTP fallback markChatRoomAsRead failed:", err);
 			}
