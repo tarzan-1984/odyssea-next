@@ -21,10 +21,6 @@ const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ss
 
 const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
 
-const CircleMarker = dynamic(() => import("react-leaflet").then(mod => mod.CircleMarker), {
-	ssr: false,
-});
-
 type LoadLocation = {
 	address?: string;
 	short_address?: string;
@@ -57,8 +53,8 @@ type LoadRoute = {
 
 const MIN_DRIVER_MARKER_SIZE = 34;
 const MAX_DRIVER_MARKER_SIZE = 78;
-const MIN_HISTORY_MARKER_RADIUS = 6;
-const MAX_HISTORY_MARKER_RADIUS = 15;
+const MIN_HISTORY_MARKER_RADIUS = 3;
+const MAX_HISTORY_MARKER_RADIUS = 10;
 const SELECTED_HISTORY_POINT_ZOOM = 8;
 const DRIVER_WAYPOINT_LABEL = "Current driver location";
 
@@ -567,6 +563,38 @@ const MapRefSetter = dynamic(
 
 function stopMapClickBubbling(e: L.LeafletMouseEvent) {
 	L.DomEvent.stopPropagation(e.originalEvent);
+}
+
+function createHistoryPointIcon({
+	diameterPx,
+	index,
+	isLast,
+	isSelected,
+}: {
+	diameterPx: number;
+	index: number;
+	isLast: boolean;
+	isSelected: boolean;
+}) {
+	const diameter = Math.round(Math.max(12, diameterPx + 2));
+	const color = isLast ? "#16a34a" : "#2563eb";
+	const borderColor = isLast ? "#15803d" : "#1d4ed8";
+	const ringColor = isLast ? "rgba(22, 163, 74, 0.25)" : "rgba(37, 99, 235, 0.25)";
+	const ringSize = isSelected ? 3 : 1;
+	const outer = Math.ceil(diameter * 1.5 + ringSize * 2);
+	const fontSize = Math.max(7, Math.min(11, diameter * 0.45));
+
+	return L.divIcon({
+		className: "tracking-history-point-icon",
+		html: `<div class="tracking-history-marker-wrap" style="width:${outer}px;height:${outer}px;">
+<div class="tracking-history-marker-pin" style="width:${diameter}px;height:${diameter}px;background:${color};border-color:${borderColor};box-shadow:0 0 0 ${ringSize}px ${ringColor};">
+<span style="font-size:${fontSize}px;">${index + 1}</span>
+</div>
+</div>`,
+		iconSize: [outer, outer],
+		iconAnchor: [outer / 2, outer / 2 + diameter * 0.32],
+		popupAnchor: [0, -outer / 2],
+	});
 }
 
 function createHistoryPointEditIcon(diameterPx: number) {
@@ -1138,6 +1166,33 @@ export default function TrackingDeliveryMap({
 		<div className="w-full h-full bg-white dark:bg-gray-900 relative z-0">
 			<style>
 				{`
+					.tracking-history-point-icon {
+						background: transparent !important;
+						border: none !important;
+					}
+					.tracking-history-marker-wrap {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+					.tracking-history-marker-pin {
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						border: 2px solid;
+						border-radius: 50% 50% 50% 0;
+						box-sizing: border-box;
+						color: #ffffff;
+						font-weight: 800;
+						line-height: 1;
+						text-align: center;
+						text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+						transform: rotate(-45deg);
+					}
+					.tracking-history-marker-pin span {
+						display: block;
+						transform: rotate(45deg);
+					}
 					.tracking-history-point-editing {
 						transition: fill 0.65s ease-in-out, stroke 0.65s ease-in-out;
 					}
@@ -1238,7 +1293,7 @@ export default function TrackingDeliveryMap({
 						{historyMarkerDetails.map((point, index) => {
 							const isSelected = index === selectedLoadHistoryPointIndex;
 							const isEditing = index === editingLoadHistoryPointIndex;
-							const showBlueAccent = isSelected;
+							const isLastHistoryPoint = index === historyMarkerDetails.length - 1;
 
 							if (isEditing) {
 								const position = (historyEditDragPosition ?? point.position) as [
@@ -1269,17 +1324,16 @@ export default function TrackingDeliveryMap({
 							}
 
 							return (
-								<CircleMarker
+								<Marker
 									key={`history-point-${index}-${point.position[0]}-${point.position[1]}`}
-									center={point.position}
-									radius={historyMarkerRadius}
-									pathOptions={{
-										color: showBlueAccent ? "#1d4ed8" : "#991b1b",
-										fillColor: showBlueAccent ? "#2563eb" : "#dc2626",
-										fillOpacity: 0.95,
-										weight: isSelected ? 4 : 3,
-										className: "",
-									}}
+									position={point.position}
+									icon={createHistoryPointIcon({
+										diameterPx: historyMarkerRadius * 2,
+										index,
+										isLast: isLastHistoryPoint,
+										isSelected,
+									})}
+									zIndexOffset={isLastHistoryPoint ? 650 : isSelected ? 600 : 500}
 									eventHandlers={{
 										click: e => {
 											stopMapClickBubbling(e);
@@ -1324,7 +1378,7 @@ export default function TrackingDeliveryMap({
 											</p>
 										</div>
 									</Popup>
-								</CircleMarker>
+								</Marker>
 							);
 						})}
 					</>
