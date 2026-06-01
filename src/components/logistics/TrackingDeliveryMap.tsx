@@ -53,8 +53,8 @@ type LoadRoute = {
 
 const MIN_DRIVER_MARKER_SIZE = 34;
 const MAX_DRIVER_MARKER_SIZE = 78;
-const MIN_HISTORY_MARKER_RADIUS = 3;
-const MAX_HISTORY_MARKER_RADIUS = 10;
+const MIN_HISTORY_MARKER_RADIUS = 4;
+const MAX_HISTORY_MARKER_RADIUS = 11;
 const SELECTED_HISTORY_POINT_ZOOM = 8;
 const DRIVER_WAYPOINT_LABEL = "Current driver location";
 
@@ -576,13 +576,13 @@ function createHistoryPointIcon({
 	isLast: boolean;
 	isSelected: boolean;
 }) {
-	const diameter = Math.round(Math.max(12, diameterPx + 2));
+	const diameter = Math.round(Math.max(15, diameterPx + 3));
 	const color = isLast ? "#16a34a" : "#2563eb";
 	const borderColor = isLast ? "#15803d" : "#1d4ed8";
 	const ringColor = isLast ? "rgba(22, 163, 74, 0.25)" : "rgba(37, 99, 235, 0.25)";
-	const ringSize = isSelected ? 3 : 1;
+	const ringSize = isSelected ? 3 : 2;
 	const outer = Math.ceil(diameter * 1.5 + ringSize * 2);
-	const fontSize = Math.max(7, Math.min(11, diameter * 0.45));
+	const fontSize = Math.max(8, Math.min(12, diameter * 0.45));
 
 	return L.divIcon({
 		className: "tracking-history-point-icon",
