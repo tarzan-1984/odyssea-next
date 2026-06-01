@@ -228,6 +228,46 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			}
 		};
 
+		const getClipboardFileName = (file: File, index: number) => {
+			if (file.name) return file.name;
+
+			const extensionByType: Record<string, string> = {
+				"image/png": "png",
+				"image/jpeg": "jpg",
+				"image/gif": "gif",
+				"image/webp": "webp",
+				"application/pdf": "pdf",
+				"text/plain": "txt",
+			};
+			const extension = extensionByType[file.type] || "bin";
+
+			return `pasted-file-${index + 1}.${extension}`;
+		};
+
+		const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+			const itemFiles = Array.from(e.clipboardData.items ?? [])
+				.filter(item => item.kind === "file")
+				.map(item => item.getAsFile())
+				.filter((file): file is File => Boolean(file));
+			const clipboardFiles =
+				itemFiles.length > 0 ? itemFiles : Array.from(e.clipboardData.files ?? []);
+			const files = clipboardFiles.map((file, index) => {
+					const name = getClipboardFileName(file, index);
+					if (file.name === name) return file;
+
+					return new File([file], name, {
+						type: file.type,
+						lastModified: file.lastModified,
+					});
+				});
+
+			if (files.length === 0) return;
+
+			e.preventDefault();
+			e.stopPropagation();
+			await uploadFiles(files);
+		};
+
 		const handleEmojiSelect = (emoji: string) => {
 			setMessage(prev => prev + emoji);
 			// Focus back to input after emoji selection
@@ -456,6 +496,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 							value={message}
 							onChange={handleMessageChange}
 							onKeyDown={handleKeyDown}
+							onPaste={handlePaste}
 							disabled={disabled || isSending || isUploadingAttachments}
 							className="w-full min-h-9 max-h-[7.5rem] py-2 pl-[4.85rem] pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto sm:pl-[5rem]"
 						/>

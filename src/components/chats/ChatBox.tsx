@@ -70,6 +70,41 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const hasFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
+	const getClipboardFileName = (file: File, index: number) => {
+		if (file.name) return file.name;
+
+		const extensionByType: Record<string, string> = {
+			"image/png": "png",
+			"image/jpeg": "jpg",
+			"image/gif": "gif",
+			"image/webp": "webp",
+			"application/pdf": "pdf",
+			"text/plain": "txt",
+		};
+		const extension = extensionByType[file.type] || "bin";
+
+		return `pasted-file-${index + 1}.${extension}`;
+	};
+
+	const getClipboardFiles = (clipboardData: DataTransfer): File[] => {
+		const itemFiles = Array.from(clipboardData.items ?? [])
+			.filter(item => item.kind === "file")
+			.map(item => item.getAsFile())
+			.filter((file): file is File => Boolean(file));
+
+		const files = itemFiles.length > 0 ? itemFiles : Array.from(clipboardData.files ?? []);
+
+		return files.map((file, index) => {
+			const name = getClipboardFileName(file, index);
+			if (file.name === name) return file;
+
+			return new File([file], name, {
+				type: file.type,
+				lastModified: file.lastModified,
+			});
+		});
+	};
+
 	const handleChatDragEnter = (e: React.DragEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -104,6 +139,16 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		if (!canAttachFiles) return;
 		const files = Array.from(e.dataTransfer.files);
 		if (files.length === 0) return;
+		await sendFormRef.current?.addFiles(files);
+	};
+
+	const handleChatPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+		if (!canAttachFiles) return;
+
+		const files = getClipboardFiles(e.clipboardData);
+		if (files.length === 0) return;
+
+		e.preventDefault();
 		await sendFormRef.current?.addFiles(files);
 	};
 
@@ -538,6 +583,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			onDragLeave={handleChatDragLeave}
 			onDragOver={handleChatDragOver}
 			onDrop={handleChatDrop}
+			onPaste={handleChatPaste}
 		>
 			{isDragOver && (
 				<div
