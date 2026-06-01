@@ -269,17 +269,19 @@ export const useChatSync = () => {
 				return currentChatRoom?.id != null && currentChatRoom.id !== chatRoomId;
 			};
 
-			const applyMessagesForRoom = (lists: Message[][]) => {
-				if (isStaleRequest()) return;
-				const merged = mergeMessageLists(...lists);
-				setMessages(filterMessagesForRoom(merged, chatRoomId));
-			};
-
 			const getRoomFromStore = () =>
 				useChatStore.getState().chatRooms.find(r => r.id === chatRoomId);
 
 			const getStoreMessagesForRoom = () =>
 				filterMessagesForRoom(useChatStore.getState().messages, chatRoomId);
+
+			const applyMessagesForRoom = (lists: Message[][]) => {
+				if (isStaleRequest()) return;
+				// Preserve messages that arrived via WebSocket while this async load was in flight.
+				const latestStoreForRoom = getStoreMessagesForRoom();
+				const merged = mergeMessageLists(...lists, latestStoreForRoom);
+				setMessages(filterMessagesForRoom(merged, chatRoomId));
+			};
 
 			try {
 				setLoadingMessages(true);

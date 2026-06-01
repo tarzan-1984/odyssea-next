@@ -2,6 +2,7 @@ type TmsLoadBody = {
 	success?: boolean;
 	data?: {
 		meta_data?: Record<string, unknown>;
+		shippers?: unknown[];
 		[key: string]: unknown;
 	};
 };
@@ -45,6 +46,7 @@ async function fetchTmsLoad(loadId: string, publicView: boolean): Promise<TmsLoa
 async function fetchLoadEnrichment(
 	loadId: string,
 	metaData: Record<string, unknown>,
+	shippers: unknown[] | undefined,
 	publicView: boolean
 ): Promise<LoadEnrichment> {
 	const enrichUrl = publicView
@@ -54,7 +56,10 @@ async function fetchLoadEnrichment(
 	const enrichResponse = await fetch(enrichUrl, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ meta_data: metaData }),
+		body: JSON.stringify({
+			meta_data: metaData,
+			...(Array.isArray(shippers) && shippers.length > 0 ? { shippers } : {}),
+		}),
 	});
 
 	const enrichWrapped = (await enrichResponse.json().catch(() => null)) as {
@@ -81,6 +86,7 @@ export async function fetchTrackingLoadDetails(
 	const enrichment = await fetchLoadEnrichment(
 		loadId,
 		tmsJson.data?.meta_data ?? {},
+		Array.isArray(tmsJson.data?.shippers) ? tmsJson.data.shippers : undefined,
 		publicView
 	);
 

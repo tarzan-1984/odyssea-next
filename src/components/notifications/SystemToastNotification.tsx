@@ -22,10 +22,11 @@ interface SystemToastNotificationProps {
 export const SystemToastNotification: React.FC<SystemToastNotificationProps> = ({
 	data,
 	onClose,
-	autoCloseDelay = 5000,
+	autoCloseDelay = 9000,
 }) => {
 	const [isVisible, setIsVisible] = useState(false);
 	const [isClosing, setIsClosing] = useState(false);
+	const [isHovered, setIsHovered] = useState(false);
 
 	const handleClose = useCallback(() => {
 		setIsClosing(true);
@@ -34,13 +35,16 @@ export const SystemToastNotification: React.FC<SystemToastNotificationProps> = (
 
 	useEffect(() => {
 		const showTimer = setTimeout(() => setIsVisible(true), 100);
+		return () => clearTimeout(showTimer);
+	}, []);
+
+	useEffect(() => {
+		if (isHovered || isClosing) return;
+
 		const closeTimer = setTimeout(() => handleClose(), autoCloseDelay);
 
-		return () => {
-			clearTimeout(showTimer);
-			clearTimeout(closeTimer);
-		};
-	}, [autoCloseDelay, handleClose]);
+		return () => clearTimeout(closeTimer);
+	}, [autoCloseDelay, handleClose, isClosing, isHovered]);
 
 	const generateInitials = (name: string) => {
 		const words = name.trim().split(/\s+/);
@@ -65,6 +69,8 @@ export const SystemToastNotification: React.FC<SystemToastNotificationProps> = (
 			className={`w-80 rounded-lg shadow-lg border ${variantClass} transform transition-all duration-300 ease-in-out ${
 				isVisible && !isClosing ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
 			}`}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
 			<div className="p-4">
 				<div className="flex items-start space-x-3">

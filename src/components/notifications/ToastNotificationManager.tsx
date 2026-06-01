@@ -66,7 +66,7 @@ export const ToastNotificationManager: React.FC = () => {
             message={toast.message}
             chatRoom={toast.chatRoom}
             onClose={() => removeToast(toast.id)}
-            autoCloseDelay={2000}
+            autoCloseDelay={6000}
           />
         </div>
       ))}
@@ -82,7 +82,7 @@ export const ToastNotificationManager: React.FC = () => {
           <SystemToastNotification
             data={toast}
             onClose={() => removeSystemToast(toast.id)}
-            autoCloseDelay={5000}
+            autoCloseDelay={9000}
           />
         </div>
       ))}

@@ -56,7 +56,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Get error, chat room, and pagination state from store
 	const error = useChatStore(state => state.error);
-	const currentChatRoom = useChatStore(state => state.currentChatRoom);
 	const selectedChatRoom = useChatStore(state => {
 		if (!selectedChatRoomId) return undefined;
 		if (state.currentChatRoom?.id === selectedChatRoomId) {
@@ -284,6 +283,13 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	useEffect(() => {
 		if (selectedChatRoomId) {
+			const state = useChatStore.getState();
+			if (state.currentChatRoom?.id !== selectedChatRoomId) {
+				const room = state.chatRooms.find(r => r.id === selectedChatRoomId);
+				if (room) {
+					state.setCurrentChatRoom(room);
+				}
+			}
 			loadMessagesForRoom(selectedChatRoomId);
 		}
 	}, [selectedChatRoomId, loadMessagesForRoom]);

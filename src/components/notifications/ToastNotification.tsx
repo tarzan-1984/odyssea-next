@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { useUserStore } from "@/stores/userStore";
 
@@ -14,33 +14,35 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	message,
 	chatRoom,
 	onClose,
-	autoCloseDelay = 2000,
+	autoCloseDelay = 6000,
 }) => {
 	const [isVisible, setIsVisible] = useState(false);
 	const [isClosing, setIsClosing] = useState(false);
+	const [isHovered, setIsHovered] = useState(false);
 	const currentUser = useUserStore(state => state.currentUser);
 
 	useEffect(() => {
 		// Show notification with slight delay for smooth animation
 		const showTimer = setTimeout(() => setIsVisible(true), 100);
+		return () => clearTimeout(showTimer);
+	}, []);
 
-		// Auto close after delay
-		const closeTimer = setTimeout(() => {
-			handleClose();
-		}, autoCloseDelay);
-
-		return () => {
-			clearTimeout(showTimer);
-			clearTimeout(closeTimer);
-		};
-	}, [autoCloseDelay]);
-
-	const handleClose = () => {
+	const handleClose = useCallback(() => {
 		setIsClosing(true);
 		setTimeout(() => {
 			onClose();
 		}, 300); // Match CSS transition duration
-	};
+	}, [onClose]);
+
+	useEffect(() => {
+		if (isHovered || isClosing) return;
+
+		const closeTimer = setTimeout(() => {
+			handleClose();
+		}, autoCloseDelay);
+
+		return () => clearTimeout(closeTimer);
+	}, [autoCloseDelay, handleClose, isClosing, isHovered]);
 
 	const getChatTitle = () => {
 		if (chatRoom.type === "DIRECT") {
@@ -94,6 +96,8 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 			className={`w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out ${
 				isVisible && !isClosing ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
 			}`}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
 			<div className="p-4">
 				<div className="flex items-start space-x-3">
