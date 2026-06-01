@@ -32,6 +32,9 @@ export const useWebSocketChatSync = () => {
 
 			// Fetch the specific chat room from API
 			const chatRoom = await chatApi.getChatRoom(chatRoomId);
+			const existingRoom = useChatStore
+				.getState()
+				.chatRooms.find(room => room.id === chatRoomId);
 
 			// Load last message for the chat room
 			try {
@@ -44,16 +47,33 @@ export const useWebSocketChatSync = () => {
 				console.warn("⚠️ Failed to load last message:", messageError);
 			}
 
+			const normalizedRoom = {
+				...chatRoom,
+				participants: Array.isArray(chatRoom.participants)
+					? chatRoom.participants.map((p: any) => ({
+							...p,
+							user: {
+								...p.user,
+								avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+							},
+						}))
+					: [],
+				unreadCount: chatRoom.unreadCount ?? existingRoom?.unreadCount ?? 0,
+			};
+
 			// Add to Zustand store
 			const { addChatRoom } = useChatStore.getState();
-			addChatRoom(chatRoom);
+			addChatRoom(normalizedRoom);
 
 			// Add to IndexedDB cache: get current chat rooms, add new one, save all
 			const currentChatRooms = await indexedDBChatService.getChatRooms();
-			const updatedChatRooms = [...currentChatRooms, chatRoom];
+			const updatedChatRooms = [
+				...currentChatRooms.filter(room => room.id !== normalizedRoom.id),
+				normalizedRoom,
+			];
 			await indexedDBChatService.saveChatRooms(updatedChatRooms);
 
-			return chatRoom;
+			return normalizedRoom;
 		} catch (error) {
 			console.error("❌ Failed to add chat room to cache:", error);
 			throw error;

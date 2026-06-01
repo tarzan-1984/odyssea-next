@@ -224,6 +224,61 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			forceNew: true,
 		});
 
+		const restoreChatRoomById = async (chatRoomId: string) => {
+			const restoredRoom = (await chatApi.getChatRoom(chatRoomId)) as ChatRoom & {
+				messages?: Message[];
+			};
+			const messages = Array.isArray(restoredRoom.messages) ? restoredRoom.messages : [];
+			const lastMessage = messages.length > 0 ? messages[messages.length - 1] : restoredRoom.lastMessage;
+			const currentUserId = currentUser?.id;
+			const unreadCount =
+				currentUserId && messages.length > 0
+					? messages.filter(message => {
+							if (message.senderId === currentUserId) return false;
+							return !(message.readBy ?? []).includes(currentUserId);
+						}).length
+					: restoredRoom.unreadCount;
+			const normalized: ChatRoom = {
+				...restoredRoom,
+				participants: Array.isArray(restoredRoom.participants)
+					? restoredRoom.participants.map((p: any) => ({
+							...p,
+							user: {
+								...p.user,
+								avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+							},
+						}))
+					: [],
+				...(lastMessage
+					? {
+							lastMessage: {
+								...lastMessage,
+								sender: lastMessage.sender
+									? {
+											...lastMessage.sender,
+											avatar:
+												lastMessage.sender.avatar ??
+												lastMessage.sender.profilePhoto ??
+												"",
+										}
+									: lastMessage.sender,
+							},
+						}
+					: {}),
+				unreadCount,
+			};
+			delete (normalized as ChatRoom & { messages?: Message[] }).messages;
+
+			addChatRoom(normalized);
+			await indexedDBChatService.addChatRoom(normalized);
+
+			if (newSocket.connected) {
+				newSocket.emit("joinChatRoom", { chatRoomId: normalized.id });
+			}
+
+			return normalized;
+		};
+
 		// Connection event handlers
 		newSocket.on("connect", () => {
 			setIsConnected(true);
@@ -293,43 +348,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						messageData.chatRoomId
 					);
 					try {
-						const restoredRoom = await chatApi.getChatRoom(messageData.chatRoomId);
-
-						// Normalize participant avatar field (profilePhoto -> avatar)
-						const normalized: ChatRoom = {
-							...restoredRoom,
-							participants: Array.isArray(restoredRoom.participants)
-								? restoredRoom.participants.map((p: any) => ({
-										...p,
-										user: {
-											...p.user,
-											avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
-										},
-									}))
-								: [],
-						};
-
-						// Add restored chat room to store
-						const { addChatRoom } = useChatStore.getState();
-						addChatRoom(normalized);
-						chatRoom = normalized;
-						console.log("✅ [WebSocket] Chat room restored:", normalized.id);
-
-						// Save restored chat room to IndexedDB
-						try {
-							const currentChatRooms = await indexedDBChatService.getChatRooms();
-							const updatedRooms = [
-								...currentChatRooms.filter(r => r.id !== normalized.id),
-								normalized,
-							];
-							await indexedDBChatService.saveChatRooms(updatedRooms);
-							console.log("✅ [WebSocket] Chat room saved to IndexedDB");
-						} catch (dbError) {
-							console.error(
-								"❌ [WebSocket] Failed to save restored chat room to IndexedDB:",
-								dbError
-							);
-						}
+						chatRoom = await restoreChatRoomById(messageData.chatRoomId);
+						console.log("✅ [WebSocket] Chat room restored:", chatRoom.id);
+						console.log("✅ [WebSocket] Chat room saved to IndexedDB");
 					} catch (restoreError) {
 						console.error("❌ [WebSocket] Failed to restore chat room:", restoreError);
 						// Continue with message processing even if restore failed
@@ -763,6 +784,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				}
 			} catch (error) {
 				console.error("Failed to reload chat rooms after restoration:", error);
+			}
+		});
+
+		newSocket.on("addedToChatRoom", async (data: { chatRoomId: string; addedBy?: string }) => {
+			if (!data?.chatRoomId) return;
+			try {
+				await restoreChatRoomById(data.chatRoomId);
+			} catch (error) {
+				console.error("Failed to load chat room after participant add:", error);
 			}
 		});
 
