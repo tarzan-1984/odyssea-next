@@ -59,11 +59,11 @@ const SELECTED_HISTORY_POINT_ZOOM = 8;
 const DRIVER_WAYPOINT_LABEL = "Current driver location";
 
 function getHistoryMarkerRadiusByZoom(zoom: number): number {
-	const minZoom = 4;
-	const maxZoom = 12;
+	const minZoom = 10;
+	const maxZoom = 16;
 	const normalized = Math.max(0, Math.min(1, (zoom - minZoom) / (maxZoom - minZoom)));
 	return Math.round(
-		MIN_HISTORY_MARKER_RADIUS +
+		MAX_HISTORY_MARKER_RADIUS -
 			(MAX_HISTORY_MARKER_RADIUS - MIN_HISTORY_MARKER_RADIUS) * normalized
 	);
 }
@@ -592,7 +592,7 @@ function createHistoryPointIcon({
 </div>
 </div>`,
 		iconSize: [outer, outer],
-		iconAnchor: [outer / 2, outer / 2 + diameter * 0.32],
+		iconAnchor: [outer / 2, outer / 2 + diameter * 0.56],
 		popupAnchor: [0, -outer / 2],
 	});
 }
