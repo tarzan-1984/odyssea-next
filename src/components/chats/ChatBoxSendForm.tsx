@@ -135,7 +135,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		};
 
 		const isFileAllowed = (file: File): boolean => {
-			const acceptedTypes = ["image/*", "application/pdf", ".doc", ".docx", ".txt"];
+			const acceptedTypes = ["image/*", "application/pdf", ".doc", ".docx", ".txt", ".heic", ".heif"];
 			const fileType = file.type;
 			const lowerName = file.name.toLowerCase();
 			return acceptedTypes.some(type => {
@@ -182,13 +182,13 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					const uploader = new S3Uploader();
 					const uploaded: (ChatAttachmentPayload & { localId: string })[] = [];
 					for (const file of toUpload) {
-						const { fileUrl, key } = await uploader.upload(file);
+						const { fileUrl, key, fileName, fileSize } = await uploader.upload(file);
 						uploaded.push({
 							localId: crypto.randomUUID(),
 							fileUrl,
 							key,
-							fileName: file.name,
-							fileSize: file.size,
+							fileName,
+							fileSize,
 						});
 					}
 					setAttachedFiles(prev => [...prev, ...uploaded]);
@@ -323,7 +323,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					type="file"
 					multiple
 					onChange={handleFileSelect}
-					accept="image/*,application/pdf,.doc,.docx,.txt"
+					accept="image/*,.heic,.heif,application/pdf,.doc,.docx,.txt"
 					className="hidden"
 				/>
 
