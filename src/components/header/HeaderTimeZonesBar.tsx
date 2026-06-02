@@ -97,12 +97,8 @@ export default function HeaderTimeZonesBar() {
 				isOpen={menuOpen}
 				onClose={() => setMenuOpen(false)}
 				anchorRef={anchorRef}
-				className="w-[min(100vw-2rem,22rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+				className="z-[100001] w-[min(100vw-2rem,22rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900"
 			>
-				<p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-					Select clocks for the header. Saved in this browser (same as notification sound
-					settings).
-				</p>
 				<ul className="max-h-[min(60vh,20rem)] space-y-2 overflow-y-auto pr-1">
 					{HEADER_TIME_ZONES.map(zone => {
 						const checked = visibleTimeZones.includes(zone.timeZone);
@@ -124,7 +120,11 @@ export default function HeaderTimeZonesBar() {
 
 			<div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-visible py-0.5 [-ms-overflow-style:auto] [scrollbar-gutter:stable]">
 				{visibleZones.map(zone => (
-					<TimeZoneClock key={zone.timeZone} label={zone.label} timeZone={zone.timeZone} />
+					<TimeZoneClock
+						key={zone.timeZone}
+						label={zone.label}
+						timeZone={zone.timeZone}
+					/>
 				))}
 			</div>
 		</div>

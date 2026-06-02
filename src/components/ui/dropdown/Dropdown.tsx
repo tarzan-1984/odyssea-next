@@ -14,6 +14,8 @@ interface DropdownProps {
 	anchorRef?: React.RefObject<HTMLElement | null>;
 	/** Popper placement: 'bottom-start' = left align, 'bottom-end' = right align */
 	anchorAlign?: "left" | "right";
+	/** Open menu above the anchor (e.g. header controls). Default: below. */
+	openAbove?: boolean;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -23,6 +25,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
 	className = "",
 	anchorRef,
 	anchorAlign = "left",
+	openAbove = false,
 }) => {
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const popperInstanceRef = useRef<Instance | null>(null);
@@ -53,12 +56,22 @@ export const Dropdown: React.FC<DropdownProps> = ({
 			}
 			return;
 		}
+		const placement = openAbove
+			? anchorAlign === "right"
+				? "top-end"
+				: "top-start"
+			: anchorAlign === "right"
+				? "bottom-end"
+				: "bottom-start";
+		const fallbackPlacements = openAbove ? ["top-end", "top-start"] : ["top-start", "top-end"];
+
 		popperInstanceRef.current = createPopper(anchorRef.current, dropdownRef.current, {
-			placement: anchorAlign === "right" ? "bottom-end" : "bottom-start",
+			placement,
 			strategy: "fixed",
 			modifiers: [
-				{ name: "offset", options: { offset: [0, 4] } },
-				{ name: "flip", options: { fallbackPlacements: ["top-end", "top-start"] } },
+				// Main-axis gap: below dropdown panel when openAbove, below anchor when openBelow
+				{ name: "offset", options: { offset: [0, openAbove ? 10 : 4] } },
+				{ name: "flip", options: { fallbackPlacements } },
 				{ name: "preventOverflow" },
 			],
 		});
@@ -68,7 +81,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
 				popperInstanceRef.current = null;
 			}
 		};
-	}, [isOpen, anchorRef, anchorAlign]);
+	}, [isOpen, anchorRef, anchorAlign, openAbove]);
 
 	// Update popper position when opened
 	useEffect(() => {
@@ -92,10 +105,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
 	}
 
 	return (
-		<div
-			ref={dropdownRef}
-			className={cn("absolute right-0 mt-2", baseClass, className)}
-		>
+		<div ref={dropdownRef} className={cn("absolute right-0 mt-2", baseClass, className)}>
 			{children}
 		</div>
 	);
