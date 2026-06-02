@@ -4,9 +4,10 @@ import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
 	getCartoVoyagerTileLayerProps,
-	getLeafletRasterTileLayerProps,
+	getLeafletRasterTileLayerStack,
 	isMapTilerConfigured,
 	type MapBasemapMode,
+	type LeafletRasterTileLayerProps,
 } from "@/lib/mapTileLayer";
 
 const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), {
@@ -34,11 +35,11 @@ export function ResilientBasemapTileLayer({
 	const errorCountRef = useRef(0);
 	const errorWindowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const tiles = useMemo(() => {
+	const tileStack = useMemo((): LeafletRasterTileLayerProps[] => {
 		if (!mapTilerConfigured || useCartoFallback) {
-			return getCartoVoyagerTileLayerProps();
+			return [getCartoVoyagerTileLayerProps()];
 		}
-		return getLeafletRasterTileLayerProps(mode, { useMapTiler: true });
+		return getLeafletRasterTileLayerStack(mode, { useMapTiler: true });
 	}, [mapTilerConfigured, useCartoFallback, mode]);
 
 	const activateFallback = useCallback(() => {
@@ -71,13 +72,18 @@ export function ResilientBasemapTileLayer({
 	const layerKey = useCartoFallback ? "carto-fallback" : `maptiler-${mode}`;
 
 	return (
-		<TileLayer
-			key={layerKey}
-			attribution={tiles.attribution}
-			url={tiles.url}
-			{...(tiles.subdomains ? { subdomains: tiles.subdomains } : {})}
-			maxZoom={tiles.maxZoom}
-			eventHandlers={{ tileerror: handleTileError }}
-		/>
+		<>
+			{tileStack.map((tiles, index) => (
+				<TileLayer
+					key={`${layerKey}-${index}`}
+					attribution={index === tileStack.length - 1 ? tiles.attribution : undefined}
+					url={tiles.url}
+					{...(tiles.subdomains ? { subdomains: tiles.subdomains } : {})}
+					maxZoom={tiles.maxZoom}
+					{...(tiles.opacity != null ? { opacity: tiles.opacity } : {})}
+					eventHandlers={{ tileerror: handleTileError }}
+				/>
+			))}
+		</>
 	);
 }
