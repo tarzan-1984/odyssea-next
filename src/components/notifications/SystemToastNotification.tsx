@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { SYSTEM_TOAST_AUTO_CLOSE_MS } from "@/constants/toastNotifications";
 
 export type SystemToastVariant = "success" | "error" | "default";
 
@@ -22,7 +23,7 @@ interface SystemToastNotificationProps {
 export const SystemToastNotification: React.FC<SystemToastNotificationProps> = ({
 	data,
 	onClose,
-	autoCloseDelay = 9000,
+	autoCloseDelay = SYSTEM_TOAST_AUTO_CLOSE_MS,
 }) => {
 	const [isVisible, setIsVisible] = useState(false);
 	const [isClosing, setIsClosing] = useState(false);

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Message, ChatRoom } from "@/app-api/chatApi";
+import { CHAT_TOAST_AUTO_CLOSE_MS } from "@/constants/toastNotifications";
 import { useUserStore } from "@/stores/userStore";
 
 interface ToastNotificationProps {
@@ -14,7 +15,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	message,
 	chatRoom,
 	onClose,
-	autoCloseDelay = 6000,
+	autoCloseDelay = CHAT_TOAST_AUTO_CLOSE_MS,
 }) => {
 	const [isVisible, setIsVisible] = useState(false);
 	const [isClosing, setIsClosing] = useState(false);

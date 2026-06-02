@@ -3,6 +3,10 @@ import React, { useState, useCallback } from 'react';
 import { ToastNotification } from './ToastNotification';
 import { SystemToastNotification, SystemToastData } from './SystemToastNotification';
 import { Message, ChatRoom } from '@/app-api/chatApi';
+import {
+  CHAT_TOAST_AUTO_CLOSE_MS,
+  SYSTEM_TOAST_AUTO_CLOSE_MS,
+} from '@/constants/toastNotifications';
 
 interface ToastData {
   id: string;
@@ -66,7 +70,7 @@ export const ToastNotificationManager: React.FC = () => {
             message={toast.message}
             chatRoom={toast.chatRoom}
             onClose={() => removeToast(toast.id)}
-            autoCloseDelay={6000}
+            autoCloseDelay={CHAT_TOAST_AUTO_CLOSE_MS}
           />
         </div>
       ))}
@@ -82,7 +86,7 @@ export const ToastNotificationManager: React.FC = () => {
           <SystemToastNotification
             data={toast}
             onClose={() => removeSystemToast(toast.id)}
-            autoCloseDelay={9000}
+            autoCloseDelay={SYSTEM_TOAST_AUTO_CLOSE_MS}
           />
         </div>
       ))}

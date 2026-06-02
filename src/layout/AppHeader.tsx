@@ -2,55 +2,15 @@
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import WebSocketStatusIndicator from "@/components/common/WebSocketStatusIndicator";
 import AdminNotificationSoundToggle from "@/components/header/AdminNotificationSoundToggle";
+import HeaderTimeZonesBar from "@/components/header/HeaderTimeZonesBar";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { getAppHomePath } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
-
-function useTzClock(timeZone: string): string {
-	const [now, setNow] = useState<Date | null>(null);
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-		setNow(new Date());
-		const id = window.setInterval(() => setNow(new Date()), 1000);
-		return () => window.clearInterval(id);
-	}, []);
-
-	const formatter = useMemo(
-		() =>
-			new Intl.DateTimeFormat("en-US", {
-				timeZone,
-				hour: "2-digit",
-				minute: "2-digit",
-				second: "2-digit",
-				hour12: false,
-			}),
-		[timeZone]
-	);
-
-	// Avoid SSR/CSR mismatch: the server render can't know the "current second" at hydrate time.
-	if (!mounted || !now) return "--:--:--";
-	return formatter.format(now);
-}
-
-function TimeZoneClockCell({ label, time }: { label: string; time: string }) {
-	return (
-		<div className="flex min-w-max shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
-			<span className="whitespace-nowrap text-sm font-semibold leading-tight text-gray-600 dark:text-gray-300">
-				{label}
-			</span>
-			<span className="whitespace-nowrap text-sm font-medium tabular-nums leading-tight text-gray-800 dark:text-gray-100">
-				{time}
-			</span>
-		</div>
-	);
-}
 
 const AppHeader: React.FC = () => {
 	const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
@@ -58,12 +18,6 @@ const AppHeader: React.FC = () => {
 	const mobileLogoHref = getAppHomePath(currentUser?.role);
 
 	const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
-	const nyTime = useTzClock("America/New_York");
-	const plTime = useTzClock("Europe/Warsaw");
-	const uaTime = useTzClock("Europe/Kyiv");
-	const geTime = useTzClock("Asia/Tbilisi");
-	const dzTime = useTzClock("Africa/Algiers");
-	const uzTime = useTzClock("Asia/Tashkent");
 
 	const handleToggle = () => {
 		if (window.innerWidth >= 1280) {
@@ -139,15 +93,7 @@ const AppHeader: React.FC = () => {
 						/>
 					</Link>
 
-					{/* Time widgets (desktop): flex-1 + min-w-0 so row can shrink and scroll instead of clipping cells */}
-					<div className="hidden min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-visible py-0.5 [-ms-overflow-style:auto] [scrollbar-gutter:stable] xl:flex xl:ml-2">
-						<TimeZoneClockCell label="New York (ET)" time={nyTime} />
-						<TimeZoneClockCell label="Algeria" time={dzTime} />
-						<TimeZoneClockCell label="Poland" time={plTime} />
-						<TimeZoneClockCell label="Ukraine" time={uaTime} />
-						<TimeZoneClockCell label="Georgia" time={geTime} />
-						<TimeZoneClockCell label="Uzbekistan" time={uzTime} />
-					</div>
+					<HeaderTimeZonesBar />
 
 					<button
 						onClick={toggleApplicationMenu}

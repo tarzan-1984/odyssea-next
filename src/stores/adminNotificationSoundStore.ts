@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { DEFAULT_NOTIFICATION_SOUND } from "@/constants/notificationSounds";
+import {
+	DEFAULT_VISIBLE_HEADER_TIME_ZONES,
+	normalizeVisibleHeaderTimeZones,
+} from "@/constants/headerTimeZones";
 
 export const ADMIN_NOTIFICATION_SOUND_STORAGE_KEY = "odyssea-admin-notification-sound";
 
@@ -8,16 +12,20 @@ interface AdminNotificationSoundState {
 	notificationSoundsMuted: boolean;
 	selectedNotificationSound: string;
 	notificationSoundVolume: number; // 0..1
+	/** IANA time zones shown in the app header (order follows headerTimeZones.ts). */
+	visibleHeaderTimeZones: string[];
 	setNotificationSoundsMuted: (muted: boolean) => void;
 	toggleNotificationSoundsMuted: () => void;
 	setSelectedNotificationSound: (file: string) => void;
 	setNotificationSoundVolume: (volume: number) => void;
+	toggleHeaderTimeZoneVisibility: (timeZone: string) => void;
 }
 
 type PersistedNotificationSoundState = {
 	notificationSoundsMuted?: boolean;
 	selectedNotificationSound?: string;
 	notificationSoundVolume?: number;
+	visibleHeaderTimeZones?: string[];
 };
 
 function readPersistedStateFromLocalStorage(): PersistedNotificationSoundState | null {
@@ -113,6 +121,7 @@ export const useAdminNotificationSoundStore = create<AdminNotificationSoundState
 				notificationSoundsMuted: false,
 				selectedNotificationSound: DEFAULT_NOTIFICATION_SOUND,
 				notificationSoundVolume: 0.7,
+				visibleHeaderTimeZones: [...DEFAULT_VISIBLE_HEADER_TIME_ZONES],
 				setNotificationSoundsMuted: muted =>
 					set({ notificationSoundsMuted: muted }, false, "setNotificationSoundsMuted"),
 				toggleNotificationSoundsMuted: () =>
@@ -129,13 +138,43 @@ export const useAdminNotificationSoundStore = create<AdminNotificationSoundState
 						false,
 						"setNotificationSoundVolume"
 					),
+				toggleHeaderTimeZoneVisibility: timeZone =>
+					set(state => {
+						const current = normalizeVisibleHeaderTimeZones(state.visibleHeaderTimeZones);
+						const isVisible = current.includes(timeZone);
+						if (isVisible && current.length <= 1) {
+							return state;
+						}
+						const nextSet = new Set(current);
+						if (isVisible) {
+							nextSet.delete(timeZone);
+						} else {
+							nextSet.add(timeZone);
+						}
+						return {
+							visibleHeaderTimeZones: normalizeVisibleHeaderTimeZones(
+								Array.from(nextSet)
+							),
+						};
+					}, false, "toggleHeaderTimeZoneVisibility"),
 			}),
 			{
 				name: ADMIN_NOTIFICATION_SOUND_STORAGE_KEY,
+				merge: (persisted, current) => {
+					const p = persisted as PersistedNotificationSoundState | undefined;
+					return {
+						...current,
+						...p,
+						visibleHeaderTimeZones: normalizeVisibleHeaderTimeZones(
+							p?.visibleHeaderTimeZones ?? current.visibleHeaderTimeZones
+						),
+					};
+				},
 				partialize: state => ({
 					notificationSoundsMuted: state.notificationSoundsMuted,
 					selectedNotificationSound: state.selectedNotificationSound,
 					notificationSoundVolume: state.notificationSoundVolume,
+					visibleHeaderTimeZones: state.visibleHeaderTimeZones,
 				}),
 			}
 		),

@@ -60,7 +60,9 @@ const navItems: NavItem[] = [
 		path: "/offers",
 	},
 	{
-		icon: <WorkstationIcon className="h-5 w-5" />,
+		icon: (
+			<WorkstationIcon className="h-5 w-5 dark:text-white group-[.menu-item-active]:dark:text-brand-400" />
+		),
 		name: "App settings",
 		path: "/app-settings",
 		adminOnly: true,
