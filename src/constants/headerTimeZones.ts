@@ -8,6 +8,7 @@ export const HEADER_TIME_ZONES: HeaderTimeZoneDef[] = [
 	{ label: "Alaska Time", timeZone: "America/Anchorage" },
 	{ label: "Pacific Time (Los Angeles)", timeZone: "America/Los_Angeles" },
 	{ label: "Mountain Time (Denver)", timeZone: "America/Denver" },
+	{ label: "Arizona (MST)", timeZone: "America/Phoenix" },
 	{ label: "Central Time (Dallas)", timeZone: "America/Chicago" },
 	{ label: "New York (ET)", timeZone: "America/New_York" },
 	{ label: "Algeria", timeZone: "Africa/Algiers" },
@@ -17,10 +18,7 @@ export const HEADER_TIME_ZONES: HeaderTimeZoneDef[] = [
 	{ label: "Uzbekistan", timeZone: "Asia/Tashkent" },
 ];
 
-export const DEFAULT_VISIBLE_HEADER_TIME_ZONES: string[] = [
-	"America/New_York",
-	"Europe/Warsaw",
-];
+export const DEFAULT_VISIBLE_HEADER_TIME_ZONES: string[] = ["America/New_York", "Europe/Warsaw"];
 
 const ALLOWED_TIME_ZONES = new Set(HEADER_TIME_ZONES.map(z => z.timeZone));
 
