@@ -622,6 +622,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			<TrackingDeliveryMap
 				driverData={mapLoadData}
 				showEmptyMap
+				forceLightMapBasemap
+				enableBasemapModeSwitch
 				initialZoom={4}
 				selectedLoadHistoryPointIndex={
 					isAuthenticated ? selectedHistoryPointIndex : null

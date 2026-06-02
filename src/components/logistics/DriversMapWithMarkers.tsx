@@ -22,13 +22,12 @@ import {
 	isRestrictedDriverStatusForMap,
 } from "./driversMapConstants";
 import { canViewRestrictedDriverStatusesOnMap } from "@/utils/roleAccess";
-import { getLeafletRasterTileLayerProps } from "@/lib/mapTileLayer";
+import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
 
 const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
 	ssr: false,
 });
 
-const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
 
 const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
 
@@ -375,8 +374,6 @@ export default function DriversMapWithMarkers({
 		mapRef.current.setView([lat, lng], zoom);
 	}, [centerCoordinates]);
 
-	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
-
 	// Unique driverStatus values from data for filter options
 	const driverStatusOptions = Array.from(
 		new Set(
@@ -457,12 +454,7 @@ export default function DriversMapWithMarkers({
 					key={`drivers-map-${isDark ? "dark" : "light"}`}
 				>
 					<MapRefSetter mapRef={mapRef} />
-					<TileLayer
-						attribution={mapTiles.attribution}
-						url={mapTiles.url}
-						{...(mapTiles.subdomains ? { subdomains: mapTiles.subdomains } : {})}
-						maxZoom={mapTiles.maxZoom}
-					/>
+					<ResilientBasemapTileLayer mode="simple" />
 					{filteredDrivers.map((driver, index) => {
 						if (
 							typeof driver.latitude !== "number" ||

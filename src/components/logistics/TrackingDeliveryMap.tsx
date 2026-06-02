@@ -5,15 +5,14 @@ import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/context/ThemeContext";
-import { getLeafletRasterTileLayerProps } from "@/lib/mapTileLayer";
+import { isMapTilerConfigured, type MapBasemapMode } from "@/lib/mapTileLayer";
+import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
 const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
 	ssr: false,
 });
-
-const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
 
 const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
 
@@ -689,6 +688,10 @@ interface TrackingDeliveryMapProps {
 	onHistoryEditPointDragEnd?: (lat: number, lng: number) => void;
 	/** When false, history point popups omit driver name (public load tracking). */
 	showDriverInHistoryPopup?: boolean;
+	/** When true, basemap stays light even if the app theme is dark (e.g. /tracking/load/[id]). */
+	forceLightMapBasemap?: boolean;
+	/** Show Simple / Hybrid basemap toggle (MapTiler hybrid requires API key). */
+	enableBasemapModeSwitch?: boolean;
 }
 
 export default function TrackingDeliveryMap({
@@ -704,9 +707,21 @@ export default function TrackingDeliveryMap({
 	historyEditDragPosition = null,
 	onHistoryEditPointDragEnd,
 	showDriverInHistoryPopup = true,
+	forceLightMapBasemap = false,
+	enableBasemapModeSwitch = false,
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
+	const mapUsesDarkTiles = !forceLightMapBasemap && isDark;
+	const mapTilerConfigured = enableBasemapModeSwitch && isMapTilerConfigured();
+	const [mapTilerUnavailable, setMapTilerUnavailable] = useState(false);
+	const mapTilerUsable = mapTilerConfigured && !mapTilerUnavailable;
+	const [basemapMode, setBasemapMode] = useState<MapBasemapMode>("simple");
+
+	const handleBasemapFallback = useCallback(() => {
+		setMapTilerUnavailable(true);
+		setBasemapMode("simple");
+	}, []);
 	const [loadRoute, setLoadRoute] = useState<LoadRoute | null>(null);
 	const [isRouteBuilding, setIsRouteBuilding] = useState(false);
 	const [driverMarkerSize, setDriverMarkerSize] = useState(MAX_DRIVER_MARKER_SIZE);
@@ -816,8 +831,6 @@ export default function TrackingDeliveryMap({
 		setDriverMarkerSize(getDriverMarkerSizeByZoom(zoom));
 		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
 	}, []);
-
-	const mapTiles = useMemo(() => getLeafletRasterTileLayerProps(), []);
 
 	const pickupAddressCandidates = useMemo(
 		() => getLoadLocationAddressCandidates(driverData?.pick_up_location, "pick_up_location"),
@@ -1163,7 +1176,11 @@ export default function TrackingDeliveryMap({
 	}
 
 	return (
-		<div className="w-full h-full bg-white dark:bg-gray-900 relative z-0">
+		<div
+			className={`w-full h-full relative z-0 ${
+				forceLightMapBasemap ? "tracking-map-light-basemap bg-white" : "bg-white dark:bg-gray-900"
+			}`}
+		>
 			<style>
 				{`
 					.tracking-history-point-icon {
@@ -1225,22 +1242,69 @@ export default function TrackingDeliveryMap({
 					}
 				`}
 			</style>
+			{enableBasemapModeSwitch ? (
+				<div
+					className="pointer-events-none absolute left-4 top-14 z-[1000] flex flex-col items-start gap-1"
+					role="group"
+					aria-label="Map display mode"
+				>
+					<div className="pointer-events-auto inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white/95 shadow-md backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/95">
+						<button
+							type="button"
+							className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+								basemapMode === "simple"
+									? "bg-brand-500 text-white dark:bg-brand-400"
+									: "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+							}`}
+							onClick={() => setBasemapMode("simple")}
+						>
+							Map
+						</button>
+						<button
+							type="button"
+							title={
+								mapTilerUsable
+									? "Satellite with roads and labels"
+									: mapTilerUnavailable
+										? "MapTiler unavailable — using standard map"
+										: "Requires MapTiler API key"
+							}
+							disabled={!mapTilerUsable}
+							className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+								basemapMode === "hybrid"
+									? "bg-brand-500 text-white dark:bg-brand-400"
+									: "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+							} disabled:cursor-not-allowed disabled:opacity-45`}
+							onClick={() => setBasemapMode("hybrid")}
+						>
+							Hybrid
+						</button>
+					</div>
+					{mapTilerUnavailable ? (
+						<p className="pointer-events-none max-w-[220px] rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
+							MapTiler unavailable — standard map (CARTO)
+						</p>
+					) : !mapTilerConfigured ? (
+						<p className="pointer-events-none max-w-[200px] rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
+							Hybrid needs NEXT_PUBLIC_MAPTILER_API_KEY
+						</p>
+					) : null}
+				</div>
+			) : null}
 			<MapContainer
 				center={center}
 				zoom={initialZoom}
 				attributionControl={false}
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
-				key={`map-${isDark ? "dark" : "light"}`}
+				key={`map-${mapUsesDarkTiles ? "dark" : "light"}`}
 			>
 				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
-				<TileLayer
-					key={`tiles-${isDark ? "dark" : "light"}`}
-					attribution={mapTiles.attribution}
-					url={mapTiles.url}
-					{...(mapTiles.subdomains ? { subdomains: mapTiles.subdomains } : {})}
-					maxZoom={mapTiles.maxZoom}
+				<ResilientBasemapTileLayer
+					mode={basemapMode}
+					useMapTilerBasemap={enableBasemapModeSwitch}
+					onFallback={handleBasemapFallback}
 				/>
 				{loadRoute && (
 					<>
