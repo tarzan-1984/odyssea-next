@@ -1178,7 +1178,9 @@ export default function TrackingDeliveryMap({
 	return (
 		<div
 			className={`w-full h-full relative z-0 ${
-				forceLightMapBasemap ? "tracking-map-light-basemap bg-white" : "bg-white dark:bg-gray-900"
+				forceLightMapBasemap
+					? "tracking-map-light-basemap bg-white"
+					: "bg-white dark:bg-gray-900"
 			}`}
 		>
 			<style>
@@ -1244,7 +1246,7 @@ export default function TrackingDeliveryMap({
 			</style>
 			{enableBasemapModeSwitch ? (
 				<div
-					className="pointer-events-none absolute left-4 top-14 z-[1000] flex flex-col items-start gap-1"
+					className="pointer-events-none absolute left-40 top-4 z-[1000] flex flex-col items-start gap-1"
 					role="group"
 					aria-label="Map display mode"
 				>
