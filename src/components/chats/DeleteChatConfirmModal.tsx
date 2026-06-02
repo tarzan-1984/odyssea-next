@@ -20,7 +20,7 @@ export default function DeleteChatConfirmModal({
 	isOpen,
 	onClose,
 	chatRoom,
-	onDeleteSuccess
+	onDeleteSuccess,
 }: DeleteChatConfirmModalProps) {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const currentUser = useCurrentUser();
@@ -35,6 +35,8 @@ export default function DeleteChatConfirmModal({
 		try {
 			// Check if user is admin of group chat
 			const isCurrentUserAdmin = chatRoom.adminId === currentUser.id;
+			const { useChatStore } = await import("@/stores/chatStore");
+			const state = useChatStore.getState();
 
 			if (chatRoom.type === "LOAD") {
 				// For LOAD chats, only administrators can delete
@@ -42,7 +44,7 @@ export default function DeleteChatConfirmModal({
 					console.error("Only administrators can delete LOAD chats");
 					return;
 				}
-				
+
 				// Call the LOAD chat deletion endpoint
 				const { chatApi } = await import("@/app-api/chatApi");
 				await chatApi.deleteLoadChat(chatRoom.loadId || "");
@@ -50,12 +52,14 @@ export default function DeleteChatConfirmModal({
 				// For group chats, non-admin users should leave the chat (remove themselves)
 				removeParticipant({
 					chatRoomId: chatRoom.id,
-					participantId: currentUser.id
+					participantId: currentUser.id,
 				});
+				state.removeChatRoom(chatRoom.id);
 			} else {
 				// For direct chats or admin deleting group chat, use the existing delete API
 				const { chatApi } = await import("@/app-api/chatApi");
 				await chatApi.deleteChatRoom(chatRoom.id);
+				state.removeChatRoom(chatRoom.id);
 			}
 
 			if (chatRoom.type === "LOAD") {
@@ -70,13 +74,6 @@ export default function DeleteChatConfirmModal({
 					.catch(() => {});
 			}
 
-			// Clear current chat room if it was the deleted one
-			const { useChatStore } = await import("@/stores/chatStore");
-			const state = useChatStore.getState();
-			if (state.currentChatRoom?.id === chatRoom.id) {
-				state.setCurrentChatRoom(null);
-			}
-			
 			onDeleteSuccess?.();
 			onClose();
 		} catch (error) {
@@ -143,7 +140,9 @@ export default function DeleteChatConfirmModal({
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			// For direct chats, show the other participant's name
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
-			return otherParticipant ? `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}` : "Direct Chat";
+			return otherParticipant
+				? `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`
+				: "Direct Chat";
 		}
 
 		return chatRoom.name || "Group Chat";
@@ -165,8 +164,7 @@ export default function DeleteChatConfirmModal({
 				<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
 					{chatRoom?.type === "GROUP" && chatRoom?.adminId !== currentUser?.id
 						? `Leave ${getChatTypeText()}`
-						: `Delete ${getChatTypeText()}`
-					}
+						: `Delete ${getChatTypeText()}`}
 				</h3>
 
 				{/* Chat name */}
