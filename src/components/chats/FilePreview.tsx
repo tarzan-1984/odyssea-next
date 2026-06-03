@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
+import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 
 /** Rotate left (counter-clockwise) — bundled icon for image modal toolbar */
 function RotateCcwIcon({ className }: { className?: string }) {
@@ -127,6 +128,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 	const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
+	const [isDownloading, setIsDownloading] = useState(false);
 	const [convertedImageUrl, setConvertedImageUrl] = useState<string | null>(null);
 	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
 	const [modalImageScale, setModalImageScale] = useState(1);
@@ -144,10 +146,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			if (!viewport || !nat.w || !nat.h) return;
 
 			const vw = viewport.clientWidth;
-			const vh = Math.max(
-				120,
-				viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX
-			);
+			const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
 			const fit = computeModalFitScale(nat.w, nat.h, vw, vh, rotationDeg);
 			setModalImageScale(fit);
 			setModalZoomUsesPixelSizing(true);
@@ -176,12 +175,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			applyModalFitToViewport(modalImgNaturalSize, modalImageRotationDeg);
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [
-		isImageModalOpen,
-		modalImgNaturalSize,
-		modalImageRotationDeg,
-		applyModalFitToViewport,
-	]);
+	}, [isImageModalOpen, modalImgNaturalSize, modalImageRotationDeg, applyModalFitToViewport]);
 
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
@@ -409,16 +403,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							setIsImageModalOpen(true);
 						}}
 					>
-						{isLoading && (
-							<div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg z-10">
-								<div className="flex flex-col items-center gap-2">
-									<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-									<p className="text-xs text-gray-600 dark:text-gray-400">
-										Converting HEIC...
-									</p>
-								</div>
-							</div>
-						)}
+						{isLoading && <HeicConvertingOverlay />}
 						{previewContent && (
 							<img
 								src={previewContent}
@@ -447,7 +432,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							compact ? "h-24" : "h-32"
 						} bg-gray-50 dark:bg-gray-800 rounded px-1 text-center`}
 					>
-						<p className={`text-gray-600 dark:text-gray-400 ${compact ? "text-[10px]" : "text-sm"}`}>
+						<p
+							className={`text-gray-600 dark:text-gray-400 ${compact ? "text-[10px]" : "text-sm"}`}
+						>
 							Preview not available
 						</p>
 					</div>
@@ -489,18 +476,35 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					</div>
 
 					{/* Preview Content */}
-					<div className="p-2">{renderPreview()}</div>
+					<div className="relative p-2">
+						{renderPreview()}
+						{isDownloading &&
+							(fileExtension === "heic" || fileExtension === "heif") && (
+								<HeicConvertingOverlay className="z-20 rounded-none" />
+							)}
+					</div>
 
 					{/* Download Button */}
 					<div className="p-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
 						<button
+							type="button"
+							disabled={isDownloading}
 							onClick={async e => {
 								e.preventDefault();
 								e.stopPropagation();
-								const { downloadChatFile } = await import("@/utils/downloadChatFile");
-								await downloadChatFile(fileUrl, fileName);
+								const { downloadChatFile } = await import(
+									"@/utils/downloadChatFile"
+								);
+								try {
+									await downloadChatFile(fileUrl, fileName, {
+										onConvertingStart: () => setIsDownloading(true),
+										onConvertingEnd: () => setIsDownloading(false),
+									});
+								} catch {
+									setIsDownloading(false);
+								}
 							}}
-							className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors"
+							className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<svg
 								className="w-4 h-4"
@@ -548,10 +552,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								if (!nat?.w || !nat?.h) return;
 								setModalZoomUsesPixelSizing(true);
 								setModalImageScale(s =>
-									Math.min(
-										MODAL_IMAGE_ZOOM_MAX,
-										s * MODAL_IMAGE_ZOOM_STEP
-									)
+									Math.min(MODAL_IMAGE_ZOOM_MAX, s * MODAL_IMAGE_ZOOM_STEP)
 								);
 							}}
 							className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 disabled:pointer-events-none disabled:opacity-40 sm:h-8 sm:w-8"
@@ -573,10 +574,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								if (!nat?.w || !nat?.h) return;
 								setModalZoomUsesPixelSizing(true);
 								setModalImageScale(s =>
-									Math.max(
-										MODAL_IMAGE_ZOOM_MIN,
-										s / MODAL_IMAGE_ZOOM_STEP
-									)
+									Math.max(MODAL_IMAGE_ZOOM_MIN, s / MODAL_IMAGE_ZOOM_STEP)
 								);
 							}}
 							className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 disabled:pointer-events-none disabled:opacity-40 sm:h-8 sm:w-8"
@@ -588,28 +586,28 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					{/* Top toolbar — shrink-0 row is transparent to clicks except rotate buttons */}
 					<div className="pointer-events-none flex shrink-0 justify-center px-4 pb-2 pt-3 sm:pb-2 sm:pt-4">
 						<div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
-						<button
-							type="button"
-							aria-label="Rotate image counter-clockwise"
-							onClick={e => {
-								e.stopPropagation();
-								setModalImageRotationDeg(d => ((d - 90) % 360 + 360) % 360);
-							}}
-							className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 sm:h-8 sm:w-8"
-						>
-							<RotateCcwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
-						</button>
-						<button
-							type="button"
-							aria-label="Rotate image clockwise"
-							onClick={e => {
-								e.stopPropagation();
-								setModalImageRotationDeg(d => (d + 90) % 360);
-							}}
-							className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 sm:h-8 sm:w-8"
-						>
-							<RotateCwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
-						</button>
+							<button
+								type="button"
+								aria-label="Rotate image counter-clockwise"
+								onClick={e => {
+									e.stopPropagation();
+									setModalImageRotationDeg(d => (((d - 90) % 360) + 360) % 360);
+								}}
+								className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 sm:h-8 sm:w-8"
+							>
+								<RotateCcwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
+							</button>
+							<button
+								type="button"
+								aria-label="Rotate image clockwise"
+								onClick={e => {
+									e.stopPropagation();
+									setModalImageRotationDeg(d => (d + 90) % 360);
+								}}
+								className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 sm:h-8 sm:w-8"
+							>
+								<RotateCwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
+							</button>
 						</div>
 					</div>
 
@@ -622,15 +620,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							ref={modalImageViewportRef}
 							className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8"
 						>
-							{/* Loader for HEIC conversion */}
 							{isModalImageLoading &&
 								(fileExtension === "heic" || fileExtension === "heif") && (
-									<div className="absolute inset-4 flex items-center justify-center z-20 bg-black/50 rounded-lg sm:inset-8">
-										<div className="flex flex-col items-center gap-3">
-											<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-											<p className="text-sm text-white">Converting HEIC...</p>
-										</div>
-									</div>
+									<HeicConvertingOverlay variant="modal" />
 								)}
 
 							{/* Image */}
@@ -646,10 +638,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 									style={{
 										...(modalImgNaturalSize
 											? {
-													width:
-														modalImgNaturalSize.w * modalImageScale,
-													height:
-														modalImgNaturalSize.h * modalImageScale,
+													width: modalImgNaturalSize.w * modalImageScale,
+													height: modalImgNaturalSize.h * modalImageScale,
 												}
 											: {}),
 										transform: `rotate(${modalImageRotationDeg}deg)`,
@@ -666,10 +656,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 											};
 											setModalImgNaturalSize(nat);
 											requestAnimationFrame(() => {
-												applyModalFitToViewport(
-													nat,
-													modalImageRotationDeg
-												);
+												applyModalFitToViewport(nat, modalImageRotationDeg);
 											});
 										}
 										if (target.complete && target.naturalHeight !== 0) {
