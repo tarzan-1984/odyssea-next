@@ -17,6 +17,7 @@ import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
+import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
 // WebSocket context interface
@@ -180,12 +181,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// WebSocket URL from environment variables
 	const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
 
-	// Debug logging for URL (only once on mount)
 	const [urlLogged, setUrlLogged] = useState(false);
-	if (process.env.NODE_ENV === "development" && !urlLogged) {
-		//console.log("WebSocket URL:", wsUrl);
-		setUrlLogged(true);
-	}
+	useEffect(() => {
+		if (process.env.NODE_ENV === "development" && !urlLogged) {
+			setUrlLogged(true);
+		}
+	}, [urlLogged]);
 
 	const connect = () => {
 		// Only connect if we have a current user
@@ -814,35 +815,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			// Successfully left chat room
 		});
 
-		// Handle bulk messages marked as read
+		// Handle bulk messages marked as read (batched to avoid nested React update loops)
 		newSocket.on(
 			"messagesMarkedAsRead",
 			(data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
-				const state = useChatStore.getState();
-				const didUpdate = state.applyMessagesMarkedAsRead(data);
-				if (!didUpdate) {
-					return;
-				}
-
-				// Sync read receipts to IndexedDB only when store data actually changed
-				const messagesAfter = useChatStore.getState().messages;
-				data.messageIds.forEach(messageId => {
-					const message = messagesAfter.find(m => m.id === messageId);
-					if (!message) {
-						return;
-					}
-					indexedDBChatService
-						.updateMessage(messageId, {
-							isRead: true,
-							readBy: message.readBy,
-						})
-						.catch((error: Error) => {
-							console.error(
-								"Failed to update message as read in IndexedDB:",
-								error
-							);
-						});
-				});
+				queueMessagesMarkedAsRead(data);
 			}
 		);
 

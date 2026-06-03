@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
-import { ChatRoom, Message, User } from "@/app-api/chatApi";
+import { ChatRoom, Message, User, isMessageReadByUser } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeMessageLists } from "@/utils/chatMessagesMerge";
 import { useUserStore } from "./userStore";
@@ -90,6 +90,12 @@ interface ChatState {
 		messageIds: string[];
 		userId: string;
 	}) => boolean;
+	/** Apply multiple read events in one store update (avoids update loops on "Read all"). */
+	applyBulkMessagesMarkedAsRead: (
+		events: { chatRoomId: string; messageIds: string[]; userId: string }[]
+	) => boolean;
+	/** Optimistic local sync when user clicks "Read all" before WebSocket events arrive. */
+	markChatRoomsAsReadLocally: (chatRoomIds: string[]) => void;
 	addMessage: (message: Message) => void;
 	updateMessage: (messageId: string, updates: Partial<Message>) => void;
 	prependMessages: (messages: Message[]) => void;
@@ -278,27 +284,47 @@ export const useChatStore = create<ChatState>()(
 					set({ messages, error: null }, false, "setMessages");
 				},
 
-				applyMessagesMarkedAsRead: data => {
+				applyBulkMessagesMarkedAsRead: events => {
+					if (events.length === 0) {
+						return false;
+					}
+
 					const { messages, chatRooms } = get();
 					const currentUserId = useUserStore.getState().currentUser?.id;
-					const messageIdSet = new Set(data.messageIds);
-					let messagesChanged = false;
 
+					const readByUserId = new Map<string, string>();
+					const roomsToClearUnread = new Set<string>();
+
+					for (const event of events) {
+						if (
+							currentUserId &&
+							event.userId === currentUserId &&
+							event.chatRoomId
+						) {
+							roomsToClearUnread.add(event.chatRoomId);
+						}
+						for (const messageId of event.messageIds) {
+							readByUserId.set(messageId, event.userId);
+						}
+					}
+
+					let messagesChanged = false;
 					const nextMessages =
-						messageIdSet.size === 0
+						readByUserId.size === 0
 							? messages
 							: messages.map(msg => {
-									if (!messageIdSet.has(msg.id)) {
+									const userId = readByUserId.get(msg.id);
+									if (!userId) {
 										return msg;
 									}
-									const currentReadBy = msg.readBy || [];
-									if (currentReadBy.includes(data.userId) && msg.isRead) {
+									if (isMessageReadByUser(msg, userId) && msg.isRead !== false) {
 										return msg;
 									}
 									messagesChanged = true;
-									const updatedReadBy = currentReadBy.includes(data.userId)
+									const currentReadBy = msg.readBy || [];
+									const updatedReadBy = currentReadBy.includes(userId)
 										? currentReadBy
-										: [...currentReadBy, data.userId];
+										: [...currentReadBy, userId];
 									return {
 										...msg,
 										isRead: true,
@@ -308,23 +334,19 @@ export const useChatStore = create<ChatState>()(
 
 					let roomsChanged = false;
 					const nextRooms = chatRooms.map(room => {
-						if (room.id !== data.chatRoomId || data.userId !== currentUserId) {
+						if (!roomsToClearUnread.has(room.id)) {
 							return room;
 						}
-						const newUnreadCount = Math.max(
-							0,
-							(room.unreadCount ?? 0) - data.messageIds.length
-						);
-						if (newUnreadCount === (room.unreadCount ?? 0)) {
+						if ((room.unreadCount ?? 0) === 0) {
 							return room;
 						}
 						roomsChanged = true;
 						indexedDBChatService
-							.updateChatRoom(room.id, { unreadCount: newUnreadCount })
+							.updateChatRoom(room.id, { unreadCount: 0 })
 							.catch((error: Error) => {
 								console.error("Failed to update chat room in IndexedDB:", error);
 							});
-						return { ...room, unreadCount: newUnreadCount };
+						return { ...room, unreadCount: 0 };
 					});
 
 					if (!messagesChanged && !roomsChanged) {
@@ -339,8 +361,33 @@ export const useChatStore = create<ChatState>()(
 						patch.chatRooms = sortChatRoomsByLastMessage(nextRooms);
 					}
 
-					set(patch, false, "applyMessagesMarkedAsRead");
+					set(patch, false, "applyBulkMessagesMarkedAsRead");
 					return true;
+				},
+
+				applyMessagesMarkedAsRead: data =>
+					get().applyBulkMessagesMarkedAsRead([data]),
+
+				markChatRoomsAsReadLocally: chatRoomIds => {
+					if (chatRoomIds.length === 0) {
+						return;
+					}
+					const currentUserId = useUserStore.getState().currentUser?.id;
+					if (!currentUserId) {
+						return;
+					}
+
+					const { messages } = get();
+					get().applyBulkMessagesMarkedAsRead(
+						chatRoomIds.map(chatRoomId => ({
+							chatRoomId,
+							messageIds: messages
+								.filter(m => m.chatRoomId === chatRoomId)
+								.filter(m => !isMessageReadByUser(m, currentUserId))
+								.map(m => m.id),
+							userId: currentUserId,
+						}))
+					);
 				},
 
 				addMessage: message => {
@@ -1009,6 +1056,8 @@ export const useChatActions = () =>
 		updateChatRoom: state.updateChatRoom,
 		setMessages: state.setMessages,
 		applyMessagesMarkedAsRead: state.applyMessagesMarkedAsRead,
+		applyBulkMessagesMarkedAsRead: state.applyBulkMessagesMarkedAsRead,
+		markChatRoomsAsReadLocally: state.markChatRoomsAsReadLocally,
 		addMessage: state.addMessage,
 		updateMessage: state.updateMessage,
 		prependMessages: state.prependMessages,

@@ -66,6 +66,7 @@ export default function ChatList({
 
 	const currentUser = useCurrentUser();
 	const updateChatRoom = useChatStore(s => s.updateChatRoom);
+	const markChatRoomsAsReadLocally = useChatStore(s => s.markChatRoomsAsReadLocally);
 
 	const showOffersTab = useMemo(() => {
 		const role = (currentUser?.role || "").trim().toUpperCase();
@@ -309,8 +310,10 @@ export default function ChatList({
 				return; // No unread messages
 			}
 
-			// Call the API to mark all messages as read
-			const result = await chatApi.markAllMessagesAsReadByChatRooms(unreadChatRoomIds);
+			// Optimistic UI: one store update instead of hundreds of WebSocket-driven updates
+			markChatRoomsAsReadLocally(unreadChatRoomIds);
+
+			await chatApi.markAllMessagesAsReadByChatRooms(unreadChatRoomIds);
 		} catch (error) {
 			console.error("Failed to mark all messages as read:", error);
 		}
