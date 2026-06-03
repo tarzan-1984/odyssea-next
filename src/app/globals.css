@@ -876,19 +876,38 @@ span.flatpickr-weekday,
 	animation: fadeOut 3s ease-in-out forwards;
 }
 
-/* Create offer icon: minimal up-down motion (car driving) */
+/* Create offer modal: car is position:absolute — animate left/bottom only (no layout impact) */
 @keyframes createOfferDrive {
 	0%,
 	100% {
-		transform: translateY(0);
+		left: 1.5rem;
+		bottom: 1.5rem;
 	}
 	50% {
-		transform: translateY(-2px);
+		left: 2.25rem;
+		bottom: 1.625rem;
 	}
 }
 
-.animate-create-offer-drive {
-	animation: createOfferDrive 0.5s ease-in-out infinite;
+@media (min-width: 640px) {
+	@keyframes createOfferDrive {
+		0%,
+		100% {
+			left: 2rem;
+			bottom: 1.5rem;
+		}
+		50% {
+			left: 2.75rem;
+			bottom: 1.625rem;
+		}
+	}
+}
+
+.create-offer-drive-icon {
+	position: absolute;
+	z-index: 10;
+	pointer-events: none;
+	animation: createOfferDrive 0.6s ease-in-out infinite;
 }
 
 /* Code Editor */

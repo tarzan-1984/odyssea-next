@@ -19,7 +19,6 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
-
 export interface CreateOfferModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -79,7 +78,6 @@ function isValidLocationFormat(value: string): boolean {
 
 const LOCATION_FORMAT_ERROR = "Use format: City, State (e.g. Los Angeles, CA) or ZIP code";
 
-
 /** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
 	row,
@@ -121,7 +119,10 @@ function DraggableExtraRow({
 	const [{ isOver, dragIndex }, drop] = useDrop({
 		accept: DND_EXTRA_ROW_TYPE,
 		collect: monitor => {
-			const item = monitor.getItem() as { index: number; type?: "pickup" | "delivery" } | null;
+			const item = monitor.getItem() as {
+				index: number;
+				type?: "pickup" | "delivery";
+			} | null;
 			return {
 				isOver: monitor.isOver(),
 				dragIndex: item?.index ?? null,
@@ -185,22 +186,20 @@ function DraggableExtraRow({
 				/>
 			)}
 
-		{/* Drag handle — only shown when there are more than 2 rows */}
-		{rowCount > 2 && (
-			<div
-				ref={handleRef}
-				className="hidden sm:flex items-center justify-center self-end w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:border-gray-400 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:border-gray-500 transition-colors shrink-0"
-				aria-label="Drag to reorder"
-			>
-				<DragHandleIcon />
-			</div>
-		)}
+			{/* Drag handle — only shown when there are more than 2 rows */}
+			{rowCount > 2 && (
+				<div
+					ref={handleRef}
+					className="hidden sm:flex items-center justify-center self-end w-11 h-11 rounded-lg border border-gray-300 dark:border-gray-700 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:border-gray-400 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:border-gray-500 transition-colors shrink-0"
+					aria-label="Drag to reorder"
+				>
+					<DragHandleIcon />
+				</div>
+			)}
 
 			{/* Location field */}
 			<div className="flex-1 min-w-0 relative">
-				<Label>
-					{row.type === "pickup" ? "Pick up location" : "Delivery location"}
-				</Label>
+				<Label>{row.type === "pickup" ? "Pick up location" : "Delivery location"}</Label>
 				<Input
 					type="text"
 					value={row.location}
@@ -210,9 +209,7 @@ function DraggableExtraRow({
 					}}
 					onBlur={() => onAddressBlur?.(index, row.location, row.id)}
 					placeholder={
-						row.type === "pickup"
-							? "Enter pick up location"
-							: "Enter delivery location"
+						row.type === "pickup" ? "Enter pick up location" : "Enter delivery location"
 					}
 					className="dark:bg-gray-900"
 					error={Boolean(locationError)}
@@ -227,27 +224,31 @@ function DraggableExtraRow({
 			{/* Time field + remove button grouped together */}
 			<div className="flex items-end gap-2 shrink-0">
 				<div className="flex-1 min-w-0 sm:min-w-[13.5rem] sm:max-w-[16rem]">
-				<DateTimePicker
-					id={`datetime-${row.id}`}
-					label={row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
-					value={row.time}
-					onChange={(v) => updateExtraRow(index, "time", v)}
-					onBlur={onTimeBlur}
-					className="dark:bg-gray-900"
-				/>
+					<DateTimePicker
+						id={`datetime-${row.id}`}
+						label={
+							row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"
+						}
+						value={row.time}
+						onChange={v => updateExtraRow(index, "time", v)}
+						onBlur={onTimeBlur}
+						className="dark:bg-gray-900"
+					/>
 				</div>
-			{canRemove && (
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
-					onClick={() => removeExtraRow(index)}
-					aria-label={row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"}
-				>
-					−
-				</Button>
-			)}
+				{canRemove && (
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+						onClick={() => removeExtraRow(index)}
+						aria-label={
+							row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"
+						}
+					>
+						−
+					</Button>
+				)}
 			</div>
 		</div>
 	);
@@ -349,15 +350,18 @@ export default function CreateOfferModal({
 		setCommittedLocations(locs);
 	}, []);
 
-	const removeExtraRow = useCallback((index: number) => {
-		setRouteRows(prev => {
-			const next = prev.filter((_, i) => i !== index);
-			// After removing, commit the remaining rows immediately.
-			// If all are filled and valid, useQuery will use cache or fire a new request.
-			commitLocations(next);
-			return next;
-		});
-	}, [commitLocations]);
+	const removeExtraRow = useCallback(
+		(index: number) => {
+			setRouteRows(prev => {
+				const next = prev.filter((_, i) => i !== index);
+				// After removing, commit the remaining rows immediately.
+				// If all are filled and valid, useQuery will use cache or fire a new request.
+				commitLocations(next);
+				return next;
+			});
+		},
+		[commitLocations]
+	);
 
 	// Ref to store target index during drag; move happens only on drop
 	const pendingDropRef = useRef<number | null>(null);
@@ -386,28 +390,28 @@ export default function CreateOfferModal({
 				return next;
 			});
 
-		// Geocode ZIP or "City, ST" abbreviation to "City, State (ZIP)" format, then commit
-		const needsGeocode =
-			ZIP_PATTERN.test(trimmed.replace(/\s/g, "")) ||
-			CITY_STATE_ABBR_PATTERN.test(trimmed);
-		let finalRows: RouteRow[] | null = null;
-		if (needsGeocode) {
-			try {
-				const formatted = await offers.geocodeToFormattedAddress(trimmed);
-				if (formatted && formatted !== trimmed) {
-					setRouteRows(prev => {
-						const next = [...prev];
-						if (next[index]) {
-							next[index] = { ...next[index], location: formatted };
-						}
-						finalRows = next;
-						return next;
-					});
+			// Geocode ZIP or "City, ST" abbreviation to "City, State (ZIP)" format, then commit
+			const needsGeocode =
+				ZIP_PATTERN.test(trimmed.replace(/\s/g, "")) ||
+				CITY_STATE_ABBR_PATTERN.test(trimmed);
+			let finalRows: RouteRow[] | null = null;
+			if (needsGeocode) {
+				try {
+					const formatted = await offers.geocodeToFormattedAddress(trimmed);
+					if (formatted && formatted !== trimmed) {
+						setRouteRows(prev => {
+							const next = [...prev];
+							if (next[index]) {
+								next[index] = { ...next[index], location: formatted };
+							}
+							finalRows = next;
+							return next;
+						});
+					}
+				} catch {
+					// Keep original value on error
 				}
-			} catch {
-				// Keep original value on error
 			}
-		}
 
 			// Commit after geocoding resolves (or immediately if no geocoding)
 			// Use a microtask so setRouteRows state is flushed before reading it
@@ -581,213 +585,238 @@ export default function CreateOfferModal({
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
-			className="relative w-full max-w-3xl max-h-[95vh] overflow-y-auto p-6 sm:p-8 m-5 sm:m-0 rounded-3xl bg-white dark:bg-gray-900 shadow-sm"
+			containScroll
+			className="relative m-5 flex w-full max-w-3xl max-h-[95vh] flex-col overflow-hidden rounded-3xl bg-white p-0 shadow-sm dark:bg-gray-900 sm:m-0"
 		>
-			<form onSubmit={handleSubmit} className="space-y-5">
-				<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-					Create Offer
-				</h4>
-
-				{/* Hidden: externalId */}
-				<input type="hidden" name="externalId" value={externalId} readOnly />
-
-				{/* Hidden: selected driver IDs (comma-separated) */}
-				<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
-
-				{/* Route rows: first Pick up, then any intermediate points, last Delivery — all draggable */}
-				<DndProvider backend={HTML5Backend}>
-					{routeRows.map((row, index) => (
-					<DraggableExtraRow
-						key={row.id}
-						row={row}
-						index={index}
-						updateExtraRow={updateExtraRow}
-						removeExtraRow={removeExtraRow}
-						moveRow={moveExtraRow}
-						pendingDropRef={pendingDropRef}
-						onAddressBlur={handleAddressBlur}
-						onLocationChange={rowId =>
-							setRouteRowLocationErrors(prev => {
-								const next = { ...prev };
-								delete next[rowId];
-								return next;
-							})
-						}
-					locationError={routeRowLocationErrors[row.id]}
-						canRemove={
-							(row.type === "pickup" &&
-								routeRows.filter(r => r.type === "pickup").length > 1) ||
-							(row.type === "delivery" &&
-								routeRows.filter(r => r.type === "delivery").length > 1)
-						}
-						rowCount={routeRows.length}
-					/>
-					))}
-				</DndProvider>
-
-				{/* Loaded miles (left, 50%) and Add Pick Up / Add Delivery buttons (right) */}
-				<div className="flex items-end gap-3 mt-2">
-					<div className="relative w-1/2 min-w-0">
-						<Label htmlFor="loaded-miles-field">Loaded miles</Label>
-						<div className="relative">
-							<Input
-								id="loaded-miles-field"
-								type="text"
-								readOnly
-								value={
-									loadedMiles != null
-										? Number.isFinite(loadedMiles)
-											? String(Math.round(loadedMiles))
-											: ""
-										: ""
-								}
-								placeholder="Fill all addresses and blur to calculate"
-								className="cursor-not-allowed"
-							/>
-							{isCalculatingRoute && (
-								<div
-									className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-gray-900/80"
-									aria-hidden
-								>
-									<SpinnerOne />
-								</div>
-							)}
-						</div>
-					</div>
-					<div className="flex gap-2 w-1/2 min-w-0">
-						<Button
-							type="button"
-							variant="primary"
-							className="h-11 flex-1 !py-0"
-							onClick={addPickUpRow}
-						>
-							Add Pick Up
-						</Button>
-						<Button
-							type="button"
-							variant="primary"
-							className="h-11 flex-1 !py-0"
-							onClick={addDeliveryRow}
-						>
-							Add Delivery
-						</Button>
-					</div>
-				</div>
-
-			{routeDistanceError && (
-				<p className="text-sm text-red-500 dark:text-red-400">{routeDistanceError}</p>
-			)}
-			{routeError && (
-				<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
-			)}
-
-				{/* Row 4: Weight, Commodity */}
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<div>
-						<Label>Weight</Label>
-						<Input
-							type="text"
-							value={formValues.weight}
-							onChange={e => handleChange("weight", e.target.value)}
-							placeholder="e.g. 1,000 lbs"
-							className="dark:bg-gray-900"
-							error={!!errors.weight}
-							hint={errors.weight}
+			<form
+				onSubmit={handleSubmit}
+				className="relative flex max-h-[95vh] min-h-0 flex-col overflow-hidden"
+			>
+				{isSubmitting && (
+					<div className="create-offer-drive-icon" aria-hidden>
+						<Image
+							src={createOfferIcon}
+							alt=""
+							width={127}
+							height={99}
+							className="object-contain"
 						/>
 					</div>
-					<div>
-						<Label>Commodity</Label>
-						<Input
-							type="text"
-							value={formValues.commodity}
-							onChange={e => handleChange("commodity", e.target.value)}
-							placeholder="Enter commodity"
-							className="dark:bg-gray-900"
-						/>
-					</div>
-				</div>
-
-				{/* Row 5: Special requirements (full width) */}
-				<div className="w-full">
-					<div className="flex flex-col gap-1">
-						<MultiSelect
-							label="Special requirements"
-							options={[
-								{ value: "hazmat", text: "Hazmat", selected: false },
-								{ value: "tanker-end", text: "Tanker End", selected: false },
-								{ value: "driver-assist", text: "Driver assist", selected: false },
-								{ value: "liftgate", text: "Liftgate", selected: false },
-								{ value: "pallet-jack", text: "Pallet Jack", selected: false },
-								{ value: "dock-high", text: "Dock High", selected: false },
-								{ value: "true-team", text: "True team", selected: false },
-								{ value: "fake-team", text: "Fake team", selected: false },
-								{ value: "tsa", text: "TSA", selected: false },
-								{ value: "twic", text: "TWIC", selected: false },
-								{ value: "airport", text: "Airport", selected: false },
-								{ value: "round-trip", text: "Round trip", selected: false },
-								{ value: "alcohol", text: "Alcohol", selected: false },
-								{
-									value: "temperature-control",
-									text: "Temperature control",
-									selected: false,
-								},
-								{ value: "ace", text: "ACE", selected: false },
-								{ value: "aci", text: "ACI", selected: false },
-								{ value: "mexico", text: "Mexico", selected: false },
-								{ value: "military-base", text: "Military base", selected: false },
-								{
-									value: "blind-shipment",
-									text: "Blind shipment",
-									selected: false,
-								},
-								{ value: "partial", text: "Partial", selected: false },
-								{
-									value: "white-glove-service",
-									text: "White glove service",
-									selected: false,
-								},
-								{
-									value: "high-value-freight",
-									text: "High value freight",
-									selected: false,
-								},
-								{ value: "fragile", text: "Fragile", selected: false },
-								{ value: "hemp-product", text: "Hemp product", selected: false },
-							]}
-							defaultSelected={formValues.specialRequirements}
-							onChange={values => handleChange("specialRequirements", values)}
-							triggerClassName="min-h-11 py-2"
-						/>
-					</div>
-				</div>
-
-				{/* Notes */}
-				<div className="w-full">
-					<Label>Notes</Label>
-					<TextArea
-						rows={2}
-						value={formValues.notes}
-						onChange={v => handleChange("notes", v)}
-						placeholder="Enter notes"
-						className="w-full dark:bg-gray-900"
-					/>
-				</div>
-
-				{submitError && (
-					<p className="text-sm text-red-500 dark:text-red-400">{submitError}</p>
 				)}
-				<div className="relative flex items-center justify-end gap-3 pt-4">
-					{isSubmitting && (
-						<div className="animate-create-offer-drive absolute left-0 top-1/2 -translate-y-1/2 flex items-center">
-							<Image
-								src={createOfferIcon}
-								alt=""
-								width={127}
-								height={99}
-								className="object-contain"
+				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-6 [scrollbar-gutter:stable] sm:p-8">
+					<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+						Create Offer
+					</h4>
+
+					{/* Hidden: externalId */}
+					<input type="hidden" name="externalId" value={externalId} readOnly />
+
+					{/* Hidden: selected driver IDs (comma-separated) */}
+					<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
+
+					{/* Route rows: first Pick up, then any intermediate points, last Delivery — all draggable */}
+					<DndProvider backend={HTML5Backend}>
+						{routeRows.map((row, index) => (
+							<DraggableExtraRow
+								key={row.id}
+								row={row}
+								index={index}
+								updateExtraRow={updateExtraRow}
+								removeExtraRow={removeExtraRow}
+								moveRow={moveExtraRow}
+								pendingDropRef={pendingDropRef}
+								onAddressBlur={handleAddressBlur}
+								onLocationChange={rowId =>
+									setRouteRowLocationErrors(prev => {
+										const next = { ...prev };
+										delete next[rowId];
+										return next;
+									})
+								}
+								locationError={routeRowLocationErrors[row.id]}
+								canRemove={
+									(row.type === "pickup" &&
+										routeRows.filter(r => r.type === "pickup").length > 1) ||
+									(row.type === "delivery" &&
+										routeRows.filter(r => r.type === "delivery").length > 1)
+								}
+								rowCount={routeRows.length}
+							/>
+						))}
+					</DndProvider>
+
+					{/* Loaded miles (left, 50%) and Add Pick Up / Add Delivery buttons (right) */}
+					<div className="flex items-end gap-3 mt-2">
+						<div className="relative w-1/2 min-w-0">
+							<Label htmlFor="loaded-miles-field">Loaded miles</Label>
+							<div className="relative">
+								<Input
+									id="loaded-miles-field"
+									type="text"
+									readOnly
+									value={
+										loadedMiles != null
+											? Number.isFinite(loadedMiles)
+												? String(Math.round(loadedMiles))
+												: ""
+											: ""
+									}
+									placeholder="Fill all addresses and blur to calculate"
+									className="cursor-not-allowed"
+								/>
+								{isCalculatingRoute && (
+									<div
+										className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-gray-900/80"
+										aria-hidden
+									>
+										<SpinnerOne />
+									</div>
+								)}
+							</div>
+						</div>
+						<div className="flex gap-2 w-1/2 min-w-0">
+							<Button
+								type="button"
+								variant="primary"
+								className="h-11 flex-1 !py-0"
+								onClick={addPickUpRow}
+							>
+								Add Pick Up
+							</Button>
+							<Button
+								type="button"
+								variant="primary"
+								className="h-11 flex-1 !py-0"
+								onClick={addDeliveryRow}
+							>
+								Add Delivery
+							</Button>
+						</div>
+					</div>
+
+					{routeDistanceError && (
+						<p className="text-sm text-red-500 dark:text-red-400">
+							{routeDistanceError}
+						</p>
+					)}
+					{routeError && (
+						<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
+					)}
+
+					{/* Row 4: Weight, Commodity */}
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<Label>Weight</Label>
+							<Input
+								type="text"
+								value={formValues.weight}
+								onChange={e => handleChange("weight", e.target.value)}
+								placeholder="e.g. 1,000 lbs"
+								className="dark:bg-gray-900"
+								error={!!errors.weight}
+								hint={errors.weight}
 							/>
 						</div>
+						<div>
+							<Label>Commodity</Label>
+							<Input
+								type="text"
+								value={formValues.commodity}
+								onChange={e => handleChange("commodity", e.target.value)}
+								placeholder="Enter commodity"
+								className="dark:bg-gray-900"
+							/>
+						</div>
+					</div>
+
+					{/* Row 5: Special requirements (full width) */}
+					<div className="w-full">
+						<div className="flex flex-col gap-1">
+							<MultiSelect
+								label="Special requirements"
+								options={[
+									{ value: "hazmat", text: "Hazmat", selected: false },
+									{ value: "tanker-end", text: "Tanker End", selected: false },
+									{
+										value: "driver-assist",
+										text: "Driver assist",
+										selected: false,
+									},
+									{ value: "liftgate", text: "Liftgate", selected: false },
+									{ value: "pallet-jack", text: "Pallet Jack", selected: false },
+									{ value: "dock-high", text: "Dock High", selected: false },
+									{ value: "true-team", text: "True team", selected: false },
+									{ value: "fake-team", text: "Fake team", selected: false },
+									{ value: "tsa", text: "TSA", selected: false },
+									{ value: "twic", text: "TWIC", selected: false },
+									{ value: "airport", text: "Airport", selected: false },
+									{ value: "round-trip", text: "Round trip", selected: false },
+									{ value: "alcohol", text: "Alcohol", selected: false },
+									{
+										value: "temperature-control",
+										text: "Temperature control",
+										selected: false,
+									},
+									{ value: "ace", text: "ACE", selected: false },
+									{ value: "aci", text: "ACI", selected: false },
+									{ value: "mexico", text: "Mexico", selected: false },
+									{
+										value: "military-base",
+										text: "Military base",
+										selected: false,
+									},
+									{
+										value: "blind-shipment",
+										text: "Blind shipment",
+										selected: false,
+									},
+									{ value: "partial", text: "Partial", selected: false },
+									{
+										value: "white-glove-service",
+										text: "White glove service",
+										selected: false,
+									},
+									{
+										value: "high-value-freight",
+										text: "High value freight",
+										selected: false,
+									},
+									{ value: "fragile", text: "Fragile", selected: false },
+									{
+										value: "hemp-product",
+										text: "Hemp product",
+										selected: false,
+									},
+								]}
+								defaultSelected={formValues.specialRequirements}
+								onChange={values => handleChange("specialRequirements", values)}
+								triggerClassName="min-h-11 py-2"
+							/>
+						</div>
+					</div>
+
+					{/* Notes */}
+					<div className="w-full">
+						<Label>Notes</Label>
+						<TextArea
+							rows={2}
+							value={formValues.notes}
+							onChange={v => handleChange("notes", v)}
+							placeholder="Enter notes"
+							className="w-full dark:bg-gray-900"
+						/>
+					</div>
+
+					{submitError ? (
+						<p className="min-h-[1.25rem] text-sm text-red-500 dark:text-red-400">
+							{submitError}
+						</p>
+					) : (
+						<p className="min-h-[1.25rem] text-sm" aria-hidden="true" />
 					)}
+				</div>
+
+				<div className="flex shrink-0 items-center justify-end gap-3 px-6 pb-6 pt-4 sm:px-8 sm:pb-8">
 					<Button
 						type="button"
 						size="sm"
@@ -800,6 +829,7 @@ export default function CreateOfferModal({
 					<Button
 						type="submit"
 						size="sm"
+						className="min-w-[6.5rem]"
 						disabled={
 							isSubmitting ||
 							isCalculatingRoute ||

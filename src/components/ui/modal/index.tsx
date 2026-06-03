@@ -14,6 +14,8 @@ interface ModalProps {
 	closeOnBackdropClick?: boolean; // Close modal when clicking outside the content area
 	/** When false, Escape does not close this modal (useful when a nested modal handles Escape). */
 	closeOnEscape?: boolean;
+	/** When true, the viewport wrapper does not scroll (scroll inside modal content only). */
+	containScroll?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -26,6 +28,7 @@ export const Modal: React.FC<ModalProps> = ({
 	isFullscreen = false,
 	closeOnBackdropClick = false, // Default to false for backwards compatibility
 	closeOnEscape = true,
+	containScroll = false,
 }) => {
 	const modalRef = useRef<HTMLDivElement>(null);
 	const [mounted, setMounted] = useState(false);
@@ -69,7 +72,11 @@ export const Modal: React.FC<ModalProps> = ({
 		: "relative w-full rounded-3xl bg-white dark:bg-gray-900 shadow-sm";
 
 	const modalMarkup = (
-		<div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto p-4">
+		<div
+			className={`fixed inset-0 z-[99999] flex items-center justify-center p-4 ${
+				containScroll ? "overflow-hidden" : "overflow-y-auto"
+			}`}
+		>
 			{(!isFullscreen || closeOnBackdropClick) && (
 				<div
 					className="fixed inset-0 z-[99999] h-full w-full bg-primary/70 backdrop-blur-[3px]"
@@ -79,7 +86,7 @@ export const Modal: React.FC<ModalProps> = ({
 			<div
 				ref={modalRef}
 				className={`${contentClasses} ${className} relative z-[100000]`}
-				onClick={(e) => e.stopPropagation()}
+				onClick={e => e.stopPropagation()}
 			>
 				{showCloseButton && (
 					<button
