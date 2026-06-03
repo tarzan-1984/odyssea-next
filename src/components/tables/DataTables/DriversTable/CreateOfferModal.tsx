@@ -16,6 +16,7 @@ import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import createOfferIcon from "@/icons/create_offer_icon.png";
 import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
+import { parseOfferDateTimeField } from "@/utils/offerDateTimeRange";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -223,9 +224,10 @@ function DraggableExtraRow({
 
 			{/* Time field + remove button grouped together */}
 			<div className="flex items-end gap-2 shrink-0">
-				<div className="flex-1 min-w-0 sm:min-w-[13.5rem] sm:max-w-[16rem]">
+				<div className="w-full shrink-0 sm:w-[calc(16rem+10px)]">
 					<DateTimePicker
 						id={`datetime-${row.id}`}
+						allowTimeRange
 						label={
 							row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"
 						}
@@ -493,6 +495,14 @@ export default function CreateOfferModal({
 					);
 					if (invalidLocation) {
 						routeError = LOCATION_FORMAT_ERROR;
+					} else {
+						const invalidRange = trimmedRoute.some(row => {
+							const { start, end } = parseOfferDateTimeField(row.time);
+							return start && end && end.getTime() <= start.getTime();
+						});
+						if (invalidRange) {
+							routeError = "End time must be after start time";
+						}
 					}
 				}
 			}
