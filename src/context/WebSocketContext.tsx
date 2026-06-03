@@ -247,6 +247,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 							user: {
 								...p.user,
 								avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+								userColor: p.user?.userColor ?? null,
 							},
 						}))
 					: [],
@@ -926,6 +927,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 								user: {
 									...p.user,
 									avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+									userColor: p.user?.userColor ?? null,
 								},
 							}))
 						: [],
@@ -990,6 +992,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					user: {
 						...p.user,
 						avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+						userColor: p.user?.userColor ?? null,
 					},
 				}));
 

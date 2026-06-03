@@ -63,6 +63,7 @@ export const useChatSync = () => {
 				lastName: p.user.lastName,
 				avatar: p.user.profilePhoto ?? p.user.avatar ?? "",
 				role: p.user.role ?? "USER",
+				userColor: p.user.userColor ?? null,
 			},
 		}));
 	};

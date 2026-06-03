@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
+import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -246,12 +247,8 @@ export default function ChatListItem({
 			</div>
 
 			<div className="relative flex-shrink-0">
-				{chatRoom.type === "LOAD" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
-					<div
-						className="h-12 w-12 shrink-0 rounded-full"
-						style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-						aria-hidden
-					/>
+				{chatRoom.type === "LOAD" ? (
+					renderLoadChatAvatar(chatRoom, "w-12 h-12")
 				) : chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
 					<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
 						{(() => {
@@ -315,8 +312,8 @@ export default function ChatListItem({
 							}
 						}
 
-						// Fallback for GROUP/LOAD chats with avatar
-						if (chatRoom.avatar) {
+						// Fallback for GROUP chats with avatar
+						if (chatRoom.avatar && chatRoom.type !== "LOAD") {
 							return (
 								// eslint-disable-next-line @next/next/no-img-element
 								<img

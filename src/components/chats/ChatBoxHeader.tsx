@@ -8,6 +8,7 @@ import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon, LoadTrackingCha
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
+import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
@@ -170,26 +171,17 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								}
 							}
 
-							if (
-								(chatRoom.type === "GROUP" || chatRoom.type === "LOAD") &&
-								chatRoom.avatar
-							) {
+							if (chatRoom.type === "LOAD") {
+								return renderLoadChatAvatar(chatRoom, "w-12 h-12");
+							}
+
+							if (chatRoom.type === "GROUP" && chatRoom.avatar) {
 								return (
 									// eslint-disable-next-line @next/next/no-img-element
 									<img
 										src={chatRoom.avatar}
 										alt="avatar"
 										className="w-12 h-12 rounded-full object-cover"
-									/>
-								);
-							}
-
-							if (chatRoom.type === "LOAD") {
-								return (
-									<div
-										className="h-12 w-12 shrink-0 rounded-full"
-										style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-										aria-hidden
 									/>
 								);
 							}

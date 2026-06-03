@@ -6,6 +6,7 @@ import { ChatRoom, chatApi } from "@/app-api/chatApi";
 import { UserListItem } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
 import { renderAvatar, getRoleDisplayLabel, chatRoomPlaceholderBg } from "@/helpers";
+import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import usersApi from "@/app-api/users";
 import { useWebSocketChatRooms } from "@/hooks/useWebSocketChatRooms";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -384,6 +385,8 @@ export default function ChatParticipantsModal({
 										height={64}
 										className="w-16 h-16 rounded-full object-cover"
 									/>
+								) : chatRoom?.type === "LOAD" ? (
+									renderLoadChatAvatar(chatRoom, "w-16 h-16")
 								) : chatRoom?.avatar ? (
 									<Image
 										src={chatRoom.avatar}
@@ -392,7 +395,7 @@ export default function ChatParticipantsModal({
 										height={64}
 										className="w-16 h-16 rounded-full object-cover"
 									/>
-								) : (chatRoom?.type === "LOAD" || chatRoom?.type === "OFFER") ? (
+								) : chatRoom?.type === "OFFER" ? (
 									<div
 										className="h-16 w-16 shrink-0 rounded-full"
 										style={{
