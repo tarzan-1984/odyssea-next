@@ -818,8 +818,27 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// Handle bulk messages marked as read (batched to avoid nested React update loops)
 		newSocket.on(
 			"messagesMarkedAsRead",
-			(data: { chatRoomId: string; messageIds: string[]; userId: string }) => {
+			(data: {
+				chatRoomId: string;
+				messageIds: string[];
+				userId: string;
+				messages?: { id: string; readBy?: string[]; isRead?: boolean }[];
+			}) => {
 				queueMessagesMarkedAsRead(data);
+			}
+		);
+
+		// Read receipt for a single message — keep in WebSocketContext so senders always receive it
+		newSocket.on(
+			"messageRead",
+			(data: { messageId: string; readBy: string; chatRoomId?: string }) => {
+				if (!data?.messageId || !data?.readBy) {
+					return;
+				}
+				useChatStore.getState().applyMessageReadReceipt({
+					messageId: data.messageId,
+					readByUserId: data.readBy,
+				});
 			}
 		);
 
@@ -1088,8 +1107,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 	const joinChatRoom = useCallback(
 		(chatRoomId: string) => {
-			if (socket && isConnected) {
-				//socket.emit("joinChatRoom", { chatRoomId });
+			if (socket && isConnected && chatRoomId) {
+				socket.emit("joinChatRoom", { chatRoomId });
 			}
 		},
 		[socket, isConnected]

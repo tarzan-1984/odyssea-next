@@ -272,39 +272,13 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 		}
 	};
 
-	const handleDownload = async (fileUrl: string, fileName: string, messageId: string, e?: React.MouseEvent) => {
+	const handleDownload = async (fileUrl: string, fileName: string, _messageId: string, e?: React.MouseEvent) => {
 		if (e) {
 			e.preventDefault();
 			e.stopPropagation();
 		}
-		
-		try {
-			// Download file directly from cloud storage
-			const response = await fetch(fileUrl, {
-				method: 'GET',
-				mode: 'cors',
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to download file');
-			}
-
-			// Get the file blob
-			const blob = await response.blob();
-			
-			// Create download link
-			const url = window.URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.href = url;
-			link.download = fileName;
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-			window.URL.revokeObjectURL(url);
-		} catch (error) {
-			// Fallback: try to open in new tab
-			window.open(fileUrl, '_blank');
-		}
+		const { downloadChatFile } = await import("@/utils/downloadChatFile");
+		await downloadChatFile(fileUrl, fileName);
 	};
 
 

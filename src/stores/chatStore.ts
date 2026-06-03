@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { ChatRoom, Message, User, isMessageReadByUser } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
-import { mergeMessageLists } from "@/utils/chatMessagesMerge";
+import { mergeMessageLists, mergeReadByArrays } from "@/utils/chatMessagesMerge";
 import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin, unread, mute status, and last message date
@@ -92,8 +92,18 @@ interface ChatState {
 	}) => boolean;
 	/** Apply multiple read events in one store update (avoids update loops on "Read all"). */
 	applyBulkMessagesMarkedAsRead: (
-		events: { chatRoomId: string; messageIds: string[]; userId: string }[]
+		events: {
+			chatRoomId: string;
+			messageIds: string[];
+			userId: string;
+			messages?: { id: string; readBy?: string[]; isRead?: boolean }[];
+		}[]
 	) => boolean;
+	/** Single read receipt from `messageRead` WebSocket event. */
+	applyMessageReadReceipt: (data: {
+		messageId: string;
+		readByUserId: string;
+	}) => boolean;
 	/** Optimistic local sync when user clicks "Read all" before WebSocket events arrive. */
 	markChatRoomsAsReadLocally: (chatRoomIds: string[]) => void;
 	addMessage: (message: Message) => void;
@@ -292,7 +302,8 @@ export const useChatStore = create<ChatState>()(
 					const { messages, chatRooms } = get();
 					const currentUserId = useUserStore.getState().currentUser?.id;
 
-					const readByUserId = new Map<string, string>();
+					const readersToAdd = new Map<string, Set<string>>();
+					const readByFromServer = new Map<string, string[]>();
 					const roomsToClearUnread = new Set<string>();
 
 					for (const event of events) {
@@ -303,32 +314,51 @@ export const useChatStore = create<ChatState>()(
 						) {
 							roomsToClearUnread.add(event.chatRoomId);
 						}
+						for (const snapshot of event.messages ?? []) {
+							if (snapshot.id && snapshot.readBy?.length) {
+								readByFromServer.set(snapshot.id, snapshot.readBy);
+							}
+						}
 						for (const messageId of event.messageIds) {
-							readByUserId.set(messageId, event.userId);
+							if (!readersToAdd.has(messageId)) {
+								readersToAdd.set(messageId, new Set());
+							}
+							readersToAdd.get(messageId)!.add(event.userId);
 						}
 					}
 
 					let messagesChanged = false;
 					const nextMessages =
-						readByUserId.size === 0
+						readersToAdd.size === 0 && readByFromServer.size === 0
 							? messages
 							: messages.map(msg => {
-									const userId = readByUserId.get(msg.id);
-									if (!userId) {
+									const serverReadBy = readByFromServer.get(msg.id);
+									const addIds = readersToAdd.get(msg.id);
+									if (!serverReadBy && !addIds?.size) {
 										return msg;
 									}
-									if (isMessageReadByUser(msg, userId) && msg.isRead !== false) {
+
+									const mergedReadBy = serverReadBy
+										? mergeReadByArrays(msg.readBy, serverReadBy)
+										: mergeReadByArrays(
+												msg.readBy,
+												addIds ? [...addIds] : []
+											);
+
+									const prevReadBy = msg.readBy ?? [];
+									if (
+										msg.isRead !== false &&
+										mergedReadBy.length === prevReadBy.length &&
+										mergedReadBy.every(id => prevReadBy.includes(id))
+									) {
 										return msg;
 									}
+
 									messagesChanged = true;
-									const currentReadBy = msg.readBy || [];
-									const updatedReadBy = currentReadBy.includes(userId)
-										? currentReadBy
-										: [...currentReadBy, userId];
 									return {
 										...msg,
 										isRead: true,
-										readBy: updatedReadBy,
+										readBy: mergedReadBy,
 									};
 								});
 
@@ -367,6 +397,45 @@ export const useChatStore = create<ChatState>()(
 
 				applyMessagesMarkedAsRead: data =>
 					get().applyBulkMessagesMarkedAsRead([data]),
+
+				applyMessageReadReceipt: data => {
+					const { messages } = get();
+					const message = messages.find(m => m.id === data.messageId);
+					if (!message) {
+						return false;
+					}
+					if (
+						isMessageReadByUser(message, data.readByUserId) &&
+						message.isRead !== false
+					) {
+						return false;
+					}
+					const updatedReadBy = mergeReadByArrays(message.readBy, [
+						data.readByUserId,
+					]);
+					const updatedMessages = messages.map(msg =>
+						msg.id === data.messageId
+							? { ...msg, isRead: true, readBy: updatedReadBy }
+							: msg
+					);
+					set(
+						{ messages: updatedMessages, error: null },
+						false,
+						"applyMessageReadReceipt"
+					);
+					indexedDBChatService
+						.updateMessage(data.messageId, {
+							isRead: true,
+							readBy: updatedReadBy,
+						})
+						.catch((error: Error) => {
+							console.error(
+								"Failed to update message read receipt in IndexedDB:",
+								error
+							);
+						});
+					return true;
+				},
 
 				markChatRoomsAsReadLocally: chatRoomIds => {
 					if (chatRoomIds.length === 0) {
@@ -1057,6 +1126,7 @@ export const useChatActions = () =>
 		setMessages: state.setMessages,
 		applyMessagesMarkedAsRead: state.applyMessagesMarkedAsRead,
 		applyBulkMessagesMarkedAsRead: state.applyBulkMessagesMarkedAsRead,
+		applyMessageReadReceipt: state.applyMessageReadReceipt,
 		markChatRoomsAsReadLocally: state.markChatRoomsAsReadLocally,
 		addMessage: state.addMessage,
 		updateMessage: state.updateMessage,

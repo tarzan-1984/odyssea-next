@@ -1,13 +1,15 @@
 import { useChatStore } from "@/stores/chatStore";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
-type MessagesMarkedAsReadEvent = {
+export type MessagesMarkedAsReadEvent = {
 	chatRoomId: string;
 	messageIds: string[];
 	userId: string;
+	/** Full readBy from DB when provided by the server (authoritative). */
+	messages?: { id: string; readBy?: string[]; isRead?: boolean }[];
 };
 
-const pendingByRoom = new Map<string, MessagesMarkedAsReadEvent>();
+const pendingEvents: MessagesMarkedAsReadEvent[] = [];
 let flushScheduled = false;
 
 const scheduleFlush = () => {
@@ -23,33 +25,27 @@ export const queueMessagesMarkedAsRead = (data: MessagesMarkedAsReadEvent) => {
 		return;
 	}
 
-	const existing = pendingByRoom.get(data.chatRoomId);
-	if (existing) {
-		const mergedIds = new Set([...existing.messageIds, ...data.messageIds]);
-		pendingByRoom.set(data.chatRoomId, {
-			chatRoomId: data.chatRoomId,
-			userId: data.userId,
-			messageIds: [...mergedIds],
-		});
-	} else {
-		pendingByRoom.set(data.chatRoomId, {
-			chatRoomId: data.chatRoomId,
-			userId: data.userId,
-			messageIds: [...data.messageIds],
-		});
-	}
+	pendingEvents.push({
+		chatRoomId: data.chatRoomId,
+		userId: data.userId,
+		messageIds: [...data.messageIds],
+		messages: data.messages?.map(m => ({
+			id: m.id,
+			readBy: m.readBy ? [...m.readBy] : undefined,
+			isRead: m.isRead,
+		})),
+	});
 
 	scheduleFlush();
 };
 
 export const flushPendingMessagesMarkedAsRead = () => {
 	flushScheduled = false;
-	if (pendingByRoom.size === 0) {
+	if (pendingEvents.length === 0) {
 		return;
 	}
 
-	const batch = [...pendingByRoom.values()];
-	pendingByRoom.clear();
+	const batch = pendingEvents.splice(0, pendingEvents.length);
 
 	const state = useChatStore.getState();
 	const didUpdate = state.applyBulkMessagesMarkedAsRead(batch);

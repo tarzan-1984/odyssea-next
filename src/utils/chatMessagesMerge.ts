@@ -1,6 +1,21 @@
 import type { Message } from "@/app-api/chatApi";
 import type { ChatRoom } from "@/app-api/chatApi";
 
+/** Union readBy user ids without dropping readers from an older source. */
+export function mergeReadByArrays(
+	a: string[] | undefined,
+	b: string[] | undefined
+): string[] {
+	const ids = new Set<string>();
+	for (const id of a ?? []) {
+		if (id) ids.add(id);
+	}
+	for (const id of b ?? []) {
+		if (id) ids.add(id);
+	}
+	return [...ids];
+}
+
 export function sortMessagesByCreatedAt(messages: Message[]): Message[] {
 	return [...messages].sort(
 		(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -15,7 +30,15 @@ export function mergeMessageLists(...sources: Message[][]): Message[] {
 		for (const msg of source) {
 			if (!msg?.id) continue;
 			const prev = byId.get(msg.id);
-			byId.set(msg.id, prev ? { ...prev, ...msg } : msg);
+			if (!prev) {
+				byId.set(msg.id, msg);
+				continue;
+			}
+			byId.set(msg.id, {
+				...prev,
+				...msg,
+				readBy: mergeReadByArrays(prev.readBy, msg.readBy),
+			});
 		}
 	}
 
