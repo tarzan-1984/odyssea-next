@@ -1152,7 +1152,7 @@ pre[class*="language-"].line-numbers {
 	filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.1);
 }
 
-/* Load tracking page: keep admin dark UI but show standard (light) map tiles */
+/* Keep admin dark UI but show standard (light) map tiles — tracking, drivers map, etc. */
 .dark .tracking-map-light-basemap .leaflet-tile-pane {
 	filter: none !important;
 }

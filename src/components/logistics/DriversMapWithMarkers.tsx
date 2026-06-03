@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useTheme } from "@/context/ThemeContext";
 import { useDriversForMap, type DriverForMap } from "@/hooks/useDriversForMap";
 import users from "@/app-api/users";
 import chatRoomsApi from "@/app-api/chatRooms";
@@ -27,7 +26,6 @@ import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasem
 const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
 	ssr: false,
 });
-
 
 const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
 
@@ -165,8 +163,6 @@ export default function DriversMapWithMarkers({
 	radiusMiles: radiusMilesProp,
 }: DriversMapWithMarkersProps = {}) {
 	const router = useRouter();
-	const { theme } = useTheme();
-	const [isDark, setIsDark] = useState(false);
 	const mapRef = useRef<L.Map | null>(null);
 	const hasFitBoundsRef = useRef(false);
 
@@ -316,20 +312,6 @@ export default function DriversMapWithMarkers({
 		setSelectedDriverTMS(null);
 	}, [isChatActionLoading]);
 
-	useEffect(() => {
-		setIsDark(theme === "dark");
-		const checkDark = () => {
-			setIsDark(document.documentElement.classList.contains("dark"));
-		};
-		checkDark();
-		const observer = new MutationObserver(checkDark);
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["class"],
-		});
-		return () => observer.disconnect();
-	}, [theme]);
-
 	// Fit map to bounds when drivers load (once)
 	useEffect(() => {
 		if (!mapRef.current || drivers.length === 0 || hasFitBoundsRef.current) return;
@@ -438,8 +420,8 @@ export default function DriversMapWithMarkers({
 				</div>
 			)}
 
-			{/* Map area */}
-			<div className="relative flex-1 min-h-0">
+			{/* Map area — light basemap even when app UI is in dark mode */}
+			<div className="relative flex-1 min-h-0 tracking-map-light-basemap bg-white">
 				{(isLoading || isFetching) && (
 					<div className="absolute left-4 top-4 z-[1000] rounded-md bg-white/90 px-3 py-2 text-sm shadow dark:bg-gray-800/90">
 						{isLoading ? "Loading drivers..." : "Loading more drivers..."}
@@ -451,7 +433,7 @@ export default function DriversMapWithMarkers({
 					attributionControl={false}
 					style={{ height: "100%", width: "100%" }}
 					scrollWheelZoom
-					key={`drivers-map-${isDark ? "dark" : "light"}`}
+					key="drivers-map"
 				>
 					<MapRefSetter mapRef={mapRef} />
 					<ResilientBasemapTileLayer mode="simple" />
