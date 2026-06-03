@@ -150,9 +150,7 @@ function parseTmsBatchSettings(json: unknown): TmsBatchSettingsPayload | null {
 	return raw;
 }
 
-function parseDeliveredLoadChatSettings(
-	json: unknown
-): DeliveredLoadChatSettingsPayload | null {
+function parseDeliveredLoadChatSettings(json: unknown): DeliveredLoadChatSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<DeliveredLoadChatSettingsPayload> &
 		DeliveredLoadChatSettingsPayload;
@@ -213,9 +211,7 @@ function parseAccountDeletionRequestSettings(
 	const root = json as ApiEnvelope<AccountDeletionRequestSettingsPayload> &
 		AccountDeletionRequestSettingsPayload;
 	const raw =
-		root.data &&
-		typeof root.data === "object" &&
-		"accountDeletionRequestEmail" in root.data
+		root.data && typeof root.data === "object" && "accountDeletionRequestEmail" in root.data
 			? root.data
 			: "accountDeletionRequestEmail" in root
 				? (root as AccountDeletionRequestSettingsPayload)
@@ -568,11 +564,15 @@ export default function AppSettingsPage() {
 		setLoadingDeletion(true);
 		setErrorDeletion(null);
 		try {
-			const res = await fetch("/api/app-settings/account-deletion-request", { method: "GET" });
+			const res = await fetch("/api/app-settings/account-deletion-request", {
+				method: "GET",
+			});
 			const json = await res.json();
 			if (!res.ok) {
 				setErrorDeletion(
-					typeof json.error === "string" ? json.error : "Failed to load account deletion settings"
+					typeof json.error === "string"
+						? json.error
+						: "Failed to load account deletion settings"
 				);
 				return;
 			}
@@ -704,8 +704,7 @@ export default function AppSettingsPage() {
 		const locationMinDistanceM = Number.parseInt(distanceM, 10);
 		const reverseGeocodeMinDistanceM = Number.parseInt(reverseGeocodeM, 10);
 		const driverTrackingIntervalMinutes = Number.parseInt(driverTrackingIntervalMin, 10);
-		const driverTrackingPointMinIntervalMs =
-			driverTrackingIntervalMinutes * MS_PER_MINUTE;
+		const driverTrackingPointMinIntervalMs = driverTrackingIntervalMinutes * MS_PER_MINUTE;
 
 		if (
 			!Number.isFinite(intervalMinutes) ||
@@ -835,10 +834,7 @@ export default function AppSettingsPage() {
 		setErrorLoadChat(null);
 		setSuccessLoadChat(null);
 
-		const deliveredLoadChatArchiveAfterHours = Number.parseInt(
-			deliveredLoadArchiveHours,
-			10
-		);
+		const deliveredLoadChatArchiveAfterHours = Number.parseInt(deliveredLoadArchiveHours, 10);
 		if (
 			!Number.isFinite(deliveredLoadChatArchiveAfterHours) ||
 			deliveredLoadChatArchiveAfterHours < 1 ||
@@ -1020,16 +1016,16 @@ export default function AppSettingsPage() {
 											</thead>
 											<tbody>
 												<tr>
-													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													<td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-900 dark:border-gray-700 dark:text-white">
 														{uIos}
 													</td>
-													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													<td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-900 dark:border-gray-700 dark:text-white">
 														{uAndroid}
 													</td>
-													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													<td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-900 dark:border-gray-700 dark:text-white">
 														{dIos}
 													</td>
-													<td className="border border-gray-200 px-3 py-2 text-center dark:border-gray-700">
+													<td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-900 dark:border-gray-700 dark:text-white">
 														{dAndroid}
 													</td>
 												</tr>
@@ -1356,7 +1352,10 @@ export default function AppSettingsPage() {
 							</div>
 
 							<div className="max-w-xl">
-								<Label htmlFor="driverTrackingPointMinIntervalMinutes" className="mb-1">
+								<Label
+									htmlFor="driverTrackingPointMinIntervalMinutes"
+									className="mb-1"
+								>
 									Driver tracking history: min interval between points (minutes)
 								</Label>
 								<Input
@@ -1375,8 +1374,8 @@ export default function AppSettingsPage() {
 								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
 									Controls how often backend writes a new point to{" "}
 									<code className="text-xs">driver_tracking</code> for the same
-									driver and load. 0 = write every accepted location update. Default
-									30 minutes.
+									driver and load. 0 = write every accepted location update.
+									Default 30 minutes.
 								</p>
 							</div>
 						</div>
@@ -1484,8 +1483,8 @@ export default function AppSettingsPage() {
 						Account deletion requests
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Public requests from <code className="text-xs">/delete-account</code> will be emailed to this
-						address.
+						Public requests from <code className="text-xs">/delete-account</code> will
+						be emailed to this address.
 					</p>
 
 					{loadingDeletion ? (
@@ -1502,7 +1501,7 @@ export default function AppSettingsPage() {
 								name="accountDeletionRequestEmail"
 								type="email"
 								value={accountDeletionRequestEmail}
-								onChange={(e) => setAccountDeletionRequestEmail(e.target.value)}
+								onChange={e => setAccountDeletionRequestEmail(e.target.value)}
 								placeholder="support@yourcompany.com"
 								required
 								className="!h-9 !min-h-0 !py-1.5"
@@ -1519,7 +1518,9 @@ export default function AppSettingsPage() {
 						</p>
 					) : null}
 					{successDeletion ? (
-						<p className="mt-4 text-sm text-green-600 dark:text-green-400">{successDeletion}</p>
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successDeletion}
+						</p>
 					) : null}
 
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
@@ -1725,10 +1726,11 @@ export default function AppSettingsPage() {
 						Backend — delivered LOAD chat flag
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						After a LOAD chat has <code className="text-xs">deliveryAt</code> set, the server
-						waits this many hours, then the cron (every 3 hours) sets{" "}
-						<code className="text-xs">isLoadArchived=true</code> on that chat room. The chat and
-						messages stay in the database; clients receive <code className="text-xs">chatRoomUpdated</code>.
+						After a LOAD chat has <code className="text-xs">deliveryAt</code> set, the
+						server waits this many hours, then the cron (every 3 hours) sets{" "}
+						<code className="text-xs">isLoadArchived=true</code> on that chat room. The
+						chat and messages stay in the database; clients receive{" "}
+						<code className="text-xs">chatRoomUpdated</code>.
 					</p>
 
 					{loadingLoadChat ? (
@@ -1754,8 +1756,8 @@ export default function AppSettingsPage() {
 								className="!h-9 !min-h-0 !py-1.5"
 							/>
 							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-								Compared to <code className="text-xs">deliveryAt</code> as stored (no extra
-								timezone). Range 1–720 hours (30 days). Default 5.
+								Compared to <code className="text-xs">deliveryAt</code> as stored
+								(no extra timezone). Range 1–720 hours (30 days). Default 5.
 							</p>
 						</div>
 					)}
