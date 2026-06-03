@@ -189,6 +189,7 @@ export interface DriverMeta {
 	ic_agreement: string;
 	background_file?: string;
 	alaska?: string;
+	activate_application?: string;
 }
 
 export interface Driver {

@@ -51,6 +51,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
+import DriverMobileAppIcon, { driverUsesMobileApp } from "./DriverMobileAppIcon";
 import DriverNotesModal from "./DriverNotesModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
@@ -212,7 +213,16 @@ export default function DriversListTable({
 		}) ?? [];
 
 	const visibleDriverIds: string[] = filteredResults.map((d: any) => String(d.id));
-	const selectableVisibleDriverIds = visibleDriverIds.filter(id => !existingDriverIdsSet.has(id));
+	const isDriverRowSelectable = (item: {
+		id?: string | number;
+		meta_data?: { activate_application?: string };
+	}) =>
+		!existingDriverIdsSet.has(String(item?.id)) &&
+		driverUsesMobileApp(item?.meta_data?.activate_application);
+	const selectableVisibleDriverIds = visibleDriverIds.filter(id => {
+		const item = filteredResults.find((d: any) => String(d.id) === id);
+		return item != null && isDriverRowSelectable(item);
+	});
 	const allVisibleSelected =
 		selectableVisibleDriverIds.length > 0 &&
 		selectableVisibleDriverIds.every(id => selectedDriverIds.includes(id));
@@ -235,6 +245,17 @@ export default function DriversListTable({
 		}
 	}, [canSelectDrivers]);
 
+	// Drop selection for drivers without the mobile app or already in the offer
+	useEffect(() => {
+		setSelectedDriverIds(prev => {
+			const next = prev.filter(id => {
+				const item = filteredResults.find((d: any) => String(d.id) === id);
+				return item != null && isDriverRowSelectable(item);
+			});
+			return next.length === prev.length ? prev : next;
+		});
+	}, [filteredResults, existingDriverIdsSet]);
+
 	useEffect(() => {
 		const handleMouseUp = () => {
 			const { isActive, startIndex, hasAddedAny } = dragSelectRef.current;
@@ -244,7 +265,7 @@ export default function DriversListTable({
 			}
 			if (isActive && !hasAddedAny && startIndex >= 0) {
 				const item = filteredResults[startIndex];
-				if (item && !existingDriverIdsSet.has(String(item.id))) {
+				if (item && isDriverRowSelectable(item)) {
 					const id = String(item.id);
 					setSelectedDriverIds(prev =>
 						prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -720,6 +741,8 @@ export default function DriversListTable({
 											const isAlreadyInOffer = existingDriverIdsSet.has(
 												String(item.id)
 											);
+											const canSelectThisRow =
+												canSelectDrivers && isDriverRowSelectable(item);
 											const isStatusHovered = hoveredStatusRowIndex === i;
 											const isSelected = selectedDriverIds.includes(
 												String(item.id)
@@ -754,8 +777,7 @@ export default function DriversListTable({
 														return (
 															<TableCell
 																className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
-																	isAlreadyInOffer ||
-																	!canSelectDrivers
+																	!canSelectThisRow
 																		? "cursor-not-allowed"
 																		: "cursor-pointer"
 																}`}
@@ -765,10 +787,9 @@ export default function DriversListTable({
 																onMouseEnter={() => {
 																	setHoveredStatusRowIndex(i);
 																	if (
-																		canSelectDrivers &&
+																		canSelectThisRow &&
 																		dragSelectRef.current
-																			.isActive &&
-																		!isAlreadyInOffer
+																			.isActive
 																	) {
 																		const {
 																			startIndex,
@@ -789,10 +810,8 @@ export default function DriversListTable({
 																						];
 																					if (
 																						startItem &&
-																						!existingDriverIdsSet.has(
-																							String(
-																								startItem.id
-																							)
+																						isDriverRowSelectable(
+																							startItem
 																						)
 																					) {
 																						next.add(
@@ -802,9 +821,17 @@ export default function DriversListTable({
 																						);
 																					}
 																				}
-																				next.add(
-																					String(item.id)
-																				);
+																				if (
+																					isDriverRowSelectable(
+																						item
+																					)
+																				) {
+																					next.add(
+																						String(
+																							item.id
+																						)
+																					);
+																				}
 																				return Array.from(
 																					next
 																				);
@@ -816,10 +843,7 @@ export default function DriversListTable({
 																	setHoveredStatusRowIndex(null)
 																}
 																onMouseDown={() => {
-																	if (
-																		canSelectDrivers &&
-																		!isAlreadyInOffer
-																	) {
+																	if (canSelectThisRow) {
 																		dragSelectRef.current = {
 																			isActive: true,
 																			startIndex: i,
@@ -922,9 +946,14 @@ export default function DriversListTable({
 													>
 														<div className="space-y-0.5 break-words">
 															<p
-																className="break-words inline-flex items-center gap-1"
+																className="break-words inline-flex items-center gap-1.5"
 																title={`(${item?.id}) ${item?.meta_data?.driver_name || ""}`}
 															>
+																<DriverMobileAppIcon
+																	usesApp={driverUsesMobileApp(
+																		item?.meta_data?.activate_application
+																	)}
+																/>
 																({item?.id}){" "}
 																{item?.meta_data?.driver_name}
 																<LanguageFlagIcon
