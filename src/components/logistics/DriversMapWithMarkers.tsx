@@ -22,6 +22,7 @@ import {
 } from "./driversMapConstants";
 import { canViewRestrictedDriverStatusesOnMap } from "@/utils/roleAccess";
 import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
+import { findDirectChatWithUser } from "@/utils/findDirectChatRoom";
 
 const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), {
 	ssr: false,
@@ -115,19 +116,6 @@ function getDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number
 		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	return R * c;
-}
-
-function findDirectChatWithUser(
-	rooms: ChatRoom[],
-	myUserId: string,
-	otherUserId: string
-): ChatRoom | undefined {
-	return rooms.find(r => {
-		if (r.type !== "DIRECT") return false;
-		const hasOther = r.participants?.some(p => p.user?.id === otherUserId);
-		const hasMe = r.participants?.some(p => p.user?.id === myUserId);
-		return Boolean(hasOther && hasMe);
-	});
 }
 
 interface DriversMapWithMarkersProps {

@@ -488,31 +488,17 @@ export const useChatSync = () => {
 				});
 
 				if (result.success && result.data) {
-					// Transform result.data to match ChatRoom interface
-					const chatData = result.data; // Store in variable to avoid TS18048 error
-
-					const chatRoom = {
+					const chatData = result.data;
+					const normalizedRoom = {
 						...chatData,
 						isArchived: false,
-						updatedAt: chatData.createdAt, // Use createdAt as updatedAt for new chat
-						participants: chatData.participants.map((userData: any) => ({
-							id: `participant_${userData.id}_${chatData.id}`,
-							chatRoomId: chatData.id,
-							userId: userData.id,
-							joinedAt: chatData.createdAt,
-							user: {
-								id: userData.user.id,
-								firstName: userData.user.firstName,
-								lastName: userData.user.lastName,
-								avatar: userData.user.profilePhoto ?? userData.avatar ?? "",
-								role: userData.user.role ?? "USER",
-							},
-						})),
-					};
-					// Add chat room to local state
-					setChatRooms([chatRoom, ...chatRooms]);
-					await indexedDBChatService.addChatRoom(chatRoom);
-					return chatRoom as unknown as ChatRoom;
+						updatedAt: chatData.createdAt,
+						participants: normalizeParticipants(chatData.participants || []),
+					} as ChatRoom;
+
+					useChatStore.getState().addChatRoom(normalizedRoom);
+					await indexedDBChatService.addChatRoom(normalizedRoom);
+					return normalizedRoom;
 				} else {
 					console.error("useChatSync: API returned error:", result.error);
 					throw new Error(result.error || "Failed to create chat room");
@@ -523,7 +509,7 @@ export const useChatSync = () => {
 			}
 			return undefined;
 		},
-		[chatRooms, setChatRooms, setError]
+		[setError]
 	);
 
 	// Mark message as read

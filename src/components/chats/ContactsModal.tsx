@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "../ui/modal";
 import Input from "../form/input/InputField";
 import usersApi from "@/app-api/users";
@@ -9,6 +10,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatSync } from "@/hooks/useChatSync";
+import { findDirectChatWithUser } from "@/utils/findDirectChatRoom";
 
 interface ContactsModalProps {
 	isOpen: boolean;
@@ -28,8 +30,9 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 
 	// Get current user and chat store
 	const currentUser = useCurrentUser();
-	const { chatRooms } = useChatStore();
-	const { createChatRoom } = useChatSync();
+	const router = useRouter();
+	const { chatRooms, setCurrentChatRoom } = useChatStore();
+	const { createChatRoom, loadChatRooms } = useChatSync();
 	
 	// Get online status functionality
 	const { isUserOnline } = useWebSocketChatSync();
@@ -42,17 +45,18 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 		}
 
 		try {
-			// Check if there's already a DIRECT chat with this user
-			const existingChat = chatRooms.find(chat => 
-				chat.type === "DIRECT" && 
-				chat.participants.length === 2 &&
-				chat.participants.some(p => p.user.id === contact.id) &&
-				chat.participants.some(p => p.user.id === currentUser.id)
+			await loadChatRooms({ force: true });
+
+			const rooms = useChatStore.getState().chatRooms;
+			const existingChat = findDirectChatWithUser(
+				rooms,
+				currentUser.id,
+				contact.id
 			);
 
 			if (existingChat) {
-				// Chat already exists, just close the modal
-				// The user can select this chat from the chat list
+				setCurrentChatRoom(existingChat);
+				router.push(`/chat?room=${encodeURIComponent(existingChat.id)}`);
 				onClose();
 				return;
 			}
@@ -75,7 +79,8 @@ export default function ContactsModal({ isOpen, onClose }: ContactsModalProps) {
 		});
 
 		if (chatRoom) {
-			// Close modal - chat room is already added to store via createChatRoom
+			setCurrentChatRoom(chatRoom);
+			router.push(`/chat?room=${encodeURIComponent(chatRoom.id)}`);
 			onClose();
 		} else {
 			setError("Failed to create direct chat");
