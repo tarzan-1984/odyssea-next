@@ -15,10 +15,7 @@ import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrou
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
-import {
-	normalizeDriverExternalId,
-	normalizeTrackingLoadDriver,
-} from "@/utils/trackingLoadDriver";
+import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { isLastLocationOlderThanNy } from "@/utils/nyWallClock";
 
@@ -103,12 +100,7 @@ type LoadDriver = {
 };
 
 /** Load statuses where live driver marker must not be shown. */
-const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set([
-	"delivered",
-	"tonu",
-	"cancelled",
-	"canceled",
-]);
+const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set(["delivered", "tonu", "cancelled", "canceled"]);
 
 /** Load statuses where stale-location map hide applies (at / before pickup). */
 const LOAD_STATUSES_STALE_TRACKING = new Set(["waiting_on_pu_date", "at_pu"]);
@@ -661,21 +653,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			)
 	);
 
-	const driverStatusLabel = getStatusLabelForFilter(
-		currentTrackingDriver?.driverStatus ?? null
-	);
+	const driverStatusLabel = getStatusLabelForFilter(currentTrackingDriver?.driverStatus ?? null);
 
-	const mapUiMode:
-		| "map"
-		| "no_app"
-		| "driver_not_loaded_enroute"
-		| "stale_location" = (() => {
+	const mapUiMode: "map" | "no_app" | "driver_not_loaded_enroute" | "stale_location" = (() => {
 		if (currentTrackingDriver && !driverUsesMobileApp) return "no_app";
-		if (
-			currentTrackingDriver &&
-			driverUsesMobileApp &&
-			!isDriverLoadedEnroute
-		) {
+		if (currentTrackingDriver && driverUsesMobileApp && !isDriverLoadedEnroute) {
 			return "driver_not_loaded_enroute";
 		}
 		if (showStaleLocationMessage) return "stale_location";
@@ -715,15 +697,28 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			Number.isFinite(Number(pickupGeocode.lng))
 	);
 
+	const pickupEtaDriver = useMemo((): { lat: number; lng: number } | null => {
+		if (!showPickupRoadEta || !hasCurrentDriverCoordinates) return null;
+		return { lat: currentDriverLatitude, lng: currentDriverLongitude };
+	}, [
+		showPickupRoadEta,
+		hasCurrentDriverCoordinates,
+		currentDriverLatitude,
+		currentDriverLongitude,
+	]);
+
+	const pickupEtaPickup = useMemo((): { lat: number; lng: number } | null => {
+		if (!showPickupRoadEta || !pickupGeocode) return null;
+		const lat = Number(pickupGeocode.lat);
+		const lng = Number(pickupGeocode.lng);
+		if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+		return { lat, lng };
+	}, [showPickupRoadEta, pickupGeocode?.lat, pickupGeocode?.lng]);
+
 	const pickupRoadEta = usePickupRoadEta({
 		enabled: showPickupRoadEta,
-		driver: showPickupRoadEta
-			? { lat: currentDriverLatitude, lng: currentDriverLongitude }
-			: null,
-		pickup:
-			showPickupRoadEta && pickupGeocode
-				? { lat: Number(pickupGeocode.lat), lng: Number(pickupGeocode.lng) }
-				: null,
+		driver: pickupEtaDriver,
+		pickup: pickupEtaPickup,
 	});
 
 	const showLoadedEnrouteStaleTopBanner = Boolean(
@@ -791,307 +786,320 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 			{isPageReady && (
 				<>
-			{mapUiMode === "no_app" && (
-				<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-[min(18vh,8rem)] dark:bg-gray-950">
-					<div className="max-w-md text-center">
-						<p className="text-lg font-semibold text-gray-900 dark:text-white">
-							Driver is not using the mobile app
-						</p>
-						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-							Map, load history, and live tracking are unavailable until the driver
-							opens the mobile application at least once.
-						</p>
-					</div>
-				</div>
-			)}
-			{mapUiMode === "driver_not_loaded_enroute" && (
-				<DriverNotLoadedEnroutePanel
-					driverStatusLabel={driverStatusLabel}
-					driverExternalId={currentTrackingDriver?.externalId}
-				/>
-			)}
-			{mapUiMode === "stale_location" && (
-				<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950">
-					<div className="absolute inset-x-0 top-20 z-[600] flex justify-center px-6 pointer-events-none">
-						<div className="max-w-lg rounded-lg border border-amber-200 bg-amber-50 px-6 py-4 text-center shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
-							<p className="text-base font-semibold text-amber-950 dark:text-amber-100">
-								No driver updates in the last {formatStaleThresholdLabel()}
-							</p>
-							<p className="mt-1.5 text-sm text-amber-900/80 dark:text-amber-200/90">
-								The driver&apos;s last location update is older than{" "}
-								{formatStaleThresholdLabel()} (Eastern Time). Map and load history
-								are hidden until a new update is received.
-							</p>
+					{mapUiMode === "no_app" && (
+						<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-[min(18vh,8rem)] dark:bg-gray-950">
+							<div className="max-w-md text-center">
+								<p className="text-lg font-semibold text-gray-900 dark:text-white">
+									Driver is not using the mobile app
+								</p>
+								<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+									Map, load history, and live tracking are unavailable until the
+									driver opens the mobile application at least once.
+								</p>
+							</div>
 						</div>
-					</div>
-				</div>
-			)}
-			{showMapAndTrackingTools && (
-			<>
-			{showPickupRoadEta ? (
-				<PickupRoadEtaBanner
-					status={pickupRoadEta.status}
-					eta={pickupRoadEta.eta}
-					pickupAddressLabel={pickupGeocode?.addressLabel}
-					reserveRightForHistory={reserveTopBannerRightLane}
-				/>
-			) : showLoadedEnrouteStaleTopBanner ? (
-				<LoadedEnrouteStaleLocationBanner
-					thresholdLabel={formatStaleThresholdLabel()}
-					reserveRightForHistory={reserveTopBannerRightLane}
-				/>
-			) : null}
-			<TrackingDeliveryMap
-				driverData={mapLoadData}
-				showEmptyMap
-				forceLightMapBasemap
-				enableBasemapModeSwitch
-				initialZoom={4}
-				selectedLoadHistoryPointIndex={
-					isAuthenticated ? selectedHistoryPointIndex : null
-				}
-				editingLoadHistoryPointIndex={
-					isAuthenticated && canEditLoadHistory ? editingHistoryPointIndex : null
-				}
-				onLoadHistoryPointMarkerClick={
-					isAuthenticated ? handleLoadHistoryPointMarkerClick : undefined
-				}
-				onMapBackgroundClick={
-					isAuthenticated ? clearHistoryPointSelection : undefined
-				}
-				historyEditDragPosition={
-					isAuthenticated && canEditLoadHistory ? historyDragDraft : null
-				}
-				onHistoryEditPointDragEnd={
-					isAuthenticated && canEditLoadHistory
-						? handleHistoryEditDragEnd
-						: undefined
-				}
-				showDriverInHistoryPopup={isAuthenticated}
-			/>
-			</>
-			)}
-			{showLoadHistoryPanel && (
-			<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
-				<button
-					type="button"
-					className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800"
-					onClick={() => setIsHistoryOpen(value => !value)}
-				>
-					<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-						Load history
-						<span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-							{loadHistoryDetails.length}
-						</span>
-					</span>
-					<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-						{isHistoryOpen ? "Hide" : "Show"}
-					</span>
-				</button>
-				{isHistoryOpen && (
-					<div className="max-h-[calc(50vh-45px)] overflow-y-auto px-4 py-3">
-						{loadHistoryDetails.length > 0 ? (
-							<ol className="space-y-3">
-								{loadHistoryDetails.map((point, index) => {
-									const isEditingCard = editingHistoryPointIndex === index;
-									const isSelectedCard = selectedHistoryPointIndex === index;
-									const displayCoords =
-										isEditingCard && historyDragDraft
-											? historyDragDraft
-											: point.position;
+					)}
+					{mapUiMode === "driver_not_loaded_enroute" && (
+						<DriverNotLoadedEnroutePanel
+							driverStatusLabel={driverStatusLabel}
+							driverExternalId={currentTrackingDriver?.externalId}
+						/>
+					)}
+					{mapUiMode === "stale_location" && (
+						<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950">
+							<div className="absolute inset-x-0 top-20 z-[600] flex justify-center px-6 pointer-events-none">
+								<div className="max-w-lg rounded-lg border border-amber-200 bg-amber-50 px-6 py-4 text-center shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+									<p className="text-base font-semibold text-amber-950 dark:text-amber-100">
+										No driver updates in the last {formatStaleThresholdLabel()}
+									</p>
+									<p className="mt-1.5 text-sm text-amber-900/80 dark:text-amber-200/90">
+										The driver&apos;s last location update is older than{" "}
+										{formatStaleThresholdLabel()} (Eastern Time). Map and load
+										history are hidden until a new update is received.
+									</p>
+								</div>
+							</div>
+						</div>
+					)}
+					{showMapAndTrackingTools && (
+						<>
+							{showPickupRoadEta ? (
+								<PickupRoadEtaBanner
+									status={pickupRoadEta.status}
+									eta={pickupRoadEta.eta}
+									pickupAddressLabel={pickupGeocode?.addressLabel}
+									reserveRightForHistory={reserveTopBannerRightLane}
+								/>
+							) : showLoadedEnrouteStaleTopBanner ? (
+								<LoadedEnrouteStaleLocationBanner
+									thresholdLabel={formatStaleThresholdLabel()}
+									reserveRightForHistory={reserveTopBannerRightLane}
+								/>
+							) : null}
+							<TrackingDeliveryMap
+								driverData={mapLoadData}
+								showEmptyMap
+								forceLightMapBasemap
+								enableBasemapModeSwitch
+								initialZoom={4}
+								selectedLoadHistoryPointIndex={
+									isAuthenticated ? selectedHistoryPointIndex : null
+								}
+								editingLoadHistoryPointIndex={
+									isAuthenticated && canEditLoadHistory
+										? editingHistoryPointIndex
+										: null
+								}
+								onLoadHistoryPointMarkerClick={
+									isAuthenticated ? handleLoadHistoryPointMarkerClick : undefined
+								}
+								onMapBackgroundClick={
+									isAuthenticated ? clearHistoryPointSelection : undefined
+								}
+								historyEditDragPosition={
+									isAuthenticated && canEditLoadHistory ? historyDragDraft : null
+								}
+								onHistoryEditPointDragEnd={
+									isAuthenticated && canEditLoadHistory
+										? handleHistoryEditDragEnd
+										: undefined
+								}
+								showDriverInHistoryPopup={isAuthenticated}
+							/>
+						</>
+					)}
+					{showLoadHistoryPanel && (
+						<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+							<button
+								type="button"
+								className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800"
+								onClick={() => setIsHistoryOpen(value => !value)}
+							>
+								<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+									Load history
+									<span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+										{loadHistoryDetails.length}
+									</span>
+								</span>
+								<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+									{isHistoryOpen ? "Hide" : "Show"}
+								</span>
+							</button>
+							{isHistoryOpen && (
+								<div className="max-h-[calc(50vh-45px)] overflow-y-auto px-4 py-3">
+									{loadHistoryDetails.length > 0 ? (
+										<ol className="space-y-3">
+											{loadHistoryDetails.map((point, index) => {
+												const isEditingCard =
+													editingHistoryPointIndex === index;
+												const isSelectedCard =
+													selectedHistoryPointIndex === index;
+												const displayCoords =
+													isEditingCard && historyDragDraft
+														? historyDragDraft
+														: point.position;
 
-									let cardTone: string;
-									if (isEditingCard) {
-										cardTone =
-											"border-blue-700 bg-blue-100 text-blue-950 shadow-md ring-2 ring-blue-500/50 ring-offset-1 ring-offset-white dark:border-blue-400 dark:bg-blue-950 dark:text-blue-100 dark:ring-blue-400/35 dark:ring-offset-gray-900";
-									} else if (isSelectedCard) {
-										cardTone =
-											"border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-100";
-									} else {
-										cardTone =
-											"border-gray-100 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300";
-									}
+												let cardTone: string;
+												if (isEditingCard) {
+													cardTone =
+														"border-blue-700 bg-blue-100 text-blue-950 shadow-md ring-2 ring-blue-500/50 ring-offset-1 ring-offset-white dark:border-blue-400 dark:bg-blue-950 dark:text-blue-100 dark:ring-blue-400/35 dark:ring-offset-gray-900";
+												} else if (isSelectedCard) {
+													cardTone =
+														"border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-100";
+												} else {
+													cardTone =
+														"border-gray-100 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300";
+												}
 
-									return (
-										<li
-											key={
-												point.id ??
-												`${point.position[0]}-${point.position[1]}-${point.createdAt ?? index}`
-											}
-											ref={el => {
-												historyCardRefs.current[index] = el;
-											}}
-										>
-											<div
-												role="button"
-												tabIndex={0}
-												className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
-												onClick={() => {
-													applyHistoryPointSelection(index);
-												}}
-												onKeyDown={event => {
-													if (
-														event.key === "Enter" ||
-														event.key === " "
-													) {
-														event.preventDefault();
-														applyHistoryPointSelection(index);
-													}
-												}}
-											>
-												<div className="mb-2 flex items-center justify-between gap-2">
-													<p
-														className={`font-semibold ${
-															isEditingCard
-																? "text-blue-900 dark:text-blue-50"
-																: "text-gray-900 dark:text-white"
-														}`}
+												return (
+													<li
+														key={
+															point.id ??
+															`${point.position[0]}-${point.position[1]}-${point.createdAt ?? index}`
+														}
+														ref={el => {
+															historyCardRefs.current[index] = el;
+														}}
 													>
-														Step {index + 1}
-													</p>
-													{canEditLoadHistory ? (
-													<div className="flex items-center gap-2">
-														{isEditingCard &&
-														historyEditShowApplyCancel ? (
-															<>
-																<button
-																	type="button"
-																	className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
-																	disabled={
-																		Boolean(
-																			savingHistoryPointId
-																		) || !point.id
-																	}
-																	onClick={event => {
-																		event.stopPropagation();
-																		handleApplyHistoryPointEdit();
-																	}}
+														<div
+															role="button"
+															tabIndex={0}
+															className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
+															onClick={() => {
+																applyHistoryPointSelection(index);
+															}}
+															onKeyDown={event => {
+																if (
+																	event.key === "Enter" ||
+																	event.key === " "
+																) {
+																	event.preventDefault();
+																	applyHistoryPointSelection(
+																		index
+																	);
+																}
+															}}
+														>
+															<div className="mb-2 flex items-center justify-between gap-2">
+																<p
+																	className={`font-semibold ${
+																		isEditingCard
+																			? "text-blue-900 dark:text-blue-50"
+																			: "text-gray-900 dark:text-white"
+																	}`}
 																>
-																	Apply
-																</button>
-																<button
-																	type="button"
-																	className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
-																	disabled={Boolean(
-																		savingHistoryPointId
-																	)}
-																	onClick={event => {
-																		event.stopPropagation();
-																		handleCancelHistoryPointEdit();
-																	}}
-																>
-																	Cancel
-																</button>
-															</>
-														) : (
-															<>
-																<button
-																	type="button"
-																	className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
-																	aria-label="Edit history point"
-																	onClick={event => {
-																		event.stopPropagation();
-																		setSelectedHistoryPointIndex(
-																			index
-																		);
-																		setEditingHistoryPointIndex(
-																			index
-																		);
-																	}}
-																>
-																	<svg
-																		className="h-full w-full"
-																		xmlns="http://www.w3.org/2000/svg"
-																		viewBox="0 0 122.88 122.88"
-																		aria-hidden="true"
-																	>
-																		<path
-																			fill="currentColor"
-																			fillRule="evenodd"
-																			clipRule="evenodd"
-																			d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
-																		/>
-																	</svg>
-																</button>
-																<button
-																	type="button"
-																	className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
-																	aria-label="Delete history point"
-																	disabled={
-																		!point.id ||
-																		deletingHistoryPointId ===
-																			point.id
-																	}
-																	onClick={event => {
-																		event.stopPropagation();
-																		handleDeleteHistoryPoint(
-																			point.id,
-																			index
-																		);
-																	}}
-																>
-																	<svg
-																		className="h-full w-full"
-																		xmlns="http://www.w3.org/2000/svg"
-																		viewBox="0 0 122.88 122.88"
-																		aria-hidden="true"
-																	>
-																		<path
-																			fill="currentColor"
-																			d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
-																		/>
-																	</svg>
-																</button>
-															</>
-														)}
-													</div>
-													) : null}
-												</div>
-												<p>
-													<span className="font-medium">
-														Coordinates:
-													</span>{" "}
-													{displayCoords[0].toFixed(6)},{" "}
-													{displayCoords[1].toFixed(6)}
-												</p>
-												{point.placeLabel ? (
-													<p>
-														<span className="font-medium">Place:</span>{" "}
-														{point.placeLabel}
-													</p>
-												) : null}
-												<p>
-													<span className="font-medium">Tracked:</span>{" "}
-													{formatHistoryDate(point.createdAt)}
-												</p>
-												<p>
-													<span className="font-medium">Updated:</span>{" "}
-													{formatHistoryDate(point.updatedAt)}
-												</p>
-											</div>
-										</li>
-									);
-								})}
-							</ol>
-						) : (
-							<p className="text-sm text-gray-500 dark:text-gray-400">
-								No history points yet.
-							</p>
-						)}
-					</div>
-				)}
-			</div>
-			)}
-			{isAuthenticated && currentTrackingDriver && (
-				<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
-					<DriverInfo
-						driverData={driverCardData}
-						loadId={loadId}
-						loadStatusLabel={loadStatusLabel}
-						showLoadTrackingActions={mapUiMode !== "no_app"}
-					/>
-				</div>
-			)}
+																	Step {index + 1}
+																</p>
+																{canEditLoadHistory ? (
+																	<div className="flex items-center gap-2">
+																		{isEditingCard &&
+																		historyEditShowApplyCancel ? (
+																			<>
+																				<button
+																					type="button"
+																					className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+																					disabled={
+																						Boolean(
+																							savingHistoryPointId
+																						) ||
+																						!point.id
+																					}
+																					onClick={event => {
+																						event.stopPropagation();
+																						handleApplyHistoryPointEdit();
+																					}}
+																				>
+																					Apply
+																				</button>
+																				<button
+																					type="button"
+																					className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+																					disabled={Boolean(
+																						savingHistoryPointId
+																					)}
+																					onClick={event => {
+																						event.stopPropagation();
+																						handleCancelHistoryPointEdit();
+																					}}
+																				>
+																					Cancel
+																				</button>
+																			</>
+																		) : (
+																			<>
+																				<button
+																					type="button"
+																					className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
+																					aria-label="Edit history point"
+																					onClick={event => {
+																						event.stopPropagation();
+																						setSelectedHistoryPointIndex(
+																							index
+																						);
+																						setEditingHistoryPointIndex(
+																							index
+																						);
+																					}}
+																				>
+																					<svg
+																						className="h-full w-full"
+																						xmlns="http://www.w3.org/2000/svg"
+																						viewBox="0 0 122.88 122.88"
+																						aria-hidden="true"
+																					>
+																						<path
+																							fill="currentColor"
+																							fillRule="evenodd"
+																							clipRule="evenodd"
+																							d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
+																						/>
+																					</svg>
+																				</button>
+																				<button
+																					type="button"
+																					className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
+																					aria-label="Delete history point"
+																					disabled={
+																						!point.id ||
+																						deletingHistoryPointId ===
+																							point.id
+																					}
+																					onClick={event => {
+																						event.stopPropagation();
+																						handleDeleteHistoryPoint(
+																							point.id,
+																							index
+																						);
+																					}}
+																				>
+																					<svg
+																						className="h-full w-full"
+																						xmlns="http://www.w3.org/2000/svg"
+																						viewBox="0 0 122.88 122.88"
+																						aria-hidden="true"
+																					>
+																						<path
+																							fill="currentColor"
+																							d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
+																						/>
+																					</svg>
+																				</button>
+																			</>
+																		)}
+																	</div>
+																) : null}
+															</div>
+															<p>
+																<span className="font-medium">
+																	Coordinates:
+																</span>{" "}
+																{displayCoords[0].toFixed(6)},{" "}
+																{displayCoords[1].toFixed(6)}
+															</p>
+															{point.placeLabel ? (
+																<p>
+																	<span className="font-medium">
+																		Place:
+																	</span>{" "}
+																	{point.placeLabel}
+																</p>
+															) : null}
+															<p>
+																<span className="font-medium">
+																	Tracked:
+																</span>{" "}
+																{formatHistoryDate(point.createdAt)}
+															</p>
+															<p>
+																<span className="font-medium">
+																	Updated:
+																</span>{" "}
+																{formatHistoryDate(point.updatedAt)}
+															</p>
+														</div>
+													</li>
+												);
+											})}
+										</ol>
+									) : (
+										<p className="text-sm text-gray-500 dark:text-gray-400">
+											No history points yet.
+										</p>
+									)}
+								</div>
+							)}
+						</div>
+					)}
+					{isAuthenticated && currentTrackingDriver && (
+						<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
+							<DriverInfo
+								driverData={driverCardData}
+								loadId={loadId}
+								loadStatusLabel={loadStatusLabel}
+								showLoadTrackingActions={mapUiMode !== "no_app"}
+							/>
+						</div>
+					)}
 				</>
 			)}
 		</section>
