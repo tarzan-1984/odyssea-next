@@ -1276,6 +1276,36 @@ pre[class*="language-"] {
 	text-decoration: line-through;
 }
 
+.chat-markdown a.chat-msg-link,
+.chat-msg-link {
+	color: var(--color-brand-600, #465fff);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.chat-markdown a.chat-msg-link:hover,
+.chat-msg-link:hover {
+	color: var(--color-brand-500, #3641f5);
+}
+
+.dark .chat-markdown a.chat-msg-link,
+.dark .chat-msg-link {
+	color: var(--color-brand-400, #7592ff);
+}
+
+/* Outgoing bubble: beat .dark .chat-msg-link (higher specificity + fallback). */
+.chat-markdown.chat-markdown--outgoing a.chat-msg-link,
+.dark .chat-markdown.chat-markdown--outgoing a.chat-msg-link,
+.dark .chat-markdown--outgoing a.chat-msg-link {
+	color: #ffffff !important;
+}
+
+.chat-markdown.chat-markdown--outgoing a.chat-msg-link:hover,
+.dark .chat-markdown.chat-markdown--outgoing a.chat-msg-link:hover,
+.dark .chat-markdown--outgoing a.chat-msg-link:hover {
+	color: rgba(255, 255, 255, 0.9) !important;
+}
+
 /* Reply Message Styles */
 .message-reply {
 	margin-bottom: 8px;

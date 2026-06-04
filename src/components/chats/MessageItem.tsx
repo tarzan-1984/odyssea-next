@@ -169,7 +169,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && <MessageReply replyData={message.replyData} />}
 								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
 								{message.content?.trim() ? (
-									<ChatMessageContent content={message.content} />
+									<ChatMessageContent content={message.content} isOutgoing />
 								) : null}
 							</div>
 							<MessageDropdown
@@ -453,7 +453,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && (
 									<MessageReply replyData={message.replyData} />
 								)}
-								<ChatMessageContent content={message.content} />
+								<ChatMessageContent content={message.content} isOutgoing />
 							</div>
 							<MessageDropdown
 								message={message}

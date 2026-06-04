@@ -7,28 +7,73 @@ import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Schema } from "hast-util-sanitize";
+import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
 
 const chatMarkdownSanitizeSchema: Schema = {
 	...defaultSchema,
-	tagNames: ["p", "br", "strong", "em", "del", "u", "ul", "ol", "li"],
+	tagNames: ["p", "br", "strong", "em", "del", "u", "ul", "ol", "li", "a"],
+	attributes: {
+		...defaultSchema.attributes,
+		a: [
+			...(Array.isArray(defaultSchema.attributes?.a) ? defaultSchema.attributes.a : []),
+			"href",
+			"target",
+			"rel",
+		],
+	},
 };
 
 type ChatMessageContentProps = {
 	content: string;
 	className?: string;
+	/** Outgoing bubble (blue bg) — links are white. */
+	isOutgoing?: boolean;
 };
 
-export default function ChatMessageContent({ content, className = "" }: ChatMessageContentProps) {
+export default function ChatMessageContent({
+	content,
+	className = "",
+	isOutgoing = false,
+}: ChatMessageContentProps) {
 	if (!content.trim()) {
 		return null;
 	}
 
+	const linkedContent = preprocessChatMessageLinks(content);
+
+	const rootClass = [
+		"chat-markdown min-w-0 break-words",
+		isOutgoing ? "chat-markdown--outgoing" : "",
+		className,
+	]
+		.filter(Boolean)
+		.join(" ");
+
 	return (
-		<div className={`chat-markdown min-w-0 break-words ${className}`.trim()}>
+		<div className={rootClass}>
 			<ReactMarkdown
 				remarkPlugins={[remarkGfm, remarkBreaks]}
 				rehypePlugins={[rehypeRaw, [rehypeSanitize, { schema: chatMarkdownSanitizeSchema }]]}
 				components={{
+					a: ({ href, children }) => {
+						if (!href || !isAllowedChatHref(href)) {
+							return <span>{children}</span>;
+						}
+						return (
+							<a
+								href={href}
+								target="_blank"
+								rel="noopener noreferrer"
+								className={
+									isOutgoing
+										? "break-all underline underline-offset-2 !text-white hover:!text-white/90"
+										: "chat-msg-link break-all"
+								}
+							>
+								{children}
+							</a>
+						);
+					},
 					p: ({ children }) => (
 						<p className="chat-msg-body mb-1 last:mb-0 whitespace-pre-wrap">{children}</p>
 					),
@@ -45,7 +90,7 @@ export default function ChatMessageContent({ content, className = "" }: ChatMess
 					u: ({ children }) => <u className="underline">{children}</u>,
 				}}
 			>
-				{content}
+				{linkedContent}
 			</ReactMarkdown>
 		</div>
 	);
