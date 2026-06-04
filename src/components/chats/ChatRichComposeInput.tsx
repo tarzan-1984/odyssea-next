@@ -88,7 +88,7 @@ export default function ChatRichComposeInput({
 				onInput={handleInput}
 				onKeyDown={onKeyDown}
 				onPaste={onPaste}
-				className={`relative z-10 ${COMPOSE_FIELD_CLASS} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
+				className={`relative z-0 ${COMPOSE_FIELD_CLASS} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
 			/>
 		</div>
 	);
