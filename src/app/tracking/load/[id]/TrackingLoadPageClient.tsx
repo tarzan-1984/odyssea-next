@@ -10,6 +10,28 @@ import { clientAuth } from "@/utils/auth";
 import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
 import DriverInfo from "../../[id]/DriverInfo";
+import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
+import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrouteStaleLocationBanner";
+import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
+import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
+import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
+import {
+	normalizeDriverExternalId,
+	normalizeTrackingLoadDriver,
+} from "@/utils/trackingLoadDriver";
+import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
+import { isLastLocationOlderThanNy } from "@/utils/nyWallClock";
+
+const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { hours: 3 };
+
+function formatStaleThresholdLabel(): string {
+	if (STALE_LOCATION_THRESHOLD.minutes != null) {
+		const n = STALE_LOCATION_THRESHOLD.minutes;
+		return n === 1 ? "1 minute" : `${n} minutes`;
+	}
+	const h = STALE_LOCATION_THRESHOLD.hours ?? 3;
+	return h === 1 ? "1 hour" : `${h} hours`;
+}
 
 const TrackingDeliveryMap = dynamic(() => import("@/components/logistics/TrackingDeliveryMap"), {
 	ssr: false,
@@ -76,7 +98,20 @@ type LoadDriver = {
 	latitude?: number | string | null;
 	longitude?: number | string | null;
 	lastLocationUpdateAt?: string | null;
+	lastActiveApp?: string | null;
+	trackingLoadId?: string | null;
 };
+
+/** Load statuses where live driver marker must not be shown. */
+const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set([
+	"delivered",
+	"tonu",
+	"cancelled",
+	"canceled",
+]);
+
+/** Load statuses where stale-location map hide applies (at / before pickup). */
+const LOAD_STATUSES_STALE_TRACKING = new Set(["waiting_on_pu_date", "at_pu"]);
 
 type LoadTrackingPoint = {
 	id?: string | null;
@@ -113,6 +148,12 @@ function normalizeTrackingStatus(value: string | null | undefined): string {
 		.trim()
 		.toLowerCase()
 		.replace(/-/g, "_");
+}
+
+function hasValidLastLocationUpdate(value: string | null | undefined): boolean {
+	const raw = String(value ?? "").trim();
+	if (!raw) return false;
+	return Number.isFinite(new Date(raw).getTime());
 }
 
 const LOAD_STATUS_LABELS: Record<string, string> = {
@@ -214,9 +255,19 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		queryKey: ["tracking-load-details", loadId, isPublicView ? "public" : "auth"],
 		queryFn: () => fetchTrackingLoadDetails(loadId, { publicView: isPublicView }),
 		enabled: Boolean(loadId) && !isAuthLoading,
-		staleTime: 10 * 60 * 1000,
+		staleTime: 60 * 1000,
 		gcTime: 10 * 60 * 1000,
+		refetchOnWindowFocus: true,
 	});
+
+	useEffect(() => {
+		if (!loadId || isAuthLoading || !isAuthenticated) return;
+		queryClient
+			.invalidateQueries({
+				queryKey: ["tracking-load-details", loadId],
+			})
+			.catch(() => {});
+	}, [loadId, isAuthLoading, isAuthenticated, queryClient]);
 
 	const isPageLoading = isAuthLoading || isLoadDetailsPending;
 	const isPageReady = !isPageLoading && Boolean(loadDetails);
@@ -286,12 +337,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	}, [loadDetails]);
 	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
 	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
-	const isDeliveredLoad = normalizedLoadStatus === "delivered";
-	const isLoadLoadedEnroute = normalizedLoadStatus === "loaded_enroute";
+	const loadStatusAllowsDriverMarker =
+		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
-		return details?.data?.data?.drivers ?? details?.data?.drivers ?? [];
+		const raw = details?.data?.data?.drivers ?? details?.data?.drivers ?? [];
+		if (!Array.isArray(raw)) return [];
+		return raw
+			.filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+			.map(d => normalizeTrackingLoadDriver(d)) as LoadDriver[];
 	}, [loadDetails]);
 
 	const sortedTrackingPoints = useMemo(() => {
@@ -505,10 +560,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		// Scan backwards so a trailing point without externalDriverId does not hide the real active driver.
 		if (sortedTrackingPoints.length > 0) {
 			for (let i = sortedTrackingPoints.length - 1; i >= 0; i--) {
-				const externalId = sortedTrackingPoints[i]?.externalDriverId?.trim();
+				const externalId = normalizeDriverExternalId(
+					sortedTrackingPoints[i]?.externalDriverId
+				);
 				if (!externalId) continue;
 				const fromHistory = loadDrivers.find(
-					driver => driver.externalId?.trim() === externalId
+					driver => normalizeDriverExternalId(driver.externalId) === externalId
 				);
 				if (fromHistory) return fromHistory;
 			}
@@ -523,13 +580,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		Number.isFinite(currentDriverLatitude) && Number.isFinite(currentDriverLongitude);
 	const isDriverLoadedEnroute =
 		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "loaded_enroute";
+	const hasLastLocationUpdate = hasValidLastLocationUpdate(
+		currentTrackingDriver?.lastLocationUpdateAt
+	);
 	const showDriverLiveMarker =
-		!isDeliveredLoad &&
-		isLoadLoadedEnroute &&
 		isDriverLoadedEnroute &&
-		hasCurrentDriverCoordinates;
+		loadStatusAllowsDriverMarker &&
+		hasCurrentDriverCoordinates &&
+		hasLastLocationUpdate;
 
-	const mapLoadData = useMemo(
+	const driverCardData = useMemo(
 		() => ({
 			id: currentTrackingDriver?.id ?? null,
 			email: currentTrackingDriver?.email ?? null,
@@ -543,9 +603,24 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			city: currentTrackingDriver?.city ?? null,
 			state: currentTrackingDriver?.state ?? null,
 			zip: currentTrackingDriver?.zip ?? null,
+			latitude: hasCurrentDriverCoordinates ? currentDriverLatitude : null,
+			longitude: hasCurrentDriverCoordinates ? currentDriverLongitude : null,
+			lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
+			lastActiveApp: currentTrackingDriver?.lastActiveApp ?? null,
+		}),
+		[
+			currentDriverLatitude,
+			currentDriverLongitude,
+			currentTrackingDriver,
+			hasCurrentDriverCoordinates,
+		]
+	);
+
+	const mapLoadData = useMemo(
+		() => ({
+			...driverCardData,
 			latitude: showDriverLiveMarker ? currentDriverLatitude : null,
 			longitude: showDriverLiveMarker ? currentDriverLongitude : null,
-			lastLocationUpdateAt: currentTrackingDriver?.lastLocationUpdateAt ?? null,
 			pick_up_location: loadMetaData?.pick_up_location ?? null,
 			delivery_location: loadMetaData?.delivery_location ?? null,
 			routeGeocode:
@@ -556,15 +631,112 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			load_history_details: loadHistoryDetails,
 		}),
 		[
+			driverCardData,
+			showDriverLiveMarker,
 			currentDriverLatitude,
 			currentDriverLongitude,
-			currentTrackingDriver,
-			showDriverLiveMarker,
 			loadMetaData,
 			routeGeocodeFromApi,
 			loadHistoryForMap,
 			loadHistoryDetails,
 		]
+	);
+
+	const { usesMobileApp: driverUsesMobileApp } = useResolvedDriverLastActiveApp(
+		currentTrackingDriver?.externalId,
+		currentTrackingDriver?.lastActiveApp
+	);
+
+	const loadQualifiesForStaleTrackingCheck =
+		LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus);
+	const showStaleLocationMessage = Boolean(
+		currentTrackingDriver &&
+			driverUsesMobileApp &&
+			isDriverLoadedEnroute &&
+			loadQualifiesForStaleTrackingCheck &&
+			hasLastLocationUpdate &&
+			isLastLocationOlderThanNy(
+				currentTrackingDriver.lastLocationUpdateAt,
+				STALE_LOCATION_THRESHOLD
+			)
+	);
+
+	const driverStatusLabel = getStatusLabelForFilter(
+		currentTrackingDriver?.driverStatus ?? null
+	);
+
+	const mapUiMode:
+		| "map"
+		| "no_app"
+		| "driver_not_loaded_enroute"
+		| "stale_location" = (() => {
+		if (currentTrackingDriver && !driverUsesMobileApp) return "no_app";
+		if (
+			currentTrackingDriver &&
+			driverUsesMobileApp &&
+			!isDriverLoadedEnroute
+		) {
+			return "driver_not_loaded_enroute";
+		}
+		if (showStaleLocationMessage) return "stale_location";
+		return "map";
+	})();
+
+	const showMapAndTrackingTools = mapUiMode === "map";
+	const showLoadHistoryPanel = Boolean(
+		isAuthenticated &&
+			showMapAndTrackingTools &&
+			isDriverLoadedEnroute &&
+			!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
+	);
+	/** Keep top banners centered in the same lane even when history panel is hidden. */
+	const reserveTopBannerRightLane = isAuthenticated && showMapAndTrackingTools;
+	const showBackButton =
+		isAuthenticated &&
+		(mapUiMode === "map" ||
+			mapUiMode === "stale_location" ||
+			mapUiMode === "driver_not_loaded_enroute");
+
+	const pickupGeocode = routeGeocodeFromApi?.pickup ?? null;
+	const hasFreshLastLocationUpdate =
+		hasLastLocationUpdate &&
+		!isLastLocationOlderThanNy(
+			currentTrackingDriver?.lastLocationUpdateAt,
+			STALE_LOCATION_THRESHOLD
+		);
+	const showPickupRoadEta = Boolean(
+		showMapAndTrackingTools &&
+			isDriverLoadedEnroute &&
+			normalizedLoadStatus === "waiting_on_pu_date" &&
+			hasCurrentDriverCoordinates &&
+			hasFreshLastLocationUpdate &&
+			pickupGeocode &&
+			Number.isFinite(Number(pickupGeocode.lat)) &&
+			Number.isFinite(Number(pickupGeocode.lng))
+	);
+
+	const pickupRoadEta = usePickupRoadEta({
+		enabled: showPickupRoadEta,
+		driver: showPickupRoadEta
+			? { lat: currentDriverLatitude, lng: currentDriverLongitude }
+			: null,
+		pickup:
+			showPickupRoadEta && pickupGeocode
+				? { lat: Number(pickupGeocode.lat), lng: Number(pickupGeocode.lng) }
+				: null,
+	});
+
+	const showLoadedEnrouteStaleTopBanner = Boolean(
+		showMapAndTrackingTools &&
+			currentTrackingDriver &&
+			driverUsesMobileApp &&
+			isDriverLoadedEnroute &&
+			normalizedLoadStatus === "loaded_enroute" &&
+			hasLastLocationUpdate &&
+			isLastLocationOlderThanNy(
+				currentTrackingDriver.lastLocationUpdateAt,
+				STALE_LOCATION_THRESHOLD
+			)
 	);
 
 	return (
@@ -597,7 +769,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				</div>
 			)}
 
-			{!isAuthLoading && isAuthenticated && (
+			{!isAuthLoading && showBackButton && (
 				<button
 					type="button"
 					onClick={() => router.back()}
@@ -619,6 +791,56 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 			{isPageReady && (
 				<>
+			{mapUiMode === "no_app" && (
+				<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-[min(18vh,8rem)] dark:bg-gray-950">
+					<div className="max-w-md text-center">
+						<p className="text-lg font-semibold text-gray-900 dark:text-white">
+							Driver is not using the mobile app
+						</p>
+						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+							Map, load history, and live tracking are unavailable until the driver
+							opens the mobile application at least once.
+						</p>
+					</div>
+				</div>
+			)}
+			{mapUiMode === "driver_not_loaded_enroute" && (
+				<DriverNotLoadedEnroutePanel
+					driverStatusLabel={driverStatusLabel}
+					driverExternalId={currentTrackingDriver?.externalId}
+				/>
+			)}
+			{mapUiMode === "stale_location" && (
+				<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950">
+					<div className="absolute inset-x-0 top-20 z-[600] flex justify-center px-6 pointer-events-none">
+						<div className="max-w-lg rounded-lg border border-amber-200 bg-amber-50 px-6 py-4 text-center shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+							<p className="text-base font-semibold text-amber-950 dark:text-amber-100">
+								No driver updates in the last {formatStaleThresholdLabel()}
+							</p>
+							<p className="mt-1.5 text-sm text-amber-900/80 dark:text-amber-200/90">
+								The driver&apos;s last location update is older than{" "}
+								{formatStaleThresholdLabel()} (Eastern Time). Map and load history
+								are hidden until a new update is received.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
+			{showMapAndTrackingTools && (
+			<>
+			{showPickupRoadEta ? (
+				<PickupRoadEtaBanner
+					status={pickupRoadEta.status}
+					eta={pickupRoadEta.eta}
+					pickupAddressLabel={pickupGeocode?.addressLabel}
+					reserveRightForHistory={reserveTopBannerRightLane}
+				/>
+			) : showLoadedEnrouteStaleTopBanner ? (
+				<LoadedEnrouteStaleLocationBanner
+					thresholdLabel={formatStaleThresholdLabel()}
+					reserveRightForHistory={reserveTopBannerRightLane}
+				/>
+			) : null}
 			<TrackingDeliveryMap
 				driverData={mapLoadData}
 				showEmptyMap
@@ -647,7 +869,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				}
 				showDriverInHistoryPopup={isAuthenticated}
 			/>
-			{isAuthenticated && (
+			</>
+			)}
+			{showLoadHistoryPanel && (
 			<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
 				<button
 					type="button"
@@ -861,9 +1085,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			{isAuthenticated && currentTrackingDriver && (
 				<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
 					<DriverInfo
-						driverData={mapLoadData}
+						driverData={driverCardData}
 						loadId={loadId}
 						loadStatusLabel={loadStatusLabel}
+						showLoadTrackingActions={mapUiMode !== "no_app"}
 					/>
 				</div>
 			)}

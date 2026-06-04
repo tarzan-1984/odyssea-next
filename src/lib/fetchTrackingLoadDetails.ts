@@ -7,11 +7,35 @@ type TmsLoadBody = {
 	};
 };
 
+import { normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
+
 type LoadEnrichment = {
 	drivers?: unknown[];
 	trackingPoints?: unknown[];
 	routeGeocode?: unknown;
 };
+
+function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
+	if (!body || typeof body !== "object") return {};
+	const root = body as Record<string, unknown>;
+	const inner = root.data;
+	if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+		const payload = inner as Record<string, unknown>;
+		if ("drivers" in payload || "trackingPoints" in payload || "routeGeocode" in payload) {
+			return inner as LoadEnrichment;
+		}
+	}
+	if ("drivers" in root || "trackingPoints" in root || "routeGeocode" in root) {
+		return root as LoadEnrichment;
+	}
+	return {};
+}
+
+function normalizeEnrichmentDrivers(drivers: unknown[]): Record<string, unknown>[] {
+	return drivers
+		.filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+		.map(d => normalizeTrackingLoadDriver(d));
+}
 
 /** Shape expected by TrackingLoadPageClient (Nest-style wrapper). */
 export type TrackingLoadDetailsPayload = {
@@ -62,18 +86,25 @@ async function fetchLoadEnrichment(
 		}),
 	});
 
-	const enrichWrapped = (await enrichResponse.json().catch(() => null)) as {
-		data?: LoadEnrichment;
-		error?: string;
-	} | null;
+	const enrichWrapped = await enrichResponse.json().catch(() => null);
 
 	if (!enrichResponse.ok) {
-		throw new Error(
-			enrichWrapped?.error || `Failed to fetch load enrichment: ${enrichResponse.status}`
-		);
+		const err =
+			(enrichWrapped as { error?: string })?.error ||
+			(enrichWrapped as { message?: string })?.message ||
+			`Failed to fetch load enrichment: ${enrichResponse.status}`;
+		throw new Error(err);
 	}
 
-	return enrichWrapped?.data ?? {};
+	const payload = unwrapEnrichmentBody(enrichWrapped);
+	const drivers = Array.isArray(payload.drivers)
+		? normalizeEnrichmentDrivers(payload.drivers)
+		: [];
+
+	return {
+		...payload,
+		drivers,
+	};
 }
 
 export async function fetchTrackingLoadDetails(

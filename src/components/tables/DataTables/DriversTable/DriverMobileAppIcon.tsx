@@ -1,5 +1,16 @@
 type ActivateApplicationValue = string | number | boolean | null | undefined;
 
+/** True when the driver has opened the mobile app at least once (`users.last_active_app`). */
+export function driverUsesMobileAppFromLastActive(
+	lastActiveApp: string | Date | null | undefined
+): boolean {
+	if (lastActiveApp == null) return false;
+	if (lastActiveApp instanceof Date) {
+		return !Number.isNaN(lastActiveApp.getTime());
+	}
+	return String(lastActiveApp).trim() !== "";
+}
+
 export function driverUsesMobileApp(
 	activateApplication: ActivateApplicationValue
 ): boolean {

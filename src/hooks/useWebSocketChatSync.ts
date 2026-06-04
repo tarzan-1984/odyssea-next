@@ -9,6 +9,7 @@ import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useOnlineStatus } from "./useOnlineStatus";
+import type { ChatRoomParticipant } from "@/app-api/chatApi";
 
 /**
  * Enhanced chat sync hook that integrates WebSocket real-time functionality
@@ -21,7 +22,13 @@ export const useWebSocketChatSync = () => {
 
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
-	const { loadChatRooms } = chatSync;
+	const {
+		currentChatRoom,
+		sendMessage: sendMessageApi,
+		createChatRoom: createChatRoomApi,
+		markMessageAsRead: markMessageAsReadApi,
+		setCurrentChatRoom,
+	} = chatSync;
 
 	// Add specific chat room to cache and store
 	const addChatRoomToCache = useCallback(async (chatRoomId: string) => {
@@ -50,7 +57,7 @@ export const useWebSocketChatSync = () => {
 			const normalizedRoom = {
 				...chatRoom,
 				participants: Array.isArray(chatRoom.participants)
-					? chatRoom.participants.map((p: any) => ({
+					? chatRoom.participants.map((p: ChatRoomParticipant) => ({
 							...p,
 							user: {
 								...p.user,
@@ -81,21 +88,21 @@ export const useWebSocketChatSync = () => {
 	}, []);
 
 	// WebSocket message handling for current chat room
-	const webSocketMessages = useWebSocketMessages({
-		chatRoomId: chatSync.currentChatRoom?.id || "",
-		onNewMessage: message => {
+	const {
+		sendMessage: wsSendMessage,
+		markAsRead: wsMarkAsRead,
+		joinChatRoom,
+		leaveChatRoom,
+		sendTyping,
+		isTyping,
+	} = useWebSocketMessages({
+		chatRoomId: currentChatRoom?.id || "",
+		onNewMessage: () => {
 			// Message is automatically added to store by WebSocketContext
-			// No need to log here as it creates confusion
 		},
-		onMessageSent: data => {
-			// Message sent confirmation handled by WebSocketContext
-		},
-		onMessageRead: data => {
-			// Message read confirmation
-		},
-		onUserTyping: data => {
-			// User typing
-		},
+		onMessageSent: () => {},
+		onMessageRead: () => {},
+		onUserTyping: () => {},
 		onUserOnline: data => {
 			updateUserOnlineStatus(data.userId, data.isOnline);
 		},
@@ -105,7 +112,13 @@ export const useWebSocketChatSync = () => {
 	});
 
 	// WebSocket chat room management
-	const webSocketChatRooms = useWebSocketChatRooms({
+	const {
+		createChatRoom: wsCreateChatRoom,
+		updateChatRoom: wsUpdateChatRoom,
+		addParticipants: wsAddParticipants,
+		removeParticipant: wsRemoveParticipant,
+		isLoading: wsChatRoomsLoading,
+	} = useWebSocketChatRooms({
 		onChatRoomCreated: chatRoom => {
 			// Chat room is automatically added to store by useWebSocketChatRooms
 		},
@@ -160,10 +173,9 @@ export const useWebSocketChatSync = () => {
 			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
 			replyData?: { avatar?: string; time: string; content: string; senderName: string };
 		}) => {
-			if (isConnected && chatSync.currentChatRoom) {
+			if (isConnected && currentChatRoom) {
 				const multi = messageData.attachments && messageData.attachments.length >= 2 ? messageData.attachments : null;
-				// Use WebSocket for real-time messaging
-				webSocketMessages.sendMessage({
+				wsSendMessage({
 					content: messageData.content,
 					fileUrl: multi ? multi[0].fileUrl : messageData.fileData?.fileUrl,
 					fileName: multi ? multi[0].fileName : messageData.fileData?.fileName,
@@ -172,11 +184,10 @@ export const useWebSocketChatSync = () => {
 					replyData: messageData.replyData,
 				});
 			} else {
-				// Fallback to API-based messaging
-				await chatSync.sendMessage(messageData);
+				await sendMessageApi(messageData);
 			}
 		},
-		[isConnected, chatSync.currentChatRoom, webSocketMessages, chatSync.sendMessage]
+		[isConnected, currentChatRoom, wsSendMessage, sendMessageApi]
 	);
 
 	// Enhanced create chat room function that uses WebSocket when available
@@ -188,37 +199,33 @@ export const useWebSocketChatSync = () => {
 			participantIds: string[];
 		}) => {
 			if (isConnected) {
-				// Use WebSocket for real-time chat room creation
-				webSocketChatRooms.createChatRoom({
+				wsCreateChatRoom({
 					name: chatRoomData.name,
 					type: chatRoomData.type as "DIRECT" | "GROUP" | "LOAD",
 					loadId: chatRoomData.loadId,
 					participantIds: chatRoomData.participantIds,
 				});
 			} else {
-				// Fallback to API-based chat room creation
-				await chatSync.createChatRoom({
+				await createChatRoomApi({
 					...chatRoomData,
-					name: chatRoomData.name || `Chat ${Date.now()}`, // Provide default name if not specified
-					type: chatRoomData.type as "DIRECT" | "GROUP", // Ensure correct type
+					name: chatRoomData.name || `Chat ${Date.now()}`,
+					type: chatRoomData.type as "DIRECT" | "GROUP",
 				});
 			}
 		},
-		[isConnected, webSocketChatRooms.createChatRoom, chatSync.createChatRoom]
+		[isConnected, wsCreateChatRoom, createChatRoomApi]
 	);
 
 	// Enhanced mark message as read function that uses WebSocket when available
 	const markMessageAsReadWithWebSocket = useCallback(
 		async (messageId: string) => {
-			if (isConnected && chatSync.currentChatRoom) {
-				// Use WebSocket for real-time read status
-				webSocketMessages.markAsRead(messageId);
+			if (isConnected && currentChatRoom) {
+				wsMarkAsRead(messageId);
 			} else {
-				// Fallback to API-based read status
-				await chatSync.markMessageAsRead(messageId);
+				await markMessageAsReadApi(messageId);
 			}
 		},
-		[isConnected, chatSync.currentChatRoom, webSocketMessages, chatSync.markMessageAsRead]
+		[isConnected, currentChatRoom, wsMarkAsRead, markMessageAsReadApi]
 	);
 
 	// Auto-connect WebSocket when user is available
@@ -241,23 +248,23 @@ export const useWebSocketChatSync = () => {
 		markMessageAsRead: markMessageAsReadWithWebSocket,
 
 		// Explicitly export setCurrentChatRoom for compatibility
-		setCurrentChatRoom: chatSync.setCurrentChatRoom,
+		setCurrentChatRoom,
 
 		// WebSocket room management
-		joinChatRoom: webSocketMessages.joinChatRoom,
-		leaveChatRoom: webSocketMessages.leaveChatRoom,
+		joinChatRoom,
+		leaveChatRoom,
 
 		// WebSocket-specific functionality
 		webSocketMessages: {
-			sendTyping: webSocketMessages.sendTyping,
-			isTyping: webSocketMessages.isTyping,
+			sendTyping,
+			isTyping,
 		},
 
 		webSocketChatRooms: {
-			updateChatRoom: webSocketChatRooms.updateChatRoom,
-			addParticipants: webSocketChatRooms.addParticipants,
-			removeParticipant: webSocketChatRooms.removeParticipant,
-			isLoading: webSocketChatRooms.isLoading,
+			updateChatRoom: wsUpdateChatRoom,
+			addParticipants: wsAddParticipants,
+			removeParticipant: wsRemoveParticipant,
+			isLoading: wsChatRoomsLoading,
 		},
 
 		webSocketNotifications: {

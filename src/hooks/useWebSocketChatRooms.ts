@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { useChatStore } from "@/stores/chatStore";
-import { ChatRoom } from "@/app-api/chatApi";
+import { ChatRoom, ChatRoomParticipant } from "@/app-api/chatApi";
 import { useQueryClient } from "@tanstack/react-query";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
@@ -16,7 +16,7 @@ interface UseWebSocketChatRoomsProps {
 	}) => void;
 	onParticipantsAdded?: (data: {
 		chatRoomId: string;
-		newParticipants: any[];
+		newParticipants: ChatRoomParticipant[];
 		addedBy: string;
 	}) => void;
 	onParticipantRemoved?: (data: {
@@ -29,6 +29,20 @@ interface UseWebSocketChatRoomsProps {
 		addedBy: string;
 	}) => void;
 	onError?: (error: { message: string; details?: string }) => void;
+}
+
+function parseChatRoomCreatedPayload(
+	data: { chatRoom: ChatRoom } | ChatRoom
+): ChatRoom | undefined {
+	if (data && typeof data === "object" && "chatRoom" in data) {
+		const wrapped = (data as { chatRoom: ChatRoom }).chatRoom;
+		return wrapped?.id ? wrapped : undefined;
+	}
+	if (data && typeof data === "object" && "id" in data) {
+		const room = data as ChatRoom;
+		return room.id ? room : undefined;
+	}
+	return undefined;
 }
 
 export const useWebSocketChatRooms = ({
@@ -49,8 +63,7 @@ export const useWebSocketChatRooms = ({
 		if (!socket) return;
 
 		const handleChatRoomCreated = (data: { chatRoom: ChatRoom } | ChatRoom) => {
-			// Normalize payload: server can send { chatRoom } or ChatRoom
-			const room: ChatRoom | undefined = (data as any)?.chatRoom ? (data as any).chatRoom : (data as any);
+			const room = parseChatRoomCreatedPayload(data);
 			if (!room || !room.id) {
 				console.error("Invalid chatRoomCreated payload", data);
 				return;
@@ -80,7 +93,7 @@ export const useWebSocketChatRooms = ({
 
 		const handleParticipantsAdded = (data: {
 			chatRoomId: string;
-			newParticipants: any[];
+			newParticipants: ChatRoomParticipant[];
 			addedBy: string;
 		}) => {
 			onParticipantsAdded?.(data);
