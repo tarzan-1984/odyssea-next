@@ -144,7 +144,7 @@ export default function NotificationSoundSettings() {
 	const customSounds = sounds.filter(s => s.isUserOwned);
 
 	return (
-		<div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
+		<div className="flex h-full min-w-0 flex-col rounded-2xl border border-gray-200 p-5 dark:border-gray-800 lg:p-6">
 			<input
 				ref={uploadInputRef}
 				type="file"
@@ -152,7 +152,7 @@ export default function NotificationSoundSettings() {
 				className="hidden"
 				onChange={handleUploadChange}
 			/>
-			<div className="flex items-start justify-between gap-6">
+			<div className="flex flex-col gap-4 min-[520px]:flex-row min-[520px]:items-start min-[520px]:justify-between">
 				<div className="min-w-0">
 					<h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
 						Notification sound
@@ -162,7 +162,7 @@ export default function NotificationSoundSettings() {
 					</p>
 				</div>
 
-				<div className="flex w-[320px] shrink-0 items-center justify-end gap-4">
+				<div className="flex w-full min-w-0 flex-col gap-3 min-[520px]:w-auto min-[520px]:shrink-0 min-[520px]:flex-row min-[520px]:items-center min-[520px]:justify-end min-[520px]:gap-4">
 					<button
 						type="button"
 						onClick={handleUploadClick}
@@ -172,7 +172,7 @@ export default function NotificationSoundSettings() {
 						{isUploading ? "Uploading..." : "Add sound"}
 					</button>
 
-					<div className="w-[220px]">
+					<div className="w-full min-[520px]:w-[220px]">
 					<p className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">
 						Volume: {Math.round((volume ?? 0.7) * 100)}%
 					</p>

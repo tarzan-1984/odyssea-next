@@ -552,7 +552,7 @@ export default function ChatList({
 								: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
 						}`}
 					>
-						Shipments
+						Active Loads
 						{tabUnreadCounts.shipments > 0 && (
 							<span
 								className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${

@@ -1201,6 +1201,81 @@ pre[class*="language-"] {
 	color: #cbd5e1;
 }
 
+/* Chat message font sizes (scaled via --chat-font-* on :root) */
+.chat-msg-body {
+	font-size: var(--chat-font-body, 14px);
+	line-height: var(--chat-font-body-lh, 20px);
+}
+
+.chat-msg-name {
+	font-size: var(--chat-font-name, 14px);
+	line-height: var(--chat-font-name-lh, 20px);
+}
+
+.chat-msg-meta {
+	font-size: var(--chat-font-meta, 12px);
+	line-height: var(--chat-font-meta-lh, 18px);
+}
+
+.chat-markdown {
+	color: inherit;
+}
+
+.chat-markdown > :first-child {
+	margin-top: 0;
+}
+
+.chat-markdown > :last-child {
+	margin-bottom: 0;
+}
+
+.chat-compose-editor ul {
+	margin: 0.25rem 0;
+	list-style-type: disc;
+	padding-left: 1.25rem;
+}
+
+.chat-compose-editor ol {
+	margin: 0.25rem 0;
+	list-style-type: decimal;
+	padding-left: 1.25rem;
+}
+
+.chat-compose-editor li {
+	margin: 0.125rem 0;
+}
+
+/* Rich compose + message bubbles: use real font weights (Outfit must load 600/700). */
+.chat-compose-editor strong,
+.chat-compose-editor b,
+.chat-compose-editor span[style*="font-weight: bold"],
+.chat-compose-editor span[style*="font-weight:bold"],
+.chat-compose-editor span[style*="font-weight: 700"],
+.chat-compose-editor span[style*="font-weight:700"],
+.chat-markdown strong,
+.chat-markdown b {
+	font-weight: 700;
+}
+
+.chat-compose-editor em,
+.chat-compose-editor i,
+.chat-markdown em {
+	font-style: italic;
+}
+
+.chat-compose-editor u,
+.chat-markdown u {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.chat-compose-editor s,
+.chat-compose-editor strike,
+.chat-compose-editor del,
+.chat-markdown del {
+	text-decoration: line-through;
+}
+
 /* Reply Message Styles */
 .message-reply {
 	margin-bottom: 8px;
@@ -1223,7 +1298,7 @@ pre[class*="language-"] {
 }
 
 .message-reply-label {
-	font-size: 11px;
+	font-size: var(--chat-font-reply-label, 11px);
 	font-weight: 500;
 	color: #64748b;
 	text-transform: uppercase;
@@ -1235,7 +1310,7 @@ pre[class*="language-"] {
 }
 
 .message-reply-sender {
-	font-size: 11px;
+	font-size: var(--chat-font-reply-label, 11px);
 	font-weight: 600;
 	color: #465fff;
 }
@@ -1245,7 +1320,7 @@ pre[class*="language-"] {
 }
 
 .message-reply-time {
-	font-size: 10px;
+	font-size: var(--chat-font-reply-time, 10px);
 	color: #64748b;
 }
 
@@ -1254,7 +1329,7 @@ pre[class*="language-"] {
 }
 
 .message-reply-content {
-	font-size: 13px;
+	font-size: var(--chat-font-reply-content, 13px);
 	color: #475569;
 	line-height: 1.3;
 	overflow: hidden;

@@ -1,5 +1,6 @@
-import React from 'react';
-import { Message } from '@/app-api/chatApi';
+import React from "react";
+import { Message } from "@/app-api/chatApi";
+import { stripMarkdown } from "@/utils/chatMarkdown";
 
 interface MessageReplyProps {
 	replyData: Message['replyData'];
@@ -25,10 +26,10 @@ const MessageReply: React.FC<MessageReplyProps> = ({ replyData }) => {
 				<span className="message-reply-time">{formatTime(replyData.time)}</span>
 			</div>
 			<div className="message-reply-content">
-				{replyData.content.length > 100 
-					? `${replyData.content.substring(0, 100)}...` 
-					: replyData.content
-				}
+				{(() => {
+					const plain = stripMarkdown(replyData.content);
+					return plain.length > 100 ? `${plain.substring(0, 100)}...` : plain;
+				})()}
 			</div>
 		</div>
 	);

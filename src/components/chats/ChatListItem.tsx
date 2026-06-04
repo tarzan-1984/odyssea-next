@@ -10,6 +10,7 @@ import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import { MoreDotIcon, SoundOnIcon, SoundOffIcon, PinIcon, PushPinIcon } from "@/icons";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
+import { stripMarkdown } from "@/utils/chatMarkdown";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -73,7 +74,7 @@ export default function ChatListItem({
 			if (chatRoom.lastMessage.fileUrl) {
 				return `📎 ${chatRoom.lastMessage.fileName || "File"}`;
 			}
-			return chatRoom.lastMessage.content;
+			return stripMarkdown(chatRoom.lastMessage.content);
 		}
 		return "No messages yet";
 	};
@@ -352,7 +353,7 @@ export default function ChatListItem({
 					</span>
 				</div>
 				<div className="flex items-center gap-1">
-					<p className="text-sm text-gray-500 dark:text-gray-400 truncate flex-1">
+					<p className="chat-msg-body text-gray-500 dark:text-gray-400 truncate flex-1">
 						{getChatLastMessage(chatRoom)}
 					</p>
 					{isPinned && (

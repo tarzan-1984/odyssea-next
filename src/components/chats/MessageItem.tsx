@@ -8,6 +8,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
 import MessageReply from "./MessageReply";
+import ChatMessageContent from "./ChatMessageContent";
 import FilePreview from "./FilePreview";
 import MessageAttachmentsGrid from "./MessageAttachmentsGrid";
 import MessageReactions from "./MessageReactions";
@@ -81,7 +82,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	})();
 
 	const incomingRoleAndTime = !isSender ? (
-		<p className="text-gray-500 text-theme-xs dark:text-gray-400">
+		<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
 			{`${incomingRoleLabel}, ${formatTime(message.createdAt)}`}
 		</p>
 	) : null;
@@ -100,7 +101,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{shouldShowPhoneUnderName ? (
 					<a
 						href={telHref(driverPhoneDisplay)}
-						className="inline-block text-theme-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+						className="chat-msg-meta inline-block font-medium text-brand-600 hover:underline dark:text-brand-400"
 					>
 						{driverPhoneDisplay}
 					</a>
@@ -156,7 +157,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{!isSender &&
 					senderNameLabel &&
 					(showLegacySingleFile || message.content || multiAttachments) ? (
-					<p className="mb-1.5 text-sm font-medium text-gray-800 dark:text-white/90">
+					<p className="chat-msg-name mb-1.5 font-medium text-gray-800 dark:text-white/90">
 						{senderNameLabel}
 					</p>
 				) : null}
@@ -168,7 +169,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && <MessageReply replyData={message.replyData} />}
 								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
 								{message.content?.trim() ? (
-									<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+									<ChatMessageContent content={message.content} />
 								) : null}
 							</div>
 							<MessageDropdown
@@ -191,7 +192,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										{message.replyData && <MessageReply replyData={message.replyData} />}
 										<MessageAttachmentsGrid items={multiAttachments} />
 										{message.content?.trim() ? (
-											<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+											<ChatMessageContent content={message.content} />
 										) : null}
 									</div>
 								</IncomingMessageBubble>
@@ -313,11 +314,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										/>
 									</svg>
 									<div className="flex-1 min-w-0">
-										<p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+										<p className="chat-msg-body font-medium text-gray-900 dark:text-white truncate">
 											{message.fileName || "Download file"}
 										</p>
 										{message.fileSize && (
-											<p className="text-xs text-gray-500 dark:text-gray-400">
+											<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
 												{Math.round(message.fileSize / 1024)}KB
 											</p>
 										)}
@@ -388,11 +389,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									/>
 								</svg>
 								<div className="flex-1 min-w-0">
-									<p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+									<p className="chat-msg-body font-medium text-gray-900 dark:text-white truncate">
 										{message.fileName || "Download file"}
 									</p>
 									{message.fileSize && (
-										<p className="text-xs text-gray-500 dark:text-gray-400">
+										<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
 											{Math.round(message.fileSize / 1024)}KB
 										</p>
 									)}
@@ -452,7 +453,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && (
 									<MessageReply replyData={message.replyData} />
 								)}
-								<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+								<ChatMessageContent content={message.content} />
 							</div>
 							<MessageDropdown
 								message={message}
@@ -470,7 +471,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										{message.replyData && (
 											<MessageReply replyData={message.replyData} />
 										)}
-										<p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+										<ChatMessageContent content={message.content} />
 									</div>
 								</IncomingMessageBubble>
 								<MessageDropdown
@@ -506,7 +507,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 							senderId={message.senderId}
 							className="flex-shrink-0"
 						/>
-						<p className="text-gray-500 text-theme-xs dark:text-gray-400">
+						<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
 							{formatTime(message.createdAt)}
 						</p>
 					</div>

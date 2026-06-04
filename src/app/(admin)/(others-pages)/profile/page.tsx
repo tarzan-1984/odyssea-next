@@ -5,6 +5,7 @@ import React from "react";
 import { useUserInit } from "@/hooks/useUserInit";
 import UserContactCard from "@/components/user-profile/UserContactCard";
 import NotificationSoundSettings from "@/components/user-profile/NotificationSoundSettings";
+import ChatFontSizeSettings from "@/components/user-profile/ChatFontSizeSettings";
 import Link from "next/link";
 
 export default function Profile() {
@@ -38,7 +39,10 @@ export default function Profile() {
 				</div>
 				<div className="space-y-6">
 					<UserMetaCard user={currentUser} />
-					<NotificationSoundSettings />
+					<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+						<NotificationSoundSettings />
+						<ChatFontSizeSettings />
+					</div>
 					<UserContactCard user={currentUser} />
 				</div>
 			</div>

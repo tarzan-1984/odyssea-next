@@ -9,6 +9,7 @@ import AccessTokenRefreshInitializer from "@/components/common/AccessTokenRefres
 import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
 import NotificationsInitializer from "@/components/common/NotificationsInitializer";
 import { ToastNotificationManager } from "@/components/notifications/ToastNotificationManager";
+import ChatFontSizeCssSync from "@/components/chat/ChatFontSizeCssSync";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 const queryClient = new QueryClient()
@@ -24,6 +25,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 						<ChatSyncInitializer />
 						<NotificationsInitializer />
 						<ToastNotificationManager />
+						<ChatFontSizeCssSync />
 						{children}
 					</WebSocketProvider>
 				</SidebarProvider>

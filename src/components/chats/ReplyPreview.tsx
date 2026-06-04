@@ -1,5 +1,6 @@
-import React from 'react';
-import { Message } from '@/app-api/chatApi';
+import React from "react";
+import { Message } from "@/app-api/chatApi";
+import { stripMarkdown } from "@/utils/chatMarkdown";
 
 interface ReplyPreviewProps {
 	replyData: Message['replyData'];
@@ -27,10 +28,10 @@ const ReplyPreview: React.FC<ReplyPreviewProps> = ({ replyData, onCancel }) => {
 					<span className="reply-preview-time">{formatTime(replyData.time)}</span>
 				</div>
 				<div className="reply-preview-message">
-					{replyData.content.length > 100 
-						? `${replyData.content.substring(0, 100)}...` 
-						: replyData.content
-					}
+					{(() => {
+						const plain = stripMarkdown(replyData.content);
+						return plain.length > 100 ? `${plain.substring(0, 100)}...` : plain;
+					})()}
 				</div>
 			</div>
 			<button 

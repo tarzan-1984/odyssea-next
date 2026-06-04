@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { CHAT_TOAST_AUTO_CLOSE_MS } from "@/constants/toastNotifications";
+import { stripMarkdown } from "@/utils/chatMarkdown";
 import { useUserStore } from "@/stores/userStore";
 
 interface ToastNotificationProps {
@@ -75,9 +76,9 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	};
 
 	const formatMessageContent = (content: string) => {
-		// Truncate message to fit in two lines
-		if (content.length <= 60) return content;
-		return content.substring(0, 57) + "...";
+		const plain = stripMarkdown(content);
+		if (plain.length <= 60) return plain;
+		return plain.substring(0, 57) + "...";
 	};
 
 	const generateInitials = (name: string) => {

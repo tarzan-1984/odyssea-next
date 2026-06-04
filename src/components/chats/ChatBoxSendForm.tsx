@@ -13,6 +13,17 @@ import ReplyPreview from "./ReplyPreview";
 import MessageTemplatesModal from "./MessageTemplatesModal";
 import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
+import ChatFormatToolbar, { type ChatFormatAction } from "./ChatFormatToolbar";
+import ChatRichComposeInput from "./ChatRichComposeInput";
+import { useEditorFormatState } from "@/hooks/useEditorFormatState";
+import {
+	applyEditorFormat,
+	formatActionToCommand,
+	getEditorPlainText,
+	htmlToMarkdown,
+	insertTextAtSelection,
+	type EditorFormatCommand,
+} from "@/utils/chatRichEditor";
 
 export type ChatAttachmentPayload = {
 	fileUrl: string;
@@ -44,6 +55,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		ref
 	) {
 		const [message, setMessage] = useState<string>("");
+		const [composeResetKey, setComposeResetKey] = useState(0);
 		const [isSending, setIsSending] = useState(false);
 
 		const [attachedFiles, setAttachedFiles] = useState<
@@ -54,20 +66,33 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
 		const emojiButtonRef = useRef<HTMLButtonElement>(null);
 		const emojiPickerRef = useRef<HTMLDivElement>(null);
-		const textareaRef = useRef<HTMLTextAreaElement>(null);
+		const editorRef = useRef<HTMLDivElement>(null);
 		const fileInputRef = useRef<HTMLInputElement>(null);
+		const { formatState, refreshFormatState } = useEditorFormatState(
+			editorRef,
+			composeResetKey
+		);
 
-		const TEXTAREA_MIN_PX = 36;
-		const TEXTAREA_MAX_PX = 120;
-
-		const adjustTextareaHeight = () => {
-			const el = textareaRef.current;
-			if (!el) {
-				return;
+		const syncEditorContent = useCallback(() => {
+			const el = editorRef.current;
+			if (!el) return;
+			const markdown = htmlToMarkdown(el.innerHTML);
+			const plain = getEditorPlainText(el);
+			setMessage(markdown);
+			if (onTyping) {
+				onTyping(plain.length > 0);
 			}
-			el.style.height = "auto";
-			el.style.height = `${Math.min(Math.max(el.scrollHeight, TEXTAREA_MIN_PX), TEXTAREA_MAX_PX)}px`;
-		};
+		}, [onTyping]);
+
+		const handleContentChange = useCallback(
+			(markdown: string, plainText: string) => {
+				setMessage(markdown);
+				if (onTyping) {
+					onTyping(plainText.length > 0);
+				}
+			},
+			[onTyping]
+		);
 
 		const handleSendMessage = async () => {
 			if (!message.trim() && attachedFiles.length === 0) return;
@@ -93,6 +118,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 
 				// Reset form
 				setMessage("");
+				setComposeResetKey(k => k + 1);
 				setAttachedFiles([]);
 				setShowEmojiPicker(false);
 
@@ -103,8 +129,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 
 				// Focus back to input after sending message
 				requestAnimationFrame(() => {
-					textareaRef.current?.focus();
-					adjustTextareaHeight();
+					editorRef.current?.focus();
 				});
 			} catch (error) {
 				console.error("Failed to send message:", error);
@@ -113,7 +138,46 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			}
 		};
 
-		const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		const applyFormatAction = useCallback(
+			(action: ChatFormatAction) => {
+				const el = editorRef.current;
+				if (!el || disabled || isSending || isUploadingAttachments) {
+					return;
+				}
+
+				el.focus();
+				const command = formatActionToCommand(action);
+				if (command) {
+					applyEditorFormat(command);
+				}
+				requestAnimationFrame(() => {
+					syncEditorContent();
+					refreshFormatState();
+				});
+			},
+			[disabled, isSending, isUploadingAttachments, syncEditorContent, refreshFormatState]
+		);
+
+		const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+			if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+				const shortcutMap: Record<string, EditorFormatCommand> = {
+					b: "bold",
+					i: "italic",
+					u: "underline",
+				};
+				const command = shortcutMap[e.key.toLowerCase()];
+				if (command) {
+					e.preventDefault();
+					editorRef.current?.focus();
+					applyEditorFormat(command);
+					requestAnimationFrame(() => {
+						syncEditorContent();
+						refreshFormatState();
+					});
+					return;
+				}
+			}
+
 			if (e.key !== "Enter" || e.shiftKey) {
 				return;
 			}
@@ -122,16 +186,6 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			}
 			e.preventDefault();
 			handleSendMessage();
-		};
-
-		const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-			const value = e.target.value;
-			setMessage(value);
-
-			// Send typing indicator
-			if (onTyping) {
-				onTyping(value.trim().length > 0);
-			}
 		};
 
 		const isFileAllowed = (file: File): boolean => {
@@ -244,7 +298,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			return `pasted-file-${index + 1}.${extension}`;
 		};
 
-		const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+		const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
 			const itemFiles = Array.from(e.clipboardData.items ?? [])
 				.filter(item => item.kind === "file")
 				.map(item => item.getAsFile())
@@ -252,29 +306,33 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			const clipboardFiles =
 				itemFiles.length > 0 ? itemFiles : Array.from(e.clipboardData.files ?? []);
 			const files = clipboardFiles.map((file, index) => {
-					const name = getClipboardFileName(file, index);
-					if (file.name === name) return file;
+				const name = getClipboardFileName(file, index);
+				if (file.name === name) return file;
 
-					return new File([file], name, {
-						type: file.type,
-						lastModified: file.lastModified,
-					});
+				return new File([file], name, {
+					type: file.type,
+					lastModified: file.lastModified,
 				});
+			});
 
-			if (files.length === 0) return;
+			if (files.length > 0) {
+				e.preventDefault();
+				e.stopPropagation();
+				await uploadFiles(files);
+				return;
+			}
 
-			e.preventDefault();
-			e.stopPropagation();
-			await uploadFiles(files);
+			const plain = e.clipboardData.getData("text/plain");
+			if (plain) {
+				e.preventDefault();
+				insertTextAtSelection(editorRef.current, plain);
+				requestAnimationFrame(syncEditorContent);
+			}
 		};
 
 		const handleEmojiSelect = (emoji: string) => {
-			setMessage(prev => prev + emoji);
-			// Focus back to input after emoji selection
-			requestAnimationFrame(() => {
-				textareaRef.current?.focus();
-				adjustTextareaHeight();
-			});
+			insertTextAtSelection(editorRef.current, emoji);
+			requestAnimationFrame(syncEditorContent);
 		};
 
 		// Close emoji picker when clicking outside
@@ -301,10 +359,6 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				document.removeEventListener("mousedown", handleClickOutside);
 			};
 		}, [showEmojiPicker]);
-
-		useEffect(() => {
-			adjustTextareaHeight();
-		}, [message]);
 
 		const removeAttachedFile = (localId: string) => {
 			setAttachedFiles(prev => prev.filter(f => f.localId !== localId));
@@ -429,8 +483,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						handleSendMessage();
 					}}
 				>
-					<div className="relative w-full min-w-0">
-						<div className="absolute left-1 top-2 z-10 flex items-center gap-2 sm:left-3">
+					<div className="relative w-full min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40">
+						<ChatFormatToolbar
+							disabled={disabled || isSending || isUploadingAttachments}
+							activeFormats={formatState}
+							onAction={applyFormatAction}
+						/>
+						<div className="relative">
+						<div className="absolute bottom-1.5 left-1 z-10 flex items-center gap-2 sm:left-2">
 							<button
 								ref={emojiButtonRef}
 								type="button"
@@ -489,17 +549,15 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 							onEmojiSelect={handleEmojiSelect}
 						/>
 
-						<textarea
-							ref={textareaRef}
-							placeholder="Type a message"
-							rows={1}
-							value={message}
-							onChange={handleMessageChange}
+						<ChatRichComposeInput
+							editorRef={editorRef}
+							resetKey={composeResetKey}
+							onContentChange={handleContentChange}
 							onKeyDown={handleKeyDown}
 							onPaste={handlePaste}
 							disabled={disabled || isSending || isUploadingAttachments}
-							className="w-full min-h-9 max-h-[7.5rem] py-2 pl-[4.85rem] pr-5 text-sm leading-snug text-gray-800 bg-transparent border-none outline-hidden resize-none placeholder:text-gray-400 focus:border-0 focus:ring-0 dark:text-white/90 disabled:opacity-50 overflow-y-auto sm:pl-[5rem]"
 						/>
+						</div>
 					</div>
 
 					<div className="flex flex-shrink-0 items-center pb-0.5">
@@ -589,18 +647,16 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					onInsertContent={text => {
 						const t = text.trim();
 						if (!t) return;
-						setMessage(prev => {
-							const p = prev.trim();
-							return p ? `${p}\n${t}` : t;
-						});
-						setTemplatesModalOpen(false);
-						if (onTyping) {
-							onTyping(true);
+						const el = editorRef.current;
+						if (el) {
+							el.focus();
+							const existing = getEditorPlainText(el);
+							const toInsert = existing ? `\n${t}` : t;
+							insertTextAtSelection(el, toInsert);
+							syncEditorContent();
 						}
-						requestAnimationFrame(() => {
-							textareaRef.current?.focus();
-							adjustTextareaHeight();
-						});
+						setTemplatesModalOpen(false);
+						requestAnimationFrame(() => editorRef.current?.focus());
 					}}
 				/>
 			</div>
