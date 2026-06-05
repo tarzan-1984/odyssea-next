@@ -17,6 +17,12 @@ import createOfferIcon from "@/icons/create_offer_icon.png";
 import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { parseOfferDateTimeField } from "@/utils/offerDateTimeRange";
+import {
+	isValidLocationFormat,
+	LOCATION_FORMAT_ERROR,
+	normalizeLocationForGeocode,
+	needsLocationGeocode,
+} from "@/utils/offerLocationFormat";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -59,25 +65,6 @@ const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 });
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
-
-/** ZIP pattern: 5 digits, optionally +4 */
-const ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
-
-/** City, State format: "City, State" or "City, State (ZIP)" */
-const CITY_STATE_PATTERN = /^[^,]+\s*,\s*[^,]+$/;
-
-/** "City, ST" with two-letter abbreviation — needs geocoding to add ZIP */
-const CITY_STATE_ABBR_PATTERN = /^([^,]+),\s*([A-Za-z]{2})\s*$/;
-
-function isValidLocationFormat(value: string): boolean {
-	const trimmed = value.trim();
-	if (!trimmed) return true; // Empty is handled elsewhere
-	const normalized = trimmed.replace(/\s/g, "");
-	if (ZIP_PATTERN.test(normalized)) return true;
-	return CITY_STATE_PATTERN.test(trimmed);
-}
-
-const LOCATION_FORMAT_ERROR = "Use format: City, State (e.g. Los Angeles, CA) or ZIP code";
 
 /** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
@@ -392,14 +379,11 @@ export default function CreateOfferModal({
 				return next;
 			});
 
-			// Geocode ZIP or "City, ST" abbreviation to "City, State (ZIP)" format, then commit
-			const needsGeocode =
-				ZIP_PATTERN.test(trimmed.replace(/\s/g, "")) ||
-				CITY_STATE_ABBR_PATTERN.test(trimmed);
+			const geocodeAddress = normalizeLocationForGeocode(trimmed);
 			let finalRows: RouteRow[] | null = null;
-			if (needsGeocode) {
+			if (needsLocationGeocode(trimmed)) {
 				try {
-					const formatted = await offers.geocodeToFormattedAddress(trimmed);
+					const formatted = await offers.geocodeToFormattedAddress(geocodeAddress);
 					if (formatted && formatted !== trimmed) {
 						setRouteRows(prev => {
 							const next = [...prev];
@@ -413,6 +397,15 @@ export default function CreateOfferModal({
 				} catch {
 					// Keep original value on error
 				}
+			} else if (geocodeAddress !== trimmed) {
+				setRouteRows(prev => {
+					const next = [...prev];
+					if (next[index]) {
+						next[index] = { ...next[index], location: geocodeAddress };
+					}
+					finalRows = next;
+					return next;
+				});
 			}
 
 			// Commit after geocoding resolves (or immediately if no geocoding)
