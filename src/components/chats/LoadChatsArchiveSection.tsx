@@ -9,9 +9,9 @@ import { useCurrentUser } from "@/stores/userStore";
 import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "./loadArchivedChatsQueryKey";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 
 const PAGE_SIZE = 10;
-
 
 interface LoadChatsArchiveSectionProps {
 	/** Only fetch when Shipments tab is active */
@@ -91,23 +91,17 @@ export default function LoadChatsArchiveSection({
 		[currentUser?.id]
 	);
 
-	const {
-		data,
-		hasNextPage,
-		isFetchingNextPage,
-		fetchNextPage,
-		isLoading,
-		isError,
-	} = useInfiniteQuery({
-		queryKey: ARCHIVED_LOAD_CHATS_QUERY_KEY,
-		queryFn: ({ pageParam }) =>
-			chatApi.getArchivedLoadChatRooms(Number(pageParam) || 1, PAGE_SIZE),
-		enabled: tabActive && expanded,
-		initialPageParam: 1,
-		getNextPageParam: last =>
-			last.pagination?.hasMore ? last.pagination.page + 1 : undefined,
-		staleTime: 10 * 60 * 1000,
-	});
+	const { data, hasNextPage, isFetchingNextPage, fetchNextPage, isLoading, isError } =
+		useInfiniteQuery({
+			queryKey: ARCHIVED_LOAD_CHATS_QUERY_KEY,
+			queryFn: ({ pageParam }) =>
+				chatApi.getArchivedLoadChatRooms(Number(pageParam) || 1, PAGE_SIZE),
+			enabled: tabActive && expanded,
+			initialPageParam: 1,
+			getNextPageParam: last =>
+				last.pagination?.hasMore ? last.pagination.page + 1 : undefined,
+			staleTime: 10 * 60 * 1000,
+		});
 
 	useEffect(() => {
 		const root = scrollRootRef.current;
@@ -116,24 +110,20 @@ export default function LoadChatsArchiveSection({
 			return;
 		}
 
-		const observer = new IntersectionObserver(entries => {
-			const hit = entries.some(e => e.isIntersecting);
-			if (hit && hasNextPage && !isFetchingNextPage) {
-				fetchNextPage().catch(() => {});
-			}
-		}, { root, rootMargin: "100px", threshold: 0 });
+		const observer = new IntersectionObserver(
+			entries => {
+				const hit = entries.some(e => e.isIntersecting);
+				if (hit && hasNextPage && !isFetchingNextPage) {
+					fetchNextPage().catch(() => {});
+				}
+			},
+			{ root, rootMargin: "100px", threshold: 0 }
+		);
 
 		observer.observe(sentinel);
 
 		return () => observer.disconnect();
-	}, [
-		tabActive,
-		expanded,
-		hasNextPage,
-		isFetchingNextPage,
-		fetchNextPage,
-		data?.pages?.length,
-	]);
+	}, [tabActive, expanded, hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages?.length]);
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
@@ -155,7 +145,9 @@ export default function LoadChatsArchiveSection({
 		const q = debouncedArchiveSearch.trim().toLowerCase();
 		if (!q) return archivedRooms;
 		return archivedRooms.filter(room =>
-			getArchiveChatDisplayName(room).toLowerCase().includes(q)
+			chatRoomMatchesSearchQuery(room, q, getArchiveChatDisplayName, {
+				includeParticipantPhones: true,
+			})
 		);
 	}, [archivedRooms, debouncedArchiveSearch, getArchiveChatDisplayName]);
 
@@ -171,7 +163,10 @@ export default function LoadChatsArchiveSection({
 					<span className="text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
 						Archive
 					</span>
-					<span className="ml-auto shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true">
+					<span
+						className="ml-auto shrink-0 text-gray-500 dark:text-gray-400"
+						aria-hidden="true"
+					>
 						{expanded ? (
 							<ChevronUpIcon className="h-4 w-4" />
 						) : (
@@ -237,75 +232,84 @@ export default function LoadChatsArchiveSection({
 							ref={scrollRootRef}
 							className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
 						>
-					{isLoading && archivedRooms.length === 0 ? (
-						<div className="px-3 py-4 text-center text-sm text-gray-500">
-							Loading archived…
-						</div>
-					) : isError ? (
-						<div className="px-3 py-4 text-center text-sm text-red-500">
-							Failed to load archive
-						</div>
-					) : archivedRooms.length === 0 ? (
-						<div className="px-3 py-4 text-center text-sm text-gray-500">
-							No archived shipments yet
-						</div>
-					) : filteredArchivedRooms.length === 0 ? (
-						<div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-							{debouncedArchiveSearch.trim() ? (
-								<>No chats found</>
+							{isLoading && archivedRooms.length === 0 ? (
+								<div className="px-3 py-4 text-center text-sm text-gray-500">
+									Loading archived…
+								</div>
+							) : isError ? (
+								<div className="px-3 py-4 text-center text-sm text-red-500">
+									Failed to load archive
+								</div>
+							) : archivedRooms.length === 0 ? (
+								<div className="px-3 py-4 text-center text-sm text-gray-500">
+									No archived shipments yet
+								</div>
+							) : filteredArchivedRooms.length === 0 ? (
+								<div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+									{debouncedArchiveSearch.trim() ? (
+										<>No chats found</>
+									) : (
+										<>No archived shipments yet</>
+									)}
+								</div>
 							) : (
-								<>No archived shipments yet</>
-							)}
-						</div>
-					) : (
-						<ul className="divide-y divide-gray-200 py-1 dark:divide-white/10">
-							{filteredArchivedRooms.map(chatRoom => {
-								const isSelected = selectedChatId === chatRoom.id;
-								const title = archivedChatTitle(chatRoom);
-								const displayRoom =
-									chatRoom.name === title ? chatRoom : { ...chatRoom, name: title };
+								<ul className="divide-y divide-gray-200 py-1 dark:divide-white/10">
+									{filteredArchivedRooms.map(chatRoom => {
+										const isSelected = selectedChatId === chatRoom.id;
+										const title = archivedChatTitle(chatRoom);
+										const displayRoom =
+											chatRoom.name === title
+												? chatRoom
+												: { ...chatRoom, name: title };
 
-								const status =
-									displayRoom?.type === "DIRECT" &&
-									displayRoom.participants.length === 2
-										? (() => {
-												const otherParticipant = displayRoom.participants.find(
-													p => p.user.id !== currentUser?.id
-												);
-												if (
-													otherParticipant &&
-													webSocketChatSync.isUserOnline
-												) {
-													return webSocketChatSync.isUserOnline(otherParticipant.user.id)
-														? "online"
-														: "offline";
+										const status =
+											displayRoom?.type === "DIRECT" &&
+											displayRoom.participants.length === 2
+												? (() => {
+														const otherParticipant =
+															displayRoom.participants.find(
+																p => p.user.id !== currentUser?.id
+															);
+														if (
+															otherParticipant &&
+															webSocketChatSync.isUserOnline
+														) {
+															return webSocketChatSync.isUserOnline(
+																otherParticipant.user.id
+															)
+																? "online"
+																: "offline";
+														}
+														return "offline";
+													})()
+												: "offline";
+
+										return (
+											<ChatListItem
+												key={`arch-${chatRoom.id}`}
+												chatRoom={displayRoom}
+												isSelected={isSelected}
+												status={status}
+												onChatSelect={onChatSelect}
+												isUserOnline={webSocketChatSync.isUserOnline}
+												onChatRoomUpdate={() =>
+													loadChatRooms({ force: true })
 												}
-												return "offline";
-										  })()
-										: "offline";
-
-								return (
-									<ChatListItem
-										key={`arch-${chatRoom.id}`}
-										chatRoom={displayRoom}
-										isSelected={isSelected}
-										status={status}
-										onChatSelect={onChatSelect}
-										isUserOnline={webSocketChatSync.isUserOnline}
-										onChatRoomUpdate={() => loadChatRooms({ force: true })}
-										isMenuOpen={openMenuChatId === chatRoom.id}
-										onMenuToggle={open => setOpenMenuChatId(open ? chatRoom.id : null)}
-									/>
-								);
-							})}
-						</ul>
-					)}
-					<div ref={sentinelRef} aria-hidden className="h-2 w-full shrink-0" />
-					{isFetchingNextPage && (
-						<div className="border-t border-gray-200 px-3 py-2 text-center text-xs text-gray-500 dark:border-white/10">
-							Loading more…
-						</div>
-					)}
+												isMenuOpen={openMenuChatId === chatRoom.id}
+												onMenuToggle={open =>
+													setOpenMenuChatId(open ? chatRoom.id : null)
+												}
+											/>
+										);
+									})}
+								</ul>
+							)}
+							<div ref={sentinelRef} aria-hidden className="h-2 w-full shrink-0" />
+							{isFetchingNextPage && (
+								<div className="border-t border-gray-200 px-3 py-2 text-center text-xs text-gray-500 dark:border-white/10">
+									Loading more…
+								</div>
+							)}
 						</div>
 					</div>
 				)}
