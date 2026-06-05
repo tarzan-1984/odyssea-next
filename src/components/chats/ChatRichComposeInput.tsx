@@ -6,6 +6,7 @@ import {
 	getEditorPlainText,
 	htmlToMarkdown,
 	isEditorEmpty,
+	resetComposeEditorHeight,
 } from "@/utils/chatRichEditor";
 
 const COMPOSE_FIELD_CLASS =
@@ -50,8 +51,14 @@ export default function ChatRichComposeInput({
 		const el = editorRef.current;
 		if (!el) return;
 		clearEditor(el);
+		resetComposeEditorHeight(el);
 		setShowPlaceholder(true);
 		onContentChange("", "");
+		requestAnimationFrame(() => {
+			const node = editorRef.current;
+			if (!node) return;
+			resetComposeEditorHeight(node);
+		});
 	}, [resetKey, editorRef, onContentChange]);
 
 	const adjustHeight = useCallback(() => {

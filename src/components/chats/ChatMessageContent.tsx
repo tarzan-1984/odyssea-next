@@ -53,7 +53,10 @@ export default function ChatMessageContent({
 		<div className={rootClass}>
 			<ReactMarkdown
 				remarkPlugins={[remarkGfm, remarkBreaks]}
-				rehypePlugins={[rehypeRaw, [rehypeSanitize, { schema: chatMarkdownSanitizeSchema }]]}
+				rehypePlugins={[
+					rehypeRaw,
+					[rehypeSanitize, { schema: chatMarkdownSanitizeSchema }],
+				]}
 				components={{
 					a: ({ href, children }) => {
 						if (!href || !isAllowedChatHref(href)) {
@@ -74,19 +77,23 @@ export default function ChatMessageContent({
 							</a>
 						);
 					},
-					p: ({ children }) => (
-						<p className="chat-msg-body mb-1 last:mb-0 whitespace-pre-wrap">{children}</p>
-					),
+					p: ({ children }) => <p className="chat-msg-body mb-2 last:mb-0">{children}</p>,
 					ul: ({ children }) => (
-						<ul className="chat-msg-body my-1 list-disc space-y-0.5 pl-5">{children}</ul>
+						<ul className="chat-msg-body my-1 list-disc space-y-0.5 pl-5">
+							{children}
+						</ul>
 					),
 					ol: ({ children }) => (
-						<ol className="chat-msg-body my-1 list-decimal space-y-0.5 pl-5">{children}</ol>
+						<ol className="chat-msg-body my-1 list-decimal space-y-0.5 pl-5">
+							{children}
+						</ol>
 					),
 					li: ({ children }) => <li className="chat-msg-body">{children}</li>,
 					strong: ({ children }) => <strong className="font-bold">{children}</strong>,
 					em: ({ children }) => <em className="italic">{children}</em>,
-					del: ({ children }) => <del className="line-through opacity-90">{children}</del>,
+					del: ({ children }) => (
+						<del className="line-through opacity-90">{children}</del>
+					),
 					u: ({ children }) => <u className="underline">{children}</u>,
 				}}
 			>

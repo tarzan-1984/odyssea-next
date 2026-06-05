@@ -45,9 +45,17 @@ export function insertTextAtSelection(editor: HTMLElement | null, text: string):
 	document.execCommand("insertText", false, text);
 }
 
+export const COMPOSE_EDITOR_MIN_HEIGHT_PX = 36;
+
 export function clearEditor(editor: HTMLElement | null): void {
 	if (!editor) return;
 	editor.innerHTML = "";
+}
+
+/** Reset auto-grown compose field height after send/clear. */
+export function resetComposeEditorHeight(editor: HTMLElement | null): void {
+	if (!editor) return;
+	editor.style.height = `${COMPOSE_EDITOR_MIN_HEIGHT_PX}px`;
 }
 
 export type EditorFormatState = {
