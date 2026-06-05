@@ -13,6 +13,13 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "../DriversTable/PaginationWithIcon";
 import type { CheckListDriver, CheckListResponse } from "./checkListTypes";
 import CheckListPushModal from "./CheckListPushModal";
+import {
+	bulkCreatePrivateChats,
+	normalizeBulkDirectChatRoom,
+	showBulkPrivateChatsToast,
+} from "./checkListBulkPrivateChats";
+import { useChatStore } from "@/stores/chatStore";
+import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
 const NY_TZ = "America/New_York";
 
@@ -82,6 +89,8 @@ export default function CheckListTable() {
 		useState<CheckListLastLocationSort>("asc");
 	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
+	const [creatingPrivateChats, setCreatingPrivateChats] = useState(false);
+	const addChatRoom = useChatStore(s => s.addChatRoom);
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -178,6 +187,48 @@ export default function CheckListTable() {
 		setCurrentPage(1);
 	};
 
+	const handleBulkCreatePrivateChats = async () => {
+		const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+		if (selected.length === 0 || creatingPrivateChats) return;
+
+		setCreatingPrivateChats(true);
+		try {
+			const summary = await bulkCreatePrivateChats(selected.map(d => d.id));
+
+			for (const item of summary.items) {
+				if (item.status !== "created" || !item.chatRoom) continue;
+				const normalized = normalizeBulkDirectChatRoom(item.chatRoom);
+				addChatRoom(normalized);
+				await indexedDBChatService.addChatRoom(normalized).catch(() => {});
+			}
+
+			showBulkPrivateChatsToast(summary);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Failed to create private chats";
+			const addSystemToast = (
+				window as unknown as {
+					addSystemToastNotification?: (n: {
+						id: string;
+						title: string;
+						message: string;
+						variant?: "error";
+					}) => void;
+				}
+			).addSystemToastNotification;
+			if (typeof addSystemToast === "function") {
+				addSystemToast({
+					id: `check-list-bulk-chats-error-${Date.now()}`,
+					title: "Private chats",
+					message,
+					variant: "error",
+				});
+			}
+		} finally {
+			setCreatingPrivateChats(false);
+		}
+	};
+
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
 			<div className="relative z-20 flex flex-col gap-3 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl lg:flex-row lg:items-center lg:justify-between lg:gap-4">
@@ -209,20 +260,33 @@ export default function CheckListTable() {
 						/>
 					</div>
 					{selectedDriverIds.size > 0 && (
-						<Button
-							type="button"
-							size="sm"
-							variant="primary"
-							className="h-10 shrink-0 whitespace-nowrap"
-							onClick={() => {
-								const selected = drivers.filter(d => selectedDriverIds.has(d.id));
-								if (selected.length > 0) {
-									setPushModalDrivers(selected);
-								}
-							}}
-						>
-							Send push
-						</Button>
+						<>
+							<Button
+								type="button"
+								size="sm"
+								variant="primary"
+								className="h-10 shrink-0 whitespace-nowrap"
+								disabled={creatingPrivateChats}
+								onClick={handleBulkCreatePrivateChats}
+							>
+								Create chat
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant="primary"
+								className="h-10 shrink-0 whitespace-nowrap"
+								disabled={creatingPrivateChats}
+								onClick={() => {
+									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+									if (selected.length > 0) {
+										setPushModalDrivers(selected);
+									}
+								}}
+							>
+								Send push
+							</Button>
+						</>
 					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-2 shrink-0 lg:justify-end">
@@ -452,7 +516,7 @@ export default function CheckListTable() {
 				</div>
 			</div>
 
-			{query.isPending && (
+			{(query.isPending || creatingPrivateChats) && (
 				<div
 					className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 dark:bg-white/10 rounded-xl"
 					aria-hidden
