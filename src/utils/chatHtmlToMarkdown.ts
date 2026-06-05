@@ -91,6 +91,11 @@ function segmentsEndWithNewline(segments: Segment[]): boolean {
 	return !!last?.text.endsWith("\n");
 }
 
+/** contentEditable blank line: empty div or div with only <br>. */
+function isEmptyBlockElement(el: Element): boolean {
+	return !(el.textContent || "").replace(/\u00a0/g, "").trim();
+}
+
 function getFormatsFromElement(el: Element): ChatFormatKind[] {
 	const tag = el.tagName.toLowerCase();
 	const formats: ChatFormatKind[] = [];
@@ -167,6 +172,12 @@ function collectSegments(node: Node, inherited: ChatFormatKind[]): Segment[] {
 		return segments;
 	}
 
+	// Blank line in the editor (empty div / div with only <br>) → paragraph break.
+	if (BLOCK_TAGS.has(tag) && isEmptyBlockElement(el)) {
+		segments.push({ text: "\n", formats: [] });
+		return segments;
+	}
+
 	const nodeFormats = getFormatsFromElement(el);
 	const combined = normalizeFormats([...inherited, ...nodeFormats]);
 
@@ -176,8 +187,13 @@ function collectSegments(node: Node, inherited: ChatFormatKind[]): Segment[] {
 		segments.push(...collectSegments(child, combined));
 
 		if (child.nodeType === Node.ELEMENT_NODE) {
-			const childTag = (child as Element).tagName.toLowerCase();
-			if (BLOCK_TAGS.has(childTag) && !segmentsEndWithNewline(segments)) {
+			const childEl = child as Element;
+			const childTag = childEl.tagName.toLowerCase();
+			if (
+				BLOCK_TAGS.has(childTag) &&
+				!isEmptyBlockElement(childEl) &&
+				!segmentsEndWithNewline(segments)
+			) {
 				segments.push({ text: "\n", formats: [] });
 			}
 		}
@@ -217,7 +233,9 @@ export function htmlToMarkdownFromDocument(html: string, doc: Document): string 
 	const div = doc.createElement("div");
 	div.innerHTML = trimmed;
 	const segments = normalizeSegments(collectSegments(div, []));
-	return serializeSegments(segments).replace(/\n{3,}/g, "\n\n").trim();
+	return serializeSegments(segments)
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
 }
 
 export function htmlToMarkdown(html: string): string {

@@ -77,7 +77,7 @@ export default function ChatMessageContent({
 							</a>
 						);
 					},
-					p: ({ children }) => <p className="chat-msg-body mb-2 last:mb-0">{children}</p>,
+					p: ({ children }) => <p className="chat-msg-body mb-0">{children}</p>,
 					ul: ({ children }) => (
 						<ul className="chat-msg-body my-1 list-disc space-y-0.5 pl-5">
 							{children}

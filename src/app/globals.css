@@ -1219,6 +1219,9 @@ pre[class*="language-"] {
 
 .chat-markdown {
 	color: inherit;
+	display: flex;
+	flex-direction: column;
+	gap: var(--chat-font-body-lh, 20px);
 }
 
 .chat-markdown > :first-child {
