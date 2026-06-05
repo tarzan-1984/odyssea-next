@@ -11,6 +11,7 @@ import { MoreDotIcon, SoundOnIcon, SoundOffIcon, PinIcon, PushPinIcon } from "@/
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { stripMarkdown } from "@/utils/chatMarkdown";
+import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -44,7 +45,7 @@ export default function ChatListItem({
 		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
-				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
+				return formatChatPeerDisplayName(otherParticipant.user);
 			}
 		}
 

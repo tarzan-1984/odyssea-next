@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +12,6 @@ import DateTimePicker from "@/components/form/DateTimePicker";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
-import createOfferIcon from "@/icons/create_offer_icon.png";
 import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { parseOfferDateTimeField } from "@/utils/offerDateTimeRange";
@@ -595,17 +593,6 @@ export default function CreateOfferModal({
 				onSubmit={handleSubmit}
 				className="relative flex max-h-[95vh] min-h-0 flex-col overflow-hidden"
 			>
-				{isSubmitting && (
-					<div className="create-offer-drive-icon" aria-hidden>
-						<Image
-							src={createOfferIcon}
-							alt=""
-							width={127}
-							height={99}
-							className="object-contain"
-						/>
-					</div>
-				)}
 				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-6 [scrollbar-gutter:stable] sm:p-8">
 					<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
 						Create Offer
@@ -820,6 +807,11 @@ export default function CreateOfferModal({
 				</div>
 
 				<div className="flex shrink-0 items-center justify-end gap-3 px-6 pb-6 pt-4 sm:px-8 sm:pb-8">
+					{isSubmitting && (
+						<div className="mr-1 flex items-center" aria-hidden>
+							<SpinnerOne />
+						</div>
+					)}
 					<Button
 						type="button"
 						size="sm"

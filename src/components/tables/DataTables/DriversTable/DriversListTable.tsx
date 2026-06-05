@@ -116,6 +116,13 @@ function formatDateMmDdYy(date: Date | null): string {
 	return `${m}/${d}/${y}`;
 }
 
+/** Test driver on drivers-list — selectable and offerable without Address filter. */
+const TEST_DRIVER_EXTERNAL_ID = "3343";
+
+function isTestDriver(item: { id?: string | number }): boolean {
+	return String(item?.id ?? "") === TEST_DRIVER_EXTERNAL_ID;
+}
+
 export interface DriversListTableProps {
 	/** When false, hides the "Actions" dropdown and Apply button (e.g. in Add drivers modal). Default true. */
 	showActionsInHeader?: boolean;
@@ -219,9 +226,13 @@ export default function DriversListTable({
 	}) =>
 		!existingDriverIdsSet.has(String(item?.id)) &&
 		driverUsesMobileApp(item?.meta_data?.activate_application);
+	const canSelectDriverRow = (item: {
+		id?: string | number;
+		meta_data?: { activate_application?: string };
+	}) => isDriverRowSelectable(item) && (canSelectDrivers || isTestDriver(item));
 	const selectableVisibleDriverIds = visibleDriverIds.filter(id => {
 		const item = filteredResults.find((d: any) => String(d.id) === id);
-		return item != null && isDriverRowSelectable(item);
+		return item != null && canSelectDriverRow(item);
 	});
 	const allVisibleSelected =
 		selectableVisibleDriverIds.length > 0 &&
@@ -238,10 +249,13 @@ export default function DriversListTable({
 		});
 	};
 
-	// Clear selection when address becomes empty
+	// When address is empty, drop all selections except the test driver
 	useEffect(() => {
 		if (!canSelectDrivers) {
-			setSelectedDriverIds([]);
+			setSelectedDriverIds(prev => {
+				const next = prev.filter(id => id === TEST_DRIVER_EXTERNAL_ID);
+				return next.length === prev.length ? prev : next;
+			});
 		}
 	}, [canSelectDrivers]);
 
@@ -259,13 +273,9 @@ export default function DriversListTable({
 	useEffect(() => {
 		const handleMouseUp = () => {
 			const { isActive, startIndex, hasAddedAny } = dragSelectRef.current;
-			if (!canSelectDrivers) {
-				dragSelectRef.current = { isActive: false, startIndex: -1, hasAddedAny: false };
-				return;
-			}
 			if (isActive && !hasAddedAny && startIndex >= 0) {
 				const item = filteredResults[startIndex];
-				if (item && isDriverRowSelectable(item)) {
+				if (item && canSelectDriverRow(item)) {
 					const id = String(item.id);
 					setSelectedDriverIds(prev =>
 						prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -286,6 +296,15 @@ export default function DriversListTable({
 		Boolean(debouncedAddressFilter) && Boolean(driverList?.data?.has_distance_data);
 	const idPosts = driverList?.data?.id_posts ?? {};
 	const colCount = showDistanceColumn ? 10 : 9;
+	const canCreateOffersWithoutAddress =
+		selectedDriverIds.length > 0 &&
+		selectedDriverIds.every(id => {
+			const item = filteredResults.find((d: any) => String(d.id) === id);
+			return item != null && isTestDriver(item);
+		});
+	const canCreateOffers =
+		selectedDriverIds.length > 0 &&
+		(showDistanceColumn || canCreateOffersWithoutAddress);
 
 	/** Map driverId -> empty_miles (rounded) for selected drivers with distance data. Used when creating offers. */
 	const driverEmptyMiles: Record<string, number> = {};
@@ -334,9 +353,7 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={
-										!canSelectDrivers || selectableVisibleDriverIds.length === 0
-									}
+									disabled={selectableVisibleDriverIds.length === 0}
 									onClick={toggleAllVisible}
 									className="ml-2 h-9"
 								>
@@ -351,7 +368,7 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={selectedDriverIds.length === 0 || !showDistanceColumn}
+									disabled={!canCreateOffers}
 									onClick={() => setCreateOfferModalOpen(true)}
 									className="h-9"
 								>
@@ -741,8 +758,7 @@ export default function DriversListTable({
 											const isAlreadyInOffer = existingDriverIdsSet.has(
 												String(item.id)
 											);
-											const canSelectThisRow =
-												canSelectDrivers && isDriverRowSelectable(item);
+											const canSelectThisRow = canSelectDriverRow(item);
 											const isStatusHovered = hoveredStatusRowIndex === i;
 											const isSelected = selectedDriverIds.includes(
 												String(item.id)
@@ -810,7 +826,7 @@ export default function DriversListTable({
 																						];
 																					if (
 																						startItem &&
-																						isDriverRowSelectable(
+																						canSelectDriverRow(
 																							startItem
 																						)
 																					) {
@@ -822,7 +838,7 @@ export default function DriversListTable({
 																					}
 																				}
 																				if (
-																					isDriverRowSelectable(
+																					canSelectDriverRow(
 																						item
 																					)
 																				) {

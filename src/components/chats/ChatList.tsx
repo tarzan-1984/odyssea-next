@@ -14,6 +14,7 @@ import { chatApi } from "@/app-api/chatApi";
 import LoadChatsArchiveSection from "./LoadChatsArchiveSection";
 import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
+import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -146,11 +147,11 @@ export default function ChatList({
 	}, [showOffersTab, activeTab]);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
-		// For DIRECT chats, always show the other participant's name
-		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
+		// For DIRECT and OFFER chats, show the other participant's name
+		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
-				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
+				return formatChatPeerDisplayName(otherParticipant.user);
 			}
 		}
 
