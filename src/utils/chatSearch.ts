@@ -27,8 +27,30 @@ function collectSearchPhones(chatRoom: ChatRoom): string[] {
 	return phones;
 }
 
+function collectSearchExternalIds(chatRoom: ChatRoom): string[] {
+	const externalIds: string[] = [];
+	for (const participant of chatRoom.participants) {
+		const externalId = String(participant.user.externalId ?? "").trim();
+		if (externalId) externalIds.push(externalId);
+	}
+	const lastMessage = chatRoom.lastMessage;
+	if (lastMessage?.sender?.externalId) {
+		externalIds.push(String(lastMessage.sender.externalId).trim());
+	}
+	if (lastMessage?.receiver?.externalId) {
+		externalIds.push(String(lastMessage.receiver.externalId).trim());
+	}
+	return externalIds;
+}
+
+function externalIdMatchesQuery(externalIdRaw: string, qLower: string): boolean {
+	const externalId = externalIdRaw.trim();
+	if (!externalId) return false;
+	return externalId.toLowerCase().includes(qLower);
+}
+
 /**
- * Match chat room against sidebar search (display name + optional participant phones).
+ * Match chat room against sidebar search (display name + optional LOAD participant phones / externalIds).
  */
 export function chatRoomMatchesSearchQuery(
 	chatRoom: ChatRoom,
@@ -51,6 +73,12 @@ export function chatRoomMatchesSearchQuery(
 	const qDigits = normalizePhoneDigits(q);
 	for (const phone of collectSearchPhones(chatRoom)) {
 		if (phoneMatchesQuery(phone, qLower, qDigits)) {
+			return true;
+		}
+	}
+
+	for (const externalId of collectSearchExternalIds(chatRoom)) {
+		if (externalIdMatchesQuery(externalId, qLower)) {
 			return true;
 		}
 	}
