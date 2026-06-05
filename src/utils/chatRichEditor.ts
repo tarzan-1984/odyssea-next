@@ -1,28 +1,10 @@
-import TurndownService from "turndown";
+import { getPlainTextFromHtml, htmlToMarkdown } from "@/utils/chatHtmlToMarkdown";
 
 type FormatWrapKind = "bold" | "italic" | "underline" | "strike";
 
 export type RichEditorFormatAction = { type: "wrap"; kind: FormatWrapKind };
 
-const turndown = new TurndownService({
-	headingStyle: "atx",
-	bulletListMarker: "-",
-	emDelimiter: "*",
-	strongDelimiter: "**",
-});
-
-turndown.addRule("underline", {
-	filter: ["u"],
-	replacement: content => `<u>${content}</u>`,
-});
-
-turndown.addRule("strikethrough", {
-	filter: (node: HTMLElement) =>
-		node.nodeName === "S" ||
-		node.nodeName === "STRIKE" ||
-		node.nodeName === "DEL",
-	replacement: content => `~~${content}~~`,
-});
+export { htmlToMarkdown, getPlainTextFromHtml };
 
 export type EditorFormatCommand = "bold" | "italic" | "underline" | "strikeThrough";
 
@@ -46,14 +28,6 @@ export function formatActionToCommand(action: RichEditorFormatAction): EditorFor
 
 export function applyEditorFormat(command: EditorFormatCommand): void {
 	document.execCommand(command, false);
-}
-
-export function htmlToMarkdown(html: string): string {
-	const trimmed = html.trim();
-	if (!trimmed || trimmed === "<br>") {
-		return "";
-	}
-	return turndown.turndown(trimmed).trim();
 }
 
 export function getEditorPlainText(editor: HTMLElement | null): string {
