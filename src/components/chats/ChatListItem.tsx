@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
+import { renderAvatar } from "@/helpers";
 import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
@@ -12,6 +12,11 @@ import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { stripMarkdown } from "@/utils/chatMarkdown";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import {
+	getOtherChatParticipant,
+	OFFER_CHAT_LIST_AVATAR_CLASS,
+	participantUserToAvatarData,
+} from "@/utils/chatOtherParticipant";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -263,54 +268,21 @@ export default function ChatListItem({
 						})()}
 					</div>
 				) : (
-					// Use renderAvatar for DIRECT and OFFER chats (other participant), or room avatar image
 					(() => {
-						if (chatRoom.type === "OFFER" && chatRoom.avatar) {
-							return (
-								// eslint-disable-next-line @next/next/no-img-element
-								<img
-									src={chatRoom.avatar}
-									alt="avatar"
-									className="w-12 h-12 rounded-full object-cover"
-								/>
-							);
-						}
-
-						if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
-							const otherParticipant = chatRoom.participants.find(
-								p => p.user.id !== currentUser?.id
+						if (chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") {
+							const otherParticipant = getOtherChatParticipant(
+								chatRoom,
+								currentUser?.id
 							);
 							if (otherParticipant) {
-								const photo =
-									otherParticipant.user.avatar ||
-									(otherParticipant.user as { profilePhoto?: string }).profilePhoto;
-								if (photo) {
-									const userData = {
-										firstName: otherParticipant.user.firstName,
-										lastName: otherParticipant.user.lastName,
-										avatar: photo,
-										role: otherParticipant.user.role,
-										userColor: otherParticipant.user.userColor ?? null,
-									};
-									return renderAvatar(userData, "w-12 h-12");
-								}
-								if (chatRoom.type === "OFFER") {
-									return (
-										<div
-											className="h-12 w-12 shrink-0 rounded-full"
-											style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-											aria-hidden
-										/>
-									);
-								}
-								const userData = {
-									firstName: otherParticipant.user.firstName,
-									lastName: otherParticipant.user.lastName,
-									avatar: undefined as string | undefined,
-									role: otherParticipant.user.role,
-									userColor: otherParticipant.user.userColor ?? null,
-								};
-								return renderAvatar(userData, "w-12 h-12");
+								const avatarClassName =
+									chatRoom.type === "OFFER"
+										? OFFER_CHAT_LIST_AVATAR_CLASS
+										: "w-12 h-12";
+								return renderAvatar(
+									participantUserToAvatarData(otherParticipant.user),
+									avatarClassName
+								);
 							}
 						}
 
@@ -326,16 +298,6 @@ export default function ChatListItem({
 							);
 						}
 
-						if (chatRoom.type === "OFFER") {
-							return (
-								<div
-									className="h-12 w-12 shrink-0 rounded-full"
-									style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-									aria-hidden
-								/>
-							);
-						}
-
 						return renderAvatar(null, "w-12 h-12");
 					})()
 				)}
@@ -346,7 +308,11 @@ export default function ChatListItem({
 
 			<div className="flex-1 ml-3 text-left min-w-0">
 				<div className="flex items-center justify-between gap-2">
-					<h3 className="text-base font-medium text-gray-900 dark:text-white truncate flex-shrink min-w-0">
+					<h3
+						className={`font-medium text-gray-900 dark:text-white truncate flex-shrink min-w-0 ${
+							chatRoom.type === "OFFER" ? "text-sm" : "text-base"
+						}`}
+					>
 						{getChatDisplayName(chatRoom)}
 					</h3>
 					<span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">

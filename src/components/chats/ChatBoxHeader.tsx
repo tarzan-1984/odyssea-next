@@ -7,11 +7,16 @@ import { ExternalLink } from "lucide-react";
 import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon, LoadTrackingChatIcon } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
-import { chatRoomPlaceholderBg, renderAvatar } from "@/helpers";
+import { renderAvatar } from "@/helpers";
 import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
+import {
+	CHAT_HEADER_AVATAR_CLASS,
+	getOtherChatParticipant,
+	participantUserToAvatarData,
+} from "@/utils/chatOtherParticipant";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -119,55 +124,16 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								return renderAvatar(null, "w-12 h-12");
 							}
 
-							if (chatRoom.type === "OFFER" && chatRoom.avatar) {
-								return (
-									// eslint-disable-next-line @next/next/no-img-element
-									<img
-										src={chatRoom.avatar}
-										alt="avatar"
-										className="w-12 h-12 rounded-full object-cover"
-									/>
-								);
-							}
-
-							if (
-								(chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") &&
-								chatRoom.participants.length === 2
-							) {
-								const otherParticipant = chatRoom.participants.find(
-									p => p.user.id !== currentUser?.id
+							if (chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") {
+								const otherParticipant = getOtherChatParticipant(
+									chatRoom,
+									currentUser?.id
 								);
 								if (otherParticipant) {
-									const photo =
-										otherParticipant.user.avatar ||
-										(otherParticipant.user as { profilePhoto?: string }).profilePhoto;
-									if (photo) {
-										const userData = {
-											firstName: otherParticipant.user.firstName,
-											lastName: otherParticipant.user.lastName,
-											avatar: photo,
-											role: otherParticipant.user.role,
-											userColor: otherParticipant.user.userColor ?? null,
-										};
-										return renderAvatar(userData, "w-12 h-12");
-									}
-									if (chatRoom.type === "OFFER") {
-										return (
-											<div
-												className="h-12 w-12 shrink-0 rounded-full"
-												style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-												aria-hidden
-											/>
-										);
-									}
-									const userData = {
-										firstName: otherParticipant.user.firstName,
-										lastName: otherParticipant.user.lastName,
-										avatar: undefined as string | undefined,
-										role: otherParticipant.user.role,
-										userColor: otherParticipant.user.userColor ?? null,
-									};
-									return renderAvatar(userData, "w-12 h-12");
+									return renderAvatar(
+										participantUserToAvatarData(otherParticipant.user),
+										CHAT_HEADER_AVATAR_CLASS
+									);
 								}
 							}
 
@@ -199,17 +165,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								);
 							}
 
-							if (chatRoom.type === "OFFER") {
-								return (
-									<div
-										className="h-12 w-12 shrink-0 rounded-full"
-										style={{ backgroundColor: chatRoomPlaceholderBg(chatRoom.id) }}
-										aria-hidden
-									/>
-								);
-							}
-
-							return renderAvatar(null, "w-12 h-12");
+							return renderAvatar(null, CHAT_HEADER_AVATAR_CLASS);
 						})()}
 						{chatRoom &&
 							(() => {

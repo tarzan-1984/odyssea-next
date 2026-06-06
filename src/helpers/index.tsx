@@ -151,6 +151,9 @@ export function renderAvatar(
 		if (className?.includes('w-[50px]') || className?.includes('h-[50px]') || className?.includes('w-12') || className?.includes('h-12')) {
 			return 'text-lg';
 		}
+		if (className?.includes('w-10') || className?.includes('h-10')) {
+			return 'text-sm';
+		}
 		if (className?.includes('w-[40px]') || className?.includes('h-[40px]')) {
 			return 'text-base';
 		}
