@@ -258,6 +258,10 @@ const OffersList = () => {
 																: null;
 
 														const isInactiveDriver = driver.active === false;
+														const hasActiveTimer =
+															!isInactiveDriver &&
+															remainingSeconds != null &&
+															remainingSeconds > 0;
 
 														return (
 															<div
@@ -265,14 +269,18 @@ const OffersList = () => {
 																className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
 																	isInactiveDriver
 																		? "border-transparent bg-[#f5b8ab] dark:border-red-800/35 dark:bg-red-950/50"
-																		: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
+																		: hasActiveTimer
+																			? "border-transparent bg-[#d4e8d7] dark:border-green-800/35 dark:bg-green-950/45"
+																			: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
 																}`}
 															>
 																<span
 																	className={`max-w-[140px] truncate text-xs font-medium ${
 																		isInactiveDriver
 																			? "font-semibold text-[#a20000] dark:text-red-100"
-																			: "text-gray-700 dark:text-gray-300"
+																			: hasActiveTimer
+																				? "font-semibold text-green-900 dark:text-green-100"
+																				: "text-gray-700 dark:text-gray-300"
 																	}`}
 																>
 																	{driverName}
