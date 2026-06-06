@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
+import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 
 /** Rotate left (counter-clockwise) — bundled icon for image modal toolbar */
 function RotateCcwIcon({ className }: { className?: string }) {
@@ -85,7 +86,6 @@ function RotateCwIcon({ className }: { className?: string }) {
 }
 
 /** Zoom uses intrinsic pixel size × factor so overflow/scroll expands with magnification. */
-const MODAL_IMAGE_ZOOM_MIN = 0.5;
 const MODAL_IMAGE_ZOOM_MAX = 5;
 const MODAL_IMAGE_ZOOM_STEP = 1.25;
 /** Space reserved for filename badge at bottom of image modal */
@@ -138,7 +138,26 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	} | null>(null);
 	const [modalZoomUsesPixelSizing, setModalZoomUsesPixelSizing] = useState(false);
 	const modalScrollViewportRef = useRef<HTMLDivElement>(null);
+	const modalFitScaleRef = useRef(1);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
+	const chatImageGallery = useChatImageGalleryOptional();
+	const fileExtension = fileName.toLowerCase().split(".").pop();
+	const isImage =
+		fileExtension &&
+		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff"].includes(
+			fileExtension
+		);
+
+	const openImageViewer = useCallback(() => {
+		if (chatImageGallery && isImage) {
+			chatImageGallery.openImage({ fileUrl, fileName, fileSize });
+			return;
+		}
+		if (fileExtension === "heic" || fileExtension === "heif") {
+			setIsModalImageLoading(true);
+		}
+		setIsImageModalOpen(true);
+	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension]);
 
 	const applyModalFitToViewport = useCallback(
 		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
@@ -148,6 +167,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			const vw = viewport.clientWidth;
 			const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
 			const fit = computeModalFitScale(nat.w, nat.h, vw, vh, rotationDeg);
+			modalFitScaleRef.current = fit;
 			setModalImageScale(fit);
 			setModalZoomUsesPixelSizing(true);
 		},
@@ -159,6 +179,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		setModalImageScale(1);
 		setModalImgNaturalSize(null);
 		setModalZoomUsesPixelSizing(false);
+		modalFitScaleRef.current = 1;
 		setIsImageModalOpen(false);
 	}, []);
 
@@ -176,13 +197,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		});
 		return () => cancelAnimationFrame(frame);
 	}, [isImageModalOpen, modalImgNaturalSize, modalImageRotationDeg, applyModalFitToViewport]);
-
-	const fileExtension = fileName.toLowerCase().split(".").pop();
-	const isImage =
-		fileExtension &&
-		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff"].includes(
-			fileExtension
-		);
 
 	useEffect(() => {
 		const loadPreview = async () => {
@@ -367,7 +381,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						} overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity`}
 						onClick={e => {
 							e.stopPropagation();
-							setIsImageModalOpen(true);
+							openImageViewer();
 						}}
 					>
 						<img
@@ -396,11 +410,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						}`}
 						onClick={e => {
 							e.stopPropagation();
-							// Reset modal loading state when opening modal for HEIC files
-							if (fileExtension === "heic" || fileExtension === "heif") {
-								setIsModalImageLoading(true);
-							}
-							setIsImageModalOpen(true);
+							openImageViewer();
 						}}
 					>
 						{isLoading && <HeicConvertingOverlay />}
@@ -525,8 +535,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				</div>
 			)}
 
-			{/* Image Modal: outer column is non-scrolling so toolbar + close stay fixed; only the middle pane scrolls */}
-			{isImage && (
+			{/* Fallback image modal when gallery provider is not available (e.g. Files modal) */}
+			{isImage && !chatImageGallery && (
 				<Modal
 					isOpen={isImageModalOpen}
 					onClose={closeImageModal}
@@ -542,9 +552,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							aria-label="Zoom in"
 							disabled={
 								modalImgNaturalSize === null ||
-								(modalZoomUsesPixelSizing &&
-									modalImageScale * MODAL_IMAGE_ZOOM_STEP >
-										MODAL_IMAGE_ZOOM_MAX + 0.0001)
+								modalImageScale * MODAL_IMAGE_ZOOM_STEP >
+									MODAL_IMAGE_ZOOM_MAX + 0.0001
 							}
 							onClick={e => {
 								e.stopPropagation();
@@ -564,17 +573,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							aria-label="Zoom out"
 							disabled={
 								modalImgNaturalSize === null ||
-								(modalZoomUsesPixelSizing &&
-									modalImageScale / MODAL_IMAGE_ZOOM_STEP + 0.0001 <
-										MODAL_IMAGE_ZOOM_MIN)
+								modalImageScale <= modalFitScaleRef.current + 0.0001
 							}
 							onClick={e => {
 								e.stopPropagation();
 								const nat = modalImgNaturalSize;
 								if (!nat?.w || !nat?.h) return;
 								setModalZoomUsesPixelSizing(true);
+								const fitScale = modalFitScaleRef.current;
 								setModalImageScale(s =>
-									Math.max(MODAL_IMAGE_ZOOM_MIN, s / MODAL_IMAGE_ZOOM_STEP)
+									Math.max(fitScale, s / MODAL_IMAGE_ZOOM_STEP)
 								);
 							}}
 							className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 disabled:pointer-events-none disabled:opacity-40 sm:h-8 sm:w-8"

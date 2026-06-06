@@ -12,6 +12,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { UserData } from "@/app-api/api-types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageItem from "./MessageItem";
+import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -577,6 +578,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	}
 
 	return (
+		<ChatImageGalleryProvider messages={uniqueMessages}>
 		<div
 			className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4"
 			onDragEnter={handleChatDragEnter}
@@ -728,5 +730,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				/>
 			)}
 		</div>
+		</ChatImageGalleryProvider>
 	);
 }

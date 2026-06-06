@@ -736,7 +736,7 @@ export default function ChatList({
 											</div>
 										</button>
 										{isExpanded && (
-											<div className="max-h-[min(16rem,38vh)] min-h-0 overflow-y-auto overscroll-y-contain border-t border-gray-200 [-webkit-overflow-scrolling:touch] dark:border-white/10">
+											<div className="max-h-[min(28rem,66vh)] min-h-0 overflow-y-auto overscroll-y-contain border-t border-gray-200 [-webkit-overflow-scrolling:touch] dark:border-white/10">
 												{rooms.map(chatRoom => {
 													const isSelected =
 														selectedChatId === chatRoom.id;
