@@ -386,16 +386,11 @@ export default function ChatList({
 		return map;
 	}, [activeTab, filteredChatRooms]);
 
-	// Accordion expansion state (offerId -> expanded). All closed by default.
-	const [expandedOfferIds, setExpandedOfferIds] = useState<Set<string>>(new Set());
+	// Only one offer accordion section open at a time.
+	const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
 
 	const toggleOfferAccordion = (offerId: string) => {
-		setExpandedOfferIds(prev => {
-			const next = new Set(prev);
-			if (next.has(offerId)) next.delete(offerId);
-			else next.add(offerId);
-			return next;
-		});
+		setExpandedOfferId(prev => (prev === offerId ? null : offerId));
 	};
 
 	useEffect(() => {
@@ -693,7 +688,7 @@ export default function ChatList({
 							{Array.from(groupedOfferChats.entries()).map(([offerId, rooms]) => {
 								const firstRoom = rooms[0];
 								const { route, id } = getOfferAccordionTitle(firstRoom);
-								const isExpanded = expandedOfferIds.has(offerId);
+								const isExpanded = expandedOfferId === offerId;
 								const groupUnreadCount = rooms.reduce(
 									(sum, r) => sum + (r.unreadCount ?? 0),
 									0
@@ -701,12 +696,21 @@ export default function ChatList({
 								return (
 									<div
 										key={offerId}
-										className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 overflow-hidden"
+										className={`rounded-lg border overflow-hidden transition-shadow ${
+											isExpanded
+												? "border-gray-300 bg-gray-50/80 shadow-sm dark:border-white/15 dark:bg-white/[0.06]"
+												: "border-gray-200 bg-gray-50/50 dark:border-white/10 dark:bg-white/5"
+										}`}
 									>
 										<button
 											type="button"
 											onClick={() => toggleOfferAccordion(offerId)}
-											className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-100/80 dark:hover:bg-white/5 transition-colors"
+											aria-expanded={isExpanded}
+											className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${
+												isExpanded
+													? "bg-gray-100/90 dark:bg-white/[0.04]"
+													: "hover:bg-gray-100/80 dark:hover:bg-white/5"
+											}`}
 										>
 											<div className="min-w-0 flex-1">
 												<div className="font-medium text-gray-800 dark:text-gray-200 truncate">
@@ -732,7 +736,7 @@ export default function ChatList({
 											</div>
 										</button>
 										{isExpanded && (
-											<div className="border-t border-gray-200 dark:border-white/10">
+											<div className="max-h-[min(16rem,38vh)] min-h-0 overflow-y-auto overscroll-y-contain border-t border-gray-200 [-webkit-overflow-scrolling:touch] dark:border-white/10">
 												{rooms.map(chatRoom => {
 													const isSelected =
 														selectedChatId === chatRoom.id;

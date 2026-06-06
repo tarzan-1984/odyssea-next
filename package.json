@@ -13,8 +13,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "prepare": "husky"
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.15",
