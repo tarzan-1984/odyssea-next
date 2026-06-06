@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 import { canAccessCheckList } from "@/utils/roleAccess";
 
-type BulkDirectChatsResponse = {
+type BulkDirectChatsWithMessageResponse = {
 	created: number;
 	existed: number;
 	errors: number;
+	messagesSent?: number;
+	messageErrors?: number;
 	items: Array<{
 		driverUserId: string;
 		status: "created" | "existed" | "error";
 		chatRoom?: unknown;
+		messageSent?: boolean;
+		messageId?: string;
+		messageError?: string;
 	}>;
 };
 
@@ -25,10 +30,14 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
-		const body = (await request.json()) as { driverUserIds?: unknown };
+		const body = (await request.json()) as {
+			driverUserIds?: unknown;
+			message?: unknown;
+		};
 		const driverUserIds = Array.isArray(body?.driverUserIds)
 			? body.driverUserIds.filter((id): id is string => typeof id === "string" && id.trim() !== "")
 			: [];
+		const message = typeof body?.message === "string" ? body.message : undefined;
 
 		if (driverUserIds.length === 0) {
 			return NextResponse.json(
@@ -45,14 +54,17 @@ export async function POST(request: NextRequest) {
 		}
 
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/chat-rooms/direct/bulk`,
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/chat-rooms/direct/bulk-with-message`,
 			{
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${accessToken}`,
 				},
-				body: JSON.stringify({ driverUserIds }),
+				body: JSON.stringify({
+					driverUserIds,
+					...(message !== undefined ? { message } : {}),
+				}),
 			}
 		);
 
@@ -70,12 +82,12 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const payload = ((data as { data?: BulkDirectChatsResponse })?.data ??
-			data) as BulkDirectChatsResponse;
+		const payload = ((data as { data?: BulkDirectChatsWithMessageResponse })?.data ??
+			data) as BulkDirectChatsWithMessageResponse;
 
 		return NextResponse.json(payload, { status: 200 });
 	} catch (error) {
-		console.error("Error during bulk direct chat creation:", error);
+		console.error("Error during bulk direct chat with message:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }

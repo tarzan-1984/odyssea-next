@@ -5,10 +5,15 @@ export type BulkDirectChatsSummary = {
 	created: number;
 	existed: number;
 	errors: number;
+	messagesSent?: number;
+	messageErrors?: number;
 	items: Array<{
 		driverUserId: string;
 		status: "created" | "existed" | "error";
 		chatRoom?: Record<string, unknown>;
+		messageSent?: boolean;
+		messageId?: string;
+		messageError?: string;
 	}>;
 };
 
@@ -47,14 +52,19 @@ export function normalizeBulkDirectChatRoom(raw: Record<string, unknown>): ChatR
 	};
 }
 
-export async function bulkCreatePrivateChats(
-	driverUserIds: string[]
+export async function bulkCreatePrivateChatsWithMessage(
+	driverUserIds: string[],
+	message?: string
 ): Promise<BulkDirectChatsSummary> {
-	const res = await fetch("/api/chat-rooms/direct/bulk", {
+	const trimmed = message?.trim() ?? "";
+	const res = await fetch("/api/chat-rooms/direct/bulk-with-message", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		credentials: "include",
-		body: JSON.stringify({ driverUserIds }),
+		body: JSON.stringify({
+			driverUserIds,
+			...(trimmed ? { message: trimmed } : {}),
+		}),
 	});
 
 	const json = (await res.json().catch(() => ({}))) as BulkDirectChatsSummary & {
@@ -74,13 +84,19 @@ export function showBulkPrivateChatsToast(summary: BulkDirectChatsSummary): void
 
 	if (typeof addSystemToast !== "function") return;
 
-	const { created, existed, errors } = summary;
-	const message = `Created: ${created}, already existed: ${existed}, errors: ${errors}`;
+	const { created, existed, errors, messagesSent, messageErrors } = summary;
+	let message = `Created: ${created}, already existed: ${existed}, errors: ${errors}`;
+	if (typeof messagesSent === "number") {
+		message += `, messages sent: ${messagesSent}`;
+	}
+	if (typeof messageErrors === "number" && messageErrors > 0) {
+		message += `, message errors: ${messageErrors}`;
+	}
 
 	addSystemToast({
 		id: `check-list-bulk-chats-${Date.now()}`,
 		title: "Private chats",
 		message,
-		variant: created > 0 ? "success" : errors > 0 ? "error" : "default",
+		variant: created > 0 || (messagesSent ?? 0) > 0 ? "success" : errors > 0 ? "error" : "default",
 	});
 }

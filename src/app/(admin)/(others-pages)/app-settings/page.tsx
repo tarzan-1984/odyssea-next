@@ -943,9 +943,12 @@ export default function AppSettingsPage() {
 						Mobile app usage (ACTIVE + device registered)
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Counts are based on <code className="text-xs">users.status=ACTIVE</code> and
+						Counts are based on <code className="text-xs">users.status=ACTIVE</code>,
 						presence of a row in <code className="text-xs">user_devices</code> (one row
-						per <code className="text-xs">externalId</code>).
+						per <code className="text-xs">externalId</code>), and drivers with{" "}
+						<code className="text-xs">driverStatus</code>{" "}
+						<code className="text-xs">blocked</code> or{" "}
+						<code className="text-xs">expired_documents</code> are excluded.
 					</p>
 
 					{loadingUsage ? (
