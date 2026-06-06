@@ -11,6 +11,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
+import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import type { OfferRow } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
 import UserFilterSelect from "./UserFilterSelect";
@@ -221,7 +222,7 @@ const OffersList = () => {
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
 												{routeSummary(row.route) ||
-													`${row.pick_up_location ?? ""} - ${row.delivery_location ?? ""}`}{" "}
+													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}{" "}
 												(id: {row.id})
 											</p>
 											{hasHazmat(row.special_requirements) && (

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 
 export interface OfferDriver {
 	driver_id: string;
@@ -78,7 +79,7 @@ export function formatRoute(
 	return route
 		.map((p) => {
 			const label = p.type === "pick_up_location" ? "Pick up" : "Delivery";
-			const loc = p.location ?? "";
+			const loc = abbreviateStateInLocationString(p.location ?? "");
 			const t = p.time ?? "";
 			return `${label} - ${loc} - ${t}`;
 		})
@@ -90,8 +91,11 @@ export function routeSummary(
 	route: Array<{ location?: string }> | null | undefined,
 ): string {
 	if (!Array.isArray(route) || route.length === 0) return "";
-	const first = route[0]?.location ?? "";
-	const last = route.length > 1 ? route[route.length - 1]?.location ?? "" : first;
+	const first = abbreviateStateInLocationString(route[0]?.location ?? "");
+	const last =
+		route.length > 1
+			? abbreviateStateInLocationString(route[route.length - 1]?.location ?? "")
+			: first;
 	return last ? `${first} → ${last}` : first;
 }
 

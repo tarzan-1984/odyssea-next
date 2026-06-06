@@ -73,6 +73,33 @@ export function toStateAbbreviation(state: string | null | undefined): string | 
 	return US_STATE_NAME_KEY_TO_ABBR[key] ?? trimmed;
 }
 
+/** "City, State ZIP" → "City, ST ZIP" for offer/route display. */
+export function abbreviateStateInLocationString(
+	location: string | null | undefined
+): string {
+	const trimmed = location?.trim();
+	if (!trimmed) return trimmed ?? "";
+
+	const commaIdx = trimmed.indexOf(",");
+	if (commaIdx === -1) return trimmed;
+
+	const city = trimmed.slice(0, commaIdx).trim();
+	const rest = trimmed.slice(commaIdx + 1).trim();
+	if (!rest) return trimmed;
+
+	const zipMatch = rest.match(/^(.+?)\s+(\d{5}(?:-\d{4})?)$/);
+	const statePart = (zipMatch ? zipMatch[1] : rest).trim();
+	const zip = zipMatch?.[2] ?? "";
+	const abbr = toStateAbbreviation(statePart) ?? statePart;
+
+	if (abbr === statePart && /^[A-Za-z]{2}$/.test(statePart)) {
+		return trimmed;
+	}
+
+	const stateZip = zip ? `${abbr} ${zip}` : abbr;
+	return `${city}, ${stateZip}`;
+}
+
 /** Format: City, ST, ZIP — single line for easy copy. */
 export function formatDriverLocationLine(
 	city: string | null | undefined,
