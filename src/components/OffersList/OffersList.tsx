@@ -16,7 +16,6 @@ import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriv
 import UserFilterSelect from "./UserFilterSelect";
 import OfferTimeImage from "@/icons/OfferTime.png";
 import TimeOverIcon from "@/icons/timeOver.png";
-import CloseOfferIcon from "@/icons/CloseOffer.png";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
@@ -257,23 +256,27 @@ const OffersList = () => {
 																? Math.max(0, actionTimeUnix - nowUnixSeconds)
 																: null;
 
+														const isInactiveDriver = driver.active === false;
+
 														return (
 															<div
 																key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIdx}`}
-																className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.04] px-2.5 py-1"
+																className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
+																	isInactiveDriver
+																		? "border-[#fb2c36]/80 bg-[#fb2c36] dark:border-red-800/35 dark:bg-red-950/50"
+																		: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
+																}`}
 															>
-																<span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[100px]">
+																<span
+																	className={`max-w-[140px] truncate text-xs font-medium ${
+																		isInactiveDriver
+																			? "text-white"
+																			: "text-gray-700 dark:text-gray-300"
+																	}`}
+																>
 																	{driverName}
 																</span>
-																{driver.active === false ? (
-																	<Image
-																		src={CloseOfferIcon}
-																		alt="Refused/removed"
-																		width={22}
-																		height={22}
-																		className="h-[22px] w-[22px] flex-shrink-0 object-contain"
-																	/>
-																) : remainingSeconds != null && remainingSeconds > 0 ? (
+																{isInactiveDriver ? null : remainingSeconds != null && remainingSeconds > 0 ? (
 																	<span className="inline-flex min-w-[64px] items-center justify-center rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
 																		{formatCountdown(remainingSeconds)}
 																	</span>
