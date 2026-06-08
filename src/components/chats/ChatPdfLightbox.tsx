@@ -280,7 +280,9 @@ export default function ChatPdfLightbox({
 			}
 		};
 
-		void loadPdf();
+		loadPdf().catch(error => {
+			console.error("[ChatPdfLightbox] Failed to load PDF:", error);
+		});
 		return () => {
 			cancelled = true;
 		};
@@ -352,10 +354,10 @@ export default function ChatPdfLightbox({
 			if (isEditing) return;
 			if (e.key === "ArrowLeft" && hasPrevPage) {
 				e.preventDefault();
-				void goPrevPage();
+				goPrevPage().catch(console.error);
 			} else if (e.key === "ArrowRight" && hasNextPage) {
 				e.preventDefault();
-				void goNextPage();
+				goNextPage().catch(console.error);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
@@ -603,7 +605,7 @@ export default function ChatPdfLightbox({
 								disabled={!completedCrop?.width || !completedCrop?.height || isEditBusy}
 								onClick={e => {
 									e.stopPropagation();
-									void handleApplyCrop();
+									handleApplyCrop().catch(console.error);
 								}}
 								className={toolTextButtonClass}
 							>
@@ -673,7 +675,7 @@ export default function ChatPdfLightbox({
 								disabled={!pageCanvas || isEditBusy}
 								onClick={e => {
 									e.stopPropagation();
-									void handleSaveEdited();
+									handleSaveEdited().catch(console.error);
 								}}
 								className={`${toolTextButtonClass} min-w-[4.75rem]`}
 								title="Save"
@@ -737,7 +739,7 @@ export default function ChatPdfLightbox({
 						disabled={!hasPrevPage || isPdfLoading}
 						onClick={e => {
 							e.stopPropagation();
-							void goPrevPage();
+							goPrevPage().catch(console.error);
 						}}
 						className={`${navButtonClass} left-3 sm:left-6`}
 					>
@@ -749,7 +751,7 @@ export default function ChatPdfLightbox({
 						disabled={!hasNextPage || isPdfLoading}
 						onClick={e => {
 							e.stopPropagation();
-							void goNextPage();
+							goNextPage().catch(console.error);
 						}}
 						className={`${navButtonClass} right-3 sm:right-6`}
 					>

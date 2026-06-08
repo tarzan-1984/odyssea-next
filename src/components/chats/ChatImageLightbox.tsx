@@ -588,7 +588,7 @@ export default function ChatImageLightbox({
 							disabled={!completedCrop?.width || !completedCrop?.height || isEditBusy}
 							onClick={e => {
 								e.stopPropagation();
-								void handleApplyCrop();
+								handleApplyCrop().catch(console.error);
 							}}
 							className={toolTextButtonClass}
 						>
@@ -658,7 +658,7 @@ export default function ChatImageLightbox({
 							disabled={!editCanvas || isEditBusy}
 							onClick={e => {
 								e.stopPropagation();
-								void handleSaveEdited();
+								handleSaveEdited().catch(console.error);
 							}}
 							className={`${toolTextButtonClass} min-w-[4.75rem]`}
 							title="Save"
@@ -688,7 +688,7 @@ export default function ChatImageLightbox({
 							disabled={isEditBusy || !previewUrl}
 							onClick={e => {
 								e.stopPropagation();
-								void handleStartEdit();
+								handleStartEdit().catch(console.error);
 							}}
 							className={`${toolTextButtonClass} min-w-[4.75rem]`}
 							title="Edit"
