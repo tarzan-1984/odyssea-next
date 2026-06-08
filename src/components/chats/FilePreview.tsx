@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
+import ChatPdfLightbox from "@/components/chats/ChatPdfLightbox";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 
@@ -127,6 +128,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const [error, setError] = useState<string>("");
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 	const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
+	const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
 	const [isDownloading, setIsDownloading] = useState(false);
 	const [convertedImageUrl, setConvertedImageUrl] = useState<string | null>(null);
@@ -336,7 +338,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							className="absolute inset-0 z-10 group-hover:bg-black/5 transition-colors"
 							onClick={e => {
 								e.stopPropagation();
-								setIsDocumentModalOpen(true);
+								setIsPdfModalOpen(true);
 							}}
 						/>
 					</div>
@@ -701,7 +703,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
 			{/* Document Modal */}
 			{(fileExtension === "txt" ||
-				fileExtension === "pdf" ||
 				fileExtension === "docx" ||
 				fileExtension === "doc") && (
 				<Modal
@@ -768,18 +769,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							</div>
 						)}
 
-						{fileExtension === "pdf" && (
-							<div className="w-full h-full min-h-[600px] border rounded overflow-hidden">
-								<iframe
-									src={`${fileUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-									className="w-full h-full min-h-[600px]"
-									title="PDF Preview"
-									allow="fullscreen"
-									allowFullScreen={true}
-								/>
-							</div>
-						)}
-
 						{(fileExtension === "docx" || fileExtension === "doc") && (
 							<div className="w-full h-full min-h-[600px] border rounded overflow-hidden">
 								<iframe
@@ -793,6 +782,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						)}
 					</div>
 				</Modal>
+			)}
+
+			{fileExtension === "pdf" && (
+				<ChatPdfLightbox
+					isOpen={isPdfModalOpen}
+					fileUrl={fileUrl}
+					fileName={fileName}
+					fileSize={fileSize}
+					onClose={() => setIsPdfModalOpen(false)}
+				/>
 			)}
 		</>
 	);

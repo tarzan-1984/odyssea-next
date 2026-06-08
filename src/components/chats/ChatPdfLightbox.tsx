@@ -3,29 +3,30 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactCrop, { centerCrop, type Crop, type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Modal } from "@/components/ui/modal";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
-import type { ChatGalleryImage } from "@/utils/chatGalleryImages";
-import { isChatImageFileName } from "@/utils/chatGalleryImages";
+import ChatEraserSettingsPanel from "@/components/chats/ChatEraserSettingsPanel";
 import {
 	applyDocumentGrayscaleToCanvas,
 	canvasToBlob,
 	canvasToObjectUrl,
 	captureCanvasEditSnapshot,
-	createCanvasFromImage,
 	downloadBlob,
-	editedDownloadFilename,
 	getCroppedImageBlobFromElement,
 	hexToRgb,
-	loadChatImageBlobUrl,
-	loadImageElement,
 	replaceCanvasFromBlob,
 	restoreCanvasEditSnapshot,
-	rgbToHex,
 	type CanvasEditSnapshot,
 	type RgbColor,
 } from "@/utils/chatImageEditor";
+import {
+	editedPdfPageFilename,
+	loadChatPdfBytes,
+	openPdfDocument,
+	renderPdfPageToCanvas,
+} from "@/utils/pdfDocumentEditor";
 
 const MODAL_IMAGE_ZOOM_MAX = 5;
 const MODAL_IMAGE_ZOOM_STEP = 1.25;
@@ -41,23 +42,10 @@ function computeModalFitScale(
 	naturalW: number,
 	naturalH: number,
 	viewportW: number,
-	viewportH: number,
-	rotationDeg: number
+	viewportH: number
 ): number {
 	if (!naturalW || !naturalH || !viewportW || !viewportH) return 1;
-	const rot = ((rotationDeg % 360) + 360) % 360;
-	const swapped = rot === 90 || rot === 270;
-	const effW = swapped ? naturalH : naturalW;
-	const effH = swapped ? naturalW : naturalH;
-	return Math.min(viewportW / effW, viewportH / effH, 1);
-}
-
-function resolveImagePreviewUrl(fileUrl: string, fileName: string): string {
-	const ext = fileName.toLowerCase().split(".").pop();
-	if (ext === "heic" || ext === "heif") {
-		return `/api/storage/convert-heic?url=${encodeURIComponent(fileUrl)}`;
-	}
-	return fileUrl;
+	return Math.min(viewportW / naturalW, viewportH / naturalH, 1);
 }
 
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -125,19 +113,6 @@ function EraserIcon({ className }: { className?: string }) {
 	);
 }
 
-function EyedropperIcon({ className }: { className?: string }) {
-	return (
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className} aria-hidden>
-			<path
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				strokeWidth={2}
-				d="M4 20l4-1 9.5-9.5a2.121 2.121 0 00-3-3L5 16l-1 4zM14 6l4 4"
-			/>
-		</svg>
-	);
-}
-
 function SaveIcon({ className }: { className?: string }) {
 	return (
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className} aria-hidden>
@@ -145,68 +120,66 @@ function SaveIcon({ className }: { className?: string }) {
 				strokeLinecap="round"
 				strokeLinejoin="round"
 				strokeWidth={2}
-				d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+				d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
 			/>
 		</svg>
 	);
 }
 
-type ChatImageLightboxProps = {
+type ChatPdfLightboxProps = {
 	isOpen: boolean;
-	images: ChatGalleryImage[];
-	currentIndex: number;
+	fileUrl: string;
+	fileName: string;
+	fileSize?: number;
 	onClose: () => void;
-	onPrev: () => void;
-	onNext: () => void;
 };
 
-export default function ChatImageLightbox({
+export default function ChatPdfLightbox({
 	isOpen,
-	images,
-	currentIndex,
+	fileUrl,
+	fileName,
+	fileSize,
 	onClose,
-	onPrev,
-	onNext,
-}: ChatImageLightboxProps) {
-	const current = images[currentIndex];
-	const [previewUrl, setPreviewUrl] = useState("");
-	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
+}: ChatPdfLightboxProps) {
 	const [modalImageScale, setModalImageScale] = useState(1);
 	const [modalImgNaturalSize, setModalImgNaturalSize] = useState<{
 		w: number;
 		h: number;
 	} | null>(null);
-
 	const [viewMode, setViewMode] = useState<ViewMode>("preview");
 	const [editSubTool, setEditSubTool] = useState<EditSubTool>("none");
 	const [isGrayscale, setIsGrayscale] = useState(false);
 	const [isEditBusy, setIsEditBusy] = useState(false);
+	const [isPdfLoading, setIsPdfLoading] = useState(false);
+	const [pdfError, setPdfError] = useState<string | null>(null);
+	const [pageCount, setPageCount] = useState(0);
+	const [pageIndex, setPageIndex] = useState(0);
+	const [pageRenderVersion, setPageRenderVersion] = useState(0);
 	const [editCanvasVersion, setEditCanvasVersion] = useState(0);
 	const [eraserRadius, setEraserRadius] = useState(DEFAULT_ERASER_RADIUS);
 	const [eraserColor, setEraserColor] = useState<RgbColor>(DEFAULT_ERASER_COLOR);
 	const [eraserAutoColor, setEraserAutoColor] = useState(true);
 	const [eraserEyedropperActive, setEraserEyedropperActive] = useState(false);
-
 	const [crop, setCrop] = useState<Crop>();
 	const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
 	const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
 
 	const modalScrollViewportRef = useRef<HTMLDivElement>(null);
 	const modalFitScaleRef = useRef(1);
-	const editCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
+	const pageCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const colorBeforeGrayscaleRef = useRef<ImageData | null>(null);
 	const cropSourceUrlRef = useRef<string | null>(null);
 	const cropImgRef = useRef<HTMLImageElement>(null);
 	const undoStackRef = useRef<CanvasEditSnapshot[]>([]);
 	const isGrayscaleRef = useRef(false);
 
-	const hasPrev = currentIndex > 0;
-	const hasNext = currentIndex < images.length - 1;
-	const fileExtension = current?.fileName.toLowerCase().split(".").pop();
-	const isHeic = fileExtension === "heic" || fileExtension === "heif";
 	const isEditing = viewMode === "edit";
 	const isCropMode = isEditing && editSubTool === "crop";
 	const isEraserMode = isEditing && editSubTool === "eraser";
+	const pageCanvas = pageCanvasRef.current;
+	const hasPrevPage = pageIndex > 0;
+	const hasNextPage = pageIndex < pageCount - 1;
 
 	useEffect(() => {
 		isGrayscaleRef.current = isGrayscale;
@@ -214,6 +187,10 @@ export default function ChatImageLightbox({
 
 	const bumpEditCanvas = useCallback(() => {
 		setEditCanvasVersion(v => v + 1);
+	}, []);
+
+	const bumpPageRender = useCallback(() => {
+		setPageRenderVersion(v => v + 1);
 	}, []);
 
 	const revokeCropSourceUrl = useCallback(() => {
@@ -224,39 +201,18 @@ export default function ChatImageLightbox({
 		setCropSourceUrl(null);
 	}, []);
 
-	const pushUndoSnapshot = useCallback(() => {
-		const canvas = editCanvasRef.current;
-		if (!canvas) return;
-		const snapshot = captureCanvasEditSnapshot(canvas, isGrayscaleRef.current);
-		if (!snapshot) return;
-
-		const stack = undoStackRef.current;
-		stack.push(snapshot);
-		if (stack.length > MAX_EDIT_UNDO_STEPS) {
-			stack.shift();
-		}
+	const applyModalFitToViewport = useCallback((nat: { w: number; h: number }) => {
+		const viewport = modalScrollViewportRef.current;
+		if (!viewport || !nat.w || !nat.h) return;
+		const vw = viewport.clientWidth;
+		const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
+		const fit = computeModalFitScale(nat.w, nat.h, vw, vh);
+		modalFitScaleRef.current = fit;
+		setModalImageScale(fit);
 	}, []);
-
-	const handleUndoEdit = useCallback(() => {
-		if (isCropMode || isEditBusy) return;
-
-		const stack = undoStackRef.current;
-		if (stack.length === 0) return;
-
-		const canvas = editCanvasRef.current;
-		const snapshot = stack.pop();
-		if (!canvas || !snapshot) return;
-
-		restoreCanvasEditSnapshot(canvas, snapshot);
-		colorBeforeGrayscaleRef.current = null;
-		setIsGrayscale(snapshot.isGrayscale);
-		setEditSubTool(prev => (prev === "eraser" ? prev : "none"));
-		bumpEditCanvas();
-	}, [isCropMode, isEditBusy, bumpEditCanvas]);
 
 	const resetEditState = useCallback(() => {
 		revokeCropSourceUrl();
-		editCanvasRef.current = null;
 		colorBeforeGrayscaleRef.current = null;
 		undoStackRef.current = [];
 		setViewMode("preview");
@@ -276,40 +232,114 @@ export default function ChatImageLightbox({
 		setModalImageScale(1);
 		setModalImgNaturalSize(null);
 		modalFitScaleRef.current = 1;
+		pdfDocRef.current = null;
+		pageCanvasRef.current = null;
+		setPageCount(0);
+		setPageIndex(0);
+		setPageRenderVersion(0);
+		setPdfError(null);
 		resetEditState();
 	}, [resetEditState]);
 
-	const applyModalFitToViewport = useCallback((nat: { w: number; h: number }) => {
-		const viewport = modalScrollViewportRef.current;
-		if (!viewport || !nat.w || !nat.h) return;
+	const renderCurrentPage = useCallback(
+		async (pdf: PDFDocumentProxy, nextPageIndex: number) => {
+			const canvas = await renderPdfPageToCanvas(pdf, nextPageIndex + 1);
+			pageCanvasRef.current = canvas;
+			const nat = { w: canvas.width, h: canvas.height };
+			setModalImgNaturalSize(nat);
+			bumpPageRender();
+			requestAnimationFrame(() => {
+				applyModalFitToViewport(nat);
+			});
+		},
+		[applyModalFitToViewport, bumpPageRender]
+	);
 
-		const vw = viewport.clientWidth;
-		const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
-		const fit = computeModalFitScale(nat.w, nat.h, vw, vh, 0);
-		modalFitScaleRef.current = fit;
-		setModalImageScale(fit);
-	}, []);
+	useEffect(() => {
+		if (!isOpen) return;
+		let cancelled = false;
+
+		const loadPdf = async () => {
+			setIsPdfLoading(true);
+			setPdfError(null);
+			resetView();
+			try {
+				const bytes = await loadChatPdfBytes(fileUrl, fileName);
+				const pdf = await openPdfDocument(bytes);
+				if (cancelled) return;
+				pdfDocRef.current = pdf;
+				setPageCount(pdf.numPages);
+				setPageIndex(0);
+				await renderCurrentPage(pdf, 0);
+			} catch (error) {
+				if (cancelled) return;
+				console.error("[ChatPdfLightbox] Failed to load PDF:", error);
+				setPdfError("Failed to load PDF");
+			} finally {
+				if (!cancelled) setIsPdfLoading(false);
+			}
+		};
+
+		void loadPdf();
+		return () => {
+			cancelled = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isOpen, fileUrl, fileName]);
 
 	const handleClose = useCallback(() => {
 		resetView();
 		onClose();
 	}, [onClose, resetView]);
 
-	useEffect(() => {
-		if (!isOpen || !current) return;
-		resetView();
-		if (!isChatImageFileName(current.fileName)) return;
-		setPreviewUrl(resolveImagePreviewUrl(current.fileUrl, current.fileName));
-		if (isHeic) setIsModalImageLoading(true);
-	}, [isOpen, current, isHeic, resetView]);
+	const goPrevPage = useCallback(async () => {
+		if (!hasPrevPage || isEditing || !pdfDocRef.current) return;
+		const nextIndex = pageIndex - 1;
+		setPageIndex(nextIndex);
+		setIsPdfLoading(true);
+		try {
+			await renderCurrentPage(pdfDocRef.current, nextIndex);
+		} finally {
+			setIsPdfLoading(false);
+		}
+	}, [hasPrevPage, isEditing, pageIndex, renderCurrentPage]);
 
-	useEffect(() => {
-		if (!isOpen || !modalImgNaturalSize || isEditing) return;
-		const frame = requestAnimationFrame(() => {
-			applyModalFitToViewport(modalImgNaturalSize);
-		});
-		return () => cancelAnimationFrame(frame);
-	}, [isOpen, modalImgNaturalSize, applyModalFitToViewport, isEditing]);
+	const goNextPage = useCallback(async () => {
+		if (!hasNextPage || isEditing || !pdfDocRef.current) return;
+		const nextIndex = pageIndex + 1;
+		setPageIndex(nextIndex);
+		setIsPdfLoading(true);
+		try {
+			await renderCurrentPage(pdfDocRef.current, nextIndex);
+		} finally {
+			setIsPdfLoading(false);
+		}
+	}, [hasNextPage, isEditing, pageIndex, renderCurrentPage]);
+
+	const pushUndoSnapshot = useCallback(() => {
+		const canvas = pageCanvasRef.current;
+		if (!canvas) return;
+		const snapshot = captureCanvasEditSnapshot(canvas, isGrayscaleRef.current);
+		if (!snapshot) return;
+		const stack = undoStackRef.current;
+		stack.push(snapshot);
+		if (stack.length > MAX_EDIT_UNDO_STEPS) stack.shift();
+	}, []);
+
+	const handleUndoEdit = useCallback(() => {
+		if (isCropMode || isEditBusy) return;
+		const stack = undoStackRef.current;
+		if (stack.length === 0) return;
+		const canvas = pageCanvasRef.current;
+		const snapshot = stack.pop();
+		if (!canvas || !snapshot) return;
+		restoreCanvasEditSnapshot(canvas, snapshot);
+		colorBeforeGrayscaleRef.current = null;
+		setIsGrayscale(snapshot.isGrayscale);
+		setEditSubTool(prev => (prev === "eraser" ? prev : "none"));
+		bumpEditCanvas();
+		bumpPageRender();
+	}, [isCropMode, isEditBusy, bumpEditCanvas, bumpPageRender]);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -320,47 +350,35 @@ export default function ChatImageLightbox({
 				return;
 			}
 			if (isEditing) return;
-			if (e.key === "ArrowLeft" && hasPrev) {
+			if (e.key === "ArrowLeft" && hasPrevPage) {
 				e.preventDefault();
-				onPrev();
-			} else if (e.key === "ArrowRight" && hasNext) {
+				void goPrevPage();
+			} else if (e.key === "ArrowRight" && hasNextPage) {
 				e.preventDefault();
-				onNext();
+				void goNextPage();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [isOpen, hasPrev, hasNext, onPrev, onNext, isEditing, isCropMode, handleUndoEdit]);
+	}, [isOpen, isEditing, isCropMode, handleUndoEdit, hasPrevPage, hasNextPage, goPrevPage, goNextPage]);
 
-	const handleStartEdit = useCallback(async () => {
-		if (!current || isEditBusy) return;
-		setIsEditBusy(true);
-		try {
-			const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
-			const image = await loadImageElement(blobUrl);
-			URL.revokeObjectURL(blobUrl);
-			editCanvasRef.current = createCanvasFromImage(image);
-			colorBeforeGrayscaleRef.current = null;
-			undoStackRef.current = [];
-			setViewMode("edit");
-			setEditSubTool("none");
-			setIsGrayscale(false);
-			bumpEditCanvas();
-		} catch (error) {
-			console.error("[ChatImageLightbox] Failed to start edit mode:", error);
-		} finally {
-			setIsEditBusy(false);
-		}
-	}, [current, isEditBusy, bumpEditCanvas]);
+	const handleStartEdit = useCallback(() => {
+		if (!pageCanvasRef.current || isEditBusy) return;
+		undoStackRef.current = [];
+		colorBeforeGrayscaleRef.current = null;
+		setViewMode("edit");
+		setEditSubTool("none");
+		setIsGrayscale(false);
+		bumpEditCanvas();
+	}, [isEditBusy, bumpEditCanvas]);
 
 	const handleExitEdit = useCallback(() => {
 		resetEditState();
-		setModalImgNaturalSize(null);
-		setModalImageScale(1);
-	}, [resetEditState]);
+		bumpPageRender();
+	}, [resetEditState, bumpPageRender]);
 
 	const handleStartCrop = useCallback(() => {
-		const canvas = editCanvasRef.current;
+		const canvas = pageCanvasRef.current;
 		if (!canvas) return;
 		revokeCropSourceUrl();
 		const dataUrl = canvasToObjectUrl(canvas);
@@ -384,10 +402,9 @@ export default function ChatImageLightbox({
 	}, []);
 
 	const handleApplyCrop = useCallback(async () => {
-		const canvas = editCanvasRef.current;
+		const canvas = pageCanvasRef.current;
 		const image = cropImgRef.current;
 		if (!canvas || !image || !completedCrop || isEditBusy) return;
-
 		setIsEditBusy(true);
 		try {
 			pushUndoSnapshot();
@@ -403,23 +420,30 @@ export default function ChatImageLightbox({
 			setEditSubTool("none");
 			setCrop(undefined);
 			setCompletedCrop(null);
+			setModalImgNaturalSize({ w: canvas.width, h: canvas.height });
 			bumpEditCanvas();
+			bumpPageRender();
 		} catch (error) {
-			console.error("[ChatImageLightbox] Failed to apply crop:", error);
+			console.error("[ChatPdfLightbox] Failed to apply crop:", error);
 		} finally {
 			setIsEditBusy(false);
 		}
-	}, [completedCrop, isEditBusy, isGrayscale, revokeCropSourceUrl, bumpEditCanvas, pushUndoSnapshot]);
+	}, [
+		completedCrop,
+		isEditBusy,
+		isGrayscale,
+		revokeCropSourceUrl,
+		bumpEditCanvas,
+		bumpPageRender,
+		pushUndoSnapshot,
+	]);
 
 	const handleToggleGrayscale = useCallback(() => {
-		const canvas = editCanvasRef.current;
+		const canvas = pageCanvasRef.current;
 		if (!canvas || editSubTool === "crop") return;
-
 		const ctx = canvas.getContext("2d");
 		if (!ctx) return;
-
 		pushUndoSnapshot();
-
 		if (!isGrayscale) {
 			colorBeforeGrayscaleRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
 			applyDocumentGrayscaleToCanvas(canvas);
@@ -432,7 +456,8 @@ export default function ChatImageLightbox({
 			setIsGrayscale(false);
 		}
 		bumpEditCanvas();
-	}, [isGrayscale, editSubTool, bumpEditCanvas, pushUndoSnapshot]);
+		bumpPageRender();
+	}, [isGrayscale, editSubTool, bumpEditCanvas, bumpPageRender, pushUndoSnapshot]);
 
 	const handleEraserStrokeStart = useCallback(() => {
 		pushUndoSnapshot();
@@ -476,19 +501,18 @@ export default function ChatImageLightbox({
 	}, []);
 
 	const handleSaveEdited = useCallback(async () => {
-		const canvas = editCanvasRef.current;
-		if (!canvas || !current || isEditBusy) return;
-
+		const canvas = pageCanvasRef.current;
+		if (!canvas || isEditBusy) return;
 		setIsEditBusy(true);
 		try {
 			const blob = await canvasToBlob(canvas);
-			downloadBlob(blob, editedDownloadFilename(current.fileName));
+			downloadBlob(blob, editedPdfPageFilename(fileName, pageIndex + 1));
 		} catch (error) {
-			console.error("[ChatImageLightbox] Failed to save edited image:", error);
+			console.error("[ChatPdfLightbox] Failed to save edited PDF page:", error);
 		} finally {
 			setIsEditBusy(false);
 		}
-	}, [current, isEditBusy]);
+	}, [fileName, isEditBusy, pageIndex]);
 
 	const handleZoomIn = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -501,8 +525,6 @@ export default function ChatImageLightbox({
 		setModalImageScale(s => Math.max(fitScale, s / MODAL_IMAGE_ZOOM_STEP));
 	}, []);
 
-	if (!current) return null;
-
 	const navButtonClass =
 		"pointer-events-auto absolute top-1/2 z-[100003] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-md ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60 disabled:pointer-events-none disabled:opacity-35 sm:h-11 sm:w-11";
 	const toolButtonClass =
@@ -512,8 +534,7 @@ export default function ChatImageLightbox({
 	const toolTextButtonActiveClass =
 		"inline-flex min-w-[4.5rem] items-center justify-center gap-1 rounded-full bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-md ring-1 ring-brand-400 transition-colors hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-40 sm:min-w-[5rem] sm:text-sm";
 
-	const editCanvas = editCanvasRef.current;
-	const zoomScaleAvailable = modalImgNaturalSize !== null || editCanvas !== null;
+	const zoomScaleAvailable = modalImgNaturalSize !== null || pageCanvas !== null;
 	const zoomInDisabled =
 		!zoomScaleAvailable ||
 		modalImageScale * MODAL_IMAGE_ZOOM_STEP > MODAL_IMAGE_ZOOM_MAX + 0.0001;
@@ -567,218 +588,156 @@ export default function ChatImageLightbox({
 					border: 2px solid #2563eb;
 					border-radius: 2px;
 				}
-				.chat-image-lightbox-crop .ReactCrop__rule-of-thirds-vt::before,
-				.chat-image-lightbox-crop .ReactCrop__rule-of-thirds-vt::after,
-				.chat-image-lightbox-crop .ReactCrop__rule-of-thirds-hz::before,
-				.chat-image-lightbox-crop .ReactCrop__rule-of-thirds-hz::after {
-					background: rgba(255, 255, 255, 0.55);
-				}
 			`,
 				}}
 			/>
 
 			<div className="pointer-events-auto absolute left-0 top-3 z-[100003] flex items-start gap-2 px-3 sm:left-3 sm:top-6">
 				<div className="flex max-w-[5.5rem] flex-col items-center gap-1.5 sm:max-w-[6.5rem] sm:gap-2">
-				{isCropMode ? (
-					<>
-						{zoomControls}
-						<button
-							type="button"
-							aria-label="Apply crop"
-							disabled={!completedCrop?.width || !completedCrop?.height || isEditBusy}
-							onClick={e => {
-								e.stopPropagation();
-								void handleApplyCrop();
-							}}
-							className={toolTextButtonClass}
-						>
-							Apply
-						</button>
-						<button
-							type="button"
-							aria-label="Cancel crop"
-							disabled={isEditBusy}
-							onClick={e => {
-								e.stopPropagation();
-								handleCancelCrop();
-							}}
-							className={toolTextButtonClass}
-						>
-							Cancel
-						</button>
-					</>
-				) : isEditing ? (
-					<>
-						{zoomControls}
-						<button
-							type="button"
-							aria-label="Crop image"
-							disabled={isEditBusy || !editCanvas}
-							onClick={e => {
-								e.stopPropagation();
-								handleStartCrop();
-							}}
-							className={toolTextButtonClass}
-							title="Crop"
-						>
-							<CropIcon className="h-3.5 w-3.5 shrink-0" />
-							Crop
-						</button>
-						<button
-							type="button"
-							aria-label="Toggle black and white"
-							disabled={isEditBusy || !editCanvas}
-							onClick={e => {
-								e.stopPropagation();
-								handleToggleGrayscale();
-							}}
-							className={isGrayscale ? toolTextButtonActiveClass : toolTextButtonClass}
-							title="Black & white"
-						>
-							<GrayscaleIcon className="h-3.5 w-3.5 shrink-0" />
-							B&amp;W
-						</button>
-						<button
-							type="button"
-							aria-label="Eraser"
-							disabled={isEditBusy || !editCanvas}
-							onClick={e => {
-								e.stopPropagation();
-								handleToggleEraser();
-							}}
-							className={isEraserMode ? toolTextButtonActiveClass : toolTextButtonClass}
-							title="Eraser"
-						>
-							<EraserIcon className="h-3.5 w-3.5 shrink-0" />
-							Eraser
-						</button>
-						<button
-							type="button"
-							aria-label="Save edited image"
-							disabled={!editCanvas || isEditBusy}
-							onClick={e => {
-								e.stopPropagation();
-								void handleSaveEdited();
-							}}
-							className={`${toolTextButtonClass} min-w-[4.75rem]`}
-							title="Save"
-						>
-							<SaveIcon className="h-3.5 w-3.5 shrink-0" />
-							Save
-						</button>
-						<button
-							type="button"
-							aria-label="Exit edit mode"
-							disabled={isEditBusy}
-							onClick={e => {
-								e.stopPropagation();
-								handleExitEdit();
-							}}
-							className={toolTextButtonClass}
-						>
-							Done
-						</button>
-					</>
-				) : (
-					<>
-						{zoomControls}
-						<button
-							type="button"
-							aria-label="Edit image"
-							disabled={isEditBusy || !previewUrl}
-							onClick={e => {
-								e.stopPropagation();
-								void handleStartEdit();
-							}}
-							className={`${toolTextButtonClass} min-w-[4.75rem]`}
-							title="Edit"
-						>
-							<EditIcon className="h-3.5 w-3.5 shrink-0" />
-							Edit
-						</button>
-					</>
-				)}
+					{isCropMode ? (
+						<>
+							{zoomControls}
+							<button
+								type="button"
+								aria-label="Apply crop"
+								disabled={!completedCrop?.width || !completedCrop?.height || isEditBusy}
+								onClick={e => {
+									e.stopPropagation();
+									void handleApplyCrop();
+								}}
+								className={toolTextButtonClass}
+							>
+								Apply
+							</button>
+							<button
+								type="button"
+								aria-label="Cancel crop"
+								disabled={isEditBusy}
+								onClick={e => {
+									e.stopPropagation();
+									handleCancelCrop();
+								}}
+								className={toolTextButtonClass}
+							>
+								Cancel
+							</button>
+						</>
+					) : isEditing ? (
+						<>
+							{zoomControls}
+							<button
+								type="button"
+								aria-label="Crop page"
+								disabled={isEditBusy || !pageCanvas}
+								onClick={e => {
+									e.stopPropagation();
+									handleStartCrop();
+								}}
+								className={toolTextButtonClass}
+								title="Crop"
+							>
+								<CropIcon className="h-3.5 w-3.5 shrink-0" />
+								Crop
+							</button>
+							<button
+								type="button"
+								aria-label="Toggle black and white"
+								disabled={isEditBusy || !pageCanvas}
+								onClick={e => {
+									e.stopPropagation();
+									handleToggleGrayscale();
+								}}
+								className={isGrayscale ? toolTextButtonActiveClass : toolTextButtonClass}
+								title="Black & white"
+							>
+								<GrayscaleIcon className="h-3.5 w-3.5 shrink-0" />
+								B&amp;W
+							</button>
+							<button
+								type="button"
+								aria-label="Eraser"
+								disabled={isEditBusy || !pageCanvas}
+								onClick={e => {
+									e.stopPropagation();
+									handleToggleEraser();
+								}}
+								className={isEraserMode ? toolTextButtonActiveClass : toolTextButtonClass}
+								title="Eraser"
+							>
+								<EraserIcon className="h-3.5 w-3.5 shrink-0" />
+								Eraser
+							</button>
+							<button
+								type="button"
+								aria-label="Save edited page"
+								disabled={!pageCanvas || isEditBusy}
+								onClick={e => {
+									e.stopPropagation();
+									void handleSaveEdited();
+								}}
+								className={`${toolTextButtonClass} min-w-[4.75rem]`}
+								title="Save"
+							>
+								<SaveIcon className="h-3.5 w-3.5 shrink-0" />
+								Save
+							</button>
+							<button
+								type="button"
+								aria-label="Exit edit mode"
+								disabled={isEditBusy}
+								onClick={e => {
+									e.stopPropagation();
+									handleExitEdit();
+								}}
+								className={toolTextButtonClass}
+							>
+								Done
+							</button>
+						</>
+					) : (
+						<>
+							{zoomControls}
+							<button
+								type="button"
+								aria-label="Edit PDF page"
+								disabled={isEditBusy || isPdfLoading || !pageCanvas}
+								onClick={e => {
+									e.stopPropagation();
+									handleStartEdit();
+								}}
+								className={`${toolTextButtonClass} min-w-[4.75rem]`}
+								title="Edit"
+							>
+								<EditIcon className="h-3.5 w-3.5 shrink-0" />
+								Edit
+							</button>
+						</>
+					)}
 				</div>
 
-				{isEraserMode && (
-					<div className="flex w-48 flex-col gap-3 rounded-xl bg-black/60 p-3 ring-1 ring-white/30">
-						<div>
-							<div className="flex items-center justify-between gap-2">
-								<label className="text-xs font-medium text-white" htmlFor="eraser-size">
-									Eraser size
-								</label>
-								<span className="text-xs tabular-nums text-gray-300">{eraserRadius * 2}px</span>
-							</div>
-							<input
-								id="eraser-size"
-								type="range"
-								min={8}
-								max={80}
-								value={eraserRadius}
-								onChange={e => setEraserRadius(Number(e.target.value))}
-								className="mt-1.5 w-full accent-brand-500"
-							/>
-						</div>
-						<div>
-							<span className="text-xs font-medium text-white">Eraser color</span>
-							<div className="mt-1.5 flex items-center gap-2">
-								<input
-									type="color"
-									value={rgbToHex(eraserColor)}
-									disabled={eraserAutoColor}
-									onChange={e => handleEraserColorChange(e.target.value)}
-									className="h-8 w-10 shrink-0 cursor-pointer rounded border border-white/30 bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-40"
-									title="Pick eraser color"
-									aria-label="Pick eraser color"
-								/>
-								<button
-									type="button"
-									aria-label="Pick color from image"
-									title="Pick color from image"
-									onClick={e => {
-										e.stopPropagation();
-										handleToggleEraserEyedropper();
-									}}
-									className={
-										eraserEyedropperActive
-											? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white ring-1 ring-brand-400"
-											: "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/40 transition-colors hover:bg-black/70 hover:ring-white/60"
-									}
-								>
-									<EyedropperIcon className="h-4 w-4" />
-								</button>
-								<span
-									className="h-8 min-w-0 flex-1 rounded border border-white/20"
-									style={{ backgroundColor: rgbToHex(eraserColor) }}
-									title={rgbToHex(eraserColor)}
-								/>
-							</div>
-							<label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-200">
-								<input
-									type="checkbox"
-									checked={eraserAutoColor}
-									onChange={e => handleToggleEraserAutoColor(e.target.checked)}
-									className="accent-brand-500"
-								/>
-								Auto match background
-							</label>
-							{eraserEyedropperActive ? (
-								<p className="mt-1.5 text-[11px] text-brand-300">Click on the image to pick a color</p>
-							) : null}
-						</div>
-					</div>
-				)}
+				{isEraserMode ? (
+					<ChatEraserSettingsPanel
+						eraserRadius={eraserRadius}
+						eraserColor={eraserColor}
+						eraserAutoColor={eraserAutoColor}
+						eraserEyedropperActive={eraserEyedropperActive}
+						onEraserRadiusChange={setEraserRadius}
+						onEraserColorChange={handleEraserColorChange}
+						onToggleEraserEyedropper={handleToggleEraserEyedropper}
+						onToggleEraserAutoColor={handleToggleEraserAutoColor}
+					/>
+				) : null}
 			</div>
 
-			{images.length > 1 && !isEditing && (
+			{pageCount > 1 && !isEditing ? (
 				<>
 					<button
 						type="button"
-						aria-label="Previous image"
-						disabled={!hasPrev}
+						aria-label="Previous page"
+						disabled={!hasPrevPage || isPdfLoading}
 						onClick={e => {
 							e.stopPropagation();
-							onPrev();
+							void goPrevPage();
 						}}
 						className={`${navButtonClass} left-3 sm:left-6`}
 					>
@@ -786,26 +745,32 @@ export default function ChatImageLightbox({
 					</button>
 					<button
 						type="button"
-						aria-label="Next image"
-						disabled={!hasNext}
+						aria-label="Next page"
+						disabled={!hasNextPage || isPdfLoading}
 						onClick={e => {
 							e.stopPropagation();
-							onNext();
+							void goNextPage();
 						}}
 						className={`${navButtonClass} right-3 sm:right-6`}
 					>
 						<ChevronRightIcon className="h-7 w-7" />
 					</button>
 					<div className="pointer-events-none absolute left-1/2 top-4 z-[100003] -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-sm font-medium text-white ring-1 ring-white/30 sm:top-6">
-						{currentIndex + 1} / {images.length}
+						{pageIndex + 1} / {pageCount}
 					</div>
 				</>
-			)}
+			) : null}
 
 			<div ref={modalScrollViewportRef} className="relative min-h-0 flex-1 overflow-auto">
-				{isEditBusy && !editCanvas ? <HeicConvertingOverlay variant="modal" /> : null}
-
-				{isCropMode && cropSourceUrl ? (
+				{(isPdfLoading && !pageCanvas) || pdfError ? (
+					<div className="flex min-h-full items-center justify-center p-8">
+						{pdfError ? (
+							<p className="text-sm text-red-300">{pdfError}</p>
+						) : (
+							<HeicConvertingOverlay variant="modal" />
+						)}
+					</div>
+				) : isCropMode && cropSourceUrl ? (
 					<div className="box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
 						<ReactCrop
 							crop={crop}
@@ -818,13 +783,13 @@ export default function ChatImageLightbox({
 							<img
 								ref={cropImgRef}
 								src={cropSourceUrl}
-								alt={current.fileName}
+								alt={fileName}
 								className="block max-w-none object-contain transition-[width,height] duration-200 ease-out"
 								style={
-									editCanvas
+									pageCanvas
 										? {
-												width: editCanvas.width * modalImageScale,
-												height: editCanvas.height * modalImageScale,
+												width: pageCanvas.width * modalImageScale,
+												height: pageCanvas.height * modalImageScale,
 											}
 										: undefined
 								}
@@ -832,77 +797,30 @@ export default function ChatImageLightbox({
 							/>
 						</ReactCrop>
 					</div>
-				) : isEditing && editCanvas ? (
+				) : pageCanvas ? (
 					<ChatImageEditCanvas
-						key={editCanvasVersion}
-						canvas={editCanvas}
+						key={`${pageRenderVersion}-${editCanvasVersion}-${isEditing ? "edit" : "view"}`}
+						canvas={pageCanvas}
 						displayScale={modalImageScale}
 						eraserActive={isEraserMode}
 						eraserAutoColor={eraserAutoColor}
 						eraserColor={eraserColor}
 						eraserRadius={eraserRadius}
 						eyedropperActive={eraserEyedropperActive}
-						canvasVersion={editCanvasVersion}
-						onStrokeStart={handleEraserStrokeStart}
-						onStrokeEnd={bumpEditCanvas}
-						onEyedropperPick={handleEraserEyedropperPick}
+						canvasVersion={pageRenderVersion + editCanvasVersion}
+						onStrokeStart={isEraserMode ? handleEraserStrokeStart : undefined}
+						onStrokeEnd={isEraserMode ? bumpPageRender : undefined}
+						onEyedropperPick={isEraserMode ? handleEraserEyedropperPick : undefined}
 					/>
-				) : (
-					<div className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
-						{isModalImageLoading && isHeic ? <HeicConvertingOverlay variant="modal" /> : null}
-						{previewUrl ? (
-							<img
-								key={`${previewUrl}-${currentIndex}`}
-								src={previewUrl}
-								alt={current.fileName}
-								className={`h-auto w-auto shrink-0 origin-center object-contain rounded-lg transition-[width,height] duration-200 ease-out ${
-									modalImgNaturalSize ? "max-w-none" : "max-h-[calc(95vh-10rem)] max-w-full"
-								}`}
-								style={
-									modalImgNaturalSize
-										? {
-												width: modalImgNaturalSize.w * modalImageScale,
-												height: modalImgNaturalSize.h * modalImageScale,
-											}
-										: undefined
-								}
-								onClick={e => e.stopPropagation()}
-								onLoad={e => {
-									setIsModalImageLoading(false);
-									const target = e.target as HTMLImageElement;
-									if (target.naturalWidth && target.naturalHeight) {
-										const nat = {
-											w: target.naturalWidth,
-											h: target.naturalHeight,
-										};
-										setModalImgNaturalSize(nat);
-										requestAnimationFrame(() => {
-											applyModalFitToViewport(nat);
-										});
-									}
-								}}
-								onError={() => {
-									setIsModalImageLoading(false);
-									handleClose();
-								}}
-							/>
-						) : (
-							<div className="flex h-64 items-center justify-center">
-								<div className="h-8 w-8 animate-spin rounded-full border-b-2 border-white" />
-							</div>
-						)}
-					</div>
-				)}
+				) : null}
 			</div>
 
 			<div className="pointer-events-none absolute bottom-4 left-1/2 z-[100002] max-w-[calc(100%-2rem)] -translate-x-1/2 transform rounded-lg bg-black/70 px-4 py-2 text-center text-white backdrop-blur-sm">
-				<p className="max-w-md truncate text-sm font-medium">{current.fileName}</p>
+				<p className="max-w-md truncate text-sm font-medium">{fileName}</p>
 				<p className="mt-1 text-xs text-gray-300">
-					<span>
-						{currentIndex + 1} / {images.length}
-						{current.fileSize ? " · " : ""}
-					</span>
-					{current.fileSize ? `${Math.round(current.fileSize / 1024)}KB` : null}
+					{pageCount > 0 ? `${pageIndex + 1} / ${pageCount}` : null}
+					{pageCount > 0 && fileSize ? " · " : null}
+					{fileSize ? `${Math.round(fileSize / 1024)}KB` : null}
 					{isEditing ? " · Editing" : null}
 					{isGrayscale ? " · B&W" : null}
 					{isEraserMode ? " · Eraser" : null}
