@@ -48,5 +48,5 @@ export async function renderPdfPageToCanvas(
 
 export function editedPdfPageFilename(fileName: string, pageNumber: number): string {
 	const base = (fileName || "document").trim().replace(/\.pdf$/i, "") || "document";
-	return `${base}-page${pageNumber}-edited.jpg`;
+	return `${base}-page${pageNumber}-edited.pdf`;
 }

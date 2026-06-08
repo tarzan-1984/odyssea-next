@@ -10,7 +10,7 @@ import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
 import ChatEraserSettingsPanel from "@/components/chats/ChatEraserSettingsPanel";
 import {
 	applyDocumentGrayscaleToCanvas,
-	canvasToBlob,
+	canvasToPdfBlob,
 	canvasToObjectUrl,
 	captureCanvasEditSnapshot,
 	downloadBlob,
@@ -507,7 +507,7 @@ export default function ChatPdfLightbox({
 		if (!canvas || isEditBusy) return;
 		setIsEditBusy(true);
 		try {
-			const blob = await canvasToBlob(canvas);
+			const blob = await canvasToPdfBlob(canvas);
 			downloadBlob(blob, editedPdfPageFilename(fileName, pageIndex + 1));
 		} catch (error) {
 			console.error("[ChatPdfLightbox] Failed to save edited PDF page:", error);

@@ -10,7 +10,7 @@ import type { ChatGalleryImage } from "@/utils/chatGalleryImages";
 import { isChatImageFileName } from "@/utils/chatGalleryImages";
 import {
 	applyDocumentGrayscaleToCanvas,
-	canvasToBlob,
+	canvasToPdfBlob,
 	canvasToObjectUrl,
 	captureCanvasEditSnapshot,
 	createCanvasFromImage,
@@ -481,7 +481,7 @@ export default function ChatImageLightbox({
 
 		setIsEditBusy(true);
 		try {
-			const blob = await canvasToBlob(canvas);
+			const blob = await canvasToPdfBlob(canvas);
 			downloadBlob(blob, editedDownloadFilename(current.fileName));
 		} catch (error) {
 			console.error("[ChatImageLightbox] Failed to save edited image:", error);

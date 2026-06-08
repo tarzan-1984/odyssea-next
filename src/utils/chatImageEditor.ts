@@ -407,6 +407,29 @@ export function canvasToBlob(
 	});
 }
 
+export async function canvasToPdfBlob(
+	canvas: HTMLCanvasElement,
+	jpegQuality = 0.92
+): Promise<Blob> {
+	const width = canvas.width;
+	const height = canvas.height;
+	if (!width || !height) {
+		throw new Error("Canvas is empty");
+	}
+
+	const { jsPDF } = await import("jspdf");
+	const pdf = new jsPDF({
+		orientation: width >= height ? "landscape" : "portrait",
+		unit: "px",
+		format: [width, height],
+		hotfixes: ["px_scaling"],
+	});
+
+	const dataUrl = canvas.toDataURL("image/jpeg", jpegQuality);
+	pdf.addImage(dataUrl, "JPEG", 0, 0, width, height, undefined, "FAST");
+	return pdf.output("blob");
+}
+
 export function canvasToObjectUrl(canvas: HTMLCanvasElement): string {
 	return canvas.toDataURL("image/jpeg", 0.92);
 }
@@ -436,15 +459,12 @@ export async function loadChatImageBlobUrl(
 export function editedDownloadFilename(fileName: string): string {
 	const base = (fileName || "image").trim();
 	if (isHeicFileName(base)) {
-		return toJpegDownloadFilename(base).replace(/(\.jpe?g)$/i, "-edited$1");
+		const jpegBase = toJpegDownloadFilename(base).replace(/(\.jpe?g)$/i, "");
+		return `${jpegBase}-edited.pdf`;
 	}
 	const dot = base.lastIndexOf(".");
-	if (dot <= 0) {
-		return `${base}-edited.jpg`;
-	}
-	const name = base.slice(0, dot);
-	const ext = base.slice(dot);
-	return `${name}-edited${ext}`;
+	const name = dot <= 0 ? base : base.slice(0, dot);
+	return `${name}-edited.pdf`;
 }
 
 export function downloadBlob(blob: Blob, fileName: string): void {
