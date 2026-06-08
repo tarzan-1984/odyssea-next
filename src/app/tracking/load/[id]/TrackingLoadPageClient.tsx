@@ -61,6 +61,13 @@ type LoadDetailsResponse = {
 				pickup: RouteGeocodeMarker | null;
 				delivery: RouteGeocodeMarker | null;
 			};
+			shippers?: Array<{
+				address_id?: string | number;
+				id?: string;
+				latitude?: string | number | null;
+				longitude?: string | number | null;
+				full_address?: string;
+			}>;
 		};
 		meta_data?: {
 			pick_up_location?: string | null;
@@ -76,6 +83,13 @@ type LoadDetailsResponse = {
 			pickup: RouteGeocodeMarker | null;
 			delivery: RouteGeocodeMarker | null;
 		};
+		shippers?: Array<{
+			address_id?: string | number;
+			id?: string;
+			latitude?: string | number | null;
+			longitude?: string | number | null;
+			full_address?: string;
+		}>;
 	};
 };
 
@@ -608,6 +622,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		]
 	);
 
+	const loadShippers = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		const raw = details?.data?.data?.shippers ?? details?.data?.shippers ?? [];
+		return Array.isArray(raw) ? raw : [];
+	}, [loadDetails]);
+
 	const mapLoadData = useMemo(
 		() => ({
 			...driverCardData,
@@ -615,6 +635,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			longitude: showDriverLiveMarker ? currentDriverLongitude : null,
 			pick_up_location: loadMetaData?.pick_up_location ?? null,
 			delivery_location: loadMetaData?.delivery_location ?? null,
+			shippers: loadShippers,
 			routeGeocode:
 				routeGeocodeFromApi?.pickup && routeGeocodeFromApi?.delivery
 					? routeGeocodeFromApi
@@ -628,6 +649,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			currentDriverLatitude,
 			currentDriverLongitude,
 			loadMetaData,
+			loadShippers,
 			routeGeocodeFromApi,
 			loadHistoryForMap,
 			loadHistoryDetails,

@@ -26,6 +26,15 @@ type LoadLocation = {
 	type?: string;
 	order?: number;
 	sort_order?: number;
+	address_id?: string | number;
+};
+
+type TmsShipperLike = {
+	address_id?: string | number;
+	id?: string;
+	latitude?: string | number | null;
+	longitude?: string | number | null;
+	full_address?: string;
 };
 
 type RoutePoint = {
@@ -194,7 +203,48 @@ type StopBuildRow = {
 	kind: StopKind;
 	candidates: string[];
 	title: string;
+	addressId: string | null;
 };
+
+function normalizeLocationAddressId(loc: LoadLocation): string | null {
+	const addressId = loc.address_id;
+	if (addressId == null || String(addressId).trim() === "") return null;
+	return String(addressId).trim();
+}
+
+function parseShipperCoordinates(
+	shipper: TmsShipperLike
+): { lat: number; lng: number } | null {
+	const lat =
+		shipper.latitude != null && String(shipper.latitude).trim() !== ""
+			? Number(shipper.latitude)
+			: NaN;
+	const lng =
+		shipper.longitude != null && String(shipper.longitude).trim() !== ""
+			? Number(shipper.longitude)
+			: NaN;
+	if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+	return { lat, lng };
+}
+
+function resolveShipperCoordsByAddressId(
+	addressId: string,
+	shippers: TmsShipperLike[]
+): { lat: number; lng: number; addressLabel: string } | null {
+	const shipper = shippers.find(entry => {
+		const shipperAddressId = String(entry.address_id ?? entry.id ?? "").trim();
+		return shipperAddressId !== "" && shipperAddressId === addressId;
+	});
+	if (!shipper) return null;
+
+	const coords = parseShipperCoordinates(shipper);
+	if (!coords) return null;
+
+	return {
+		...coords,
+		addressLabel: shipper.full_address?.trim() || addressId,
+	};
+}
 
 /**
  * Ordered load stops: all pickups (pick_up_location), then all deliveries (delivery_location).
@@ -216,6 +266,7 @@ function buildOrderedStopRows(pickUpRaw: unknown, deliveryRaw: unknown): StopBui
 			kind: "pickup",
 			candidates,
 			title: pickObjs.length > 1 ? `Pick up ${n}` : "Pick up",
+			addressId: normalizeLocationAddressId(pickObjs[p].loc),
 		});
 	}
 	for (let d = 0; d < delObjs.length; d++) {
@@ -226,25 +277,50 @@ function buildOrderedStopRows(pickUpRaw: unknown, deliveryRaw: unknown): StopBui
 			kind: "delivery",
 			candidates,
 			title: delObjs.length > 1 ? `Delivery ${n}` : "Delivery",
+			addressId: normalizeLocationAddressId(delObjs[d].loc),
 		});
 	}
 	return rows;
 }
 
+function isSinglePickupSingleDeliveryRoute(rows: StopBuildRow[]): boolean {
+	return (
+		rows.filter(row => row.kind === "pickup").length === 1 &&
+		rows.filter(row => row.kind === "delivery").length === 1
+	);
+}
+
 async function geocodeStopRows(
-	rows: StopBuildRow[]
+	rows: StopBuildRow[],
+	shippers: TmsShipperLike[] = []
 ): Promise<{ chain: RoutePoint[]; rows: StopBuildRow[] }> {
 	const chain: RoutePoint[] = [];
 	const outRows: StopBuildRow[] = [];
 	for (const row of rows) {
-		const pt = await geocodeAddressCandidates(row.candidates);
+		let pt: RoutePoint | null = null;
+		if (row.addressId && shippers.length > 0) {
+			const shipperCoords = resolveShipperCoordsByAddressId(row.addressId, shippers);
+			if (shipperCoords) {
+				pt = {
+					lat: shipperCoords.lat,
+					lng: shipperCoords.lng,
+					address: `${row.title}: ${shipperCoords.addressLabel}`,
+				};
+			}
+		}
+		if (!pt) {
+			pt = await geocodeAddressCandidates(row.candidates);
+			if (pt) {
+				pt = {
+					lat: pt.lat,
+					lng: pt.lng,
+					address: `${row.title}: ${row.candidates[0] ?? pt.address}`,
+				};
+			}
+		}
 		if (pt) {
 			outRows.push(row);
-			chain.push({
-				lat: pt.lat,
-				lng: pt.lng,
-				address: `${row.title}: ${row.candidates[0] ?? pt.address}`,
-			});
+			chain.push(pt);
 		}
 	}
 	return { chain, rows: outRows };
@@ -655,6 +731,7 @@ interface DriverData {
 	lastLocationUpdateAt: string | null;
 	pick_up_location?: string | null;
 	delivery_location?: string | null;
+	shippers?: TmsShipperLike[];
 	/** From GET load — server-cached Nominatim pickup/delivery (preferred over browser geocoding). */
 	routeGeocode?: {
 		pickup: { lat: number; lng: number; addressLabel: string } | null;
@@ -908,9 +985,12 @@ export default function TrackingDeliveryMap({
 				let stopRows: StopBuildRow[] = rows;
 
 				if (rows.length >= 2) {
-					const { chain: geoChain, rows: geoRows } = await geocodeStopRows(rows);
+					const shippers = driverData?.shippers ?? [];
+					const { chain: geoChain, rows: geoRows } = await geocodeStopRows(rows, shippers);
 					stopRows = geoRows;
-					chain = applyServerEndpointsToChain(geoChain, serverPickup, serverDelivery);
+					chain = isSinglePickupSingleDeliveryRoute(rows)
+						? applyServerEndpointsToChain(geoChain, serverPickup, serverDelivery)
+						: geoChain;
 					chain = uniqueSequentialRoutePoints(chain);
 				}
 
@@ -951,8 +1031,8 @@ export default function TrackingDeliveryMap({
 						]);
 					}
 					stopRows = [
-						{ kind: "pickup", candidates: [], title: "Pick up" },
-						{ kind: "delivery", candidates: [], title: "Delivery" },
+						{ kind: "pickup", candidates: [], title: "Pick up", addressId: null },
+						{ kind: "delivery", candidates: [], title: "Delivery", addressId: null },
 					];
 				}
 
@@ -1049,6 +1129,7 @@ export default function TrackingDeliveryMap({
 		};
 	}, [
 		driverData?.routeGeocode,
+		driverData?.shippers,
 		driverData?.pick_up_location,
 		driverData?.delivery_location,
 		pickupAddressCandidates,
