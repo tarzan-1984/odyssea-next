@@ -305,7 +305,36 @@ const OffersList = () => {
 											);
 										})()}
 									</div>
-									<div className="flex items-center justify-center flex-shrink-0">
+									<div className="flex items-center justify-center flex-shrink-0 gap-2">
+										{row.active !== false && (
+											<button
+												type="button"
+												disabled={deactivatingOfferId === row.id}
+												onClick={async (e) => {
+													e.stopPropagation();
+													setDeactivatingOfferId(row.id);
+													const res = await offersApi.deactivateOffer(row.id);
+													setDeactivatingOfferId(null);
+													if (res.success) {
+														await queryClient.invalidateQueries({
+															queryKey: ["offers-list-cards"],
+														});
+													} else {
+														console.error(res.error);
+													}
+												}}
+												className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+											>
+												Deactivate offer
+												<Image
+													src="/images/deactivate_offer.png"
+													alt=""
+													width={31}
+													height={31}
+													className="h-[31px] w-auto shrink-0"
+												/>
+											</button>
+										)}
 										<button
 											type="button"
 											onClick={(e) => {
@@ -567,51 +596,26 @@ const OffersList = () => {
 														</TableBody>
 													</Table>
 													</div>
-													{row.active !== false && (
-													<div className="mt-3 flex items-center justify-between gap-3">
+													{row.active !== false && !row.is_driver_selected && (
+													<div className="mt-3 flex items-center justify-end gap-3">
 														<button
 															type="button"
-															disabled={deactivatingOfferId === row.id}
-															onClick={async () => {
-																setDeactivatingOfferId(row.id);
-																const res = await offersApi.deactivateOffer(row.id);
-																setDeactivatingOfferId(null);
-																if (res.success) {
-																	await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																} else {
-																	console.error(res.error);
-																}
-															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-														>
-								Deactivate offer
-								<Image
-									src="/images/deactivate_offer.png"
-									alt=""
-									width={31}
-									height={31}
-									className="h-[31px] w-auto shrink-0"
-								/>
-														</button>
-														{!row.is_driver_selected && (
-															<button
-																type="button"
-																onClick={() => {
-																	setAddDriversOfferId(row.id);
-																	setAddDriversExistingDriverIds(
-																		Array.from(
-																			new Set(
-																				(row.drivers ?? []).flatMap(d =>
-																					[d.driver_id, d.externalId].filter(
-																						(x): x is string => Boolean(x)
-																					)
+															onClick={() => {
+																setAddDriversOfferId(row.id);
+																setAddDriversExistingDriverIds(
+																	Array.from(
+																		new Set(
+																			(row.drivers ?? []).flatMap(d =>
+																				[d.driver_id, d.externalId].filter(
+																					(x): x is string => Boolean(x)
 																				)
 																			)
 																		)
-																	);
-																}}
-																className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
-															>
+																	)
+																);
+															}}
+															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+														>
 									Add drivers
 									<Image
 										src="/images/add_icon.png"
@@ -619,9 +623,8 @@ const OffersList = () => {
 										width={31}
 										height={31}
 										className="h-[31px] w-auto shrink-0"
-																/>
-															</button>
-														)}
+															/>
+														</button>
 													</div>
 													)}
 												</div>
