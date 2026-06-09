@@ -248,9 +248,12 @@ const OffersList = () => {
 											return (
 												<div className="mt-2 flex flex-wrap items-center gap-2">
 													{participatingDrivers.map((driver, driverIdx) => {
-														const driverName = [driver.firstName, driver.lastName]
+														const driverName = [
+															driver.externalId != null ? `(${driver.externalId})` : null,
+															[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
+														]
 															.filter(Boolean)
-															.join(" ") || "—";
+															.join(" ");
 														const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
 														const remainingSeconds =
 															actionTimeUnix != null
@@ -275,7 +278,7 @@ const OffersList = () => {
 																}`}
 															>
 																<span
-																	className={`max-w-[140px] truncate text-xs font-medium ${
+																	className={`max-w-[180px] truncate text-xs font-medium ${
 																		isInactiveDriver
 																			? "font-semibold text-[#a20000] dark:text-red-100"
 																			: hasActiveTimer
