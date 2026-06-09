@@ -144,6 +144,14 @@ export interface ReturnDriverToOfferResponse {
 	error?: string;
 }
 
+export interface ExtendDriverTimeResponse {
+	success: boolean;
+	action_time?: number | null;
+	action_time_display?: string | null;
+	message?: string;
+	error?: string;
+}
+
 export interface SelectDriverForOfferResponse {
 	success: boolean;
 	message?: string;
@@ -407,6 +415,46 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in selectDriverForOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async extendDriverTime(
+		offerId: number,
+		driverExternalId: string,
+		payload: { extendTimeMinutes: number }
+	): Promise<ExtendDriverTimeResponse> {
+		try {
+			const response = await axios.patch<ExtendDriverTimeResponse>(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/extend-time`,
+				payload,
+				{
+					headers: { "Content-Type": "application/json" },
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					action_time: data.action_time,
+					action_time_display: data.action_time_display,
+					message: data.message,
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to extend driver time",
+			};
+		} catch (error) {
+			console.error("Error in extendDriverTime:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

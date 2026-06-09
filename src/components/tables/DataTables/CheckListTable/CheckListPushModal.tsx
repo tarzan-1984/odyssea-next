@@ -36,10 +36,16 @@ type CheckListPushModalProps = {
 	onClose: () => void;
 	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
 	drivers: CheckListDriver[] | null;
+	defaultMessage?: string;
 };
 
-export default function CheckListPushModal({ isOpen, onClose, drivers }: CheckListPushModalProps) {
-	const [message, setMessage] = useState(CHECK_LIST_PUSH_DEFAULT_MESSAGE);
+export default function CheckListPushModal({
+	isOpen,
+	onClose,
+	drivers,
+	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
+}: CheckListPushModalProps) {
+	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
@@ -49,11 +55,11 @@ export default function CheckListPushModal({ isOpen, onClose, drivers }: CheckLi
 
 	useEffect(() => {
 		if (isOpen) {
-			setMessage(CHECK_LIST_PUSH_DEFAULT_MESSAGE);
+			setMessage(defaultMessage);
 			setError(null);
 			setSuccess(null);
 		}
-	}, [isOpen, targetKey]);
+	}, [isOpen, targetKey, defaultMessage]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();

@@ -7,16 +7,16 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon } from "@/icons";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
-import type { OfferRow } from "@/app-api/offers";
+import type { OfferRow, OfferDriver } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
+import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
+import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import UserFilterSelect from "./UserFilterSelect";
-import OfferTimeImage from "@/icons/OfferTime.png";
-import TimeOverIcon from "@/icons/timeOver.png";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
@@ -71,6 +71,64 @@ function formatCountdown(totalSeconds: number): string {
 		.join(":");
 }
 
+function canExtendDriverBidTime(offer: OfferRow, driver: OfferDriver): boolean {
+	return (
+		offer.active !== false &&
+		!offer.is_driver_selected &&
+		driver.active !== false &&
+		driver.rate != null
+	);
+}
+
+function buildExtendBidTimePushMessage(offer: OfferRow): string {
+	const offerName = routeSummary(offer.route) || `Offer #${offer.id}`;
+	return `Please extend the bid time for the offer - ${offerName}`;
+}
+
+function offerDriverToCheckListDriver(driver: OfferDriver): CheckListDriver {
+	return {
+		id: driver.driver_id,
+		firstName: driver.firstName,
+		lastName: driver.lastName,
+		email: driver.email,
+		externalId: driver.externalId,
+		phone: driver.phone ?? "",
+		driverStatus: driver.status,
+		lastActiveApp: null,
+		lastLocationUpdateAt: null,
+		trackingLoadId: null,
+	};
+}
+
+function ExtendBidTimeButton({
+	offer,
+	driver,
+	onPushClick,
+}: {
+	offer: OfferRow;
+	driver: OfferDriver;
+	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
+}) {
+	const driverKey = driver.externalId ?? driver.driver_id;
+	const canExtend = canExtendDriverBidTime(offer, driver);
+
+	if (!canExtend || !driverKey) return null;
+
+	return (
+		<button
+			type="button"
+			title="Send push notification"
+			onClick={(e) => {
+				e.stopPropagation();
+				onPushClick(offer, driver);
+			}}
+			className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-brand-600 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-brand-400"
+		>
+			<ExtendBidTimeIcon className="h-4 w-4" />
+		</button>
+	);
+}
+
 const OffersList = () => {
 	useWebSocketConnectionCheck();
 	const queryClient = useQueryClient();
@@ -85,6 +143,10 @@ const OffersList = () => {
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
+	const [pushModalTarget, setPushModalTarget] = useState<{
+		offer: OfferRow;
+		driver: OfferDriver;
+	} | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
@@ -265,6 +327,10 @@ const OffersList = () => {
 															!isInactiveDriver &&
 															remainingSeconds != null &&
 															remainingSeconds > 0;
+														const isExpiredBid =
+															!isInactiveDriver &&
+															actionTimeUnix != null &&
+															(remainingSeconds == null || remainingSeconds <= 0);
 
 														return (
 															<div
@@ -274,7 +340,9 @@ const OffersList = () => {
 																		? "border-transparent bg-[#f5b8ab] dark:border-red-800/35 dark:bg-red-950/50"
 																		: hasActiveTimer
 																			? "border-transparent bg-[#d4e8d7] dark:border-green-800/35 dark:bg-green-950/45"
-																			: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
+																			: isExpiredBid
+																				? "border-gray-300 bg-gray-200 dark:border-gray-600 dark:bg-gray-700/70"
+																				: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
 																}`}
 															>
 																<span
@@ -283,7 +351,9 @@ const OffersList = () => {
 																			? "font-semibold text-[#a20000] dark:text-red-100"
 																			: hasActiveTimer
 																				? "font-semibold text-green-900 dark:text-green-100"
-																				: "text-gray-700 dark:text-gray-300"
+																				: isExpiredBid
+																					? "text-gray-600 dark:text-gray-300"
+																					: "text-gray-700 dark:text-gray-300"
 																	}`}
 																>
 																	{driverName}
@@ -293,12 +363,12 @@ const OffersList = () => {
 																		{formatCountdown(remainingSeconds)}
 																	</span>
 																) : actionTimeUnix != null ? (
-																	<Image
-																		src={TimeOverIcon}
-																		alt="Time expired"
-																		width={64}
-																		height={22}
-																		className="h-[22px] w-auto max-w-[64px] flex-shrink-0 object-contain"
+																	<ExtendBidTimeButton
+																		offer={row}
+																		driver={driver}
+																		onPushClick={(offer, driverItem) => {
+																			setPushModalTarget({ offer, driver: driverItem });
+																		}}
 																	/>
 																) : null}
 															</div>
@@ -508,13 +578,18 @@ const OffersList = () => {
 																			}
 
 																			return (
-																				<Image
-																					src={OfferTimeImage}
-																					alt="Offer time expired"
-																					width={68}
-																					height={40}
-																					className="h-auto w-[68px] object-contain"
-																				/>
+																				<span className="inline-flex items-center gap-1.5">
+																					<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+																						Offer Expired
+																					</span>
+																					<ExtendBidTimeButton
+																						offer={row}
+																						driver={driver}
+																						onPushClick={(offer, driverItem) => {
+																							setPushModalTarget({ offer, driver: driverItem });
+																						}}
+																					/>
+																				</span>
 																			);
 																		})()}
 																	</TableCell>
@@ -698,6 +773,17 @@ const OffersList = () => {
 					}}
 				/>
 			)}
+
+			<CheckListPushModal
+				isOpen={pushModalTarget != null}
+				onClose={() => setPushModalTarget(null)}
+				drivers={
+					pushModalTarget ? [offerDriverToCheckListDriver(pushModalTarget.driver)] : null
+				}
+				defaultMessage={
+					pushModalTarget ? buildExtendBidTimePushMessage(pushModalTarget.offer) : undefined
+				}
+			/>
 		</div>
 	);
 };
