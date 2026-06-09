@@ -6,6 +6,7 @@ import { Message, ChatRoom } from '@/app-api/chatApi';
 import {
   CHAT_TOAST_AUTO_CLOSE_MS,
   SYSTEM_TOAST_AUTO_CLOSE_MS,
+  TOAST_CONTAINER_CLASS,
 } from '@/constants/toastNotifications';
 
 interface ToastData {
@@ -19,14 +20,18 @@ export const ToastNotificationManager: React.FC = () => {
   const [systemToasts, setSystemToasts] = useState<SystemToastData[]>([]);
 
   const addToast = useCallback((message: Message, chatRoom: ChatRoom) => {
-    const toastId = `${message.id}-${Date.now()}`;
-    const newToast: ToastData = {
-      id: toastId,
-      message,
-      chatRoom,
-    };
-
-    setToasts(prev => [...prev, newToast]);
+    setToasts(prev => {
+      // Same message may arrive twice (e.g. duplicate WebSocket delivery)
+      if (prev.some(t => t.message.id === message.id)) {
+        return prev;
+      }
+      const newToast: ToastData = {
+        id: message.id,
+        message,
+        chatRoom,
+      };
+      return [...prev, newToast];
+    });
   }, []);
 
   const addSystemToastNotification = useCallback((notification: SystemToastData) => {
@@ -56,7 +61,7 @@ export const ToastNotificationManager: React.FC = () => {
   }, [addToast, addSystemToastNotification]);
 
   return (
-    <div className="fixed top-4 right-4 z-[999999] space-y-2 pointer-events-none">
+    <div className={TOAST_CONTAINER_CLASS}>
       {toasts.map((toast, index) => (
         <div
           key={toast.id}

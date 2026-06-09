@@ -15,6 +15,7 @@ import LoadChatsArchiveSection from "./LoadChatsArchiveSection";
 import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -58,6 +59,7 @@ export default function ChatList({
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const roomFromUrl = searchParams.get("room")?.trim() ?? null;
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
+	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
 	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
@@ -173,12 +175,7 @@ export default function ChatList({
 	};
 
 	// Extract offerId from OFFER chat (from room.offerId or parse from name)
-	const getOfferId = (chatRoom: ChatRoom): string | null => {
-		if (chatRoom.offerId) return chatRoom.offerId;
-		if (chatRoom.type !== "OFFER" || !chatRoom.name) return null;
-		const match = chatRoom.name.match(/\(id:\s*([^)]+)\)/);
-		return match ? match[1].trim() : null;
-	};
+	const getOfferId = getOfferIdFromChatRoom;
 
 	// Get accordion header: "Pick up - Delivery" and "(id: xxx)"
 	// Name format: "firstName lastName (id: offerId)\npickUp - delivery"
@@ -388,6 +385,12 @@ export default function ChatList({
 
 	// Only one offer accordion section open at a time.
 	const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (offerFromUrl) {
+			setExpandedOfferId(offerFromUrl);
+		}
+	}, [offerFromUrl, unitFromUrl]);
 
 	const toggleOfferAccordion = (offerId: string) => {
 		setExpandedOfferId(prev => (prev === offerId ? null : offerId));

@@ -11,6 +11,11 @@ import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useChatStore } from "@/stores/chatStore";
 import { findActiveLoadChatInList, findArchivedLoadChat } from "@/utils/findLoadChatRoom";
+import {
+	buildChatUrlForRoom,
+	findOfferChatRoom,
+} from "@/utils/offerChatUrl";
+import { useCurrentUser } from "@/stores/userStore";
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
@@ -18,6 +23,8 @@ export default function ChatContainer() {
 	const roomFromUrl = searchParams.get("room");
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
+	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
+	const currentUser = useCurrentUser();
 	const [selectedChatRoomId, setSelectedChatRoomId] = useState<string | null>(
 		roomFromUrl || null
 	);
@@ -25,6 +32,7 @@ export default function ChatContainer() {
 	const [expandArchiveSection, setExpandArchiveSection] = useState(false);
 	const loadResolvedRef = useRef<string | null>(null);
 	const roomResolvedRef = useRef<string | null>(null);
+	const offerResolvedRef = useRef<string | null>(null);
 	// Initialize WebSocket chat sync at the container level
 	const webSocketChatSync = useWebSocketChatSync();
 	const chatRooms = useChatStore(s => s.chatRooms);
@@ -43,16 +51,9 @@ export default function ChatContainer() {
 		[setCurrentChatRoom]
 	);
 
-	const getOfferIdFromRoom = useCallback((room: ChatRoom): string | null => {
-		if (room.offerId) return String(room.offerId).trim();
-		if (!room.name) return null;
-		const match = room.name.match(/\(id:\s*([^)]+)\)/);
-		return match ? match[1].trim() : null;
-	}, []);
-
 	useEffect(() => {
-		if (!roomFromUrl) {
-			roomResolvedRef.current = null;
+		if (!roomFromUrl || loadFromUrl || offerFromUrl) {
+			if (!roomFromUrl) roomResolvedRef.current = null;
 			return;
 		}
 		if (isLoadingChatRooms) return;
@@ -131,20 +132,26 @@ export default function ChatContainer() {
 
 	useEffect(() => {
 		if (!offerFromUrl) {
+			offerResolvedRef.current = null;
 			return;
 		}
 		if (isLoadingChatRooms) return;
 
+		const resolveKey = `${offerFromUrl}|${unitFromUrl ?? ""}`;
+		if (offerResolvedRef.current === resolveKey) return;
+
 		let cancelled = false;
 
 		const trySelectOfferChat = () => {
-			const active = chatRooms.find(r => {
-				if ((r.type || "").toUpperCase().trim() !== "OFFER") return false;
-				const id = getOfferIdFromRoom(r);
-				return id === offerFromUrl;
-			});
+			const active = findOfferChatRoom(
+				chatRooms,
+				offerFromUrl,
+				unitFromUrl,
+				currentUser?.id
+			);
 			if (active) {
 				if (cancelled) return;
+				offerResolvedRef.current = resolveKey;
 				applySelectedRoom(active);
 			}
 		};
@@ -153,7 +160,14 @@ export default function ChatContainer() {
 		return () => {
 			cancelled = true;
 		};
-	}, [offerFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom, getOfferIdFromRoom]);
+	}, [
+		offerFromUrl,
+		unitFromUrl,
+		chatRooms,
+		isLoadingChatRooms,
+		applySelectedRoom,
+		currentUser?.id,
+	]);
 
 	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } =
 		useChatModal();
@@ -172,22 +186,7 @@ export default function ChatContainer() {
 
 		// Keep URL in sync for LOAD/OFFER chats and direct/group room selection.
 		try {
-			const isLoadChat = (chatRoom.type || "").toUpperCase().trim() === "LOAD";
-			const isOfferChat = (chatRoom.type || "").toUpperCase().trim() === "OFFER";
-			const loadId = String(chatRoom.loadId ?? "").trim();
-			const url =
-				isLoadChat && loadId
-					? `/chat?load=${encodeURIComponent(loadId)}`
-					: isOfferChat
-						? (() => {
-								const offerId = getOfferIdFromRoom(chatRoom);
-								return offerId
-									? `/chat?offer=${encodeURIComponent(offerId)}`
-									: `/chat?room=${encodeURIComponent(chatRoom.id)}`;
-							})()
-						: `/chat?room=${encodeURIComponent(chatRoom.id)}`;
-
-			router.replace(url, { scroll: false });
+			router.replace(buildChatUrlForRoom(chatRoom, currentUser?.id), { scroll: false });
 		} catch {
 			// ignore url sync errors
 		}

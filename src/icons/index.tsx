@@ -72,7 +72,9 @@ import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
 import CheckListIcon from "./check-list.svg";
+import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
+import DeactivateOfferIcon from "./deactivate-offer.svg";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
 import Hazmat2Icon from "./additional/hazmat2.svg";
@@ -139,7 +141,9 @@ export {
 	OffersIcon,
 	WorkstationIcon,
 	CheckListIcon,
+	OfferDriverChatIcon,
 	ExtendBidTimeIcon,
+	DeactivateOfferIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon } from "@/icons";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
@@ -17,6 +18,8 @@ import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriv
 import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
 import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import UserFilterSelect from "./UserFilterSelect";
+import { buildOfferChatUrl } from "@/utils/offerChatUrl";
+import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
@@ -399,13 +402,7 @@ const OffersList = () => {
 												className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 											>
 												Deactivate offer
-												<Image
-													src="/images/deactivate_offer.png"
-													alt=""
-													width={31}
-													height={31}
-													className="h-[31px] w-auto shrink-0"
-												/>
+												<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
 											</button>
 										)}
 										<button
@@ -520,17 +517,46 @@ const OffersList = () => {
 															</TableRow>
 														</TableHeader>
 														<TableBody>
-															{row.drivers.map((driver, driverIndex) => (
+															{row.drivers.map((driver, driverIndex) => {
+																const driverUnitId = driver.externalId ?? driver.driver_id;
+																const driverDisplayName = [
+																	driver.externalId != null ? `(${driver.externalId})` : null,
+																	[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
+																]
+																	.filter(Boolean)
+																	.join(" ");
+																const tmsDriverUrl = buildTmsDriverPageUrl(driver.externalId);
+
+																return (
 																<TableRow
 																	key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIndex}`}
 																	className={`border-gray-200 dark:border-white/[0.08] ${driver.is_selected ? "bg-green-100 dark:bg-green-900/25" : driver.active === false ? "bg-red-100 dark:bg-red-900/25" : ""}`}
 																>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<span className="inline-flex items-center gap-1.5">
-																	<span>
-																		{driver.externalId != null ? `(${driver.externalId}) ` : ""}
-																		{[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—"}
-																	</span>
+																	{driverUnitId ? (
+																		<Link
+																			href={buildOfferChatUrl(String(row.id), driverUnitId)}
+																			title="Open offer chat"
+																			onClick={(e) => e.stopPropagation()}
+																			className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-300"
+																		>
+																			<OfferDriverChatIcon className="h-4 w-4" />
+																		</Link>
+																	) : null}
+																	{tmsDriverUrl ? (
+																		<a
+																			href={tmsDriverUrl}
+																			target="_blank"
+																			rel="noopener noreferrer"
+																			onClick={(e) => e.stopPropagation()}
+																			className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+																		>
+																			{driverDisplayName}
+																		</a>
+																	) : (
+																		<span>{driverDisplayName}</span>
+																	)}
 																	{driver.status?.toUpperCase() === "ACTIVE" ? (
 																		<svg className="shrink-0 w-5 h-5 text-gray-900 dark:text-white" xmlns="http://www.w3.org/2000/svg" shapeRendering="geometricPrecision" textRendering="geometricPrecision" imageRendering="optimizeQuality" fillRule="evenodd" clipRule="evenodd" viewBox="0 0 397 511.911"><path fill="currentColor" d="M62.087 0h168.92c17.125 0 32.753 6.988 43.891 18.212 11.293 11.306 18.184 26.85 18.184 43.89v36.586c-2.371-.11-4.755-.173-7.154-.173-4.28 0-8.515.188-12.704.538V61.507H19.771v364.164h253.453v-26.146c4.189.35 8.424.537 12.704.537a154.3 154.3 0 007.154-.172v49.934c0 17.138-6.975 32.766-18.184 43.891-11.322 11.321-26.85 18.196-43.891 18.196H62.087c-17.138 0-32.765-6.972-43.89-18.196C6.89 482.421 0 466.878 0 449.824V62.018c0-17.14 6.975-32.767 18.197-43.905C29.49 6.819 44.949 0 62.087 0zm84.376 445.096c14.046 0 25.523 11.308 25.523 25.523 0 14.061-11.306 25.538-25.523 25.538-14.046 0-25.538-11.307-25.538-25.538 0-14.031 11.309-25.523 25.538-25.523z"/><path fill="#00A912" d="M285.928 138.216c61.364 0 111.072 49.739 111.072 111.072 0 61.364-49.74 111.072-111.072 111.072-61.364 0-111.073-49.74-111.073-111.072 0-61.366 49.74-111.072 111.073-111.072zm-35.903 94.85l19.688 18.593 49.388-50.017c3.857-3.916 6.274-7.055 11.025-2.161l15.426 15.803c5.068 5.01 4.809 7.945.032 12.608l-67.062 66.023c-10.075 9.875-8.32 10.48-18.538.347l-35.921-35.722c-2.132-2.304-1.902-4.634.428-6.937l17.907-18.569c2.713-2.856 4.874-2.607 7.627.032z"/></svg>
 																	) : (
@@ -670,7 +696,8 @@ const OffersList = () => {
 																		</TableCell>
 																	)}
 																</TableRow>
-															))}
+															);
+															})}
 														</TableBody>
 													</Table>
 													</div>

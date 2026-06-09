@@ -146,6 +146,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const maxReconnectAttempts = 5;
 	/** After first successful connect, further connects are reconnects → trigger chat catch-up sync. */
 	const hadSuccessfulSocketConnectionRef = useRef(false);
+	const recentChatToastMessageIdsRef = useRef(new Set<string>());
+
+	const shouldShowChatToast = (messageId: string): boolean => {
+		if (!messageId || recentChatToastMessageIdsRef.current.has(messageId)) {
+			return false;
+		}
+		recentChatToastMessageIdsRef.current.add(messageId);
+		window.setTimeout(() => {
+			recentChatToastMessageIdsRef.current.delete(messageId);
+		}, 10000);
+		return true;
+	};
 
 	// Stable action selectors — avoid subscribing to messages/chatRooms (prevents re-render loops on read receipts)
 	const addMessage = useChatStore(state => state.addMessage);
@@ -399,7 +411,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// This works for both direct and group chats
 				if (!isCurrentChat && !isMessageFromCurrentUser && !chatRoom?.isMuted) {
 					// Show toast notification
-					if (typeof window !== "undefined" && (window as any).addToastNotification) {
+					if (
+						typeof window !== "undefined" &&
+						(window as any).addToastNotification &&
+						shouldShowChatToast(messageData.message.id)
+					) {
 						// Create a minimal chat room object for toast if not found in store
 						const chatRoomForToast = chatRoom || {
 							id: messageData.chatRoomId,
