@@ -8,6 +8,7 @@ import React, {
 	forwardRef,
 	useImperativeHandle,
 } from "react";
+import { createPortal } from "react-dom";
 import EmojiPicker from "../ui/EmojiPicker";
 import ReplyPreview from "./ReplyPreview";
 import MessageTemplatesModal from "./MessageTemplatesModal";
@@ -49,6 +50,25 @@ export type ChatBoxSendFormHandle = {
 	addFiles: (files: File[] | FileList) => Promise<void>;
 };
 
+const PICKER_WIDTH = 320;
+const POPOVER_ESTIMATED_HEIGHT = 384;
+const VIEWPORT_PADDING = 8;
+
+function computeEmojiPickerPosition(anchor: DOMRect): { top: number; left: number } {
+	let left = anchor.left;
+	if (left + PICKER_WIDTH > window.innerWidth - VIEWPORT_PADDING) {
+		left = window.innerWidth - PICKER_WIDTH - VIEWPORT_PADDING;
+	}
+	left = Math.max(VIEWPORT_PADDING, left);
+
+	let top = anchor.top - POPOVER_ESTIMATED_HEIGHT - VIEWPORT_PADDING;
+	if (top < VIEWPORT_PADDING) {
+		top = anchor.bottom + VIEWPORT_PADDING;
+	}
+
+	return { top, left };
+}
+
 const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 	function ChatBoxSendForm(
 		{ onSendMessage, onTyping, disabled = false, isLoading = false, replyingTo, onCancelReply },
@@ -63,6 +83,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		>([]);
 		const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
 		const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+		const [emojiPickerMounted, setEmojiPickerMounted] = useState(false);
+		const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(
+			null
+		);
 		const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
 		const emojiButtonRef = useRef<HTMLButtonElement>(null);
 		const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -343,6 +367,33 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			requestAnimationFrame(syncEditorContent);
 		};
 
+		useEffect(() => {
+			setEmojiPickerMounted(true);
+		}, []);
+
+		const updateEmojiPickerPosition = useCallback(() => {
+			if (!emojiButtonRef.current) return;
+			setEmojiPickerPos(
+				computeEmojiPickerPosition(emojiButtonRef.current.getBoundingClientRect())
+			);
+		}, []);
+
+		useEffect(() => {
+			if (!showEmojiPicker) {
+				setEmojiPickerPos(null);
+				return;
+			}
+
+			updateEmojiPickerPosition();
+			window.addEventListener("resize", updateEmojiPickerPosition);
+			window.addEventListener("scroll", updateEmojiPickerPosition, true);
+
+			return () => {
+				window.removeEventListener("resize", updateEmojiPickerPosition);
+				window.removeEventListener("scroll", updateEmojiPickerPosition, true);
+			};
+		}, [showEmojiPicker, updateEmojiPickerPosition]);
+
 		// Close emoji picker when clicking outside
 		useEffect(() => {
 			const handleClickOutside = (event: MouseEvent) => {
@@ -503,7 +554,15 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 									ref={emojiButtonRef}
 									type="button"
 									disabled={disabled || isSending || isUploadingAttachments}
-									onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+									onClick={() => {
+										setShowEmojiPicker(open => {
+											const next = !open;
+											if (next) {
+												requestAnimationFrame(updateEmojiPickerPosition);
+											}
+											return next;
+										});
+									}}
 									className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 								>
 									<svg
@@ -548,14 +607,6 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 									</svg>
 								</button>
 							</div>
-
-							{/* Emoji Picker */}
-							<EmojiPicker
-								ref={emojiPickerRef}
-								isOpen={showEmojiPicker}
-								onClose={() => setShowEmojiPicker(false)}
-								onEmojiSelect={handleEmojiSelect}
-							/>
 
 							<ChatRichComposeInput
 								editorRef={editorRef}
@@ -648,6 +699,29 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						</button>
 					</div>
 				</form>
+
+				{showEmojiPicker && emojiPickerPos && emojiPickerMounted
+					? createPortal(
+							<div
+								ref={emojiPickerRef}
+								className="z-[10050]"
+								style={{
+									position: "fixed",
+									top: emojiPickerPos.top,
+									left: emojiPickerPos.left,
+									width: PICKER_WIDTH,
+								}}
+							>
+								<EmojiPicker
+									variant="inline"
+									isOpen
+									onClose={() => setShowEmojiPicker(false)}
+									onEmojiSelect={handleEmojiSelect}
+								/>
+							</div>,
+							document.body
+						)
+					: null}
 
 				<MessageTemplatesModal
 					isOpen={templatesModalOpen}
