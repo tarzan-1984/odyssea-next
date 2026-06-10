@@ -289,31 +289,26 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
 					if (thumbnailUrl) {
 						setPreviewContent(thumbnailUrl);
-						if (fileExtension === "heic" || fileExtension === "heif") {
-							return;
-						}
 					} else if (fileExtension === "heic" || fileExtension === "heif") {
 						if (!HEIC_PREVIEW_CONVERT_ENABLED) {
 							setPreviewContent("");
 							setIsLoading(false);
-							return;
-						}
-						try {
-							const conversionUrl = getHeicConvertPreviewUrl(fileUrl);
-							if (!conversionUrl) {
+						} else {
+							try {
+								const conversionUrl = getHeicConvertPreviewUrl(fileUrl);
+								if (!conversionUrl) {
+									setPreviewContent("");
+									setIsLoading(false);
+								} else {
+									setPreviewContent(conversionUrl);
+								}
+							} catch (err) {
 								setPreviewContent("");
+								setError(
+									"HEIC preview is not available. Please download the file to view it."
+								);
 								setIsLoading(false);
-								return;
 							}
-							setPreviewContent(conversionUrl);
-							return;
-						} catch (err) {
-							setPreviewContent("");
-							setError(
-								"HEIC preview is not available. Please download the file to view it."
-							);
-							setIsLoading(false);
-							return;
 						}
 					} else {
 						setPreviewContent(fileUrl);

@@ -313,7 +313,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	useEffect(() => {
 		if (!messagesReady || !selectedChatRoomId) return;
 
-		void loadInitialArchiveIfPgEmpty();
+		loadInitialArchiveIfPgEmpty().catch(error => {
+			console.error("Failed to load initial archive:", error);
+		});
 		setTimeout(() => {
 			scrollToBottom();
 		}, 10);

@@ -48,15 +48,17 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 
 		let cancelled = false;
 
-		void queryClient.cancelQueries({
-			queryKey: [CHAT_MESSAGES_QUERY_KEY],
-			predicate: query => query.queryKey[1] !== chatRoomId,
-		});
+		queryClient
+			.cancelQueries({
+				queryKey: [CHAT_MESSAGES_QUERY_KEY],
+				predicate: query => query.queryKey[1] !== chatRoomId,
+			})
+			.catch(() => {});
 
 		setHydration({ ready: false, needsApi: false });
 		setError(null);
 
-		void (async () => {
+		(async () => {
 			try {
 				const { needsApi } = await hydrateChatMessagesFromCache(
 					chatRoomId,
@@ -73,7 +75,9 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 					setHydration({ ready: true, needsApi: true });
 				}
 			}
-		})();
+		})().catch(error => {
+			console.error("Failed to hydrate messages from cache:", error);
+		});
 
 		return () => {
 			cancelled = true;
