@@ -10,7 +10,11 @@ import type { CheckListDriver } from "./checkListTypes";
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
 	"We haven't received location updates from you in a while. Please check if the app is running.";
 
-function buildPushBody(driver: CheckListDriver, message: string): Record<string, unknown> {
+function buildPushBody(
+	driver: CheckListDriver,
+	message: string,
+	offerId?: number,
+): Record<string, unknown> {
 	const text = message.trim();
 	const ext = driver.externalId?.trim();
 	const body: Record<string, unknown> = {
@@ -22,6 +26,9 @@ function buildPushBody(driver: CheckListDriver, message: string): Record<string,
 		body.userId = null;
 	} else {
 		body.userId = driver.id;
+	}
+	if (offerId != null && offerId > 0) {
+		body.offerId = offerId;
 	}
 	return body;
 }
@@ -37,6 +44,9 @@ type CheckListPushModalProps = {
 	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
 	drivers: CheckListDriver[] | null;
 	defaultMessage?: string;
+	/** When set, backend updates offers.update_time after a successful push. */
+	offerId?: number;
+	onSent?: () => void | Promise<void>;
 };
 
 export default function CheckListPushModal({
@@ -44,6 +54,8 @@ export default function CheckListPushModal({
 	onClose,
 	drivers,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
+	offerId,
+	onSent,
 }: CheckListPushModalProps) {
 	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
@@ -81,7 +93,7 @@ export default function CheckListPushModal({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					credentials: "include",
-					body: JSON.stringify(buildPushBody(driver, text)),
+					body: JSON.stringify(buildPushBody(driver, text, offerId)),
 				});
 				const json = (await res.json().catch(() => ({}))) as {
 					error?: string;
@@ -98,6 +110,7 @@ export default function CheckListPushModal({
 			}
 
 			if (failures.length === 0) {
+				await onSent?.();
 				setSuccess(
 					targets.length === 1
 						? "Push sent."
