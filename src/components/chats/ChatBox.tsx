@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import ChatBoxHeader from "./ChatBoxHeader";
 import ChatBoxSendForm, { type ChatBoxSendFormHandle } from "./ChatBoxSendForm";
 import Image from "next/image";
 import { Message, ChatRoom, isMessageReadByUser } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+import { useChatRoomMessagesQuery } from "@/hooks/useChatRoomMessagesQuery";
 // WebSocket functionality is now passed via props
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -13,6 +14,7 @@ import { UserData } from "@/app-api/api-types";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
+import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -24,7 +26,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [replyingTo, setReplyingTo] = useState<Message["replyData"] | null>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
-	const messagesContainerRef = useRef<HTMLDivElement>(null);
+	const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+	const [messagesScrollRoot, setMessagesScrollRoot] = useState<HTMLDivElement | null>(null);
+	const attachMessagesContainer = useCallback((node: HTMLDivElement | null) => {
+		messagesContainerRef.current = node;
+		setMessagesScrollRoot(node);
+	}, []);
 	const sendFormRef = useRef<ChatBoxSendFormHandle>(null);
 	const dragCounterRef = useRef(0);
 
@@ -49,11 +56,24 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		messages,
 		isLoadingMessages: loading,
 		isSendingMessage: sending,
-		loadMessages,
 		sendMessage,
 		webSocketMessages: { sendTyping, isTyping },
 		isUserOnline,
 	} = webSocketChatSync;
+
+	// Sync store before useChatRoomMessagesQuery hydrates (same tick as room switch).
+	useLayoutEffect(() => {
+		if (!selectedChatRoomId) return;
+		const state = useChatStore.getState();
+		if (state.currentChatRoom?.id !== selectedChatRoomId) {
+			const room = state.chatRooms.find(r => r.id === selectedChatRoomId);
+			if (room) {
+				state.setCurrentChatRoom(room);
+			}
+		}
+	}, [selectedChatRoomId]);
+
+	const { isReady: messagesReady } = useChatRoomMessagesQuery(selectedChatRoomId);
 
 	// Get error, chat room, and pagination state from store
 	const error = useChatStore(state => state.error);
@@ -163,8 +183,10 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	// Archive-related state and actions
 	const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
 	const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
-	const loadArchivedMessages = useChatStore(state => state.loadArchivedMessages);
-	const getNextAvailableArchive = useChatStore(state => state.getNextAvailableArchive);
+	const tryLoadNextArchivePage = useChatStore(state => state.tryLoadNextArchivePage);
+	const loadInitialArchiveIfPgEmpty = useChatStore(
+		state => state.loadInitialArchiveIfPgEmpty
+	);
 	const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
 	// Only show messages for the selected room (store holds one active transcript)
@@ -257,24 +279,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				if (hasMoreMessages) {
 					Promise.resolve(loadMoreMessages()).finally(finalize);
 				} else {
-					// PostgreSQL is exhausted, try to load from archive
+					// PostgreSQL is exhausted, try to load from archive (lazy S3 day list)
 					if (isLoadingAvailableArchives) {
-						// Archives are still loading, set pending flag
 						setPendingArchiveLoad(true);
 						isLoadingMoreRef.current = false;
 					} else {
-						const nextArchive = getNextAvailableArchive();
-						if (nextArchive) {
-							Promise.resolve(
-								loadArchivedMessages(
-									nextArchive.year,
-									nextArchive.month,
-									nextArchive.day
-								)
-							).finally(finalize);
-						} else {
-							isLoadingMoreRef.current = false;
-						}
+						Promise.resolve(tryLoadNextArchivePage()).finally(finalize);
 					}
 				}
 			}
@@ -285,60 +295,29 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		loadMoreMessages,
 		isLoadingArchivedMessages,
 		isLoadingAvailableArchives,
-		loadArchivedMessages,
-		getNextAvailableArchive,
+		tryLoadNextArchivePage,
 		setPendingArchiveLoad,
 		uniqueMessages.length,
 	]);
 
-	// Note: Messages are now marked as read automatically by the backend when joining a chat room
-	// The backend sends a 'messagesMarkedAsRead' event which is handled in WebSocketContext
-
-	// Load messages when chat room changes
-	const loadMessagesForRoom = useCallback(
-		async (chatRoomId: string) => {
-			try {
-				// Reset pagination state when switching chat rooms
-				useChatStore.getState().setCurrentPage(1);
-				useChatStore.getState().setHasMoreMessages(true);
-
-				// Reset scroll tracking for new chat
-				hasUserScrolledRef.current = false;
-				isLoadingMoreRef.current = false;
-				isProgrammaticScrollRef.current = false;
-
-				const room = useChatStore
-					.getState()
-					.chatRooms.find(r => r.id === chatRoomId);
-				await loadMessages(
-					chatRoomId,
-					1,
-					50,
-					(room?.unreadCount ?? 0) > 0 ? { force: true } : undefined
-				);
-				// Scroll to bottom instantly after messages are loaded
-				setTimeout(() => {
-					scrollToBottom();
-				}, 10);
-			} catch (err) {
-				console.error("Failed to load messages:", err);
-			}
-		},
-		[loadMessages]
-	);
+	// Note: Messages are loaded via useChatRoomMessagesQuery (IndexedDB + useQuery with abort).
 
 	useEffect(() => {
 		if (selectedChatRoomId) {
-			const state = useChatStore.getState();
-			if (state.currentChatRoom?.id !== selectedChatRoomId) {
-				const room = state.chatRooms.find(r => r.id === selectedChatRoomId);
-				if (room) {
-					state.setCurrentChatRoom(room);
-				}
-			}
-			loadMessagesForRoom(selectedChatRoomId);
+			hasUserScrolledRef.current = false;
+			isLoadingMoreRef.current = false;
+			isProgrammaticScrollRef.current = false;
 		}
-	}, [selectedChatRoomId, loadMessagesForRoom]);
+	}, [selectedChatRoomId]);
+
+	useEffect(() => {
+		if (!messagesReady || !selectedChatRoomId) return;
+
+		void loadInitialArchiveIfPgEmpty();
+		setTimeout(() => {
+			scrollToBottom();
+		}, 10);
+	}, [messagesReady, selectedChatRoomId, loadInitialArchiveIfPgEmpty]);
 
 	// Scroll to bottom when messages change (for new messages)
 	useEffect(() => {
@@ -607,10 +586,14 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 			{/* Messages */}
 			<div
-				ref={messagesContainerRef}
+				ref={attachMessagesContainer}
 				onScroll={handleScroll}
 				className="flex-1 max-h-full p-5 space-y-6 overflow-auto custom-scrollbar xl:space-y-8 xl:p-6"
 			>
+				<ChatMediaLoadProvider
+					mediaLoadEnabled={messagesReady}
+					scrollRoot={messagesScrollRoot}
+				>
 				{/* Loading indicator for older messages */}
 				{(loading || isLoadingArchivedMessages) && uniqueMessages.length > 0 && (
 					<div className="flex items-center justify-center py-4">
@@ -715,6 +698,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 				{/* Invisible div to scroll to */}
 				<div ref={messagesEndRef} />
+				</ChatMediaLoadProvider>
 			</div>
 
 			{/* Send form hidden for archived LOAD shipments (read-only history) */}

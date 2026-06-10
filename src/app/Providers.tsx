@@ -10,9 +10,9 @@ import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
 import NotificationsInitializer from "@/components/common/NotificationsInitializer";
 import { ToastNotificationManager } from "@/components/notifications/ToastNotificationManager";
 import ChatFontSizeCssSync from "@/components/chat/ChatFontSizeCssSync";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import React from "react";
-const queryClient = new QueryClient()
 const Providers = ({ children }: { children: React.ReactNode }) => {
 	return (
 		<QueryClientProvider client={queryClient}>

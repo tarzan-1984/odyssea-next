@@ -4,7 +4,44 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
 import ChatPdfLightbox from "@/components/chats/ChatPdfLightbox";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
+import {
+	HEIC_PREVIEW_CONVERT_ENABLED,
+	getHeicConvertPreviewUrl,
+} from "@/config/heicPreviewConvert";
+import {
+	getChatImageThumbnailUrl,
+	CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+} from "@/config/chatImagePreview";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
+import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
+import { useLazyInViewport } from "@/hooks/useLazyInViewport";
+import { ChatMediaPreviewPlaceholder } from "@/components/chats/ChatMediaPreviewPlaceholder";
+
+const IMAGE_PREVIEW_EXTENSIONS = [
+	"jpg",
+	"jpeg",
+	"png",
+	"gif",
+	"webp",
+	"svg",
+	"bmp",
+	"tiff",
+] as const;
+
+function extensionNeedsPreviewSrc(fileExtension: string | undefined): boolean {
+	if (!fileExtension) {
+		return false;
+	}
+	if (fileExtension === "doc" || fileExtension === "docx") {
+		return true;
+	}
+	if (fileExtension === "heic" || fileExtension === "heif") {
+		return HEIC_PREVIEW_CONVERT_ENABLED;
+	}
+	return IMAGE_PREVIEW_EXTENSIONS.includes(
+		fileExtension as (typeof IMAGE_PREVIEW_EXTENSIONS)[number]
+	);
+}
 
 /** Rotate left (counter-clockwise) — bundled icon for image modal toolbar */
 function RotateCcwIcon({ className }: { className?: string }) {
@@ -124,7 +161,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	compact = false,
 }) => {
 	const [previewContent, setPreviewContent] = useState<string>("");
-	const [isLoading, setIsLoading] = useState(true);
+	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string>("");
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 	const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
@@ -143,6 +180,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const modalFitScaleRef = useRef(1);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
 	const chatImageGallery = useChatImageGalleryOptional();
+	const { mediaLoadEnabled, scrollRoot } = useChatMediaLoad();
+	const { elementRef, inView } = useLazyInViewport({
+		root: scrollRoot,
+		resetKey: fileUrl,
+	});
+	const shouldLoadMedia = mediaLoadEnabled && inView;
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
 		fileExtension &&
@@ -201,6 +244,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	}, [isImageModalOpen, modalImgNaturalSize, modalImageRotationDeg, applyModalFitToViewport]);
 
 	useEffect(() => {
+		if (!shouldLoadMedia) {
+			return;
+		}
+
 		const loadPreview = async () => {
 			try {
 				setIsLoading(true);
@@ -234,25 +281,41 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						"tiff",
 					].includes(fileExtension)
 				) {
-					// For HEIC/HEIF files, use server-side conversion to JPEG
-					if (fileExtension === "heic" || fileExtension === "heif") {
-						try {
-							// Request server-side conversion to JPEG
-							const conversionUrl = `/api/storage/convert-heic?url=${encodeURIComponent(fileUrl)}`;
+					const thumbnailUrl = getChatImageThumbnailUrl(fileUrl, fileName, {
+						maxWidth: compact
+							? Math.min(400, CHAT_IMAGE_PREVIEW_MAX_WIDTH)
+							: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+					});
 
-							// Keep loading state true until image loads
-							// The server will return JPEG, so we can use it directly as image source
+					if (thumbnailUrl) {
+						setPreviewContent(thumbnailUrl);
+						if (fileExtension === "heic" || fileExtension === "heif") {
+							return;
+						}
+					} else if (fileExtension === "heic" || fileExtension === "heif") {
+						if (!HEIC_PREVIEW_CONVERT_ENABLED) {
+							setPreviewContent("");
+							setIsLoading(false);
+							return;
+						}
+						try {
+							const conversionUrl = getHeicConvertPreviewUrl(fileUrl);
+							if (!conversionUrl) {
+								setPreviewContent("");
+								setIsLoading(false);
+								return;
+							}
 							setPreviewContent(conversionUrl);
-							// Don't set isLoading to false here - let the image onLoad handler do it
+							return;
 						} catch (err) {
 							setPreviewContent("");
 							setError(
 								"HEIC preview is not available. Please download the file to view it."
 							);
 							setIsLoading(false);
+							return;
 						}
 					} else {
-						// For other images, just set the URL
 						setPreviewContent(fileUrl);
 					}
 				}
@@ -279,7 +342,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			}
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [fileUrl, fileExtension]);
+	}, [shouldLoadMedia, fileUrl, fileExtension]);
+
+	const wrapWithLazyGate = (content: React.ReactNode) => (
+		<div ref={elementRef} className="w-full min-h-0">
+			{shouldLoadMedia ? content : <ChatMediaPreviewPlaceholder compact={compact} />}
+		</div>
+	);
 
 	const renderPreview = () => {
 		// For HEIC files, show loader overlay on top of image, not as separate component
@@ -289,6 +358,26 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					className={`flex items-center justify-center ${compact ? "h-24" : "h-32"} text-red-500 px-1 text-center text-xs`}
 				>
 					<p>{error}</p>
+				</div>
+			);
+		}
+
+		// Avoid mounting <img>/<iframe> with src="" before preview URL is ready
+		if (extensionNeedsPreviewSrc(fileExtension) && !previewContent && !error) {
+			if (fileExtension === "heic" || fileExtension === "heif") {
+				return (
+					<div
+						className={`relative w-full ${
+							compact ? "h-24" : "min-h-[180px]"
+						} overflow-hidden rounded-lg`}
+					>
+						<HeicConvertingOverlay />
+					</div>
+				);
+			}
+			return (
+				<div className={`flex items-center justify-center ${compact ? "h-24" : "h-32"}`}>
+					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);
 		}
@@ -352,13 +441,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							compact ? "h-24" : "h-64"
 						} border rounded overflow-hidden relative cursor-pointer group`}
 					>
-						<iframe
-							src={previewContent}
-							className="w-full h-full pointer-events-none"
-							title="DOC/DOCX Preview"
-							allow="fullscreen"
-							allowFullScreen={false}
-						/>
+						{previewContent ? (
+							<iframe
+								src={previewContent}
+								className="w-full h-full pointer-events-none"
+								title="DOC/DOCX Preview"
+								allow="fullscreen"
+								allowFullScreen={false}
+							/>
+						) : null}
 						<div
 							className="absolute inset-0 z-10 group-hover:bg-black/5 transition-colors"
 							onClick={e => {
@@ -386,21 +477,36 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							openImageViewer();
 						}}
 					>
-						<img
-							src={previewContent}
-							alt="File preview"
-							className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"}`}
-							onError={e => {
-								// Hide image if it fails to load
-								const target = e.target as HTMLImageElement;
-								target.style.display = "none";
-								setError("Failed to load image preview");
-							}}
-						/>
+						{previewContent ? (
+							<img
+								src={previewContent}
+								alt="File preview"
+								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"}`}
+								onError={e => {
+									// Hide image if it fails to load
+									const target = e.target as HTMLImageElement;
+									target.style.display = "none";
+									setError("Failed to load image preview");
+								}}
+							/>
+						) : null}
 					</div>
 				);
 			case "heic":
 			case "heif":
+				if (!HEIC_PREVIEW_CONVERT_ENABLED) {
+					return (
+						<div
+							className={`flex items-center justify-center ${
+								compact ? "h-24" : "h-32"
+							} bg-gray-100 dark:bg-gray-800 rounded px-2 text-center`}
+						>
+							<p className="text-xs text-gray-500 dark:text-gray-400">
+								HEIC preview off (test)
+							</p>
+						</div>
+					);
+				}
 				// HEIC/HEIF files are converted to JPEG on the server side
 				// Always show loader overlay if isLoading is true
 				return (
@@ -457,8 +563,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	return (
 		<>
 			{compact ? (
-				<div className="w-full min-h-0 overflow-hidden">{renderPreview()}</div>
+				wrapWithLazyGate(
+					<div className="w-full min-h-0 overflow-hidden">{renderPreview()}</div>
+				)
 			) : (
+				wrapWithLazyGate(
 				<div className="mb-2 w-full max-w-[400px] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
 					{/* Header */}
 					<div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800">
@@ -535,6 +644,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						</button>
 					</div>
 				</div>
+				)
 			)}
 
 			{/* Fallback image modal when gallery provider is not available (e.g. Files modal) */}
@@ -769,7 +879,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							</div>
 						)}
 
-						{(fileExtension === "docx" || fileExtension === "doc") && (
+						{(fileExtension === "docx" || fileExtension === "doc") && previewContent && (
 							<div className="w-full h-full min-h-[600px] border rounded overflow-hidden">
 								<iframe
 									src={previewContent}

@@ -7,6 +7,7 @@ type RequestOptions = {
 	method?: string;
 	headers?: Record<string, string>;
 	body?: string;
+	signal?: AbortSignal;
 };
 
 export interface User {
@@ -246,7 +247,8 @@ class ChatApiClient {
 	async getMessages(
 		chatRoomId: string,
 		page: number = 1,
-		limit: number = 9
+		limit: number = 9,
+		options?: { signal?: AbortSignal }
 	): Promise<{
 		messages: Message[];
 		hasMore: boolean;
@@ -266,7 +268,9 @@ class ChatApiClient {
 				pages: number;
 				hasMore: boolean;
 			};
-		}>(`/messages/chat-room/${chatRoomId}?${params}`);
+		}>(`/messages/chat-room/${chatRoomId}?${params}`, {
+			signal: options?.signal,
+		});
 
 		return {
 			messages: response.messages || [],

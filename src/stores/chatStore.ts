@@ -74,6 +74,9 @@ interface ChatState {
 	}[];
 	currentArchiveIndex: number; // Index of next archive to load
 	pendingArchiveLoad: boolean; // User scrolled up while archives were loading
+	/** chatRoomId for which availableArchives was fetched (even if empty). */
+	archiveDaysLoadedForRoomId: string | null;
+	archiveDaysInflightRoomId: string | null;
 
 	// Actions for managing chat rooms
 	setCurrentChatRoom: (chatRoom: ChatRoom | null) => void;
@@ -167,6 +170,14 @@ interface ChatState {
 	} | null;
 	setPendingArchiveLoad: (pending: boolean) => void;
 	triggerPendingArchiveLoad: () => void;
+	/** Fetch S3 archive day list only when needed (scroll / empty PG). Deduped per room. */
+	ensureAvailableArchiveDays: () => Promise<
+		{ year: number; month: number; day: number; messageCount: number; createdAt: string }[]
+	>;
+	/** Load the next archive day after ensuring the day list is available. */
+	tryLoadNextArchivePage: () => Promise<void>;
+	/** When PostgreSQL returned no rows, load the newest archived day immediately. */
+	loadInitialArchiveIfPgEmpty: () => Promise<void>;
 
 	// User join date methods
 	getUserJoinDate: () => Date | null;
@@ -196,9 +207,21 @@ export const useChatStore = create<ChatState>()(
 				availableArchives: [],
 				currentArchiveIndex: 0,
 				pendingArchiveLoad: false,
+				archiveDaysLoadedForRoomId: null,
+				archiveDaysInflightRoomId: null,
 
 				// Chat room actions
 				setCurrentChatRoom: chatRoom => {
+					const prev = get().currentChatRoom;
+					if (chatRoom && prev?.id === chatRoom.id) {
+						set(
+							{ currentChatRoom: chatRoom, error: null },
+							false,
+							"setCurrentChatRoom:sameRoom"
+						);
+						return;
+					}
+
 					set(
 						{
 							currentChatRoom: chatRoom,
@@ -207,20 +230,12 @@ export const useChatStore = create<ChatState>()(
 							isLoadingAvailableArchives: false,
 							availableArchives: [],
 							currentArchiveIndex: 0,
+							archiveDaysLoadedForRoomId: null,
+							archiveDaysInflightRoomId: null,
 						},
 						false,
 						"setCurrentChatRoom"
 					);
-
-					// Load available archives when switching to a chat room
-					if (chatRoom) {
-						// Load archives asynchronously
-						get()
-							.getAvailableArchiveDays()
-							.catch(error => {
-								console.error("Failed to load archive days:", error);
-							});
-					}
 				},
 
 				setChatRooms: chatRooms => {
@@ -943,9 +958,57 @@ export const useChatStore = create<ChatState>()(
 						return [];
 					}
 
+					const roomId = currentChatRoom.id;
+					const {
+						archiveDaysLoadedForRoomId,
+						availableArchives,
+						archiveDaysInflightRoomId,
+						isLoadingAvailableArchives,
+					} = get();
+
+					if (archiveDaysLoadedForRoomId === roomId) {
+						return availableArchives;
+					}
+
+					if (isLoadingAvailableArchives && archiveDaysInflightRoomId === roomId) {
+						return new Promise<
+							{
+								year: number;
+								month: number;
+								day: number;
+								messageCount: number;
+								createdAt: string;
+							}[]
+						>(resolve => {
+							const poll = () => {
+								const s = get();
+								if (
+									s.archiveDaysLoadedForRoomId === roomId ||
+									(!s.isLoadingAvailableArchives &&
+										s.archiveDaysInflightRoomId !== roomId)
+								) {
+									resolve(
+										s.archiveDaysLoadedForRoomId === roomId
+											? s.availableArchives
+											: []
+									);
+									return;
+								}
+								setTimeout(poll, 50);
+							};
+							poll();
+						});
+					}
+
 					try {
-						// Set loading state
-						set({ isLoadingAvailableArchives: true }, false, "getAvailableArchiveDays");
+						set(
+							{
+								isLoadingAvailableArchives: true,
+								archiveDaysInflightRoomId: roomId,
+							},
+							false,
+							"getAvailableArchiveDays"
+						);
 
 						// Import messagesArchiveApi dynamically
 						const { messagesArchiveApi } = await import("@/app-api/messagesArchiveApi");
@@ -984,6 +1047,8 @@ export const useChatStore = create<ChatState>()(
 								availableArchives: filteredArchives,
 								currentArchiveIndex: 0,
 								isLoadingAvailableArchives: false,
+								archiveDaysLoadedForRoomId: roomId,
+								archiveDaysInflightRoomId: null,
 							},
 							false,
 							"getAvailableArchiveDays"
@@ -1001,12 +1066,37 @@ export const useChatStore = create<ChatState>()(
 					} catch (error) {
 						console.error("❌ [ARCHIVE] Failed to get available archive days:", error);
 						set(
-							{ isLoadingAvailableArchives: false },
+							{
+								isLoadingAvailableArchives: false,
+								archiveDaysInflightRoomId: null,
+							},
 							false,
 							"getAvailableArchiveDays"
 						);
 						return [];
 					}
+				},
+
+				ensureAvailableArchiveDays: async () => get().getAvailableArchiveDays(),
+
+				tryLoadNextArchivePage: async () => {
+					await get().ensureAvailableArchiveDays();
+					const nextArchive = get().getNextAvailableArchive();
+					if (nextArchive) {
+						await get().loadArchivedMessages(
+							nextArchive.year,
+							nextArchive.month,
+							nextArchive.day
+						);
+					}
+				},
+
+				loadInitialArchiveIfPgEmpty: async () => {
+					const { messages, hasMoreMessages, currentChatRoom } = get();
+					if (!currentChatRoom || hasMoreMessages || messages.length > 0) {
+						return;
+					}
+					await get().tryLoadNextArchivePage();
 				},
 
 				// Set available archives
@@ -1154,6 +1244,9 @@ export const useChatActions = () =>
 		getNextAvailableArchive: state.getNextAvailableArchive,
 		setPendingArchiveLoad: state.setPendingArchiveLoad,
 		triggerPendingArchiveLoad: state.triggerPendingArchiveLoad,
+		ensureAvailableArchiveDays: state.ensureAvailableArchiveDays,
+		tryLoadNextArchivePage: state.tryLoadNextArchivePage,
+		loadInitialArchiveIfPgEmpty: state.loadInitialArchiveIfPgEmpty,
 		loadMoreMessages: state.loadMoreMessages,
 		clearAllData: state.clearAllData,
 	}));

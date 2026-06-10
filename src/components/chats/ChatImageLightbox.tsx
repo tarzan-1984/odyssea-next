@@ -5,6 +5,7 @@ import ReactCrop, { centerCrop, type Crop, type PixelCrop } from "react-image-cr
 import "react-image-crop/dist/ReactCrop.css";
 import { Modal } from "@/components/ui/modal";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
+import { getHeicConvertPreviewUrl } from "@/config/heicPreviewConvert";
 import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
 import type { ChatGalleryImage } from "@/utils/chatGalleryImages";
 import { isChatImageFileName } from "@/utils/chatGalleryImages";
@@ -56,7 +57,7 @@ function computeModalFitScale(
 function resolveImagePreviewUrl(fileUrl: string, fileName: string): string {
 	const ext = fileName.toLowerCase().split(".").pop();
 	if (ext === "heic" || ext === "heif") {
-		return `/api/storage/convert-heic?url=${encodeURIComponent(fileUrl)}`;
+		return getHeicConvertPreviewUrl(fileUrl) ?? fileUrl;
 	}
 	return fileUrl;
 }

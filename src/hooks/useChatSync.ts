@@ -1,17 +1,11 @@
 import { useEffect, useCallback } from "react";
 import { useChatStore } from "@/stores/chatStore";
-import { chatApi, ChatRoom, Message } from "@/app-api/chatApi";
+import { chatApi, ChatRoom } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
-import {
-	filterMessagesForRoom,
-	mergeMessageLists,
-	shouldForceMessagesApiSync,
-} from "@/utils/chatMessagesMerge";
-
-/** Ignore stale loadMessages responses after the user switches chats. */
-let loadMessagesGeneration = 0;
+import { loadChatMessagesPage, CHAT_MESSAGES_QUERY_KEY } from "@/lib/chatMessagesQuery";
+import { queryClient } from "@/lib/queryClient";
 
 /** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
 const mergeSourcesUnreadCount = (
@@ -265,7 +259,7 @@ export const useChatSync = () => {
 		loadChatRooms();
 	}, [loadChatRooms]);
 
-	// Load messages for a specific chat room
+	// Load messages for a specific chat room (imperative: reconnect, switchToChatRoom)
 	const loadMessages = useCallback(
 		async (
 			chatRoomId: string,
@@ -273,127 +267,27 @@ export const useChatSync = () => {
 			limit: number = 50,
 			syncOptions?: LoadMessagesOptions
 		) => {
-			const force = syncOptions?.force ?? false;
-			const requestGen = ++loadMessagesGeneration;
-
-			const isStaleRequest = () => {
-				if (requestGen !== loadMessagesGeneration) return true;
-				const { currentChatRoom } = useChatStore.getState();
-				return currentChatRoom?.id != null && currentChatRoom.id !== chatRoomId;
-			};
-
-			const getRoomFromStore = () =>
-				useChatStore.getState().chatRooms.find(r => r.id === chatRoomId);
-
-			const getStoreMessagesForRoom = () =>
-				filterMessagesForRoom(useChatStore.getState().messages, chatRoomId);
-
-			const applyMessagesForRoom = (lists: Message[][]) => {
-				if (isStaleRequest()) return;
-				// Preserve messages that arrived via WebSocket while this async load was in flight.
-				const latestStoreForRoom = getStoreMessagesForRoom();
-				const merged = mergeMessageLists(...lists, latestStoreForRoom);
-				setMessages(filterMessagesForRoom(merged, chatRoomId));
-			};
+			await queryClient.cancelQueries({
+				queryKey: [CHAT_MESSAGES_QUERY_KEY],
+				predicate: query => query.queryKey[1] !== chatRoomId,
+			});
 
 			try {
 				setLoadingMessages(true);
 				setError(null);
-
-				const room = getRoomFromStore();
-				const storeForRoom = getStoreMessagesForRoom();
-
-				const fetchAndApplyFromApi = async (showStaleCacheFirst: boolean) => {
-					const response = await chatApi.getMessages(chatRoomId, page, limit);
-					if (isStaleRequest()) return;
-
-					const storeNow = getStoreMessagesForRoom();
-					applyMessagesForRoom([response.messages, storeNow]);
-
-					setCurrentPage(page);
-					setHasMoreMessages(response.hasMore);
-					await indexedDBChatService.saveMessages(chatRoomId, response.messages);
-				};
-
-				const hasCachedMessages = await indexedDBChatService.hasMessages(chatRoomId);
-				let cachedMessages: Message[] = [];
-
-				if (hasCachedMessages) {
-					cachedMessages = await indexedDBChatService.getMessages(
-						chatRoomId,
-						limit,
-						(page - 1) * limit
-					);
-				}
-
-				if (cachedMessages.length > 0) {
-					applyMessagesForRoom([cachedMessages, storeForRoom]);
-					setCurrentPage(page);
-					setHasMoreMessages(cachedMessages.length >= limit);
-
-					const isCacheFresh = await indexedDBChatService.isMessagesCacheFresh(
-						chatRoomId,
-						5
-					);
-					const roomNow = getRoomFromStore();
-					const storeNow = getStoreMessagesForRoom();
-					const needsApi = shouldForceMessagesApiSync(roomNow, storeNow, {
-						force,
-						cacheFresh: isCacheFresh,
-					});
-
-					if (needsApi) {
-						try {
-							await fetchAndApplyFromApi(true);
-						} catch (apiError) {
-							console.warn("Background API update failed:", apiError);
-						}
-					}
-
-					if (!isStaleRequest()) {
-						setLoadingMessages(false);
-					}
-					return;
-				}
-
-				// No usable cache — prefer API; keep in-memory tail if API fails
-				if (
-					shouldForceMessagesApiSync(room, storeForRoom, {
-						force: true,
-						cacheFresh: false,
-					}) ||
-					storeForRoom.length === 0
-				) {
-					try {
-						await fetchAndApplyFromApi(false);
-					} catch (apiError) {
-						console.warn("API unavailable:", apiError);
-						if (!isStaleRequest()) {
-							if (storeForRoom.length > 0) {
-								applyMessagesForRoom([storeForRoom]);
-							} else {
-								setError("Failed to load messages");
-								setMessages([]);
-							}
-						}
-					}
-				} else if (storeForRoom.length > 0) {
-					applyMessagesForRoom([storeForRoom]);
-					setCurrentPage(page);
-					setHasMoreMessages(storeForRoom.length >= limit);
-				}
+				await loadChatMessagesPage(chatRoomId, page, limit, {
+					force: syncOptions?.force ?? false,
+				});
 			} catch (error) {
 				console.error("Failed to load messages:", error);
-				if (!isStaleRequest()) {
-					setError("Failed to load messages");
-				}
 			} finally {
-				if (!isStaleRequest()) {
+				const { currentChatRoom } = useChatStore.getState();
+				if (currentChatRoom?.id === chatRoomId || currentChatRoom == null) {
 					setLoadingMessages(false);
 				}
 			}
 		},
-		[setMessages, setLoadingMessages, setError, setCurrentPage, setHasMoreMessages]
+		[setLoadingMessages, setError]
 	);
 
 	// Load more messages (pagination)

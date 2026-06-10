@@ -1,5 +1,6 @@
 import type { PixelCrop } from "react-image-crop";
 import { isHeicFileName, toJpegDownloadFilename } from "@/utils/downloadChatFile";
+import { HEIC_PREVIEW_CONVERT_ENABLED, getHeicConvertPreviewUrl } from "@/config/heicPreviewConvert";
 
 export type CanvasEditSnapshot = {
 	imageData: ImageData;
@@ -464,7 +465,13 @@ export function canvasToObjectUrl(canvas: HTMLCanvasElement): string {
 
 function resolveCropSourceUrl(fileUrl: string, fileName: string): string {
 	if (isHeicFileName(fileName, fileUrl)) {
-		return `/api/storage/convert-heic?url=${encodeURIComponent(fileUrl)}`;
+		const converted = getHeicConvertPreviewUrl(fileUrl);
+		if (converted) {
+			return converted;
+		}
+		if (!HEIC_PREVIEW_CONVERT_ENABLED) {
+			throw new Error("HEIC preview conversion is disabled");
+		}
 	}
 	return `/api/storage/download?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
 }

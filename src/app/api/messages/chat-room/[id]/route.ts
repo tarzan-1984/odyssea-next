@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 		const page = searchParams.get("page") || "1";
 		const limit = searchParams.get("limit") || "9";
 
-		// Make request to backend API
+		// Propagate client abort so Nest stops work when user switches chats
 		const response = await fetch(
 			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/chat-room/${id}?page=${page}&limit=${limit}`,
 			{
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${accessToken}`,
 				},
+				signal: request.signal,
 			}
 		);
 
@@ -38,6 +39,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
+		if (error instanceof Error && error.name === "AbortError") {
+			return new NextResponse(null, { status: 499 });
+		}
 		console.error("Error fetching messages:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
