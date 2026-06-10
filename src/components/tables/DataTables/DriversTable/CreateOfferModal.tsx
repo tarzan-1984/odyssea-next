@@ -14,7 +14,11 @@ import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import { parseOfferDateTimeField } from "@/utils/offerDateTimeRange";
+import {
+	isRouteChronologicallyValid,
+	parseOfferDateTimeField,
+	ROUTE_CHRONOLOGY_ERROR,
+} from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
 	LOCATION_FORMAT_ERROR,
@@ -493,6 +497,10 @@ export default function CreateOfferModal({
 						});
 						if (invalidRange) {
 							routeError = "End time must be after start time";
+						} else if (
+							!isRouteChronologicallyValid(trimmedRoute.map(row => row.time))
+						) {
+							routeError = ROUTE_CHRONOLOGY_ERROR;
 						}
 					}
 				}

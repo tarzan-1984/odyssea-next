@@ -142,3 +142,20 @@ export function formatOfferDateTimeRange(start: Date, end?: Date | null): string
 export function parseOfferRouteDateTime(s: string): Date | null {
 	return parseOfferDateTimeField(s).start;
 }
+
+export const ROUTE_CHRONOLOGY_ERROR =
+	"Each stop date & time must be on or after the previous stop";
+
+/** Ensures route stops are in non-decreasing chronological order by start time. */
+export function isRouteChronologicallyValid(times: string[]): boolean {
+	let prevStart: Date | null = null;
+	for (const time of times) {
+		const { start } = parseOfferDateTimeField(time.trim());
+		if (!start) continue;
+		if (prevStart && start.getTime() < prevStart.getTime()) {
+			return false;
+		}
+		prevStart = start;
+	}
+	return true;
+}
