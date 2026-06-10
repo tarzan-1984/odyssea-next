@@ -44,3 +44,7 @@ export function getChatImageThumbnailUrl(
 
 	return `/api/storage/image-preview?${params.toString()}`;
 }
+
+export function isChatImageThumbnailUrl(url: string): boolean {
+	return url.includes("/api/storage/image-preview");
+}

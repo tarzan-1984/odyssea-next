@@ -11,6 +11,7 @@ import {
 import {
 	getChatImageThumbnailUrl,
 	CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+	isChatImageThumbnailUrl,
 } from "@/config/chatImagePreview";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
@@ -179,6 +180,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const modalScrollViewportRef = useRef<HTMLDivElement>(null);
 	const modalFitScaleRef = useRef(1);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
+	const previewFallbackAttemptedRef = useRef(false);
 	const chatImageGallery = useChatImageGalleryOptional();
 	const { mediaLoadEnabled, scrollRoot } = useChatMediaLoad();
 	const { elementRef, inView } = useLazyInViewport({
@@ -203,6 +205,39 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		}
 		setIsImageModalOpen(true);
 	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension]);
+
+	const handleInlineImageError = useCallback(
+		(e: React.SyntheticEvent<HTMLImageElement>) => {
+			const target = e.target as HTMLImageElement;
+			const failedSrc = target.src;
+
+			if (isChatImageThumbnailUrl(failedSrc) && !previewFallbackAttemptedRef.current) {
+				previewFallbackAttemptedRef.current = true;
+				target.style.display = "";
+				setError("");
+
+				if (fileExtension === "heic" || fileExtension === "heif") {
+					const heicUrl = getHeicConvertPreviewUrl(fileUrl);
+					if (heicUrl) {
+						setPreviewContent(heicUrl);
+						return;
+					}
+				}
+
+				setPreviewContent(fileUrl);
+				return;
+			}
+
+			target.style.display = "none";
+			setError("Failed to load image preview");
+			setIsLoading(false);
+		},
+		[fileUrl, fileExtension]
+	);
+
+	useEffect(() => {
+		previewFallbackAttemptedRef.current = false;
+	}, [fileUrl]);
 
 	const applyModalFitToViewport = useCallback(
 		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
@@ -477,12 +512,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								src={previewContent}
 								alt="File preview"
 								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"}`}
-								onError={e => {
-									// Hide image if it fails to load
-									const target = e.target as HTMLImageElement;
-									target.style.display = "none";
-									setError("Failed to load image preview");
-								}}
+								onError={handleInlineImageError}
 							/>
 						) : null}
 					</div>
@@ -526,13 +556,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 									// Image loaded successfully, hide loader
 									setIsLoading(false);
 								}}
-								onError={e => {
-									// Hide image if it fails to load
-									const target = e.target as HTMLImageElement;
-									target.style.display = "none";
-									setError("Failed to load image preview");
-									setIsLoading(false);
-								}}
+								onError={handleInlineImageError}
 							/>
 						)}
 					</div>
