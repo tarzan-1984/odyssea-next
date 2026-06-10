@@ -12,6 +12,7 @@ import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import SetPasswordModal, { type SetPasswordDriver } from "./SetPasswordModal";
 
 // Define all available roles
 const roleOptions = [
@@ -38,6 +39,9 @@ const roleOptions = [
 // VIN column visibility is permission-based: show only for allowed viewer roles.
 const vinVisibleRoles = ["MODERATOR", "ADMINISTRATOR", "RECRUITER", "RECRUITER_TL", "HR_MANAGER"];
 
+// Set password action: visible only for allowed viewer roles on driver rows.
+const setPasswordVisibleRoles = ["ADMINISTRATOR", "RECRUITER_TL"];
+
 export default function UserListTable() {
 	const currentUser = useCurrentUser();
 	// State for pagination
@@ -52,6 +56,9 @@ export default function UserListTable() {
 
 	// State for sorting functionality
 	const [sortState, setSortState] = useState<{ [key: string]: "asc" | "desc" }>({ role: "asc" });
+
+	// Set password modal state
+	const [setPasswordDriver, setSetPasswordDriver] = useState<SetPasswordDriver | null>(null);
 
 	// Fetch users data when dependencies change
 	const {
@@ -108,6 +115,7 @@ export default function UserListTable() {
 
 	const viewerRole = (currentUser?.role || "").trim().toUpperCase();
 	const showVinColumn = vinVisibleRoles.includes(viewerRole);
+	const showSetPasswordAction = setPasswordVisibleRoles.includes(viewerRole);
 
 	const columnCount = showVinColumn ? 7 : 6;
 
@@ -282,21 +290,42 @@ export default function UserListTable() {
 									<TableRow key={i + 1}>
 										{/* User name with avatar */}
 										<TableCell className="px-4 py-3 border border-gray-100 dark:border-white/[0.05] whitespace-nowrap">
-											<Link
-												href={`users/${item?.id}`}
-												className="flex items-center gap-3"
-											>
-												{item && renderAvatar(item, "w-[50px] h-[50px]")}
+											<div className="flex items-center gap-3">
+												<Link
+													href={`users/${item?.id}`}
+													className="shrink-0"
+												>
+													{item && renderAvatar(item, "w-[50px] h-[50px]")}
+												</Link>
 												<div>
-													<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
-														{item?.firstName && item?.lastName
-															? `${item.firstName} ${item.lastName}`
-															: item?.firstName ||
-																item?.lastName ||
-																"-"}
-													</span>
+													<Link href={`users/${item?.id}`}>
+														<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
+															{item?.firstName && item?.lastName
+																? `${item.firstName} ${item.lastName}`
+																: item?.firstName ||
+																	item?.lastName ||
+																	"-"}
+														</span>
+													</Link>
+													{showSetPasswordAction &&
+														(item?.role || "").trim().toUpperCase() ===
+															"DRIVER" && (
+															<button
+																type="button"
+																className="mt-1 text-xs font-medium text-brand-500 hover:underline dark:text-brand-400"
+																onClick={() => {
+																	setSetPasswordDriver({
+																		externalId: item.externalId,
+																		firstName: item.firstName,
+																		lastName: item.lastName,
+																	});
+																}}
+															>
+																Set password
+															</button>
+														)}
 												</div>
-											</Link>
+											</div>
 										</TableCell>
 										{/* User role */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
@@ -369,6 +398,12 @@ export default function UserListTable() {
 					<SpinnerOne />
 				</div>
 			)}
+
+			<SetPasswordModal
+				isOpen={setPasswordDriver !== null}
+				onClose={() => setSetPasswordDriver(null)}
+				driver={setPasswordDriver}
+			/>
 		</div>
 	);
 }

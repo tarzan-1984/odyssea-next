@@ -21,16 +21,9 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "New password is required" }, { status: 400 });
 		}
 
-		if (newPassword.length < 8) {
+		if (newPassword.length < 6) {
 			return NextResponse.json(
-				{ error: "Password must be at least 8 characters long" },
-				{ status: 400 }
-			);
-		}
-
-		if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-			return NextResponse.json(
-				{ error: "Password must contain uppercase letters and numbers" },
+				{ error: "Password must be at least 6 characters long" },
 				{ status: 400 }
 			);
 		}
