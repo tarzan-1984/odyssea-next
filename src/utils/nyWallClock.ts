@@ -60,6 +60,28 @@ export function formatNyWallClockTime(value: string | null | undefined): string 
 	});
 }
 
+/**
+ * Format NY-naive timestamps for tracking UI (driver_tracking ISO-Z, lastLocationUpdateAt).
+ * Stored UTC components match America/New_York wall-clock digits — always render with timeZone UTC.
+ */
+export function formatNyWallClockForDisplay(
+	value: string | null | undefined
+): string {
+	if (!value?.trim()) return "N/A";
+	const date = parseNaiveNyDateTime(value);
+	if (!date) return value;
+	return new Intl.DateTimeFormat(undefined, {
+		timeZone: "UTC",
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hour12: false,
+	}).format(date);
+}
+
 /** Format chat message date and time in New York wall-clock (e.g. Jun 10, 2026, 11:27 AM). */
 export function formatNyWallClockDateTime(value: string | null | undefined): string {
 	const date = parseNaiveNyDateTime(value);

@@ -8,6 +8,7 @@ import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTa
 import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import DriverMobileAppIcon from "@/components/tables/DataTables/DriversTable/DriverMobileAppIcon";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
+import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 
 const tmsCardButtonClass =
 	"inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors";
@@ -104,16 +105,8 @@ export default function DriverInfo({
 			? `${driverData.latitude.toFixed(6)}, ${driverData.longitude.toFixed(6)}`
 			: "N/A";
 
-	// Format last location update
-	const formatLastUpdate = (dateString: string | null) => {
-		if (!dateString) return "N/A";
-		try {
-			const date = new Date(dateString);
-			return date.toLocaleString();
-		} catch {
-			return dateString;
-		}
-	};
+	const formatLastUpdate = (dateString: string | null) =>
+		formatNyWallClockForDisplay(dateString);
 
 	const driverStatusLabel = getStatusLabelForFilter(driverData.driverStatus);
 	const locationLine = formatDriverLocationLine(

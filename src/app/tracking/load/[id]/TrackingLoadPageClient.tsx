@@ -17,7 +17,10 @@ import { getStatusLabelForFilter } from "@/components/logistics/driversMapConsta
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
-import { isLastLocationOlderThanNy } from "@/utils/nyWallClock";
+import {
+	formatNyWallClockForDisplay,
+	isLastLocationOlderThanNy,
+} from "@/utils/nyWallClock";
 
 const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { hours: 3 };
 
@@ -139,13 +142,7 @@ type DriverTrackingPointCreatedPayload = {
 };
 
 function formatHistoryDate(dateString: string | null) {
-	if (!dateString) return "N/A";
-
-	try {
-		return new Date(dateString).toLocaleString();
-	} catch {
-		return dateString;
-	}
+	return formatNyWallClockForDisplay(dateString);
 }
 
 /** Align with TMS / Nest: loaded-enroute → loaded_enroute */

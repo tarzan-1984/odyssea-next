@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/context/ThemeContext";
 import { isMapTilerConfigured, type MapBasemapMode } from "@/lib/mapTileLayer";
 import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
+import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
@@ -930,30 +931,28 @@ export default function TrackingDeliveryMap({
 
 	const historyMarkerDetails = useMemo(() => {
 		const details = driverData?.load_history_details ?? [];
-		if (details.length > 0) {
-			return details.filter(
-				point =>
-					Array.isArray(point.position) &&
-					Number.isFinite(point.position[0]) &&
-					Number.isFinite(point.position[1])
-			);
-		}
+		const filtered =
+			details.length > 0
+				? details.filter(
+						point =>
+							Array.isArray(point.position) &&
+							Number.isFinite(point.position[0]) &&
+							Number.isFinite(point.position[1])
+					)
+				: historyMarkerPositions.map(position => ({
+						position,
+						createdAt: null,
+						updatedAt: null,
+						externalDriverId: null,
+						driverName: null,
+						placeLabel: null,
+					}));
 
-		return historyMarkerPositions.map(position => ({
-			position,
-			createdAt: null,
-			updatedAt: null,
-			externalDriverId: null,
-			driverName: null,
-			placeLabel: null,
-		}));
+		return filtered;
 	}, [driverData?.load_history_details, historyMarkerPositions]);
 
 	const formatHistoryPointTime = useCallback((dateString: string | null) => {
-		if (!dateString) return "N/A";
-		const date = new Date(dateString);
-		if (Number.isNaN(date.getTime())) return dateString;
-		return date.toLocaleString();
+		return formatNyWallClockForDisplay(dateString);
 	}, []);
 
 	useEffect(() => {
@@ -1139,17 +1138,21 @@ export default function TrackingDeliveryMap({
 	]);
 
 	useEffect(() => {
-		if (!loadRoute || !mapRef.current) return;
+		if (!mapRef.current) return;
 		if (hasFitInitialBoundsRef.current) return;
 
-		const boundsPoints: [number, number][] = loadRoute.stopMarkers.map(s => [
-			s.point.lat,
-			s.point.lng,
-		]);
+		const boundsPoints: [number, number][] = [];
+		if (loadRoute) {
+			boundsPoints.push(
+				...loadRoute.stopMarkers.map(s => [s.point.lat, s.point.lng] as [number, number])
+			);
+		}
 		if (markerPosition) {
 			boundsPoints.push(markerPosition);
 		}
 		boundsPoints.push(...historyMarkerPositions);
+
+		if (boundsPoints.length === 0) return;
 
 		mapRef.current.fitBounds(L.latLngBounds(boundsPoints), {
 			padding: [60, 60],
@@ -1437,99 +1440,96 @@ export default function TrackingDeliveryMap({
 								</Popup>
 							</Marker>
 						))}
-						{historyMarkerDetails.map((point, index) => {
-							const isSelected = index === selectedLoadHistoryPointIndex;
-							const isEditing = index === editingLoadHistoryPointIndex;
-							const isLastHistoryPoint = index === historyMarkerDetails.length - 1;
-
-							if (isEditing) {
-								const position = (historyEditDragPosition ?? point.position) as [
-									number,
-									number,
-								];
-								return (
-									<Marker
-										key={`history-point-edit-${index}`}
-										position={position}
-										draggable
-										autoPan={false}
-										zIndexOffset={750}
-										icon={historyPointEditIcon}
-										eventHandlers={{
-											click: stopMapClickBubbling,
-											dragstart: () => {
-												document.body.style.cursor = "move";
-											},
-											dragend: e => {
-												document.body.style.cursor = "";
-												const ll = e.target.getLatLng();
-												onHistoryEditPointDragEnd?.(ll.lat, ll.lng);
-											},
-										}}
-									/>
-								);
-							}
-
-							return (
-								<Marker
-									key={`history-point-${index}-${point.position[0]}-${point.position[1]}`}
-									position={point.position}
-									icon={createHistoryPointIcon({
-										diameterPx: historyMarkerRadius * 2,
-										index,
-										isLast: isLastHistoryPoint,
-										isSelected,
-									})}
-									zIndexOffset={isLastHistoryPoint ? 650 : isSelected ? 600 : 500}
-									eventHandlers={{
-										click: e => {
-											stopMapClickBubbling(e);
-											onLoadHistoryPointMarkerClick?.(index);
-										},
-									}}
-								>
-									<Popup>
-										<div className="text-sm dark:text-white">
-											<p className="font-semibold dark:text-white">
-												History point {index + 1}
-											</p>
-											{point.placeLabel?.trim() ? (
-												<p className="font-semibold text-gray-600 dark:text-gray-300">
-													{point.placeLabel.trim()}
-												</p>
-											) : null}
-											<p
-												className={
-													point.placeLabel?.trim()
-														? "text-xs text-gray-600 dark:text-gray-300 mt-1"
-														: "text-xs text-gray-600 dark:text-gray-300"
-												}
-											>
-												{point.position[0].toFixed(6)},{" "}
-												{point.position[1].toFixed(6)}
-											</p>
-											{showDriverInHistoryPopup ? (
-												<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-													Driver:{" "}
-													{point.driverName ||
-														(point.externalDriverId
-															? `(${point.externalDriverId})`
-															: "N/A")}
-												</p>
-											) : null}
-											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-												Tracked:{" "}
-												{formatHistoryPointTime(
-													point.createdAt ?? point.updatedAt
-												)}
-											</p>
-										</div>
-									</Popup>
-								</Marker>
-							);
-						})}
 					</>
 				)}
+				{historyMarkerDetails.map((point, index) => {
+					const isSelected = index === selectedLoadHistoryPointIndex;
+					const isEditing = index === editingLoadHistoryPointIndex;
+					const isLastHistoryPoint = index === historyMarkerDetails.length - 1;
+
+					if (isEditing) {
+						const position = (historyEditDragPosition ?? point.position) as [
+							number,
+							number,
+						];
+						return (
+							<Marker
+								key={`history-point-edit-${index}`}
+								position={position}
+								draggable
+								autoPan={false}
+								zIndexOffset={750}
+								icon={historyPointEditIcon}
+								eventHandlers={{
+									click: stopMapClickBubbling,
+									dragstart: () => {
+										document.body.style.cursor = "move";
+									},
+									dragend: e => {
+										document.body.style.cursor = "";
+										const ll = e.target.getLatLng();
+										onHistoryEditPointDragEnd?.(ll.lat, ll.lng);
+									},
+								}}
+							/>
+						);
+					}
+
+					return (
+						<Marker
+							key={`history-point-${index}`}
+							position={point.position}
+							icon={createHistoryPointIcon({
+								diameterPx: historyMarkerRadius * 2,
+								index,
+								isLast: isLastHistoryPoint,
+								isSelected,
+							})}
+							zIndexOffset={isLastHistoryPoint ? 650 : isSelected ? 600 : 500}
+							eventHandlers={{
+								click: e => {
+									stopMapClickBubbling(e);
+									onLoadHistoryPointMarkerClick?.(index);
+								},
+							}}
+						>
+							<Popup>
+								<div className="text-sm dark:text-white">
+									<p className="font-semibold dark:text-white">
+										History point {index + 1}
+									</p>
+									{point.placeLabel?.trim() ? (
+										<p className="font-semibold text-gray-600 dark:text-gray-300">
+											{point.placeLabel.trim()}
+										</p>
+									) : null}
+									<p
+										className={
+											point.placeLabel?.trim()
+												? "text-xs text-gray-600 dark:text-gray-300 mt-1"
+												: "text-xs text-gray-600 dark:text-gray-300"
+										}
+									>
+										{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
+									</p>
+									{showDriverInHistoryPopup ? (
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+											Driver:{" "}
+											{point.driverName ||
+												(point.externalDriverId
+													? `(${point.externalDriverId})`
+													: "N/A")}
+										</p>
+									) : null}
+									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+										Tracked:{" "}
+										{formatHistoryPointTime(point.createdAt ?? point.updatedAt)}
+									</p>
+								</div>
+							</Popup>
+						</Marker>
+					);
+				})}
 				{markerPosition && (
 					<Marker
 						position={markerPosition}
@@ -1554,9 +1554,9 @@ export default function TrackingDeliveryMap({
 									{driverData.lastLocationUpdateAt && (
 										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
 											Last update:{" "}
-											{new Date(
+											{formatNyWallClockForDisplay(
 												driverData.lastLocationUpdateAt
-											).toLocaleString()}
+											)}
 										</p>
 									)}
 								</div>
