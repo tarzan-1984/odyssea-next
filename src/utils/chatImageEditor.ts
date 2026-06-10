@@ -59,6 +59,34 @@ export function createCanvasFromImage(image: HTMLImageElement): HTMLCanvasElemen
 	return canvas;
 }
 
+/** Rotate canvas pixels 90° clockwise (+90) or counter-clockwise (-90). */
+export function rotateCanvas(canvas: HTMLCanvasElement, degrees: 90 | -90): void {
+	const ctx = canvas.getContext("2d");
+	if (!ctx || canvas.width === 0 || canvas.height === 0) return;
+
+	const { width, height } = canvas;
+	const tempCanvas = document.createElement("canvas");
+	tempCanvas.width = width;
+	tempCanvas.height = height;
+	const tempCtx = tempCanvas.getContext("2d");
+	if (!tempCtx) return;
+	tempCtx.drawImage(canvas, 0, 0);
+
+	canvas.width = height;
+	canvas.height = width;
+	const nextCtx = canvas.getContext("2d");
+	if (!nextCtx) return;
+
+	if (degrees === 90) {
+		nextCtx.translate(canvas.width, 0);
+		nextCtx.rotate(Math.PI / 2);
+	} else {
+		nextCtx.translate(0, canvas.height);
+		nextCtx.rotate(-Math.PI / 2);
+	}
+	nextCtx.drawImage(tempCanvas, 0, 0);
+}
+
 function luminance(r: number, g: number, b: number): number {
 	return 0.299 * r + 0.587 * g + 0.114 * b;
 }

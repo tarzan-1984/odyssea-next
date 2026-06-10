@@ -22,6 +22,7 @@ import {
 	loadImageElement,
 	replaceCanvasFromBlob,
 	restoreCanvasEditSnapshot,
+	rotateCanvas,
 	rgbToHex,
 	type CanvasEditSnapshot,
 	type RgbColor,
@@ -151,6 +152,48 @@ function SaveIcon({ className }: { className?: string }) {
 	);
 }
 
+function RotateCcwIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			shapeRendering="geometricPrecision"
+			textRendering="geometricPrecision"
+			imageRendering="optimizeQuality"
+			fillRule="evenodd"
+			clipRule="evenodd"
+			viewBox="0 0 500 511.61"
+			className={className}
+			aria-hidden
+		>
+			<path
+				fillRule="nonzero"
+				d="m218.54 261.95 15.5 101.27c.56 3.8-.47 7.81-3.19 10.93-4.92 5.64-13.5 6.24-19.14 1.32L4.64 195.09l-1.53-1.59c-4.77-5.76-3.96-14.32 1.8-19.08L211.98 3.08c2.99-2.41 6.96-3.59 11.03-2.87 7.34 1.31 12.22 8.35 10.91 15.69l-15.44 85.83c17.97 2.09 37.59 6.57 57.77 13.36 52.66 17.69 109.96 51.41 153.32 100.33 43.79 49.39 73.45 114.21 70.18 193.61-1.17 28.92-6.76 59.73-17.63 92.34-1.34 5.29-5.82 9.46-11.55 10.14-7.44.88-14.19-4.44-15.06-11.87-11.94-100.09-50.53-158.11-98.25-191.8-42.66-30.12-93.19-41.36-138.72-45.89z"
+			/>
+		</svg>
+	);
+}
+
+function RotateCwIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			shapeRendering="geometricPrecision"
+			textRendering="geometricPrecision"
+			imageRendering="optimizeQuality"
+			fillRule="evenodd"
+			clipRule="evenodd"
+			viewBox="0 0 500 511.61"
+			className={className}
+			aria-hidden
+		>
+			<path
+				fillRule="nonzero"
+				d="m265.96 363.22 15.5-101.27c-45.53 4.53-96.07 15.77-138.72 45.89-47.72 33.69-86.32 91.71-98.25 191.8-.87 7.43-7.62 12.75-15.06 11.87-5.73-.68-10.21-4.86-11.55-10.14C7 468.76 1.42 437.95.25 409.03c-3.27-79.4 26.39-144.22 70.18-193.61 43.36-48.92 100.66-82.64 153.32-100.33 20.18-6.8 39.79-11.27 57.77-13.36L266.08 15.9c-1.32-7.34 3.57-14.38 10.91-15.69 4.07-.72 8.04.46 11 2.9l207.1 171.3c5.76 4.77 6.57 13.33 1.8 19.08l-1.54 1.59-207.06 180.39c-5.64 4.92-14.22 4.32-19.14-1.32a13.529 13.529 0 0 1-3.19-10.93z"
+			/>
+		</svg>
+	);
+}
+
 type ChatImageLightboxProps = {
 	isOpen: boolean;
 	images: ChatGalleryImage[];
@@ -171,6 +214,7 @@ export default function ChatImageLightbox({
 	const current = images[currentIndex];
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
+	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
 	const [modalImageScale, setModalImageScale] = useState(1);
 	const [modalImgNaturalSize, setModalImgNaturalSize] = useState<{
 		w: number;
@@ -273,22 +317,26 @@ export default function ChatImageLightbox({
 	}, [revokeCropSourceUrl]);
 
 	const resetView = useCallback(() => {
+		setModalImageRotationDeg(0);
 		setModalImageScale(1);
 		setModalImgNaturalSize(null);
 		modalFitScaleRef.current = 1;
 		resetEditState();
 	}, [resetEditState]);
 
-	const applyModalFitToViewport = useCallback((nat: { w: number; h: number }) => {
-		const viewport = modalScrollViewportRef.current;
-		if (!viewport || !nat.w || !nat.h) return;
+	const applyModalFitToViewport = useCallback(
+		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
+			const viewport = modalScrollViewportRef.current;
+			if (!viewport || !nat.w || !nat.h) return;
 
-		const vw = viewport.clientWidth;
-		const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
-		const fit = computeModalFitScale(nat.w, nat.h, vw, vh, 0);
-		modalFitScaleRef.current = fit;
-		setModalImageScale(fit);
-	}, []);
+			const vw = viewport.clientWidth;
+			const vh = Math.max(120, viewport.clientHeight - MODAL_IMAGE_BOTTOM_CHROME_PX);
+			const fit = computeModalFitScale(nat.w, nat.h, vw, vh, rotationDeg);
+			modalFitScaleRef.current = fit;
+			setModalImageScale(fit);
+		},
+		[modalImageRotationDeg]
+	);
 
 	const handleClose = useCallback(() => {
 		resetView();
@@ -306,10 +354,10 @@ export default function ChatImageLightbox({
 	useEffect(() => {
 		if (!isOpen || !modalImgNaturalSize || isEditing) return;
 		const frame = requestAnimationFrame(() => {
-			applyModalFitToViewport(modalImgNaturalSize);
+			applyModalFitToViewport(modalImgNaturalSize, modalImageRotationDeg);
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [isOpen, modalImgNaturalSize, applyModalFitToViewport, isEditing]);
+	}, [isOpen, modalImgNaturalSize, modalImageRotationDeg, applyModalFitToViewport, isEditing]);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -339,9 +387,20 @@ export default function ChatImageLightbox({
 			const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
 			const image = await loadImageElement(blobUrl);
 			URL.revokeObjectURL(blobUrl);
-			editCanvasRef.current = createCanvasFromImage(image);
+			const canvas = createCanvasFromImage(image);
+			const rotationSteps = ((((modalImageRotationDeg % 360) + 360) % 360) / 90) | 0;
+			for (let i = 0; i < rotationSteps; i++) {
+				rotateCanvas(canvas, 90);
+			}
+			editCanvasRef.current = canvas;
 			colorBeforeGrayscaleRef.current = null;
 			undoStackRef.current = [];
+			setModalImageRotationDeg(0);
+			if (rotationSteps > 0) {
+				const nat = { w: canvas.width, h: canvas.height };
+				setModalImgNaturalSize(nat);
+				requestAnimationFrame(() => applyModalFitToViewport(nat, 0));
+			}
 			setViewMode("edit");
 			setEditSubTool("none");
 			setIsGrayscale(false);
@@ -351,7 +410,7 @@ export default function ChatImageLightbox({
 		} finally {
 			setIsEditBusy(false);
 		}
-	}, [current, isEditBusy, bumpEditCanvas]);
+	}, [current, isEditBusy, bumpEditCanvas, modalImageRotationDeg, applyModalFitToViewport]);
 
 	const handleExitEdit = useCallback(() => {
 		resetEditState();
@@ -501,6 +560,56 @@ export default function ChatImageLightbox({
 		setModalImageScale(s => Math.max(fitScale, s / MODAL_IMAGE_ZOOM_STEP));
 	}, []);
 
+	const handleRotateEdit = useCallback(
+		(degrees: 90 | -90) => {
+			const canvas = editCanvasRef.current;
+			if (!canvas || isEditBusy || isCropMode) return;
+
+			pushUndoSnapshot();
+			rotateCanvas(canvas, degrees);
+			colorBeforeGrayscaleRef.current = null;
+			if (isGrayscale) {
+				applyDocumentGrayscaleToCanvas(canvas);
+			}
+			bumpEditCanvas();
+			const nat = { w: canvas.width, h: canvas.height };
+			setModalImgNaturalSize(nat);
+			requestAnimationFrame(() => applyModalFitToViewport(nat, 0));
+		},
+		[
+			isEditBusy,
+			isCropMode,
+			isGrayscale,
+			pushUndoSnapshot,
+			bumpEditCanvas,
+			applyModalFitToViewport,
+		]
+	);
+
+	const handleRotateCcw = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			if (isEditing) {
+				handleRotateEdit(-90);
+				return;
+			}
+			setModalImageRotationDeg(d => (((d - 90) % 360) + 360) % 360);
+		},
+		[isEditing, handleRotateEdit]
+	);
+
+	const handleRotateCw = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			if (isEditing) {
+				handleRotateEdit(90);
+				return;
+			}
+			setModalImageRotationDeg(d => (d + 90) % 360);
+		},
+		[isEditing, handleRotateEdit]
+	);
+
 	if (!current) return null;
 
 	const navButtonClass =
@@ -540,6 +649,34 @@ export default function ChatImageLightbox({
 				className={toolButtonClass}
 			>
 				<span className="text-sm font-bold leading-none">−</span>
+			</button>
+		</div>
+	);
+
+	const rotateDisabled =
+		isCropMode ||
+		isEditBusy ||
+		(isEditing ? !editCanvas : !previewUrl || isModalImageLoading);
+
+	const rotateControls = (
+		<div className="flex flex-row items-center gap-1.5 sm:gap-2">
+			<button
+				type="button"
+				aria-label="Rotate image counter-clockwise"
+				disabled={rotateDisabled}
+				onClick={handleRotateCcw}
+				className={toolButtonClass}
+			>
+				<RotateCcwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
+			</button>
+			<button
+				type="button"
+				aria-label="Rotate image clockwise"
+				disabled={rotateDisabled}
+				onClick={handleRotateCw}
+				className={toolButtonClass}
+			>
+				<RotateCwIcon className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
 			</button>
 		</div>
 	);
@@ -666,6 +803,7 @@ export default function ChatImageLightbox({
 							<SaveIcon className="h-3.5 w-3.5 shrink-0" />
 							Save
 						</button>
+						{rotateControls}
 						<button
 							type="button"
 							aria-label="Exit edit mode"
@@ -696,6 +834,7 @@ export default function ChatImageLightbox({
 							<EditIcon className="h-3.5 w-3.5 shrink-0" />
 							Edit
 						</button>
+						{rotateControls}
 					</>
 				)}
 				</div>
@@ -863,6 +1002,7 @@ export default function ChatImageLightbox({
 										? {
 												width: modalImgNaturalSize.w * modalImageScale,
 												height: modalImgNaturalSize.h * modalImageScale,
+												transform: `rotate(${modalImageRotationDeg}deg)`,
 											}
 										: undefined
 								}
