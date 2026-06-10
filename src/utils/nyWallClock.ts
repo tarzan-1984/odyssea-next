@@ -18,15 +18,12 @@ export function formatNyWallClockSqlString(instant: Date): string {
 	return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
-/** Parse DB `lastLocationUpdateAt` (NY wall or ISO). */
-export function parseNaiveNyDateTime(value: string | null | undefined): Date | null {
-	const trimmed = value?.trim();
-	if (!trimmed) return null;
-	const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
-	if (!match) {
-		const parsedFallback = new Date(trimmed.replace(" ", "T"));
-		return Number.isFinite(parsedFallback.getTime()) ? parsedFallback : null;
-	}
+const NY_WALL_CLOCK_RE =
+	/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z)?$/;
+
+function parseNyWallClockParts(value: string): Date | null {
+	const match = value.match(NY_WALL_CLOCK_RE);
+	if (!match) return null;
 	const [, year, month, day, hour, minute, second] = match;
 	const parsed = new Date(
 		Date.UTC(
@@ -39,6 +36,47 @@ export function parseNaiveNyDateTime(value: string | null | undefined): Date | n
 		)
 	);
 	return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+/** Parse DB/API timestamps stored as NY wall-clock (naive or ISO with Z). */
+export function parseNaiveNyDateTime(value: string | null | undefined): Date | null {
+	const trimmed = value?.trim();
+	if (!trimmed) return null;
+	const parsed = parseNyWallClockParts(trimmed);
+	if (parsed) return parsed;
+	const parsedFallback = new Date(trimmed.replace(" ", "T"));
+	return Number.isFinite(parsedFallback.getTime()) ? parsedFallback : null;
+}
+
+/** Format chat message time in New York wall-clock (HH:MM AM/PM). */
+export function formatNyWallClockTime(value: string | null | undefined): string {
+	const date = parseNaiveNyDateTime(value);
+	if (!date) return "";
+	return date.toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: true,
+		timeZone: "UTC",
+	});
+}
+
+/** Format chat message date and time in New York wall-clock (e.g. Jun 10, 2026, 11:27 AM). */
+export function formatNyWallClockDateTime(value: string | null | undefined): string {
+	const date = parseNaiveNyDateTime(value);
+	if (!date) return "";
+	const datePart = date.toLocaleDateString("en-US", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		timeZone: "UTC",
+	});
+	const timePart = date.toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: true,
+		timeZone: "UTC",
+	});
+	return `${datePart}, ${timePart}`;
 }
 
 function normalizeNyWallClockForCompare(value: string): string | null {

@@ -1,6 +1,7 @@
 import React from "react";
 import { Message } from "@/app-api/chatApi";
 import { stripMarkdown } from "@/utils/chatMarkdown";
+import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
 
 interface ReplyPreviewProps {
 	replyData: Message['replyData'];
@@ -10,22 +11,13 @@ interface ReplyPreviewProps {
 const ReplyPreview: React.FC<ReplyPreviewProps> = ({ replyData, onCancel }) => {
 	if (!replyData) return null;
 
-	const formatTime = (timeString: string) => {
-		const date = new Date(timeString);
-		return date.toLocaleTimeString('en-US', { 
-			hour: '2-digit', 
-			minute: '2-digit',
-			hour12: true 
-		});
-	};
-
 	return (
 		<div className="reply-preview">
 			<div className="reply-preview-content">
 				<div className="reply-preview-header">
 					<span className="reply-preview-label">Replying to</span>
 					<span className="reply-preview-sender">{replyData.senderName}</span>
-					<span className="reply-preview-time">{formatTime(replyData.time)}</span>
+					<span className="reply-preview-time">{formatNyWallClockDateTime(replyData.time)}</span>
 				</div>
 				<div className="reply-preview-message">
 					{(() => {

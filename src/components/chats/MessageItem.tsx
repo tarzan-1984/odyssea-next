@@ -13,6 +13,7 @@ import FilePreview from "./FilePreview";
 import MessageAttachmentsGrid from "./MessageAttachmentsGrid";
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
+import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
 
 interface MessageItemProps {
 	message: Message;
@@ -38,15 +39,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const { isUserOnline } = useOnlineStatus();
 	const isSender = message.senderId === currentUser?.id;
 	const isOnline = isUserOnline(message.senderId);
-
-	const formatTime = (timestamp: string) => {
-		const date = new Date(timestamp);
-		return date.toLocaleTimeString("en-US", {
-			hour: "2-digit",
-			minute: "2-digit",
-			hour12: true,
-		});
-	};
 
 	const isImageFile = (fileName?: string): boolean => {
 		if (!fileName) return false;
@@ -83,7 +75,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 	const incomingRoleAndTime = !isSender ? (
 		<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
-			{`${incomingRoleLabel}, ${formatTime(message.createdAt)}`}
+			{`${incomingRoleLabel}, ${formatNyWallClockDateTime(message.createdAt)}`}
 		</p>
 	) : null;
 
@@ -508,7 +500,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 							className="flex-shrink-0"
 						/>
 						<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
-							{formatTime(message.createdAt)}
+							{formatNyWallClockDateTime(message.createdAt)}
 						</p>
 					</div>
 				)}
