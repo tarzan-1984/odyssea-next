@@ -17,6 +17,7 @@ import {
 	OFFER_CHAT_LIST_AVATAR_CLASS,
 	participantUserToAvatarData,
 } from "@/utils/chatOtherParticipant";
+import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -87,14 +88,7 @@ export default function ChatListItem({
 
 	const getChatLastMessageTime = (chatRoom: ChatRoom): string => {
 		if (chatRoom.lastMessage) {
-			const messageTime = new Date(chatRoom.lastMessage.createdAt);
-			const now = new Date();
-			const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-
-			if (diffInMinutes < 1) return "Just now";
-			if (diffInMinutes < 60) return `${diffInMinutes}m`;
-			if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
-			return `${Math.floor(diffInMinutes / 1440)}d`;
+			return formatChatRelativeTimeNy(chatRoom.lastMessage.createdAt);
 		}
 		return "";
 	};

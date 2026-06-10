@@ -79,6 +79,24 @@ export function formatNyWallClockDateTime(value: string | null | undefined): str
 	return `${datePart}, ${timePart}`;
 }
 
+function nowNyWallClockDate(): Date {
+	return parseNaiveNyDateTime(formatNyWallClockSqlString(new Date()))!;
+}
+
+/** Relative label for chat list (Just now / Nm / Nh / Nd) vs current NY time. */
+export function formatChatRelativeTimeNy(value: string | null | undefined): string {
+	const messageTime = parseNaiveNyDateTime(value);
+	if (!messageTime) return "";
+	const now = nowNyWallClockDate();
+	const diffInMinutes = Math.floor(
+		(now.getTime() - messageTime.getTime()) / MS_PER_MINUTE
+	);
+	if (diffInMinutes < 1) return "Just now";
+	if (diffInMinutes < 60) return `${diffInMinutes}m`;
+	if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+	return `${Math.floor(diffInMinutes / 1440)}d`;
+}
+
 function normalizeNyWallClockForCompare(value: string): string | null {
 	const trimmed = value.trim();
 	const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
