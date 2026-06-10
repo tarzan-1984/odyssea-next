@@ -407,8 +407,13 @@ export default function AppSettingsPage() {
 				return;
 			}
 			const usersCount = json?.data?.users;
+			const queued = json?.data?.queued === true;
 			if (pushRecipientUserId) {
 				setPushSuccess("Sent to the selected user.");
+			} else if (queued && typeof usersCount === "number") {
+				setPushSuccess(
+					`Push notifications are being sent to ${usersCount} users in the background.`,
+				);
 			} else if (typeof usersCount === "number") {
 				setPushSuccess(`Sent to ${usersCount} users.`);
 			} else {
