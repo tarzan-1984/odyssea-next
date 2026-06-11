@@ -16,6 +16,7 @@ import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrou
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
+import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import {
@@ -122,6 +123,9 @@ const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set(["delivered", "tonu", "cancelle
 
 /** Load statuses where stale-location map hide applies (at / before pickup). */
 const LOAD_STATUSES_STALE_TRACKING = new Set(["waiting_on_pu_date", "at_pu"]);
+
+/** Load statuses where live driver location is appended to history list. */
+const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set(["loaded_enroute", "at_del"]);
 
 type LoadTrackingPoint = {
 	id?: string | null;
@@ -714,6 +718,20 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			(isDriverLoadedEnroute || isLoadDelivered) &&
 			!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
 	);
+	const showCurrentLocationHistoryCard = Boolean(
+		showLoadHistoryPanel &&
+			isDriverLoadedEnroute &&
+			LOAD_STATUSES_SHOW_CURRENT_LOCATION.has(normalizedLoadStatus) &&
+			hasCurrentDriverCoordinates &&
+			hasLastLocationUpdate
+	);
+	const currentLocationPlaceLabel = formatDriverLocationLine(
+		currentTrackingDriver?.city,
+		currentTrackingDriver?.state,
+		currentTrackingDriver?.zip
+	);
+	const loadHistoryPanelCount =
+		loadHistoryDetails.length + (showCurrentLocationHistoryCard ? 1 : 0);
 	/** Keep top banners centered in the same lane even when history panel is hidden. */
 	const reserveTopBannerRightLane = isAuthenticated && showMapAndTrackingTools;
 	const showBackButton =
@@ -927,7 +945,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
 									Load history
 									<span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-										{loadHistoryDetails.length}
+										{loadHistoryPanelCount}
 									</span>
 								</span>
 								<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -936,7 +954,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							</button>
 							{isHistoryOpen && (
 								<div className="max-h-[calc(50vh-45px)] overflow-y-auto px-4 py-3">
-									{loadHistoryDetails.length > 0 ? (
+									{loadHistoryPanelCount > 0 ? (
 										<ol className="space-y-3">
 											{loadHistoryDetails.map((point, index) => {
 												const isEditingCard =
@@ -1129,6 +1147,41 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 													</li>
 												);
 											})}
+											{showCurrentLocationHistoryCard ? (
+												<li key="current-location">
+													<div className="w-full rounded-md border border-gray-100 bg-gray-50 p-3 text-left text-xs text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
+														<div className="mb-2">
+															<p className="font-semibold text-gray-900 dark:text-white">
+																Current location
+															</p>
+														</div>
+														<p>
+															<span className="font-medium">
+																Coordinates:
+															</span>{" "}
+															{currentDriverLatitude.toFixed(6)},{" "}
+															{currentDriverLongitude.toFixed(6)}
+														</p>
+														{currentLocationPlaceLabel !== "N/A" ? (
+															<p>
+																<span className="font-medium">
+																	Place:
+																</span>{" "}
+																{currentLocationPlaceLabel}
+															</p>
+														) : null}
+														<p>
+															<span className="font-medium">
+																Tracked:
+															</span>{" "}
+															{formatHistoryDate(
+																currentTrackingDriver?.lastLocationUpdateAt ??
+																	null
+															)}
+														</p>
+													</div>
+												</li>
+											) : null}
 										</ol>
 									) : (
 										<p className="text-sm text-gray-500 dark:text-gray-400">
