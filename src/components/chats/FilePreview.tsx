@@ -31,6 +31,16 @@ const IMAGE_PREVIEW_EXTENSIONS = [
 	"tiff",
 ] as const;
 
+function isRasterChatImageExtension(fileExtension: string | undefined): boolean {
+	if (!fileExtension) return false;
+	if (fileExtension === "heic" || fileExtension === "heif") {
+		return HEIC_PREVIEW_CONVERT_ENABLED;
+	}
+	return IMAGE_PREVIEW_EXTENSIONS.includes(
+		fileExtension as (typeof IMAGE_PREVIEW_EXTENSIONS)[number]
+	);
+}
+
 function extensionNeedsPreviewSrc(fileExtension: string | undefined): boolean {
 	if (!fileExtension) {
 		return false;
@@ -182,7 +192,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const modalScrollViewportRef = useRef<HTMLDivElement>(null);
 	const modalFitScaleRef = useRef(1);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
-	const previewFallbackAttemptedRef = useRef(false);
+	const thumbEnsureAttemptedRef = useRef(false);
+	const heicConvertAttemptedRef = useRef(false);
 	const chatImageGallery = useChatImageGalleryOptional();
 	const { mediaLoadEnabled, scrollRoot } = useChatMediaLoad();
 	const { elementRef, inView } = useLazyInViewport({
@@ -208,14 +219,26 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		setIsImageModalOpen(true);
 	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension]);
 
+	const tryHeicConvertPreview = useCallback(() => {
+		const heicUrl = getHeicConvertPreviewUrl(fileUrl);
+		if (!heicUrl) return false;
+		heicConvertAttemptedRef.current = true;
+		setError("");
+		setIsLoading(true);
+		setPreviewContent(heicUrl);
+		return true;
+	}, [fileUrl]);
+
 	const handleInlineImageError = useCallback(
 		(e: React.SyntheticEvent<HTMLImageElement>) => {
 			const target = e.target as HTMLImageElement;
 			const failedSrc = target.src;
+			const isHeic = fileExtension === "heic" || fileExtension === "heif";
 
-			if (isChatImageThumbnailUrl(failedSrc) && !previewFallbackAttemptedRef.current) {
-				previewFallbackAttemptedRef.current = true;
-				target.style.display = "";
+			target.style.display = "";
+
+			if (isChatImageThumbnailUrl(failedSrc) && !thumbEnsureAttemptedRef.current) {
+				thumbEnsureAttemptedRef.current = true;
 				setError("");
 				setIsLoading(true);
 
@@ -225,34 +248,33 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				})
 					.then(url => {
 						setPreviewContent(url);
-						setIsLoading(false);
 					})
 					.catch(() => {
-						if (fileExtension === "heic" || fileExtension === "heif") {
-							const heicUrl = getHeicConvertPreviewUrl(fileUrl);
-							if (heicUrl) {
-								setPreviewContent(heicUrl);
-								setIsLoading(false);
-								return;
-							}
+						if (isHeic && tryHeicConvertPreview()) {
+							return;
 						}
-
 						setPreviewContent(fileUrl);
-						setIsLoading(false);
 					});
 				return;
+			}
+
+			if (isHeic && !heicConvertAttemptedRef.current) {
+				if (tryHeicConvertPreview()) {
+					return;
+				}
 			}
 
 			target.style.display = "none";
 			setError("Failed to load image preview");
 			setIsLoading(false);
 		},
-		[fileUrl, fileName, fileExtension]
+		[fileUrl, fileName, fileExtension, tryHeicConvertPreview]
 	);
 
 	useEffect(() => {
-		previewFallbackAttemptedRef.current = false;
-	}, [fileUrl]);
+		thumbEnsureAttemptedRef.current = false;
+		heicConvertAttemptedRef.current = false;
+	}, [fileUrl, shouldLoadMedia]);
 
 	const applyModalFitToViewport = useCallback(
 		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
@@ -331,36 +353,39 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						"tiff",
 					].includes(fileExtension)
 				) {
-					const thumbnailUrl = getChatImageThumbnailUrl(fileUrl, fileName, {
-						maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
-						quality: CHAT_IMAGE_PREVIEW_QUALITY,
-					});
-
-					if (thumbnailUrl) {
-						setPreviewContent(thumbnailUrl);
-					} else if (fileExtension === "heic" || fileExtension === "heif") {
+					if (fileExtension === "heic" || fileExtension === "heif") {
 						if (!HEIC_PREVIEW_CONVERT_ENABLED) {
 							setPreviewContent("");
 							setIsLoading(false);
 						} else {
 							try {
-								const conversionUrl = getHeicConvertPreviewUrl(fileUrl);
-								if (!conversionUrl) {
+								const thumbUrl = await ensureChatImageThumbnail(fileUrl, fileName, {
+									maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+									quality: CHAT_IMAGE_PREVIEW_QUALITY,
+								});
+								thumbEnsureAttemptedRef.current = true;
+								setPreviewContent(thumbUrl);
+							} catch {
+								if (!tryHeicConvertPreview()) {
 									setPreviewContent("");
+									setError(
+										"HEIC preview is not available. Please download the file to view it."
+									);
 									setIsLoading(false);
-								} else {
-									setPreviewContent(conversionUrl);
 								}
-							} catch (err) {
-								setPreviewContent("");
-								setError(
-									"HEIC preview is not available. Please download the file to view it."
-								);
-								setIsLoading(false);
 							}
 						}
 					} else {
-						setPreviewContent(fileUrl);
+						const thumbnailUrl = getChatImageThumbnailUrl(fileUrl, fileName, {
+							maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+							quality: CHAT_IMAGE_PREVIEW_QUALITY,
+						});
+
+						if (thumbnailUrl) {
+							setPreviewContent(thumbnailUrl);
+						} else {
+							setPreviewContent(fileUrl);
+						}
 					}
 				}
 			} catch (err) {
@@ -368,9 +393,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				console.error("Preview error:", err);
 				setIsLoading(false);
 			} finally {
-				// For HEIC files, don't set isLoading to false here
-				// It will be set to false when the image loads (onLoad handler)
-				if (fileExtension !== "heic" && fileExtension !== "heif") {
+				// Raster images keep loading until <img onLoad>
+				if (!isRasterChatImageExtension(fileExtension)) {
 					setIsLoading(false);
 				}
 			}
@@ -386,7 +410,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			}
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [shouldLoadMedia, fileUrl, fileExtension]);
+	}, [shouldLoadMedia, fileUrl, fileExtension, fileName, tryHeicConvertPreview]);
 
 	const wrapWithLazyGate = (content: React.ReactNode) => (
 		<div ref={elementRef} className="w-full min-h-0">
@@ -514,18 +538,26 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`w-full ${
-							compact ? "max-w-none" : "max-w-[400px]"
-						} overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity`}
+							compact ? "max-w-none h-24" : "max-w-[400px]"
+						} overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity relative ${
+							compact ? "min-h-0" : "min-h-[180px]"
+						}`}
 						onClick={e => {
 							e.stopPropagation();
 							openImageViewer();
 						}}
 					>
+						{isLoading ? (
+							<HeicConvertingOverlay message="Loading image..." />
+						) : null}
 						{previewContent ? (
 							<img
 								src={previewContent}
 								alt="File preview"
-								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"}`}
+								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
+									isLoading ? "opacity-0" : ""
+								}`}
+								onLoad={() => setIsLoading(false)}
 								onError={handleInlineImageError}
 							/>
 						) : null}
@@ -560,19 +592,22 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							openImageViewer();
 						}}
 					>
-						{isLoading && <HeicConvertingOverlay />}
-						{previewContent && (
+						{isLoading ? (
+							<HeicConvertingOverlay message="Loading image..." />
+						) : null}
+						{previewContent ? (
 							<img
 								src={previewContent}
 								alt="File preview"
-								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"}`}
+								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
+									isLoading ? "opacity-0" : ""
+								}`}
 								onLoad={() => {
-									// Image loaded successfully, hide loader
 									setIsLoading(false);
 								}}
 								onError={handleInlineImageError}
 							/>
-						)}
+						) : null}
 					</div>
 				);
 

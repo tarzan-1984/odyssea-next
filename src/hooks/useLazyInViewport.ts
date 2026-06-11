@@ -17,9 +17,10 @@ export function useLazyInViewport(options?: UseLazyInViewportOptions) {
 	const elementRef = useRef<HTMLDivElement>(null);
 	const [inView, setInView] = useState(false);
 
+	// Re-check when the file changes or the scroll root attaches (chat container mounts after first paint).
 	useEffect(() => {
 		setInView(false);
-	}, [resetKey]);
+	}, [resetKey, root]);
 
 	useEffect(() => {
 		if (inView) return;
