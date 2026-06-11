@@ -47,6 +47,12 @@ type OffersAppSettingsPayload = {
 	updatedAt?: string;
 };
 
+type MinimumAppVersionPayload = {
+	id: string;
+	minimumAppVersion: string;
+	updatedAt?: string;
+};
+
 type AccountDeletionRequestSettingsPayload = {
 	id: string;
 	accountDeletionRequestEmail: string;
@@ -187,6 +193,19 @@ function parseLocationEnvironment(json: unknown): LocationEnvironmentPayload | n
 	return raw;
 }
 
+function parseMinimumAppVersionSettings(json: unknown): MinimumAppVersionPayload | null {
+	if (!json || typeof json !== "object") return null;
+	const root = json as ApiEnvelope<MinimumAppVersionPayload> & MinimumAppVersionPayload;
+	const raw =
+		root.data && typeof root.data === "object" && "minimumAppVersion" in root.data
+			? root.data
+			: "minimumAppVersion" in root
+				? (root as MinimumAppVersionPayload)
+				: null;
+	if (!raw || typeof raw.minimumAppVersion !== "string") return null;
+	return raw;
+}
+
 function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<OffersAppSettingsPayload> & OffersAppSettingsPayload;
@@ -236,6 +255,7 @@ export default function AppSettingsPage() {
 	const [locationEnvMode, setLocationEnvMode] = useState<"live" | "test">("live");
 	const [locationTestDriverExternalId, setLocationTestDriverExternalId] = useState("3343");
 	const [maxOpenOfferParticipationsInput, setMaxOpenOfferParticipationsInput] = useState("2");
+	const [minimumAppVersionInput, setMinimumAppVersionInput] = useState("");
 	const [accountDeletionRequestEmail, setAccountDeletionRequestEmail] = useState("");
 
 	const [loadingMobile, setLoadingMobile] = useState(true);
@@ -243,24 +263,28 @@ export default function AppSettingsPage() {
 	const [loadingLoadChat, setLoadingLoadChat] = useState(true);
 	const [loadingEnv, setLoadingEnv] = useState(true);
 	const [loadingOffers, setLoadingOffers] = useState(true);
+	const [loadingMinimumVersion, setLoadingMinimumVersion] = useState(true);
 	const [loadingDeletion, setLoadingDeletion] = useState(true);
 	const [savingMobile, setSavingMobile] = useState(false);
 	const [savingTms, setSavingTms] = useState(false);
 	const [savingLoadChat, setSavingLoadChat] = useState(false);
 	const [savingEnv, setSavingEnv] = useState(false);
 	const [savingOffers, setSavingOffers] = useState(false);
+	const [savingMinimumVersion, setSavingMinimumVersion] = useState(false);
 	const [savingDeletion, setSavingDeletion] = useState(false);
 	const [errorMobile, setErrorMobile] = useState<string | null>(null);
 	const [errorTms, setErrorTms] = useState<string | null>(null);
 	const [errorLoadChat, setErrorLoadChat] = useState<string | null>(null);
 	const [errorEnv, setErrorEnv] = useState<string | null>(null);
 	const [errorOffers, setErrorOffers] = useState<string | null>(null);
+	const [errorMinimumVersion, setErrorMinimumVersion] = useState<string | null>(null);
 	const [errorDeletion, setErrorDeletion] = useState<string | null>(null);
 	const [successMobile, setSuccessMobile] = useState<string | null>(null);
 	const [successTms, setSuccessTms] = useState<string | null>(null);
 	const [successLoadChat, setSuccessLoadChat] = useState<string | null>(null);
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
+	const [successMinimumVersion, setSuccessMinimumVersion] = useState<string | null>(null);
 	const [successDeletion, setSuccessDeletion] = useState<string | null>(null);
 
 	// Usage stats (admin) section
@@ -540,6 +564,33 @@ export default function AppSettingsPage() {
 		}
 	}, []);
 
+	const loadMinimumVersion = useCallback(async () => {
+		setLoadingMinimumVersion(true);
+		setErrorMinimumVersion(null);
+		try {
+			const res = await fetch("/api/app-settings/minimum-app-version", { method: "GET" });
+			const json = await res.json();
+			if (!res.ok) {
+				setErrorMinimumVersion(
+					typeof json.error === "string"
+						? json.error
+						: "Failed to load minimum app version settings"
+				);
+				return;
+			}
+			const s = parseMinimumAppVersionSettings(json);
+			if (!s) {
+				setErrorMinimumVersion("Unexpected response from server");
+				return;
+			}
+			setMinimumAppVersionInput(s.minimumAppVersion ?? "");
+		} catch {
+			setErrorMinimumVersion("Network error while loading minimum app version settings");
+		} finally {
+			setLoadingMinimumVersion(false);
+		}
+	}, []);
+
 	const loadOffers = useCallback(async () => {
 		setLoadingOffers(true);
 		setErrorOffers(null);
@@ -602,11 +653,21 @@ export default function AppSettingsPage() {
 			loadLoadChat(),
 			loadEnv(),
 			loadOffers(),
+			loadMinimumVersion(),
 			loadDeletion(),
 		]).catch(() => {
 			/* errors surfaced via per-loader setError* */
 		});
-	}, [loadUsage, loadMobile, loadTms, loadLoadChat, loadEnv, loadOffers, loadDeletion]);
+	}, [
+		loadUsage,
+		loadMobile,
+		loadTms,
+		loadLoadChat,
+		loadEnv,
+		loadOffers,
+		loadMinimumVersion,
+		loadDeletion,
+	]);
 
 	async function onSubmitDeletion(e: FormEvent) {
 		e.preventDefault();
@@ -649,6 +710,57 @@ export default function AppSettingsPage() {
 			setErrorDeletion("Network error while saving");
 		} finally {
 			setSavingDeletion(false);
+		}
+	}
+
+	async function onSubmitMinimumVersion(e: FormEvent) {
+		e.preventDefault();
+		setSavingMinimumVersion(true);
+		setErrorMinimumVersion(null);
+		setSuccessMinimumVersion(null);
+
+		const minimumAppVersion = minimumAppVersionInput.trim();
+		if (
+			minimumAppVersion !== "" &&
+			!/^\d+(?:\.\d+)+(?:[-\w.]*)?$/u.test(minimumAppVersion)
+		) {
+			setErrorMinimumVersion('Enter a version like 2.1.4 or leave empty to disable.');
+			setSavingMinimumVersion(false);
+			return;
+		}
+
+		try {
+			const res = await fetch("/api/app-settings/minimum-app-version", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ minimumAppVersion }),
+			});
+			const json = await res.json();
+			if (!res.ok) {
+				const msg =
+					typeof json.error === "string"
+						? json.error
+						: typeof json.message === "string"
+							? json.message
+							: Array.isArray(json.message)
+								? json.message.join(", ")
+								: "Failed to save minimum app version settings";
+				setErrorMinimumVersion(msg);
+				return;
+			}
+			const s = parseMinimumAppVersionSettings(json);
+			if (s) {
+				setMinimumAppVersionInput(s.minimumAppVersion ?? "");
+			}
+			setSuccessMinimumVersion(
+				minimumAppVersion
+					? "Saved. Apps below this version will show the force-update screen after syncing settings."
+					: "Saved. Server-side minimum version check is disabled."
+			);
+		} catch {
+			setErrorMinimumVersion("Network error while saving");
+		} finally {
+			setSavingMinimumVersion(false);
 		}
 	}
 
@@ -936,7 +1048,12 @@ export default function AppSettingsPage() {
 	}
 
 	const pageLoading =
-		loadingMobile || loadingTms || loadingLoadChat || loadingEnv || loadingOffers;
+		loadingMobile ||
+		loadingTms ||
+		loadingLoadChat ||
+		loadingEnv ||
+		loadingOffers ||
+		loadingMinimumVersion;
 
 	return (
 		<div>
@@ -1413,6 +1530,68 @@ export default function AppSettingsPage() {
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingMobile ? "Saving…" : "Save mobile app settings"}
+						</button>
+					</div>
+				</form>
+
+				<form
+					onSubmit={onSubmitMinimumVersion}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						Minimum app version
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						If the installed app version is lower than this value, users see the same
+						full-screen update prompt as for an outdated store build. Leave empty to
+						disable. Mobile apps read this from GET /v1/app-settings when returning to
+						the foreground and via WebSocket{" "}
+						<code className="text-xs">appLocationSettingsUpdated</code>.
+					</p>
+
+					{loadingMinimumVersion ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
+					) : (
+						<div className="max-w-xl">
+							<Label htmlFor="minimumAppVersion" className="mb-1">
+								Minimum required version
+							</Label>
+							<Input
+								id="minimumAppVersion"
+								name="minimumAppVersion"
+								type="text"
+								value={minimumAppVersionInput}
+								onChange={e => setMinimumAppVersionInput(e.target.value)}
+								placeholder="2.1.4 (empty = disabled)"
+								className="!h-9 !min-h-0 !py-1.5"
+							/>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Marketing version from the store (e.g. 2.1.4). Works together with
+								the automatic App Store / Google Play check.
+							</p>
+						</div>
+					)}
+
+					{errorMinimumVersion ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorMinimumVersion}
+						</p>
+					) : null}
+					{successMinimumVersion ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successMinimumVersion}
+						</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={pageLoading || savingMinimumVersion}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{savingMinimumVersion ? "Saving…" : "Save minimum version"}
 						</button>
 					</div>
 				</form>
