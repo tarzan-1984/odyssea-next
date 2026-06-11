@@ -40,7 +40,7 @@ const roleOptions = [
 const vinVisibleRoles = ["MODERATOR", "ADMINISTRATOR", "RECRUITER", "RECRUITER_TL", "HR_MANAGER"];
 
 // Set password action: visible only for allowed viewer roles on driver rows.
-const setPasswordVisibleRoles = ["ADMINISTRATOR", "RECRUITER_TL"];
+const setPasswordVisibleRoles = ["ADMINISTRATOR", "RECRUITER_TL", "DRIVER_UPDATES", "TRACKING_TL"];
 
 export default function UserListTable() {
 	const currentUser = useCurrentUser();
