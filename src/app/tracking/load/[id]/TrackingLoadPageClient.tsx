@@ -179,6 +179,11 @@ function formatLoadStatusLabel(value: string | null | undefined): string {
 	);
 }
 
+function getLoadStatusFromDetails(details: LoadDetailsResponse | undefined): string {
+	const meta = details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
+	return normalizeTrackingStatus(meta?.load_status ?? null);
+}
+
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
@@ -249,6 +254,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const [deletingHistoryPointId, setDeletingHistoryPointId] = useState<string | null>(null);
 	const isPublicView = !isAuthLoading && !isAuthenticated;
+	const trackingLoadDetailsQueryKey = [
+		"tracking-load-details",
+		loadId,
+		isPublicView ? "public" : "auth",
+	] as const;
+	const cachedLoadDetails = queryClient.getQueryData(trackingLoadDetailsQueryKey) as
+		| LoadDetailsResponse
+		| undefined;
+	const isLoadDeliveredFromCache =
+		getLoadStatusFromDetails(cachedLoadDetails) === "delivered";
 
 	const {
 		data: loadDetails,
@@ -256,12 +271,13 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isError: isLoadDetailsError,
 		error: loadDetailsError,
 	} = useQuery({
-		queryKey: ["tracking-load-details", loadId, isPublicView ? "public" : "auth"],
+		queryKey: trackingLoadDetailsQueryKey,
 		queryFn: () => fetchTrackingLoadDetails(loadId, { publicView: isPublicView }),
 		enabled: Boolean(loadId) && !isAuthLoading,
 		staleTime: 60 * 1000,
 		gcTime: 10 * 60 * 1000,
-		refetchOnWindowFocus: true,
+		refetchOnWindowFocus: !isLoadDeliveredFromCache,
+		refetchOnReconnect: !isLoadDeliveredFromCache,
 	});
 
 	useEffect(() => {
@@ -286,8 +302,23 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			});
 	}, [loadId, queryClient]);
 
+	const routeGeocodeFromApi = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return details?.data?.data?.routeGeocode ?? details?.data?.routeGeocode ?? null;
+	}, [loadDetails]);
+
+	const loadMetaData = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
+	}, [loadDetails]);
+	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
+	const isLoadDelivered = normalizedLoadStatus === "delivered";
+	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
+	const loadStatusAllowsDriverMarker =
+		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
+
 	useEffect(() => {
-		if (!loadId) return;
+		if (!loadId || !isPageReady || isLoadDelivered) return;
 
 		let baseUrl =
 			process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -328,22 +359,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return () => {
 			socket.disconnect();
 		};
-	}, [loadId, refreshLoadDetails]);
-
-	const routeGeocodeFromApi = useMemo(() => {
-		const details = loadDetails as LoadDetailsResponse | undefined;
-		return details?.data?.data?.routeGeocode ?? details?.data?.routeGeocode ?? null;
-	}, [loadDetails]);
-
-	const loadMetaData = useMemo(() => {
-		const details = loadDetails as LoadDetailsResponse | undefined;
-		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
-	}, [loadDetails]);
-	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
-	const isLoadDelivered = normalizedLoadStatus === "delivered";
-	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
-	const loadStatusAllowsDriverMarker =
-		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
+	}, [isLoadDelivered, isPageReady, loadId, refreshLoadDetails]);
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
