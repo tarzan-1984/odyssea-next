@@ -287,12 +287,19 @@ const offers = {
 	 */
 	async addDriversToOffer(
 		offerId: number,
-		driverIds: string[]
+		driverIds: string[],
+		driverEmptyMiles?: Record<string, number>
 	): Promise<AddDriversToOfferResponse> {
 		try {
 			const response = await axios.patch<AddDriversToOfferResponse>(
 				`/api/offers/${offerId}/drivers`,
-				{ driverIds },
+				{
+					driverIds,
+					...(driverEmptyMiles &&
+					Object.keys(driverEmptyMiles).length > 0
+						? { driverEmptyMiles }
+						: {}),
+				},
 				{
 					headers: { "Content-Type": "application/json" },
 					withCredentials: true,

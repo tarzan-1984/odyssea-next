@@ -126,10 +126,13 @@ function isTestDriver(item: { id?: string | number }): boolean {
 export interface DriversListTableProps {
 	/** When false, hides the "Actions" dropdown and Apply button (e.g. in Add drivers modal). Default true. */
 	showActionsInHeader?: boolean;
-	/** Optional footer button (e.g. "Add drivers" in modal). When set, shown in the footer. onClick receives selected driver IDs. */
+	/** Optional footer button (e.g. "Add drivers" in modal). When set, shown in the footer. */
 	footerButton?: {
 		label: string;
-		onClick: (selectedDriverIds: string[]) => void | Promise<void>;
+		onClick: (
+			selectedDriverIds: string[],
+			driverEmptyMiles: Record<string, number>
+		) => void | Promise<void>;
 		icon?: React.ReactNode;
 		isLoading?: boolean;
 	} | null;
@@ -306,17 +309,23 @@ export default function DriversListTable({
 		selectedDriverIds.length > 0 &&
 		(showDistanceColumn || canCreateOffersWithoutAddress);
 
-	/** Map driverId -> empty_miles (rounded) for selected drivers with distance data. Used when creating offers. */
+	/** Map driverId -> empty_miles (rounded) for selected drivers with distance data. */
 	const driverEmptyMiles: Record<string, number> = {};
 	for (const driverId of selectedDriverIds) {
 		const item = filteredResults.find((d: any) => String(d.id) === driverId);
 		if (item) {
-			const key = item?.meta_data?.driver_id ?? String(item?.id ?? "");
-			const dist = idPosts[key]?.distance;
+			const key = item?.meta_data?.driver_id ?? driverId;
+			const dist =
+				idPosts[key]?.distance ?? idPosts[driverId]?.distance;
 			if (dist != null) {
 				const num = typeof dist === "string" ? parseFloat(dist) : Number(dist);
 				if (Number.isFinite(num)) {
-					driverEmptyMiles[driverId] = Math.round(num);
+					const rounded = Math.round(num);
+					driverEmptyMiles[driverId] = rounded;
+					const externalId = item?.meta_data?.driver_id;
+					if (externalId && String(externalId) !== driverId) {
+						driverEmptyMiles[String(externalId)] = rounded;
+					}
 				}
 			}
 		}
@@ -382,7 +391,12 @@ export default function DriversListTable({
 										disabled={
 											selectedDriverIds.length === 0 || footerButton.isLoading
 										}
-										onClick={() => footerButton.onClick(selectedDriverIds)}
+										onClick={() =>
+											footerButton.onClick(
+												selectedDriverIds,
+												driverEmptyMiles
+											)
+										}
 										className="inline-flex h-9 items-center gap-2"
 									>
 										{footerButton.label}
@@ -1504,7 +1518,12 @@ export default function DriversListTable({
 										disabled={
 											selectedDriverIds.length === 0 || footerButton.isLoading
 										}
-										onClick={() => footerButton.onClick(selectedDriverIds)}
+										onClick={() =>
+											footerButton.onClick(
+												selectedDriverIds,
+												driverEmptyMiles
+											)
+										}
 										className="inline-flex items-center gap-2"
 									>
 										{footerButton.label}

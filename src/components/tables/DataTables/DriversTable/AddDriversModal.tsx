@@ -13,8 +13,12 @@ export interface AddDriversModalProps {
 	existingDriverIds?: string[];
 	/** True while the add-drivers API request is in progress. */
 	isSubmitting?: boolean;
-	/** Called when user clicks "Add drivers" with selected driver IDs. */
-	onAddDrivers?: (offerId: number, selectedDriverIds: string[]) => void | Promise<void>;
+	/** Called when user clicks "Add drivers" with selected driver IDs and their empty miles. */
+	onAddDrivers?: (
+		offerId: number,
+		selectedDriverIds: string[],
+		driverEmptyMiles: Record<string, number>
+	) => void | Promise<void>;
 }
 
 export default function AddDriversModal({
@@ -82,8 +86,12 @@ export default function AddDriversModal({
 							/>
 						),
 						isLoading: isSubmitting,
-						onClick: async (selectedDriverIds) => {
-							await onAddDrivers?.(offerId, selectedDriverIds);
+						onClick: async (selectedDriverIds, driverEmptyMiles) => {
+							await onAddDrivers?.(
+								offerId,
+								selectedDriverIds,
+								driverEmptyMiles
+							);
 							onClose();
 						},
 					}}

@@ -32,6 +32,24 @@ export async function PATCH(
 			);
 		}
 
+		const driverEmptyMiles =
+			body?.driverEmptyMiles != null &&
+			typeof body.driverEmptyMiles === "object" &&
+			!Array.isArray(body.driverEmptyMiles)
+				? Object.fromEntries(
+						Object.entries(body.driverEmptyMiles as Record<string, unknown>)
+							.map(([key, value]) => {
+								const num = Number(value);
+								return Number.isFinite(num)
+									? [String(key).trim(), num]
+									: null;
+							})
+							.filter(
+								(entry): entry is [string, number] => entry != null
+							)
+					)
+				: undefined;
+
 		const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/offers/${encodeURIComponent(id)}/drivers`;
 		const response = await fetch(url, {
 			method: "PATCH",
@@ -39,7 +57,12 @@ export async function PATCH(
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${accessToken}`,
 			},
-			body: JSON.stringify({ driverIds }),
+			body: JSON.stringify({
+				driverIds,
+				...(driverEmptyMiles && Object.keys(driverEmptyMiles).length > 0
+					? { driverEmptyMiles }
+					: {}),
+			}),
 		});
 
 		const data = await response.json();

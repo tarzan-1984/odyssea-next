@@ -781,10 +781,14 @@ const OffersList = () => {
 					offerId={addDriversOfferId}
 					existingDriverIds={addDriversExistingDriverIds}
 					isSubmitting={isAddingDrivers}
-					onAddDrivers={async (offerId, selectedDriverIds) => {
+					onAddDrivers={async (offerId, selectedDriverIds, driverEmptyMiles) => {
 						setIsAddingDrivers(true);
 						try {
-							const res = await offersApi.addDriversToOffer(offerId, selectedDriverIds);
+							const res = await offersApi.addDriversToOffer(
+								offerId,
+								selectedDriverIds,
+								driverEmptyMiles
+							);
 							if (res.success) {
 								await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 							}
