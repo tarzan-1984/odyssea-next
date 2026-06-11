@@ -4,7 +4,7 @@ import React from "react";
 import { Message, ChatRoomParticipant, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 import { renderAvatar, getRoleDisplayLabel, resolveAvatarBackground } from "@/helpers";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useOnlineStatus } from "@/context/OnlineStatusContext";
 import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown from "./MessageDropdown";
 import MessageReply from "./MessageReply";
@@ -110,30 +110,31 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
 		>
 			{!isSender && (
-				<div
-					className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full"
-					style={{
-						backgroundColor: resolveAvatarBackground(
-							message.sender.role,
-							message.sender.userColor ?? null,
-						),
-					}}
-				>
-					{renderAvatar(
-						{
-							avatar: message.sender.avatar,
-							profilePhoto: message.sender.profilePhoto ?? undefined,
-							firstName: message.sender.firstName,
-							lastName: message.sender.lastName,
-							role: message.sender.role,
-							userColor: message.sender.userColor ?? null,
-						},
-						undefined,
-						{ parentProvidesBackground: true },
-					)}
-					{/* Online status indicator */}
+				<div className="relative h-10 w-10 shrink-0">
+					<div
+						className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full"
+						style={{
+							backgroundColor: resolveAvatarBackground(
+								message.sender.role,
+								message.sender.userColor ?? null,
+							),
+						}}
+					>
+						{renderAvatar(
+							{
+								avatar: message.sender.avatar,
+								profilePhoto: message.sender.profilePhoto ?? undefined,
+								firstName: message.sender.firstName,
+								lastName: message.sender.lastName,
+								role: message.sender.role,
+								userColor: message.sender.userColor ?? null,
+							},
+							undefined,
+							{ parentProvidesBackground: true },
+						)}
+					</div>
 					{isOnline && (
-						<span className="absolute -bottom-0.5 -right-0.5 z-10 block h-3 w-3 rounded-full border-2 border-white bg-success-500 dark:border-gray-900"></span>
+						<span className="absolute bottom-0 right-0 z-10 block h-3 w-3 rounded-full border-2 border-white bg-success-500 dark:border-gray-900"></span>
 					)}
 				</div>
 			)}

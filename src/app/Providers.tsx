@@ -4,6 +4,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
+import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
 import UserInitializer from "@/components/common/UserInitializer";
 import AccessTokenRefreshInitializer from "@/components/common/AccessTokenRefreshInitializer";
 import ChatSyncInitializer from "@/components/common/ChatSyncInitializer";
@@ -20,6 +21,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 			<ThemeProvider>
 				<SidebarProvider>
 					<WebSocketProvider>
+						<OnlineStatusProvider>
 						<AccessTokenRefreshInitializer />
 						<UserInitializer />
 						<ChatSyncInitializer />
@@ -27,6 +29,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 						<ToastNotificationManager />
 						<ChatFontSizeCssSync />
 						{children}
+						</OnlineStatusProvider>
 					</WebSocketProvider>
 				</SidebarProvider>
 			</ThemeProvider>

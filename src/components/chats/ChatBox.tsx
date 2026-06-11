@@ -11,7 +11,6 @@ import { useChatRoomMessagesQuery } from "@/hooks/useChatRoomMessagesQuery";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { UserData } from "@/app-api/api-types";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";

@@ -15,6 +15,7 @@ import {
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
+import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
@@ -142,8 +143,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const [isConnected, setIsConnected] = useState(false);
 	const queryClient = useQueryClient();
 	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const periodicRetryIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const reconnectAttempts = useRef(0);
-	const maxReconnectAttempts = 5;
+	const isConnectingRef = useRef(false);
+	const maxReconnectAttempts = 20;
 	/** After first successful connect, further connects are reconnects → trigger chat catch-up sync. */
 	const hadSuccessfulSocketConnectionRef = useRef(false);
 	const recentChatToastMessageIdsRef = useRef(new Set<string>());
@@ -200,42 +203,53 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 	}, [urlLogged]);
 
-	const connect = () => {
-		// Only connect if we have a current user
-		if (!currentUser) {
+	const connect = async () => {
+		if (!currentUser || isConnectingRef.current) {
 			return;
 		}
 
-		// Disconnect existing connection if any
-		if (socket) {
-			socket.disconnect();
-		}
-
-		// Get token from localStorage or cookies
-		// In this project, authentication is handled by Next.js API routes using cookies
-		// We need to get the token from the authentication system
-		const token = getAuthToken();
-
-		if (!token) {
+		if (socket?.connected) {
 			return;
 		}
 
-		// Validate WebSocket URL
-		if (!wsUrl || wsUrl.includes("https/")) {
-			console.error("Invalid WebSocket URL:", wsUrl);
+		// Let Socket.IO finish its own reconnection cycle before creating a new socket
+		if (socket && !socket.connected && socket.active) {
 			return;
 		}
 
-		// Create new socket connection with authentication (without namespace)
+		isConnectingRef.current = true;
 
-		const newSocket = io(wsUrl, {
-			auth: {
-				token: token,
-			},
-			transports: ["websocket", "polling"], // Fallback to polling if websocket fails
-			timeout: 20000,
-			forceNew: true,
-		});
+		try {
+			await runBrowserAccessTokenRefresh();
+
+			const token = getAuthToken();
+			if (!token) {
+				return;
+			}
+
+			if (!wsUrl || wsUrl.includes("https/")) {
+				console.error("Invalid WebSocket URL:", wsUrl);
+				return;
+			}
+
+			if (socket) {
+				socket.removeAllListeners();
+				socket.disconnect();
+				setSocket(null);
+			}
+
+			const newSocket = io(wsUrl, {
+				auth: {
+					token,
+				},
+				transports: ["websocket", "polling"],
+				timeout: 20000,
+				reconnection: true,
+				reconnectionAttempts: Infinity,
+				reconnectionDelay: 1000,
+				reconnectionDelayMax: 30000,
+				randomizationFactor: 0.5,
+			});
 
 		const restoreChatRoomById = async (chatRoomId: string) => {
 			const restoredRoom = (await chatApi.getChatRoom(chatRoomId)) as ChatRoom & {
@@ -297,11 +311,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("connect", () => {
 			setIsConnected(true);
 			reconnectAttempts.current = 0;
+			isConnectingRef.current = false;
 
-			// Clear any pending reconnection attempts
 			if (reconnectTimeoutRef.current) {
 				clearTimeout(reconnectTimeoutRef.current);
 				reconnectTimeoutRef.current = null;
+			}
+
+			if (periodicRetryIntervalRef.current) {
+				clearInterval(periodicRetryIntervalRef.current);
+				periodicRetryIntervalRef.current = null;
 			}
 
 			if (
@@ -311,6 +330,39 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				window.dispatchEvent(new CustomEvent(ODYSSEA_WS_RECONNECTED_EVENT));
 			}
 			hadSuccessfulSocketConnectionRef.current = true;
+		});
+
+		newSocket.io.on("reconnect_attempt", () => {
+			void runBrowserAccessTokenRefresh().then(() => {
+				const freshToken = getAuthToken();
+				if (freshToken) {
+					newSocket.auth = { token: freshToken };
+				}
+			});
+		});
+
+		newSocket.io.on("reconnect", () => {
+			reconnectAttempts.current = 0;
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(new CustomEvent(ODYSSEA_WS_RECONNECTED_EVENT));
+			}
+		});
+
+		newSocket.io.on("reconnect_failed", () => {
+			isConnectingRef.current = false;
+			if (periodicRetryIntervalRef.current) {
+				return;
+			}
+			periodicRetryIntervalRef.current = setInterval(() => {
+				if (!currentUser) {
+					return;
+				}
+				const activeSocket = socket;
+				if (activeSocket?.connected || activeSocket?.active) {
+					return;
+				}
+				void connect();
+			}, 30000);
 		});
 
 		// Handle server's connected event (with user data)
@@ -883,11 +935,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.on("disconnect", (reason: string) => {
 			setIsConnected(false);
-
-			// Re-enable auto-reconnect for stability
-			if (reason !== "io client disconnect") {
-				attemptReconnect();
-			}
+			isConnectingRef.current = false;
+			// Socket.IO handles automatic reconnection unless the client disconnected intentionally
 		});
 
 		newSocket.on("connect_error", (error: unknown) => {
@@ -904,9 +953,21 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Avoid dev overlay if error object has throwing getters
 			}
 			setIsConnected(false);
+			isConnectingRef.current = false;
 
-			// Attempt to reconnect on connection error
-			attemptReconnect();
+			if (
+				message.toLowerCase().includes("unauthorized") ||
+				message.toLowerCase().includes("jwt")
+			) {
+				void runBrowserAccessTokenRefresh().then(outcome => {
+					if (outcome === "refreshed" || outcome === "skipped") {
+						const freshToken = getAuthToken();
+						if (freshToken) {
+							newSocket.auth = { token: freshToken };
+						}
+					}
+				});
+			}
 		});
 
 		// Handle authentication errors
@@ -1085,30 +1146,31 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		setSocket(newSocket);
-	};
-
-	const attemptReconnect = () => {
-		if (reconnectAttempts.current >= maxReconnectAttempts) {
-			return;
+		} finally {
+			isConnectingRef.current = false;
 		}
-
-		reconnectAttempts.current++;
-		const delay = Math.min(5000 * Math.pow(2, reconnectAttempts.current), 60000); // Start with 5s, max 60s
-
-		// Attempting to reconnect
-
-		reconnectTimeoutRef.current = setTimeout(() => {
-			connect();
-		}, delay);
 	};
 
 	const handleAuthError = () => {
-		// Implement token refresh logic here
-		// For now, we'll just disconnect and let the user re-authenticate
-		disconnect();
+		void runBrowserAccessTokenRefresh().then(outcome => {
+			if (outcome === "refreshed" || outcome === "skipped") {
+				if (socket && !socket.connected) {
+					const freshToken = getAuthToken();
+					if (freshToken) {
+						socket.auth = { token: freshToken };
+						socket.connect();
+						return;
+					}
+				}
+				void connect();
+				return;
+			}
+			disconnect();
+		});
 	};
 
 	const disconnect = () => {
+		isConnectingRef.current = false;
 		hadSuccessfulSocketConnectionRef.current = false;
 		if (socket) {
 			socket.disconnect();
@@ -1119,6 +1181,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		if (reconnectTimeoutRef.current) {
 			clearTimeout(reconnectTimeoutRef.current);
 			reconnectTimeoutRef.current = null;
+		}
+
+		if (periodicRetryIntervalRef.current) {
+			clearInterval(periodicRetryIntervalRef.current);
+			periodicRetryIntervalRef.current = null;
 		}
 
 		reconnectAttempts.current = 0;
@@ -1210,36 +1277,39 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 	// Auto-connect when user is available
 	useEffect(() => {
-		if (currentUser && !isConnected) {
-			connect();
-		} else if (!currentUser && isConnected) {
+		if (currentUser && !socket && !isConnectingRef.current) {
+			void connect();
+		} else if (!currentUser && (socket || isConnected)) {
 			disconnect();
 		}
-	}, [currentUser, isConnected]);
+	}, [currentUser, socket, isConnected]);
 
 	// Reconnect when tab becomes visible (browser may have disconnected WebSocket in background)
 	const connectRef = useRef(connect);
 	connectRef.current = connect;
 	useEffect(() => {
 		const handleVisibilityChange = () => {
-			if (
-				document.visibilityState === "visible" &&
-				currentUser &&
-				!isConnected
-			) {
-				connectRef.current();
+			if (document.visibilityState !== "visible" || !currentUser) {
+				return;
 			}
+			if (socket?.connected || socket?.active || isConnectingRef.current) {
+				return;
+			}
+			connectRef.current();
 		};
 		document.addEventListener("visibilitychange", handleVisibilityChange);
 		return () =>
 			document.removeEventListener("visibilitychange", handleVisibilityChange);
-	}, [currentUser, isConnected]);
+	}, [currentUser, socket]);
 
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
 			if (reconnectTimeoutRef.current) {
 				clearTimeout(reconnectTimeoutRef.current);
+			}
+			if (periodicRetryIntervalRef.current) {
+				clearInterval(periodicRetryIntervalRef.current);
 			}
 			if (socket) {
 				socket.disconnect();

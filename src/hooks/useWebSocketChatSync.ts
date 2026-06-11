@@ -8,7 +8,7 @@ import { useWebSocketChatRooms } from "./useWebSocketChatRooms";
 import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
-import { useOnlineStatus } from "./useOnlineStatus";
+import { useOnlineStatus } from "@/context/OnlineStatusContext";
 import type { ChatRoomParticipant } from "@/app-api/chatApi";
 
 /**
@@ -18,7 +18,7 @@ import type { ChatRoomParticipant } from "@/app-api/chatApi";
 export const useWebSocketChatSync = () => {
 	const { isConnected } = useWebSocket();
 	const currentUser = useCurrentUser();
-	const { onlineStatus, updateUserOnlineStatus, isUserOnline } = useOnlineStatus();
+	const { isUserOnline, onlineStatus } = useOnlineStatus();
 
 	// Get existing chat sync functionality
 	const chatSync = useChatSync();
@@ -103,9 +103,6 @@ export const useWebSocketChatSync = () => {
 		onMessageSent: () => {},
 		onMessageRead: () => {},
 		onUserTyping: () => {},
-		onUserOnline: data => {
-			updateUserOnlineStatus(data.userId, data.isOnline);
-		},
 		onError: error => {
 			console.error("WebSocket message error:", error);
 		},
