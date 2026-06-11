@@ -450,8 +450,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			);
 		}
 
-		// For non-HEIC files, show general loader if loading
-		if (isLoading && !(fileExtension === "heic" || fileExtension === "heif")) {
+		// Raster images keep isLoading true until <img onLoad>; they must mount the img (see case jpg/heic).
+		if (isLoading && !isRasterChatImageExtension(fileExtension)) {
 			return (
 				<div className={`flex items-center justify-center ${compact ? "h-24" : "h-32"}`}>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
