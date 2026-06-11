@@ -1,5 +1,5 @@
 /**
- * Chat inline previews use a compressed JPEG from /api/storage/image-preview.
+ * Chat inline previews use compressed JPEG thumbnails stored in Wasabi (files/thumbs/...).
  * Full-quality originals load only in the lightbox / download flow.
  */
 export const CHAT_IMAGE_PREVIEW_ENABLED = true;
@@ -27,6 +27,38 @@ export function isChatImageThumbnailCandidate(fileName: string): boolean {
 	return Boolean(ext && THUMBNAIL_EXTENSIONS.has(ext));
 }
 
+/** Build direct Wasabi URL for a stored chat thumbnail. */
+export function buildChatImageThumbnailUrl(
+	fileUrl: string,
+	maxWidth: number = CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+	quality: number = CHAT_IMAGE_PREVIEW_QUALITY
+): string | null {
+	if (!fileUrl || !/^https?:\/\//i.test(fileUrl)) {
+		return null;
+	}
+
+	try {
+		const parsed = new URL(fileUrl);
+		const marker = "/files/";
+		const filesIdx = parsed.pathname.indexOf(marker);
+		if (filesIdx === -1) {
+			return null;
+		}
+
+		const afterFiles = parsed.pathname.slice(filesIdx + marker.length);
+		if (!afterFiles || afterFiles.startsWith("thumbs/")) {
+			return fileUrl;
+		}
+
+		const withoutExt = afterFiles.replace(/\.[^./\\]+$/, "");
+		const prefix = parsed.pathname.slice(0, filesIdx + marker.length);
+		const thumbPath = `${prefix}thumbs/${withoutExt}_w${maxWidth}_q${quality}.jpg`;
+		return `${parsed.origin}${thumbPath}`;
+	} catch {
+		return null;
+	}
+}
+
 export function getChatImageThumbnailUrl(
 	fileUrl: string,
 	fileName: string,
@@ -36,15 +68,22 @@ export function getChatImageThumbnailUrl(
 		return null;
 	}
 
-	const params = new URLSearchParams({
-		url: fileUrl,
-		w: String(options?.maxWidth ?? CHAT_IMAGE_PREVIEW_MAX_WIDTH),
-		q: String(options?.quality ?? CHAT_IMAGE_PREVIEW_QUALITY),
-	});
+	return buildChatImageThumbnailUrl(
+		fileUrl,
+		options?.maxWidth ?? CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+		options?.quality ?? CHAT_IMAGE_PREVIEW_QUALITY
+	);
+}
 
-	return `/api/storage/image-preview?${params.toString()}`;
+export function isStoredChatImageThumbnailUrl(url: string): boolean {
+	return url.includes("/files/thumbs/") && /_w\d+_q\d+\.jpg(?:\?|$)/i.test(url);
+}
+
+/** @deprecated Legacy Vercel proxy URL; kept for fallback detection during rollout. */
+export function isLegacyChatImagePreviewProxyUrl(url: string): boolean {
+	return url.includes("/api/storage/image-preview");
 }
 
 export function isChatImageThumbnailUrl(url: string): boolean {
-	return url.includes("/api/storage/image-preview");
+	return isStoredChatImageThumbnailUrl(url) || isLegacyChatImagePreviewProxyUrl(url);
 }

@@ -11,8 +11,10 @@ import {
 import {
 	getChatImageThumbnailUrl,
 	CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+	CHAT_IMAGE_PREVIEW_QUALITY,
 	isChatImageThumbnailUrl,
 } from "@/config/chatImagePreview";
+import { ensureChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
 import { useLazyInViewport } from "@/hooks/useLazyInViewport";
@@ -215,16 +217,29 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				previewFallbackAttemptedRef.current = true;
 				target.style.display = "";
 				setError("");
+				setIsLoading(true);
 
-				if (fileExtension === "heic" || fileExtension === "heif") {
-					const heicUrl = getHeicConvertPreviewUrl(fileUrl);
-					if (heicUrl) {
-						setPreviewContent(heicUrl);
-						return;
-					}
-				}
+				ensureChatImageThumbnail(fileUrl, fileName, {
+					maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+					quality: CHAT_IMAGE_PREVIEW_QUALITY,
+				})
+					.then(url => {
+						setPreviewContent(url);
+						setIsLoading(false);
+					})
+					.catch(() => {
+						if (fileExtension === "heic" || fileExtension === "heif") {
+							const heicUrl = getHeicConvertPreviewUrl(fileUrl);
+							if (heicUrl) {
+								setPreviewContent(heicUrl);
+								setIsLoading(false);
+								return;
+							}
+						}
 
-				setPreviewContent(fileUrl);
+						setPreviewContent(fileUrl);
+						setIsLoading(false);
+					});
 				return;
 			}
 
@@ -232,7 +247,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			setError("Failed to load image preview");
 			setIsLoading(false);
 		},
-		[fileUrl, fileExtension]
+		[fileUrl, fileName, fileExtension]
 	);
 
 	useEffect(() => {
@@ -317,9 +332,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 					].includes(fileExtension)
 				) {
 					const thumbnailUrl = getChatImageThumbnailUrl(fileUrl, fileName, {
-						maxWidth: compact
-							? Math.min(400, CHAT_IMAGE_PREVIEW_MAX_WIDTH)
-							: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+						maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+						quality: CHAT_IMAGE_PREVIEW_QUALITY,
 					});
 
 					if (thumbnailUrl) {
