@@ -17,10 +17,11 @@ export function useLazyInViewport(options?: UseLazyInViewportOptions) {
 	const elementRef = useRef<HTMLDivElement>(null);
 	const [inView, setInView] = useState(false);
 
-	// Re-check when the file changes or the scroll root attaches (chat container mounts after first paint).
+	// Re-check only when the file changes. Resetting on scrollRoot attach unmounted in-flight
+	// images and left previews stuck on "Loading image..." (cached img skips onLoad).
 	useEffect(() => {
 		setInView(false);
-	}, [resetKey, root]);
+	}, [resetKey]);
 
 	useEffect(() => {
 		if (inView) return;

@@ -229,6 +229,14 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		return true;
 	}, [fileUrl]);
 
+	/** Cached images may finish before React attaches onLoad — check complete on mount. */
+	const handleInlineImageMount = useCallback((img: HTMLImageElement | null) => {
+		if (!img) return;
+		if (img.complete && img.naturalHeight > 0) {
+			setIsLoading(false);
+		}
+	}, []);
+
 	const handleInlineImageError = useCallback(
 		(e: React.SyntheticEvent<HTMLImageElement>) => {
 			const target = e.target as HTMLImageElement;
@@ -274,7 +282,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	useEffect(() => {
 		thumbEnsureAttemptedRef.current = false;
 		heicConvertAttemptedRef.current = false;
-	}, [fileUrl, shouldLoadMedia]);
+		setPreviewContent("");
+		setIsLoading(false);
+		setError("");
+	}, [fileUrl]);
 
 	const applyModalFitToViewport = useCallback(
 		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
@@ -412,9 +423,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [shouldLoadMedia, fileUrl, fileExtension, fileName, tryHeicConvertPreview]);
 
+	const showPreviewContent = shouldLoadMedia || Boolean(previewContent);
+
 	const wrapWithLazyGate = (content: React.ReactNode) => (
 		<div ref={elementRef} className="w-full min-h-0">
-			{shouldLoadMedia ? content : <ChatMediaPreviewPlaceholder compact={compact} />}
+			{showPreviewContent ? content : <ChatMediaPreviewPlaceholder compact={compact} />}
 		</div>
 	);
 
@@ -552,6 +565,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						) : null}
 						{previewContent ? (
 							<img
+								key={previewContent}
+								ref={handleInlineImageMount}
 								src={previewContent}
 								alt="File preview"
 								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
@@ -597,6 +612,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						) : null}
 						{previewContent ? (
 							<img
+								key={previewContent}
+								ref={handleInlineImageMount}
 								src={previewContent}
 								alt="File preview"
 								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
