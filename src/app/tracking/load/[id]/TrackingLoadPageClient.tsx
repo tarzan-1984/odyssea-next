@@ -339,6 +339,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return details?.data?.data?.meta_data ?? details?.data?.meta_data ?? null;
 	}, [loadDetails]);
 	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
+	const isLoadDelivered = normalizedLoadStatus === "delivered";
 	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
 	const loadStatusAllowsDriverMarker =
 		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
@@ -676,7 +677,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const mapUiMode: "map" | "no_app" | "driver_not_loaded_enroute" | "stale_location" = (() => {
 		if (currentTrackingDriver && !driverUsesMobileApp) return "no_app";
-		if (currentTrackingDriver && driverUsesMobileApp && !isDriverLoadedEnroute) {
+		if (
+			currentTrackingDriver &&
+			driverUsesMobileApp &&
+			!isDriverLoadedEnroute &&
+			!isLoadDelivered
+		) {
 			return "driver_not_loaded_enroute";
 		}
 		if (showStaleLocationMessage) return "stale_location";
@@ -687,7 +693,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const showLoadHistoryPanel = Boolean(
 		isAuthenticated &&
 			showMapAndTrackingTools &&
-			isDriverLoadedEnroute &&
+			(isDriverLoadedEnroute || isLoadDelivered) &&
 			!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
 	);
 	/** Keep top banners centered in the same lane even when history panel is hidden. */
