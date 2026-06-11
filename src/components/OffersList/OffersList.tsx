@@ -250,13 +250,7 @@ const OffersList = () => {
 					</div>
 				) : results.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-12 gap-4">
-					<Image
-						src="/images/no_offers_found.png"
-						alt=""
-						width={200}
-						height={200}
-						className="h-auto object-contain"
-					/>
+
 						<p className="text-sm text-gray-500 dark:text-gray-400">No offers found</p>
 					</div>
 				) : (
