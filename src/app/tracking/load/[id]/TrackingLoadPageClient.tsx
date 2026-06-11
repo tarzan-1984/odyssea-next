@@ -11,6 +11,7 @@ import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
 import DriverInfo from "../../[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
+import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrouteStaleLocationBanner";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
@@ -662,7 +663,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const loadQualifiesForStaleTrackingCheck =
 		LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus);
 	const showStaleLocationMessage = Boolean(
-		currentTrackingDriver &&
+		isAuthenticated &&
+			currentTrackingDriver &&
 			driverUsesMobileApp &&
 			isDriverLoadedEnroute &&
 			loadQualifiesForStaleTrackingCheck &&
@@ -747,7 +749,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	});
 
 	const showLoadedEnrouteStaleTopBanner = Boolean(
-		showMapAndTrackingTools &&
+		isAuthenticated &&
+			showMapAndTrackingTools &&
 			currentTrackingDriver &&
 			driverUsesMobileApp &&
 			isDriverLoadedEnroute &&
@@ -758,6 +761,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				STALE_LOCATION_THRESHOLD
 			)
 	);
+	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
 
 	return (
 		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
@@ -858,6 +862,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							) : showLoadedEnrouteStaleTopBanner ? (
 								<LoadedEnrouteStaleLocationBanner
 									thresholdLabel={formatStaleThresholdLabel()}
+									reserveRightForHistory={reserveTopBannerRightLane}
+								/>
+							) : showDeliveredLoadBanner ? (
+								<DeliveredLoadBanner
 									reserveRightForHistory={reserveTopBannerRightLane}
 								/>
 							) : null}
@@ -1115,7 +1123,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							)}
 						</div>
 					)}
-					{isAuthenticated && currentTrackingDriver && (
+					{isAuthenticated && currentTrackingDriver && !isLoadDelivered && (
 						<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
 							<DriverInfo
 								driverData={driverCardData}
