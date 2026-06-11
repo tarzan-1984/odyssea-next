@@ -142,8 +142,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [isConnected, setIsConnected] = useState(false);
 	const queryClient = useQueryClient();
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const periodicRetryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const periodicRetryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const reconnectAttempts = useRef(0);
 	const isConnectingRef = useRef(false);
 	const maxReconnectAttempts = 20;
@@ -333,12 +333,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.io.on("reconnect_attempt", () => {
-			void runBrowserAccessTokenRefresh().then(() => {
-				const freshToken = getAuthToken();
-				if (freshToken) {
-					newSocket.auth = { token: freshToken };
-				}
-			});
+			runBrowserAccessTokenRefresh()
+				.then(() => {
+					const freshToken = getAuthToken();
+					if (freshToken) {
+						newSocket.auth = { token: freshToken };
+					}
+				})
+				.catch(() => {});
 		});
 
 		newSocket.io.on("reconnect", () => {
@@ -361,7 +363,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (activeSocket?.connected || activeSocket?.active) {
 					return;
 				}
-				void connect();
+				connect().catch(() => {});
 			}, 30000);
 		});
 
@@ -959,14 +961,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				message.toLowerCase().includes("unauthorized") ||
 				message.toLowerCase().includes("jwt")
 			) {
-				void runBrowserAccessTokenRefresh().then(outcome => {
-					if (outcome === "refreshed" || outcome === "skipped") {
-						const freshToken = getAuthToken();
-						if (freshToken) {
-							newSocket.auth = { token: freshToken };
+				runBrowserAccessTokenRefresh()
+					.then(outcome => {
+						if (outcome === "refreshed" || outcome === "skipped") {
+							const freshToken = getAuthToken();
+							if (freshToken) {
+								newSocket.auth = { token: freshToken };
+							}
 						}
-					}
-				});
+					})
+					.catch(() => {});
 			}
 		});
 
@@ -1152,21 +1156,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	};
 
 	const handleAuthError = () => {
-		void runBrowserAccessTokenRefresh().then(outcome => {
-			if (outcome === "refreshed" || outcome === "skipped") {
-				if (socket && !socket.connected) {
-					const freshToken = getAuthToken();
-					if (freshToken) {
-						socket.auth = { token: freshToken };
-						socket.connect();
-						return;
+		runBrowserAccessTokenRefresh()
+			.then(outcome => {
+				if (outcome === "refreshed" || outcome === "skipped") {
+					if (socket && !socket.connected) {
+						const freshToken = getAuthToken();
+						if (freshToken) {
+							socket.auth = { token: freshToken };
+							socket.connect();
+							return;
+						}
 					}
+					connect().catch(() => {});
+					return;
 				}
-				void connect();
-				return;
-			}
-			disconnect();
-		});
+				disconnect();
+			})
+			.catch(() => {
+				disconnect();
+			});
 	};
 
 	const disconnect = () => {
@@ -1278,7 +1286,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Auto-connect when user is available
 	useEffect(() => {
 		if (currentUser && !socket && !isConnectingRef.current) {
-			void connect();
+			connect().catch(() => {});
 		} else if (!currentUser && (socket || isConnected)) {
 			disconnect();
 		}

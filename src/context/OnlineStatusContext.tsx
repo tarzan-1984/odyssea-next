@@ -26,7 +26,7 @@ export const OnlineStatusProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const { socket, isConnected } = useWebSocket();
 	const [onlineStatus, setOnlineStatus] = useState<OnlineStatusMap>({});
-	const offlineTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+	const offlineTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
 	const updateUserOnlineStatus = useCallback((userId: string, isOnline: boolean) => {
 		const existing = offlineTimeouts.current.get(userId);
