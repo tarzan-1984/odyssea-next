@@ -146,16 +146,38 @@ export function parseOfferRouteDateTime(s: string): Date | null {
 export const ROUTE_CHRONOLOGY_ERROR =
 	"Each stop date & time must be on or after the previous stop";
 
+export const END_TIME_AFTER_START_ERROR = "End time must be after start time";
+
 /** Ensures route stops are in non-decreasing chronological order by start time. */
 export function isRouteChronologicallyValid(times: string[]): boolean {
-	let prevStart: Date | null = null;
-	for (const time of times) {
-		const { start } = parseOfferDateTimeField(time.trim());
-		if (!start) continue;
-		if (prevStart && start.getTime() < prevStart.getTime()) {
-			return false;
+	return getRouteChronologyError(times) === null;
+}
+
+/**
+ * Validates per-stop time ranges and adjacent stop chronology.
+ * Only compares consecutive stops when both have a filled date & time.
+ */
+export function getRouteChronologyError(times: string[]): string | null {
+	const trimmed = times.map(time => time.trim());
+
+	for (const time of trimmed) {
+		if (!time) continue;
+		const { start, end } = parseOfferDateTimeField(time);
+		if (start && end && end.getTime() <= start.getTime()) {
+			return END_TIME_AFTER_START_ERROR;
 		}
-		prevStart = start;
 	}
-	return true;
+
+	for (let i = 1; i < trimmed.length; i++) {
+		const prevTime = trimmed[i - 1];
+		const currTime = trimmed[i];
+		if (!prevTime || !currTime) continue;
+		const { start: prevStart } = parseOfferDateTimeField(prevTime);
+		const { start: currStart } = parseOfferDateTimeField(currTime);
+		if (prevStart && currStart && currStart.getTime() < prevStart.getTime()) {
+			return ROUTE_CHRONOLOGY_ERROR;
+		}
+	}
+
+	return null;
 }

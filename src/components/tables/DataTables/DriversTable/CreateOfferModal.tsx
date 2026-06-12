@@ -14,11 +14,7 @@ import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import { DragHandleIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import {
-	isRouteChronologicallyValid,
-	parseOfferDateTimeField,
-	ROUTE_CHRONOLOGY_ERROR,
-} from "@/utils/offerDateTimeRange";
+import { getRouteChronologyError } from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
 	LOCATION_FORMAT_ERROR,
@@ -226,6 +222,7 @@ function DraggableExtraRow({
 						className="dark:bg-gray-900"
 					/>
 				</div>
+
 				{canRemove && (
 					<Button
 						type="button"
@@ -320,13 +317,23 @@ export default function CreateOfferModal({
 		setRouteRows(prev => [...prev, initialRouteRow("delivery")]);
 	};
 
-	const updateExtraRow = (index: number, field: "location" | "time", value: string) => {
-		setRouteRows(prev => {
-			const next = [...prev];
-			next[index] = { ...next[index], [field]: value };
-			return next;
-		});
-	};
+	const validateRouteChronology = useCallback((rows: RouteRow[]) => {
+		setRouteError(getRouteChronologyError(rows.map(row => row.time)));
+	}, []);
+
+	const updateExtraRow = useCallback(
+		(index: number, field: "location" | "time", value: string) => {
+			setRouteRows(prev => {
+				const next = [...prev];
+				next[index] = { ...next[index], [field]: value };
+				if (field === "time") {
+					validateRouteChronology(next);
+				}
+				return next;
+			});
+		},
+		[validateRouteChronology]
+	);
 
 	const commitLocations = useCallback((rows: RouteRow[]) => {
 		// Only commit if ALL rows have a filled, valid location — so adding a new empty
@@ -348,10 +355,11 @@ export default function CreateOfferModal({
 				// After removing, commit the remaining rows immediately.
 				// If all are filled and valid, useQuery will use cache or fire a new request.
 				commitLocations(next);
+				validateRouteChronology(next);
 				return next;
 			});
 		},
-		[commitLocations]
+		[commitLocations, validateRouteChronology]
 	);
 
 	// Ref to store target index during drag; move happens only on drop
@@ -432,10 +440,11 @@ export default function CreateOfferModal({
 				const [removed] = next.splice(dragIndex, 1);
 				next.splice(hoverIndex, 0, removed);
 				commitLocations(next);
+				validateRouteChronology(next);
 				return next;
 			});
 		},
-		[commitLocations]
+		[commitLocations, validateRouteChronology]
 	);
 
 	const validate = (): {
@@ -491,17 +500,7 @@ export default function CreateOfferModal({
 					if (invalidLocation) {
 						routeError = LOCATION_FORMAT_ERROR;
 					} else {
-						const invalidRange = trimmedRoute.some(row => {
-							const { start, end } = parseOfferDateTimeField(row.time);
-							return start && end && end.getTime() <= start.getTime();
-						});
-						if (invalidRange) {
-							routeError = "End time must be after start time";
-						} else if (
-							!isRouteChronologicallyValid(trimmedRoute.map(row => row.time))
-						) {
-							routeError = ROUTE_CHRONOLOGY_ERROR;
-						}
+						routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
 					}
 				}
 			}
@@ -837,7 +836,8 @@ export default function CreateOfferModal({
 							isSubmitting ||
 							isCalculatingRoute ||
 							loadedMiles == null ||
-							loadedMiles === 0
+							loadedMiles === 0 ||
+							Boolean(routeError)
 						}
 					>
 						{isSubmitting ? "Creating…" : "Create"}
