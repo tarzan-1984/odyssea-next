@@ -46,6 +46,17 @@ export function insertTextAtSelection(editor: HTMLElement | null, text: string):
 }
 
 export const COMPOSE_EDITOR_MIN_HEIGHT_PX = 36;
+export const COMPOSE_EDITOR_MAX_HEIGHT_RATIO = 0.5;
+
+export function getComposeEditorMaxHeightPx(chatBox: HTMLElement | null): number {
+	if (!chatBox) {
+		return 120;
+	}
+	return Math.max(
+		COMPOSE_EDITOR_MIN_HEIGHT_PX,
+		Math.floor(chatBox.clientHeight * COMPOSE_EDITOR_MAX_HEIGHT_RATIO),
+	);
+}
 
 export function clearEditor(editor: HTMLElement | null): void {
 	if (!editor) return;

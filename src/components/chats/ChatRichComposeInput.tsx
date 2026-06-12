@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
 	clearEditor,
+	COMPOSE_EDITOR_MIN_HEIGHT_PX,
+	getComposeEditorMaxHeightPx,
 	getEditorPlainText,
 	htmlToMarkdown,
 	isEditorEmpty,
@@ -10,7 +12,7 @@ import {
 } from "@/utils/chatRichEditor";
 
 const COMPOSE_FIELD_CLASS =
-	"w-full min-h-9 max-h-[7.5rem] overflow-y-auto py-2 pl-[4.85rem] pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90 sm:pl-[5rem]";
+	"w-full min-h-9 max-h-[50cqh] overflow-y-auto py-2 pl-[4.85rem] pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90 sm:pl-[5rem]";
 
 export type ChatRichComposeInputProps = {
 	editorRef: React.RefObject<HTMLDivElement | null>;
@@ -65,10 +67,23 @@ export default function ChatRichComposeInput({
 		const el = editorRef.current;
 		if (!el) return;
 		el.style.height = "auto";
-		const min = 36;
-		const max = 120;
-		el.style.height = `${Math.min(Math.max(el.scrollHeight, min), max)}px`;
+		const chatBox = el.closest("[data-chat-box]") as HTMLElement | null;
+		const max = getComposeEditorMaxHeightPx(chatBox);
+		el.style.height = `${Math.min(Math.max(el.scrollHeight, COMPOSE_EDITOR_MIN_HEIGHT_PX), max)}px`;
 	}, [editorRef]);
+
+	useEffect(() => {
+		const el = editorRef.current;
+		if (!el) return;
+		const chatBox = el.closest("[data-chat-box]") as HTMLElement | null;
+		if (!chatBox) return;
+
+		const observer = new ResizeObserver(() => {
+			adjustHeight();
+		});
+		observer.observe(chatBox);
+		return () => observer.disconnect();
+	}, [editorRef, adjustHeight]);
 
 	const handleInput = () => {
 		syncFromEditor();
