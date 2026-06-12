@@ -50,7 +50,7 @@ export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"RECRUITER_TL",
 	"HR_MANAGER",
 	"DRIVER_UPDATES",
-	"DISPATCHER_TL",
+	"TRACKING_TL",
 ] as const;
 
 /** Check list: user-list roles plus tracking shifts. */
@@ -58,7 +58,6 @@ export const CHECK_LIST_ALLOWED_ROLES = [
 	...USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES,
 	"MORNING_TRACKING",
 	"NIGHTSHIFT_TRACKING",
-	"TRACKING_TL",
 ] as const;
 
 export function canAccessUserListAndCheckList(role: string | undefined | null): boolean {
