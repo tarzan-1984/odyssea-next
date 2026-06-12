@@ -42,7 +42,7 @@ export function canViewRestrictedDriverStatusesOnMap(role: string | undefined | 
 	return (DRIVERS_MAP_RESTRICTED_STATUS_VIEWER_ROLES as readonly string[]).includes(normalized);
 }
 
-/** User List sidebar and routes: admin, moderator, HR, driver updates. */
+/** User List sidebar and routes. */
 export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"ADMINISTRATOR",
 	"MODERATOR",
@@ -50,6 +50,7 @@ export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"RECRUITER_TL",
 	"HR_MANAGER",
 	"DRIVER_UPDATES",
+	"DISPATCHER_TL",
 ] as const;
 
 /** Check list: user-list roles plus tracking shifts. */
