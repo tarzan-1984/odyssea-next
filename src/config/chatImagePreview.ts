@@ -10,6 +10,9 @@ export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 640;
 /** JPEG quality for chat thumbnails (40–90). */
 export const CHAT_IMAGE_PREVIEW_QUALITY = 72;
 
+/** Abort inline preview if the image has not loaded within this time (ms). */
+export const CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 8_000;
+
 const THUMBNAIL_EXTENSIONS = new Set([
 	"jpg",
 	"jpeg",

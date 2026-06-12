@@ -14,6 +14,8 @@ import ReplyPreview from "./ReplyPreview";
 import MessageTemplatesModal from "./MessageTemplatesModal";
 import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
+import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
+import { isChatImageThumbnailCandidate } from "@/config/chatImagePreview";
 import ChatFormatToolbar, { type ChatFormatAction } from "./ChatFormatToolbar";
 import ChatRichComposeInput from "./ChatRichComposeInput";
 import { useEditorFormatState } from "@/hooks/useEditorFormatState";
@@ -276,6 +278,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 							fileName,
 							fileSize,
 						});
+						if (isChatImageThumbnailCandidate(fileName)) {
+							prefetchChatImageThumbnail(fileUrl, fileName);
+						}
 					}
 					setAttachedFiles(prev => [...prev, ...uploaded]);
 				} catch (error) {

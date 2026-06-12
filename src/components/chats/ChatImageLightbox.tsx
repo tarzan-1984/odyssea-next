@@ -5,7 +5,6 @@ import ReactCrop, { centerCrop, type Crop, type PixelCrop } from "react-image-cr
 import "react-image-crop/dist/ReactCrop.css";
 import { Modal } from "@/components/ui/modal";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
-import { getHeicConvertPreviewUrl } from "@/config/heicPreviewConvert";
 import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
 import type { ChatGalleryImage } from "@/utils/chatGalleryImages";
 import { isChatImageFileName } from "@/utils/chatGalleryImages";
@@ -52,14 +51,6 @@ function computeModalFitScale(
 	const effW = swapped ? naturalH : naturalW;
 	const effH = swapped ? naturalW : naturalH;
 	return Math.min(viewportW / effW, viewportH / effH, 1);
-}
-
-function resolveImagePreviewUrl(fileUrl: string, fileName: string): string {
-	const ext = fileName.toLowerCase().split(".").pop();
-	if (ext === "heic" || ext === "heif") {
-		return getHeicConvertPreviewUrl(fileUrl) ?? fileUrl;
-	}
-	return fileUrl;
 }
 
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -214,6 +205,7 @@ export default function ChatImageLightbox({
 }: ChatImageLightboxProps) {
 	const current = images[currentIndex];
 	const [previewUrl, setPreviewUrl] = useState("");
+	const [previewLoadError, setPreviewLoadError] = useState("");
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
 	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
 	const [modalImageScale, setModalImageScale] = useState(1);
@@ -242,6 +234,7 @@ export default function ChatImageLightbox({
 	const colorBeforeGrayscaleRef = useRef<ImageData | null>(null);
 	const cropSourceUrlRef = useRef<string | null>(null);
 	const cropImgRef = useRef<HTMLImageElement>(null);
+	const previewBlobUrlRef = useRef<string | null>(null);
 	const undoStackRef = useRef<CanvasEditSnapshot[]>([]);
 	const isGrayscaleRef = useRef(false);
 
@@ -346,11 +339,54 @@ export default function ChatImageLightbox({
 
 	useEffect(() => {
 		if (!isOpen || !current) return;
-		resetView();
-		if (!isChatImageFileName(current.fileName)) return;
-		setPreviewUrl(resolveImagePreviewUrl(current.fileUrl, current.fileName));
-		if (isHeic) setIsModalImageLoading(true);
-	}, [isOpen, current, isHeic, resetView]);
+
+		let cancelled = false;
+
+		const loadPreview = async () => {
+			resetView();
+			setPreviewLoadError("");
+			setPreviewUrl("");
+
+			if (!isChatImageFileName(current.fileName)) return;
+
+			if (isHeic) {
+				setIsModalImageLoading(true);
+				try {
+					const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
+					if (cancelled) {
+						URL.revokeObjectURL(blobUrl);
+						return;
+					}
+					if (previewBlobUrlRef.current) {
+						URL.revokeObjectURL(previewBlobUrlRef.current);
+					}
+					previewBlobUrlRef.current = blobUrl;
+					setPreviewUrl(blobUrl);
+				} catch (error) {
+					console.error("[ChatImageLightbox] Failed to load HEIC preview:", error);
+					if (!cancelled) {
+						setPreviewLoadError(
+							"Failed to load image. Please try downloading the file."
+						);
+						setIsModalImageLoading(false);
+					}
+				}
+				return;
+			}
+
+			setPreviewUrl(current.fileUrl);
+		};
+
+		loadPreview().catch(console.error);
+
+		return () => {
+			cancelled = true;
+			if (previewBlobUrlRef.current) {
+				URL.revokeObjectURL(previewBlobUrlRef.current);
+				previewBlobUrlRef.current = null;
+			}
+		};
+	}, [isOpen, current?.fileUrl, current?.fileName, currentIndex, isHeic, resetView]);
 
 	useEffect(() => {
 		if (!isOpen || !modalImgNaturalSize || isEditing) return;
@@ -990,7 +1026,9 @@ export default function ChatImageLightbox({
 				) : (
 					<div className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
 						{isModalImageLoading && isHeic ? <HeicConvertingOverlay variant="modal" /> : null}
-						{previewUrl ? (
+						{previewLoadError ? (
+							<p className="max-w-md px-4 text-center text-sm text-red-300">{previewLoadError}</p>
+						) : previewUrl ? (
 							<img
 								key={`${previewUrl}-${currentIndex}`}
 								src={previewUrl}
@@ -1010,6 +1048,7 @@ export default function ChatImageLightbox({
 								onClick={e => e.stopPropagation()}
 								onLoad={e => {
 									setIsModalImageLoading(false);
+									setPreviewLoadError("");
 									const target = e.target as HTMLImageElement;
 									if (target.naturalWidth && target.naturalHeight) {
 										const nat = {
@@ -1024,7 +1063,7 @@ export default function ChatImageLightbox({
 								}}
 								onError={() => {
 									setIsModalImageLoading(false);
-									handleClose();
+									setPreviewLoadError("Failed to display image. Please try downloading the file.");
 								}}
 							/>
 						) : (

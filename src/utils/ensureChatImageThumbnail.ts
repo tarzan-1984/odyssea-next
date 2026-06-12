@@ -1,6 +1,7 @@
 import {
 	CHAT_IMAGE_PREVIEW_MAX_WIDTH,
 	CHAT_IMAGE_PREVIEW_QUALITY,
+	isChatImageThumbnailCandidate,
 } from "@/config/chatImagePreview";
 
 type EnsureThumbnailResponse = {
@@ -40,4 +41,16 @@ export async function ensureChatImageThumbnail(
 	}
 
 	return data.thumbnailUrl;
+}
+
+/** Fire-and-forget thumbnail generation after upload or when scrolling into view. */
+export function prefetchChatImageThumbnail(
+	fileUrl: string,
+	fileName: string,
+	options?: { maxWidth?: number; quality?: number }
+): void {
+	if (!fileUrl || !isChatImageThumbnailCandidate(fileName)) {
+		return;
+	}
+	ensureChatImageThumbnail(fileUrl, fileName, options).catch(() => undefined);
 }
