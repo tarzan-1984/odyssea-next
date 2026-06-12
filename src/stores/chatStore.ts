@@ -509,7 +509,7 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				updateMessage: (messageId, updates) => {
-					const { messages, chatRooms } = get();
+					const { messages } = get();
 					const message = messages.find(msg => msg.id === messageId);
 					if (!message) {
 						return;
@@ -528,50 +528,6 @@ export const useChatStore = create<ChatState>()(
 					indexedDBChatService.updateMessage(messageId, updates).catch((error: Error) => {
 						console.error("Failed to update message in IndexedDB:", error);
 					});
-
-					// If marking as read, update unreadCount in chat rooms
-					if (updates.readBy && message && message.chatRoomId) {
-						const currentUser = useUserStore.getState().currentUser;
-						if (currentUser && currentUser.id) {
-							const wasRead = message.readBy?.includes(currentUser.id) || false;
-							const isNowRead = updates.readBy.includes(currentUser.id);
-
-							if (!wasRead && isNowRead) {
-								const updatedRooms = chatRooms.map(room => {
-									if (
-										room.id === message.chatRoomId &&
-										room.unreadCount &&
-										room.unreadCount > 0
-									) {
-										const updatedRoom = {
-											...room,
-											unreadCount: room.unreadCount - 1,
-										};
-										// Save updated room to IndexedDB
-										indexedDBChatService
-											.updateChatRoom(updatedRoom.id, {
-												unreadCount: updatedRoom.unreadCount,
-											})
-											.catch((error: Error) => {
-												console.error(
-													"Failed to update chat room in IndexedDB:",
-													error
-												);
-											});
-										return updatedRoom;
-									}
-									return room;
-								});
-								const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
-								set(
-									{ messages: updatedMessages, chatRooms: sortedRooms },
-									false,
-									"updateMessage"
-								);
-								return;
-							}
-						}
-					}
 
 					set({ messages: updatedMessages }, false, "updateMessage");
 				},

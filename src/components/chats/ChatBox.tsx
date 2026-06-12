@@ -477,14 +477,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			});
 			state.setMessages(updatedMessages);
 
-			// Increment unread count for the room
-			const updatedRooms = state.chatRooms.map(room =>
-				room.id === result.chatRoomId
-					? { ...room, unreadCount: (room.unreadCount || 0) + 1 }
-					: room
-			);
-			state.setChatRooms(updatedRooms);
-
 			// Update cache
 			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
 			const message = updatedMessages.find(m => m.id === messageId);
@@ -507,21 +499,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 							console.error("Failed to update message in IndexedDB:", error);
 						});
 				}
-			}
-
-			// Update chat room unread count in IndexedDB
-			const updatedRoom = updatedRooms.find(room => room.id === result.chatRoomId);
-			if (updatedRoom) {
-				indexedDBChatService
-					.updateChatRoom(result.chatRoomId, {
-						unreadCount: updatedRoom.unreadCount,
-					})
-					.catch((error: Error) => {
-						console.error(
-							"Failed to update chat room unread count in IndexedDB:",
-							error
-						);
-					});
 			}
 		} catch (error) {
 			console.error("Failed to mark message as unread:", error);

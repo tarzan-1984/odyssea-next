@@ -257,14 +257,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			};
 			const messages = Array.isArray(restoredRoom.messages) ? restoredRoom.messages : [];
 			const lastMessage = messages.length > 0 ? messages[messages.length - 1] : restoredRoom.lastMessage;
-			const currentUserId = currentUser?.id;
-			const unreadCount =
-				currentUserId && messages.length > 0
-					? messages.filter(message => {
-							if (message.senderId === currentUserId) return false;
-							return !(message.readBy ?? []).includes(currentUserId);
-						}).length
-					: restoredRoom.unreadCount;
 			const normalized: ChatRoom = {
 				...restoredRoom,
 				participants: Array.isArray(restoredRoom.participants)
@@ -293,7 +285,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 							},
 						}
 					: {}),
-				unreadCount,
+				unreadCount: restoredRoom.unreadCount ?? 0,
 			};
 			delete (normalized as ChatRoom & { messages?: Message[] }).messages;
 
@@ -434,19 +426,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 				// Update lastMessage for all chats (only if chat room exists in store)
 				if (chatRoom) {
-					const updates: any = {
+					state.updateChatRoom(messageData.chatRoomId, {
 						lastMessage: messageData.message,
 						updatedAt: messageData.message.createdAt,
-					};
-
-					// Increment unreadCount only if:
-					// 1. This is NOT the current active chat
-					// 2. The message is NOT from the current user
-					if (!isCurrentChat && !isMessageFromCurrentUser) {
-						updates.unreadCount = (chatRoom.unreadCount || 0) + 1;
-					}
-
-					state.updateChatRoom(messageData.chatRoomId, updates);
+					});
 				}
 
 				// Play notification sound for ALL participants if:
@@ -570,6 +553,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			// Update unread count in store
 			updateUnreadCount(data.unreadCount);
 		});
+
+		newSocket.on(
+			"chatUnreadCountUpdated",
+			(data: { chatRoomId: string; unreadCount: number }) => {
+				if (!data?.chatRoomId) {
+					return;
+				}
+				const state = useChatStore.getState();
+				const unreadCount = Math.max(0, data.unreadCount ?? 0);
+				state.updateChatRoom(data.chatRoomId, { unreadCount });
+				indexedDBChatService
+					.updateChatRoom(data.chatRoomId, { unreadCount })
+					.catch((error: Error) => {
+						console.error(
+							"Failed to update chat room unread count in IndexedDB:",
+							error
+						);
+					});
+			}
+		);
 
 		// Handle chat room deletion
 		newSocket.on("chatRoomDeleted", (data: { chatRoomId: string; deletedBy: string }) => {
@@ -758,22 +761,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				});
 				state.setMessages(updatedMessages);
 
-				// Update unread counts on chat room - only for the user who marked as unread
-				const updatedRooms = state.chatRooms.map(room => {
-					if (room.id !== data.chatRoomId) return room;
-
-					// Only increment unread count for the user who marked the message as unread
-					// Other participants should not see increased unread count
-					const currentUser = useUserStore.getState().currentUser;
-					if (currentUser && currentUser.id === data.userId) {
-						const increment = data.messageIds.length;
-						const unread = (room.unreadCount || 0) + increment;
-						return { ...room, unreadCount: unread };
-					}
-
-					return room; // No change for other users
-				});
-				state.setChatRooms(updatedRooms);
+				// Unread badge sync: chatUnreadCountUpdated from server (authoritative)
 
 				// Update IndexedDB cache
 				const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
@@ -802,24 +790,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						}
 					}
 				});
-
-				// Update chat room unread count in IndexedDB
-				const currentUser = useUserStore.getState().currentUser;
-				if (currentUser && currentUser.id === data.userId) {
-					const updatedRoom = updatedRooms.find(room => room.id === data.chatRoomId);
-					if (updatedRoom) {
-						indexedDBChatService
-							.updateChatRoom(data.chatRoomId, {
-								unreadCount: updatedRoom.unreadCount,
-							})
-							.catch((error: Error) => {
-								console.error(
-									"Failed to update chat room unread count in IndexedDB:",
-									error
-								);
-							});
-					}
-				}
 			}
 		);
 
