@@ -3,22 +3,23 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { useChatSync } from "@/hooks/useChatSync";
 import { useCurrentUser, useUserStore } from "@/stores/userStore";
-import { useChatStore } from "@/stores/chatStore";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
+import { catchUpChatsOnReconnect } from "@/lib/chatReconnectSync";
 
 /**
  * ChatSyncInitializer
  * - Globally loads chat rooms after user sign-in
  *   so the unread badge in the sidebar is correct right after app load.
  * - Skips loading on public pages like /tracking/[id]
- * - After WebSocket reconnects, forces API sync so messages/unread missed while offline appear.
+ * - After WebSocket reconnects, diffs chat tails and batch-syncs only stale rooms.
  */
 export default function ChatSyncInitializer() {
 	const currentUser = useCurrentUser();
 	const pathname = usePathname();
-	const { loadChatRooms, loadMessages } = useChatSync();
+	const { loadChatRooms } = useChatSync();
 	const hasLoadedRef = React.useRef(false);
 	const lastPathnameRef = React.useRef<string | null>(null);
+	const isCatchUpRunningRef = React.useRef(false);
 
 	React.useEffect(() => {
 		// Check if we're on a tracking page
@@ -58,22 +59,21 @@ export default function ChatSyncInitializer() {
 				return;
 			}
 			if (!useUserStore.getState().currentUser) return;
+			if (isCatchUpRunningRef.current) return;
 
-			loadChatRooms({ force: true }).catch((error: unknown) => {
-				console.error("[ChatSync] Failed to refresh chat rooms after WS reconnect:", error);
-			});
-
-			const openRoom = useChatStore.getState().currentChatRoom;
-			if (openRoom?.id) {
-				loadMessages(openRoom.id, 1, 50, { force: true }).catch((error: unknown) => {
-					console.error("[ChatSync] Failed to refresh messages after WS reconnect:", error);
+			isCatchUpRunningRef.current = true;
+			catchUpChatsOnReconnect()
+				.catch((error: unknown) => {
+					console.error("[ChatSync] Failed to catch up chats after WS reconnect:", error);
+				})
+				.finally(() => {
+					isCatchUpRunningRef.current = false;
 				});
-			}
 		};
 
 		window.addEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
 		return () => window.removeEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
-	}, [loadChatRooms, loadMessages]);
+	}, []);
 
 	// Render nothing
 	return null;

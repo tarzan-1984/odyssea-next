@@ -165,6 +165,25 @@ export interface CreateChatRoomDto {
 	participantIds: string[];
 }
 
+export type SyncMessagesBatchRoomRequest = {
+	chatRoomId: string;
+	lastMessageId?: string | null;
+};
+
+export type SyncMessagesBatchRoomResult = {
+	chatRoomId: string;
+	messages: Message[];
+	unreadCount: number;
+	lastMessage: Message | null;
+	upToDate: boolean;
+	hasMore?: boolean;
+	skipped?: boolean;
+};
+
+export type SyncMessagesBatchResponse = {
+	rooms: SyncMessagesBatchRoomResult[];
+};
+
 class ChatApiClient {
 	private baseUrl: string;
 
@@ -277,6 +296,27 @@ class ChatApiClient {
 			hasMore: response.pagination?.hasMore || false,
 			total: response.pagination?.total || 0,
 		};
+	}
+
+	async syncMessagesBatch(
+		rooms: SyncMessagesBatchRoomRequest[]
+	): Promise<SyncMessagesBatchResponse> {
+		const response = await this.request<SyncMessagesBatchResponse | SyncMessagesBatchResponse[]>(
+			"/messages/sync-batch",
+			{
+				method: "POST",
+				body: JSON.stringify({ rooms }),
+			}
+		);
+		if (
+			response &&
+			typeof response === "object" &&
+			!Array.isArray(response) &&
+			Array.isArray(response.rooms)
+		) {
+			return response;
+		}
+		return { rooms: [] };
 	}
 
 	// Get files (messages with fileUrl) from chat room

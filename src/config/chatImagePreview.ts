@@ -5,10 +5,10 @@
 export const CHAT_IMAGE_PREVIEW_ENABLED = true;
 
 /** Max width for thumbnails in the message list (px). */
-export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 640;
+export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 400;
 
-/** JPEG quality for chat thumbnails (40–90). */
-export const CHAT_IMAGE_PREVIEW_QUALITY = 72;
+/** JPEG quality for chat thumbnails (40–90). Lower = smaller files, faster chat load. */
+export const CHAT_IMAGE_PREVIEW_QUALITY = 50;
 
 /** Abort inline preview if the image has not loaded within this time (ms). */
 export const CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 8_000;
