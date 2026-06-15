@@ -12,7 +12,7 @@ import { AngleDownIcon, AngleUpIcon, LoadTrackingChatIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "./CheckListTablePagination";
 import type { CheckListDriver, CheckListResponse } from "./checkListTypes";
-import CheckListPushModal from "./CheckListPushModal";
+import CheckListPushModal, { CHECK_LIST_PUSH_DEFAULT_MESSAGE } from "./CheckListPushModal";
 import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
@@ -488,11 +488,13 @@ export default function CheckListTable() {
 				isOpen={chatModalDrivers !== null && chatModalDrivers.length > 0}
 				onClose={() => setChatModalDrivers(null)}
 				drivers={chatModalDrivers}
+				defaultMessage={CHECK_LIST_PUSH_DEFAULT_MESSAGE}
 			/>
 			<CheckListPushModal
 				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
 				onClose={() => setPushModalDrivers(null)}
 				drivers={pushModalDrivers}
+				defaultMessage={CHECK_LIST_PUSH_DEFAULT_MESSAGE}
 			/>
 		</div>
 	);

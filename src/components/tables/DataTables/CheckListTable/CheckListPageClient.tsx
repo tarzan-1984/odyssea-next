@@ -60,10 +60,10 @@ export default function CheckListPageClient() {
 			) : activeTab === "version" ? (
 				<>
 					<p className="text-sm text-gray-600 dark:text-gray-400">
-						ACTIVE drivers with at least one device whose app version is below the minimum
-						required version configured in App settings. All devices for matching drivers are shown.
-						Default sort is oldest app version first; use the &quot;App Version&quot; column header
-						to toggle. Search by name, driver ID, or email.
+						ACTIVE drivers with at least one device whose app version is below the latest allowed
+						version (see below). All devices for matching drivers are shown. Default sort is oldest
+						app version first; use the &quot;App Version&quot; column header to toggle. Search by
+						name, driver ID, or email.
 					</p>
 					<CheckListVersionTable />
 				</>

@@ -1,6 +1,9 @@
 import type { ChatRoom } from "@/app-api/chatApi";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 
+export const CHECK_LIST_BULK_CHAT_BATCH_SIZE = 5;
+const CHECK_LIST_BULK_CHAT_REQUEST_TIMEOUT_MS = 120_000;
+
 export type BulkDirectChatsSummary = {
 	created: number;
 	existed: number;
@@ -15,6 +18,11 @@ export type BulkDirectChatsSummary = {
 		messageId?: string;
 		messageError?: string;
 	}>;
+};
+
+export type BulkDirectChatsProgress = {
+	completed: number;
+	total: number;
 };
 
 export function normalizeBulkDirectChatRoom(raw: Record<string, unknown>): ChatRoom {
@@ -52,15 +60,39 @@ export function normalizeBulkDirectChatRoom(raw: Record<string, unknown>): ChatR
 	};
 }
 
-export async function bulkCreatePrivateChatsWithMessage(
+function chunkDriverIds(driverUserIds: string[], batchSize: number): string[][] {
+	const chunks: string[][] = [];
+	for (let i = 0; i < driverUserIds.length; i += batchSize) {
+		chunks.push(driverUserIds.slice(i, i + batchSize));
+	}
+	return chunks;
+}
+
+function mergeBulkSummaries(summaries: BulkDirectChatsSummary[]): BulkDirectChatsSummary {
+	return summaries.reduce<BulkDirectChatsSummary>(
+		(acc, summary) => ({
+			created: acc.created + summary.created,
+			existed: acc.existed + summary.existed,
+			errors: acc.errors + summary.errors,
+			messagesSent: (acc.messagesSent ?? 0) + (summary.messagesSent ?? 0),
+			messageErrors: (acc.messageErrors ?? 0) + (summary.messageErrors ?? 0),
+			items: [...acc.items, ...summary.items],
+		}),
+		{ created: 0, existed: 0, errors: 0, items: [] },
+	);
+}
+
+async function fetchBulkDirectChatsWithMessage(
 	driverUserIds: string[],
-	message?: string
+	message?: string,
+	signal?: AbortSignal,
 ): Promise<BulkDirectChatsSummary> {
 	const trimmed = message?.trim() ?? "";
 	const res = await fetch("/api/chat-rooms/direct/bulk-with-message", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		credentials: "include",
+		signal,
 		body: JSON.stringify({
 			driverUserIds,
 			...(trimmed ? { message: trimmed } : {}),
@@ -76,6 +108,53 @@ export async function bulkCreatePrivateChatsWithMessage(
 	}
 
 	return json;
+}
+
+export async function bulkCreatePrivateChatsWithMessage(
+	driverUserIds: string[],
+	message?: string,
+	onProgress?: (progress: BulkDirectChatsProgress) => void,
+): Promise<BulkDirectChatsSummary> {
+	const uniqueIds = [...new Set(driverUserIds.filter(id => id.trim() !== ""))];
+	if (uniqueIds.length === 0) {
+		return { created: 0, existed: 0, errors: 0, items: [] };
+	}
+
+	const batches = chunkDriverIds(uniqueIds, CHECK_LIST_BULK_CHAT_BATCH_SIZE);
+	const summaries: BulkDirectChatsSummary[] = [];
+	let completed = 0;
+
+	onProgress?.({ completed: 0, total: uniqueIds.length });
+
+	for (const batch of batches) {
+		const controller = new AbortController();
+		const timeoutId = window.setTimeout(
+			() => controller.abort(),
+			CHECK_LIST_BULK_CHAT_REQUEST_TIMEOUT_MS,
+		);
+
+		try {
+			const summary = await fetchBulkDirectChatsWithMessage(
+				batch,
+				message,
+				controller.signal,
+			);
+			summaries.push(summary);
+			completed += batch.length;
+			onProgress?.({ completed, total: uniqueIds.length });
+		} catch (error) {
+			if (error instanceof DOMException && error.name === "AbortError") {
+				throw new Error(
+					`Request timed out after processing ${completed} of ${uniqueIds.length} drivers. Please try again with fewer drivers selected.`,
+				);
+			}
+			throw error;
+		} finally {
+			window.clearTimeout(timeoutId);
+		}
+	}
+
+	return mergeBulkSummaries(summaries);
 }
 
 export function showBulkPrivateChatsToast(summary: BulkDirectChatsSummary): void {

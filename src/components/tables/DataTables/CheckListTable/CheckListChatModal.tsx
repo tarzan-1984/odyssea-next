@@ -10,6 +10,7 @@ import {
 	bulkCreatePrivateChatsWithMessage,
 	normalizeBulkDirectChatRoom,
 	showBulkPrivateChatsToast,
+	type BulkDirectChatsProgress,
 } from "./checkListBulkPrivateChats";
 import { useChatStore } from "@/stores/chatStore";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
@@ -18,11 +19,38 @@ type CheckListChatModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
 	drivers: CheckListDriver[] | null;
+	defaultMessage?: string;
 };
 
-export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckListChatModalProps) {
-	const [message, setMessage] = useState("");
+async function syncCreatedChatRoomsToClient(
+	items: Array<{
+		status: "created" | "existed" | "error";
+		chatRoom?: Record<string, unknown>;
+	}>,
+	addChatRoom: (room: ReturnType<typeof normalizeBulkDirectChatRoom>) => void,
+): Promise<void> {
+	const createdRooms = items
+		.filter(item => item.status === "created" && item.chatRoom)
+		.map(item => normalizeBulkDirectChatRoom(item.chatRoom!));
+
+	for (const room of createdRooms) {
+		addChatRoom(room);
+	}
+
+	await Promise.all(
+		createdRooms.map(room => indexedDBChatService.addChatRoom(room).catch(() => {})),
+	);
+}
+
+export default function CheckListChatModal({
+	isOpen,
+	onClose,
+	drivers,
+	defaultMessage = "",
+}: CheckListChatModalProps) {
+	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
+	const [progress, setProgress] = useState<BulkDirectChatsProgress | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 	const addChatRoom = useChatStore(s => s.addChatRoom);
@@ -33,11 +61,12 @@ export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckLi
 
 	useEffect(() => {
 		if (isOpen) {
-			setMessage("");
+			setMessage(defaultMessage);
 			setError(null);
 			setSuccess(null);
+			setProgress(null);
 		}
-	}, [isOpen, targetKey]);
+	}, [isOpen, targetKey, defaultMessage]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -47,19 +76,16 @@ export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckLi
 
 		const text = message.trim();
 		setSending(true);
+		setProgress({ completed: 0, total: targets.length });
 
 		try {
 			const summary = await bulkCreatePrivateChatsWithMessage(
 				targets.map(d => d.id),
 				text || undefined,
+				setProgress,
 			);
 
-			for (const item of summary.items) {
-				if (item.status !== "created" || !item.chatRoom) continue;
-				const normalized = normalizeBulkDirectChatRoom(item.chatRoom);
-				addChatRoom(normalized);
-				await indexedDBChatService.addChatRoom(normalized).catch(() => {});
-			}
+			await syncCreatedChatRoomsToClient(summary.items, addChatRoom);
 
 			const messageErrors = summary.items.filter(
 				item => item.messageError && item.messageSent === false,
@@ -96,18 +122,29 @@ export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckLi
 			setError(err instanceof Error ? err.message : "Failed to create private chats");
 		} finally {
 			setSending(false);
+			setProgress(null);
 		}
 	}
+
+	const progressLabel =
+		progress && progress.total > 1
+			? `Processing ${progress.completed} of ${progress.total} drivers…`
+			: null;
 
 	return (
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
 			className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-gray-900"
-			closeOnBackdropClick
+			closeOnBackdropClick={!sending}
 		>
 			<form onSubmit={onSubmit} className="p-6">
 				<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create chat</h2>
+				{targets.length > 1 && (
+					<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+						{targets.length} drivers selected. Chats are processed in small batches.
+					</p>
+				)}
 
 				<div className="mt-5">
 					<Label htmlFor="checklist-chat-message">Message</Label>
@@ -122,9 +159,16 @@ export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckLi
 							onChange={setMessage}
 							placeholder="Type a message to send after the chat is created…"
 							className="min-h-[120px] resize-y"
+							disabled={sending}
 						/>
 					</div>
 				</div>
+
+				{sending && progressLabel && (
+					<p className="mt-4 text-sm text-gray-600 dark:text-gray-300" aria-live="polite">
+						{progressLabel}
+					</p>
+				)}
 
 				{error && (
 					<div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
@@ -142,7 +186,11 @@ export default function CheckListChatModal({ isOpen, onClose, drivers }: CheckLi
 						Cancel
 					</Button>
 					<Button type="submit" variant="primary" size="sm" disabled={sending || targets.length === 0}>
-						{sending ? "Working…" : hasMessage ? "Send" : "Create"}
+						{sending
+							? progressLabel ?? "Working…"
+							: hasMessage
+								? "Send"
+								: "Create"}
 					</Button>
 				</div>
 			</form>

@@ -69,6 +69,8 @@ type CheckListDriverDevicesTableProps = {
 	queryKey: string;
 	getEmptyMessage: (minimumAppVersion?: string) => string;
 	getPushDefaultMessage: (minimumAppVersion: string) => string;
+	/** When true, shows the minimum allowed app version from App settings above the table. */
+	showMinimumAppVersion?: boolean;
 };
 
 export default function CheckListDriverDevicesTable({
@@ -76,6 +78,7 @@ export default function CheckListDriverDevicesTable({
 	queryKey,
 	getEmptyMessage,
 	getPushDefaultMessage,
+	showMinimumAppVersion = false,
 }: CheckListDriverDevicesTableProps) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -180,7 +183,30 @@ export default function CheckListDriverDevicesTable({
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
-			<div className="relative z-20 flex flex-col gap-3 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] rounded-t-xl lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+			{showMinimumAppVersion && (
+				<div className="rounded-t-xl border-b border-gray-100 px-4 py-3 dark:border-white/[0.05]">
+					<p className="text-sm text-gray-700 dark:text-gray-300">
+						Latest allowed app version:{" "}
+						{query.isPending ? (
+							<span className="text-gray-400 dark:text-gray-500">Loading…</span>
+						) : minimumAppVersion ? (
+							<span className="font-semibold text-brand-500">{minimumAppVersion}</span>
+						) : (
+							<>
+								<span className="font-semibold text-gray-500 dark:text-gray-400">—</span>
+								<span className="ml-2 text-gray-500 dark:text-gray-400">
+									(not configured in App settings)
+								</span>
+							</>
+						)}
+					</p>
+				</div>
+			)}
+			<div
+				className={`relative z-20 flex flex-col gap-3 px-4 py-4 border border-b-0 border-gray-100 dark:border-white/[0.05] lg:flex-row lg:items-center lg:justify-between lg:gap-4 ${
+					showMinimumAppVersion ? "" : "rounded-t-xl"
+				}`}
+			>
 				<div className="flex flex-wrap items-center gap-3 shrink-0">
 					<span className="text-gray-500 dark:text-gray-400"> Show </span>
 					<CustomStaticSelect
@@ -465,6 +491,7 @@ export default function CheckListDriverDevicesTable({
 				isOpen={chatModalDrivers !== null && chatModalDrivers.length > 0}
 				onClose={() => setChatModalDrivers(null)}
 				drivers={chatModalDrivers}
+				defaultMessage={pushDefaultMessage}
 			/>
 			<CheckListPushModal
 				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
