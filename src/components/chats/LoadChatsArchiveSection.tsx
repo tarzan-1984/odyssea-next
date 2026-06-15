@@ -104,28 +104,6 @@ export default function LoadChatsArchiveSection({
 		});
 
 	useEffect(() => {
-		const root = scrollRootRef.current;
-		const sentinel = sentinelRef.current;
-		if (!tabActive || !expanded || !root || !sentinel) {
-			return;
-		}
-
-		const observer = new IntersectionObserver(
-			entries => {
-				const hit = entries.some(e => e.isIntersecting);
-				if (hit && hasNextPage && !isFetchingNextPage) {
-					fetchNextPage().catch(() => {});
-				}
-			},
-			{ root, rootMargin: "100px", threshold: 0 }
-		);
-
-		observer.observe(sentinel);
-
-		return () => observer.disconnect();
-	}, [tabActive, expanded, hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages?.length]);
-
-	useEffect(() => {
 		const timer = window.setTimeout(() => {
 			setDebouncedArchiveSearch(archiveSearchQuery);
 		}, 300);
@@ -150,6 +128,58 @@ export default function LoadChatsArchiveSection({
 			})
 		);
 	}, [archivedRooms, debouncedArchiveSearch, getArchiveChatDisplayName]);
+
+	const isArchiveSearchActive = debouncedArchiveSearch.trim().length > 0;
+
+	useEffect(() => {
+		const root = scrollRootRef.current;
+		const sentinel = sentinelRef.current;
+		if (!tabActive || !expanded || !root || !sentinel || isArchiveSearchActive) {
+			return;
+		}
+
+		const observer = new IntersectionObserver(
+			entries => {
+				const hit = entries.some(e => e.isIntersecting);
+				if (hit && hasNextPage && !isFetchingNextPage) {
+					fetchNextPage().catch(() => {});
+				}
+			},
+			{ root, rootMargin: "100px", threshold: 0 }
+		);
+
+		observer.observe(sentinel);
+
+		return () => observer.disconnect();
+	}, [
+		tabActive,
+		expanded,
+		isArchiveSearchActive,
+		hasNextPage,
+		isFetchingNextPage,
+		fetchNextPage,
+		data?.pages?.length,
+	]);
+
+	// When searching, load more pages only while no matches exist in loaded data.
+	useEffect(() => {
+		if (!tabActive || !expanded || !isArchiveSearchActive) {
+			return;
+		}
+		if (filteredArchivedRooms.length > 0 || !hasNextPage || isFetchingNextPage) {
+			return;
+		}
+		fetchNextPage().catch(() => {});
+	}, [
+		tabActive,
+		expanded,
+		isArchiveSearchActive,
+		filteredArchivedRooms.length,
+		hasNextPage,
+		isFetchingNextPage,
+		fetchNextPage,
+		archivedRooms.length,
+	]);
 
 	return (
 		<div className="mt-auto flex min-h-0 shrink-0 flex-col pt-2">
