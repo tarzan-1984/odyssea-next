@@ -22,6 +22,8 @@ interface LoadChatsArchiveSectionProps {
 	loadChatRooms: (options?: { force?: boolean }) => Promise<void>;
 	/** Expand archive list (e.g. deep link to archived LOAD chat). */
 	expandArchive?: boolean;
+	/** Deep-linked archived LOAD chat — always shown at top of the archive list. */
+	pinnedArchivedRoom?: ChatRoom | null;
 }
 
 function archivedChatTitle(chatRoom: ChatRoom): string {
@@ -41,18 +43,19 @@ export default function LoadChatsArchiveSection({
 	webSocketChatSync,
 	loadChatRooms,
 	expandArchive = false,
+	pinnedArchivedRoom = null,
 }: LoadChatsArchiveSectionProps) {
 	const currentUser = useCurrentUser();
 	const [expanded, setExpanded] = useState(false);
+	const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
+	const [debouncedArchiveSearch, setDebouncedArchiveSearch] = useState("");
+	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (expandArchive) {
 			setExpanded(true);
 		}
 	}, [expandArchive]);
-	const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
-	const [debouncedArchiveSearch, setDebouncedArchiveSearch] = useState("");
-	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
 
 	const scrollRootRef = useRef<HTMLDivElement>(null);
 	const sentinelRef = useRef<HTMLDivElement>(null);
@@ -129,6 +132,14 @@ export default function LoadChatsArchiveSection({
 		);
 	}, [archivedRooms, debouncedArchiveSearch, getArchiveChatDisplayName]);
 
+	const visibleArchivedRooms = React.useMemo(() => {
+		if (!pinnedArchivedRoom) return filteredArchivedRooms;
+		if (filteredArchivedRooms.some(r => r.id === pinnedArchivedRoom.id)) {
+			return filteredArchivedRooms;
+		}
+		return [pinnedArchivedRoom, ...filteredArchivedRooms];
+	}, [filteredArchivedRooms, pinnedArchivedRoom]);
+
 	const isArchiveSearchActive = debouncedArchiveSearch.trim().length > 0;
 
 	useEffect(() => {
@@ -159,26 +170,6 @@ export default function LoadChatsArchiveSection({
 		isFetchingNextPage,
 		fetchNextPage,
 		data?.pages?.length,
-	]);
-
-	// When searching, load more pages only while no matches exist in loaded data.
-	useEffect(() => {
-		if (!tabActive || !expanded || !isArchiveSearchActive) {
-			return;
-		}
-		if (filteredArchivedRooms.length > 0 || !hasNextPage || isFetchingNextPage) {
-			return;
-		}
-		fetchNextPage().catch(() => {});
-	}, [
-		tabActive,
-		expanded,
-		isArchiveSearchActive,
-		filteredArchivedRooms.length,
-		hasNextPage,
-		isFetchingNextPage,
-		fetchNextPage,
-		archivedRooms.length,
 	]);
 
 	return (
@@ -274,7 +265,7 @@ export default function LoadChatsArchiveSection({
 								<div className="px-3 py-4 text-center text-sm text-gray-500">
 									No archived shipments yet
 								</div>
-							) : filteredArchivedRooms.length === 0 ? (
+							) : visibleArchivedRooms.length === 0 ? (
 								<div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
 									{debouncedArchiveSearch.trim() ? (
 										<>No chats found</>
@@ -284,7 +275,7 @@ export default function LoadChatsArchiveSection({
 								</div>
 							) : (
 								<ul className="divide-y divide-gray-200 py-1 dark:divide-white/10">
-									{filteredArchivedRooms.map(chatRoom => {
+									{visibleArchivedRooms.map(chatRoom => {
 										const isSelected = selectedChatId === chatRoom.id;
 										const title = archivedChatTitle(chatRoom);
 										const displayRoom =

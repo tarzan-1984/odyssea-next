@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import ChatList from "./ChatList";
 import ChatBox from "./ChatBox";
 import AddNewRoomModal from "./AddNewRoomModal";
@@ -10,16 +11,18 @@ import { ChatRoom } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatModal } from "@/context/ChatModalContext";
 import { useChatStore } from "@/stores/chatStore";
-import { findActiveLoadChatInList, findArchivedLoadChat } from "@/utils/findLoadChatRoom";
+import { findActiveLoadChatInList, resolveLoadChatRoom } from "@/utils/findLoadChatRoom";
 import {
 	buildChatUrlForRoom,
 	findOfferChatRoom,
 } from "@/utils/offerChatUrl";
 import { useCurrentUser } from "@/stores/userStore";
+import { upsertArchivedLoadChatInCache } from "@/utils/upsertArchivedLoadChatInCache";
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const roomFromUrl = searchParams.get("room");
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
@@ -30,7 +33,9 @@ export default function ChatContainer() {
 	);
 	const [noAccessLoadId, setNoAccessLoadId] = useState<string | null>(null);
 	const [expandArchiveSection, setExpandArchiveSection] = useState(false);
+	const [deepLinkedArchivedRoom, setDeepLinkedArchivedRoom] = useState<ChatRoom | null>(null);
 	const loadResolvedRef = useRef<string | null>(null);
+	const loadResolveGenerationRef = useRef(0);
 	const roomResolvedRef = useRef<string | null>(null);
 	const offerResolvedRef = useRef<string | null>(null);
 	// Initialize WebSocket chat sync at the container level
@@ -90,45 +95,58 @@ export default function ChatContainer() {
 			loadResolvedRef.current = null;
 			setExpandArchiveSection(false);
 			setNoAccessLoadId(null);
+			setDeepLinkedArchivedRoom(null);
 			return;
 		}
 		if (isLoadingChatRooms) return;
 		if (loadResolvedRef.current === loadFromUrl) return;
 
-		let cancelled = false;
+		const resolveGeneration = ++loadResolveGenerationRef.current;
 
 		const trySelectLoadChat = async () => {
 			const active = findActiveLoadChatInList(chatRooms, loadFromUrl);
 			if (active) {
-				if (cancelled) return;
+				if (resolveGeneration !== loadResolveGenerationRef.current) return;
 				loadResolvedRef.current = loadFromUrl;
 				setExpandArchiveSection(false);
 				setNoAccessLoadId(null);
+				setDeepLinkedArchivedRoom(null);
 				applySelectedRoom(active);
 				return;
 			}
 
-			const archived = await findArchivedLoadChat(loadFromUrl);
-			if (cancelled) return;
-			if (!archived) {
-				// User may not be a participant of this LOAD chat. Show a one-time info modal.
-				loadResolvedRef.current = loadFromUrl;
+			const resolved = await resolveLoadChatRoom(chatRooms, loadFromUrl);
+			if (resolveGeneration !== loadResolveGenerationRef.current) return;
+
+			loadResolvedRef.current = loadFromUrl;
+			if (!resolved) {
 				setExpandArchiveSection(false);
 				setNoAccessLoadId(loadFromUrl);
+				setDeepLinkedArchivedRoom(null);
 				return;
 			}
 
-			loadResolvedRef.current = loadFromUrl;
-			setExpandArchiveSection(true);
+			const { room, isArchived } = resolved;
+			setExpandArchiveSection(isArchived);
 			setNoAccessLoadId(null);
-			applySelectedRoom(archived);
+			applySelectedRoom(room);
+			if (isArchived) {
+				const archivedRoom = { ...room, isLoadArchived: true as const };
+				setDeepLinkedArchivedRoom(archivedRoom);
+				upsertArchivedLoadChatInCache(queryClient, archivedRoom);
+			} else {
+				setDeepLinkedArchivedRoom(null);
+			}
 		};
 
 		trySelectLoadChat().catch(() => {});
-		return () => {
-			cancelled = true;
-		};
-	}, [loadFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom]);
+	}, [
+		loadFromUrl,
+		chatRooms,
+		isLoadingChatRooms,
+		applySelectedRoom,
+		queryClient,
+	]);
 
 	useEffect(() => {
 		if (!offerFromUrl) {
@@ -223,6 +241,7 @@ export default function ChatContainer() {
 						selectedChatId={selectedChatRoomId || undefined}
 						webSocketChatSync={webSocketChatSync}
 						expandArchiveSection={expandArchiveSection}
+						pinnedArchivedRoom={deepLinkedArchivedRoom}
 					/>
 				</div>
 

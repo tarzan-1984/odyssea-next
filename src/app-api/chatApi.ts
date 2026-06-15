@@ -251,6 +251,21 @@ class ChatApiClient {
 		};
 	}
 
+	/** LOAD chat by TMS load id (active or archived). Returns null when not found or no access. */
+	async getLoadChatRoomByLoadId(loadId: string): Promise<ChatRoom | null> {
+		const trimmed = loadId?.trim();
+		if (!trimmed) return null;
+
+		try {
+			const room = await this.request<ChatRoom>(
+				`/chat-rooms/by-load/${encodeURIComponent(trimmed)}`
+			);
+			return room?.id ? room : null;
+		} catch {
+			return null;
+		}
+	}
+
 	getChatRoom(chatRoomId: string): Promise<ChatRoom> {
 		return this.request<ChatRoom>(`/chat-rooms/${chatRoomId}`);
 	}

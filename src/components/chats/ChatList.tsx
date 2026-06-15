@@ -24,6 +24,8 @@ interface ChatListProps {
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 	/** Open archive accordion when deep-linking to an archived LOAD chat. */
 	expandArchiveSection?: boolean;
+	/** Archived LOAD chat from deep link — pinned in archive list. */
+	pinnedArchivedRoom?: ChatRoom | null;
 }
 
 type FilterType = "all" | "muted" | "unread" | "favorite";
@@ -54,6 +56,7 @@ export default function ChatList({
 	selectedChatId,
 	webSocketChatSync,
 	expandArchiveSection = false,
+	pinnedArchivedRoom = null,
 }: ChatListProps) {
 	const searchParams = useSearchParams();
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
@@ -846,6 +849,7 @@ export default function ChatList({
 						webSocketChatSync={webSocketChatSync}
 						loadChatRooms={opts => webSocketChatSync.loadChatRooms(opts)}
 						expandArchive={expandArchiveSection}
+						pinnedArchivedRoom={pinnedArchivedRoom}
 					/>
 				)}
 			</div>

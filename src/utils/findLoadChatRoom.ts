@@ -1,7 +1,7 @@
 import { chatApi, ChatRoom } from "@/app-api/chatApi";
 
 export function matchesLoadChatId(room: ChatRoom, loadId: string): boolean {
-	return room.type === "LOAD" && room.loadId?.trim() === loadId;
+	return room.type === "LOAD" && room.loadId?.trim() === loadId.trim();
 }
 
 export function findLoadChatInList(rooms: ChatRoom[], loadId: string): ChatRoom | undefined {
@@ -18,6 +18,12 @@ export function findActiveLoadChatInList(
 	);
 }
 
+/** Lookup LOAD chat by TMS load id via API (active or archived). */
+export async function findLoadChatByLoadId(loadId: string): Promise<ChatRoom | null> {
+	return chatApi.getLoadChatRoomByLoadId(loadId);
+}
+
+/** @deprecated Prefer findLoadChatByLoadId — scans paginated archive and may miss deep pages. */
 export async function findArchivedLoadChat(loadId: string): Promise<ChatRoom | null> {
 	let page = 1;
 	const limit = 50;
@@ -40,8 +46,8 @@ export async function resolveLoadChatRoom(
 	const active = findActiveLoadChatInList(rooms, loadId);
 	if (active) return { room: active, isArchived: false };
 
-	const archived = await findArchivedLoadChat(loadId);
-	if (archived) return { room: archived, isArchived: true };
+	const room = await findLoadChatByLoadId(loadId);
+	if (!room) return null;
 
-	return null;
+	return { room, isArchived: room.isLoadArchived === true };
 }
