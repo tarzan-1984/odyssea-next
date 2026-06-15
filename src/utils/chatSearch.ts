@@ -66,6 +66,11 @@ export function chatRoomMatchesSearchQuery(
 		return true;
 	}
 
+	const loadId = chatRoom.loadId?.trim();
+	if (loadId && loadId.toLowerCase().includes(qLower)) {
+		return true;
+	}
+
 	if (options?.includeParticipantPhones === false) {
 		return false;
 	}
