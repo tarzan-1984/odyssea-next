@@ -13,6 +13,7 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "./CheckListTablePagination";
 import type { CheckListDriver, CheckListResponse } from "./checkListTypes";
 import CheckListPushModal, { CHECK_LIST_PUSH_DEFAULT_MESSAGE } from "./CheckListPushModal";
+import CheckListEmailModal from "./CheckListEmailModal";
 import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
@@ -84,6 +85,7 @@ export default function CheckListTable() {
 	const [lastLocationSort, setLastLocationSort] =
 		useState<CheckListLastLocationSort>("asc");
 	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
+	const [emailModalDrivers, setEmailModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [chatModalDrivers, setChatModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
@@ -241,6 +243,20 @@ export default function CheckListTable() {
 								}}
 							>
 								Send push
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant="primary"
+								className="h-10 shrink-0 whitespace-nowrap"
+								onClick={() => {
+									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+									if (selected.length > 0) {
+										setEmailModalDrivers(selected);
+									}
+								}}
+							>
+								Send Email
 							</Button>
 						</>
 					)}
@@ -449,15 +465,27 @@ export default function CheckListTable() {
 										)}
 									</TableCell>
 									<TableCell className="px-4 py-3 text-right whitespace-nowrap">
-										<Button
-											size="sm"
-											variant="primary"
-											type="button"
-											className="h-9"
-											onClick={() => setPushModalDrivers([row])}
-										>
-											Send push
-										</Button>
+										<div className="flex flex-wrap justify-end gap-1.5">
+											<Button
+												size="sm"
+												variant="primary"
+												type="button"
+												className="!px-2 !py-1 !text-xs h-auto rounded-md"
+												onClick={() => setPushModalDrivers([row])}
+											>
+												Send push
+											</Button>
+											<Button
+												size="sm"
+												variant="outline"
+												type="button"
+												className="!px-2 !py-1 !text-xs h-auto rounded-md"
+												onClick={() => setEmailModalDrivers([row])}
+												disabled={!row.email?.trim()}
+											>
+												Send Email
+											</Button>
+										</div>
 									</TableCell>
 								</TableRow>
 							))}
@@ -494,6 +522,12 @@ export default function CheckListTable() {
 				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
 				onClose={() => setPushModalDrivers(null)}
 				drivers={pushModalDrivers}
+				defaultMessage={CHECK_LIST_PUSH_DEFAULT_MESSAGE}
+			/>
+			<CheckListEmailModal
+				isOpen={emailModalDrivers !== null && emailModalDrivers.length > 0}
+				onClose={() => setEmailModalDrivers(null)}
+				drivers={emailModalDrivers}
 				defaultMessage={CHECK_LIST_PUSH_DEFAULT_MESSAGE}
 			/>
 		</div>

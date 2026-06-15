@@ -11,6 +11,7 @@ import CheckListTablePagination from "./CheckListTablePagination";
 import Button from "@/components/ui/button/Button";
 import { AngleDownIcon, AngleUpIcon } from "@/icons";
 import CheckListPushModal from "./CheckListPushModal";
+import CheckListEmailModal from "./CheckListEmailModal";
 import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
@@ -87,6 +88,7 @@ export default function CheckListDriverDevicesTable({
 	const [appVersionSort, setAppVersionSort] = useState<CheckListAppVersionSort>("asc");
 	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
 	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
+	const [emailModalDrivers, setEmailModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [chatModalDrivers, setChatModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 
@@ -267,6 +269,22 @@ export default function CheckListDriverDevicesTable({
 								}}
 							>
 								Send push
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant="primary"
+								className="h-10 shrink-0 whitespace-nowrap"
+								onClick={() => {
+									const selected = drivers
+										.filter(d => selectedDriverIds.has(d.id))
+										.map(toCheckListDriver);
+									if (selected.length > 0) {
+										setEmailModalDrivers(selected);
+									}
+								}}
+							>
+								Send Email
 							</Button>
 						</>
 					)}
@@ -449,17 +467,31 @@ export default function CheckListDriverDevicesTable({
 											{device.model || "—"}
 										</TableCell>
 										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
-											<Button
-												size="sm"
-												variant="primary"
-												type="button"
-												className="h-9"
-												onClick={() =>
-													setPushModalDrivers([toCheckListDriver(driver)])
-												}
-											>
-												Send push
-											</Button>
+											<div className="flex flex-wrap justify-end gap-1.5">
+												<Button
+													size="sm"
+													variant="primary"
+													type="button"
+													className="!px-2 !py-1 !text-xs h-auto rounded-md"
+													onClick={() =>
+														setPushModalDrivers([toCheckListDriver(driver)])
+													}
+												>
+													Send push
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													type="button"
+													className="!px-2 !py-1 !text-xs h-auto rounded-md"
+													onClick={() =>
+														setEmailModalDrivers([toCheckListDriver(driver)])
+													}
+													disabled={!driver.email?.trim()}
+												>
+													Send Email
+												</Button>
+											</div>
 										</TableCell>
 									</TableRow>
 								)),
@@ -497,6 +529,12 @@ export default function CheckListDriverDevicesTable({
 				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
 				onClose={() => setPushModalDrivers(null)}
 				drivers={pushModalDrivers}
+				defaultMessage={pushDefaultMessage}
+			/>
+			<CheckListEmailModal
+				isOpen={emailModalDrivers !== null && emailModalDrivers.length > 0}
+				onClose={() => setEmailModalDrivers(null)}
+				drivers={emailModalDrivers}
 				defaultMessage={pushDefaultMessage}
 			/>
 		</div>
