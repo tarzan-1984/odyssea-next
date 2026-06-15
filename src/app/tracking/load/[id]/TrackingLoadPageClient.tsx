@@ -133,6 +133,10 @@ type LoadTrackingPoint = {
 	latitude?: number | string | null;
 	longitude?: number | string | null;
 	placeLabel?: string | null;
+	deviceId?: string | null;
+	deviceModel?: string | null;
+	deviceName?: string | null;
+	devicePlatform?: string | null;
 	createdAt?: string | null;
 	updatedAt?: string | null;
 };
@@ -148,6 +152,29 @@ type DriverTrackingPointCreatedPayload = {
 
 function formatHistoryDate(dateString: string | null) {
 	return formatNyWallClockForDisplay(dateString);
+}
+
+function formatTrackingDeviceLabel(point: {
+	deviceModel?: string | null;
+	deviceName?: string | null;
+	deviceId?: string | null;
+	devicePlatform?: string | null;
+}): string | null {
+	const model = point.deviceModel?.trim();
+	const name = point.deviceName?.trim();
+	const platform = point.devicePlatform?.trim();
+	const label =
+		model && name && name.toLowerCase() !== model.toLowerCase()
+			? `${name} (${model})`
+			: model || name;
+	if (label && platform) {
+		return `${label} · ${platform}`;
+	}
+	if (label) {
+		return label;
+	}
+	const id = point.deviceId?.trim();
+	return id ? `Device ${id.slice(0, 8)}…` : null;
 }
 
 /** Align with TMS / Nest: loaded-enroute → loaded_enroute */
@@ -436,6 +463,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					externalDriverId,
 					driverName: driverName || null,
 					placeLabel: point.placeLabel?.trim() || null,
+					deviceId: point.deviceId?.trim() || null,
+					deviceModel: point.deviceModel?.trim() || null,
+					deviceName: point.deviceName?.trim() || null,
+					devicePlatform: point.devicePlatform?.trim() || null,
+					deviceLabel: formatTrackingDeviceLabel(point),
 				};
 			})
 			.filter(
@@ -449,6 +481,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					externalDriverId: string | null;
 					driverName: string | null;
 					placeLabel: string | null;
+					deviceId: string | null;
+					deviceModel: string | null;
+					deviceName: string | null;
+					devicePlatform: string | null;
+					deviceLabel: string | null;
 				} => point !== null
 			);
 	}, [loadDrivers, sortedTrackingPoints]);
@@ -1129,6 +1166,19 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																		Place:
 																	</span>{" "}
 																	{point.placeLabel}
+																</p>
+															) : null}
+															{point.deviceLabel ? (
+																<p>
+																	<span className="font-medium">
+																		Device:
+																	</span>{" "}
+																	{point.deviceLabel}
+																	{point.deviceId ? (
+																		<span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
+																			({point.deviceId.slice(0, 8)}…)
+																		</span>
+																	) : null}
 																</p>
 															) : null}
 															<p>

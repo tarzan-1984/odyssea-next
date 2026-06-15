@@ -10,6 +10,16 @@ import type { CheckListDriver } from "./checkListTypes";
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
 	"We haven't received location updates from you in a while. Please check if the app is running.";
 
+export function buildCheckListVersionPushDefaultMessage(
+	minimumAppVersion: string,
+): string {
+	const version = minimumAppVersion.trim();
+	if (!version) {
+		return "You have an unacceptable app version. Please update your app to the latest allowed version.";
+	}
+	return `You have an unacceptable app version. The latest allowed version is ${version}. Please update your app.`;
+}
+
 function buildPushBody(
 	driver: CheckListDriver,
 	message: string,

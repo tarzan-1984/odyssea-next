@@ -1,64 +1,55 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import Input from "@/components/form/input/InputField";
-import Button from "@/components/ui/button/Button";
-import { AngleDownIcon, AngleUpIcon, LoadTrackingChatIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "./CheckListTablePagination";
-import type { CheckListDriver, CheckListResponse } from "./checkListTypes";
+import Button from "@/components/ui/button/Button";
+import { AngleDownIcon, AngleUpIcon } from "@/icons";
 import CheckListPushModal from "./CheckListPushModal";
 import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
+import type {
+	CheckListDriver,
+	CheckListVersionDriver,
+	CheckListVersionResponse,
+} from "./checkListTypes";
 
-const NY_TZ = "America/New_York";
+export type CheckListAppVersionSort = "asc" | "desc";
 
-function formatInNy(isoOrNyWall: string | null | undefined): string {
-	if (!isoOrNyWall) return "—";
-	try {
-		const raw = isoOrNyWall.trim();
-		const hasT = raw.includes("T");
-		const d = hasT ? new Date(raw) : new Date(raw.replace(" ", "T"));
-		if (Number.isNaN(d.getTime())) return raw;
-		return new Intl.DateTimeFormat("en-US", {
-			timeZone: NY_TZ,
-			month: "2-digit",
-			day: "2-digit",
-			year: "numeric",
-			hour: "2-digit",
-			minute: "2-digit",
-			second: "2-digit",
-			hour12: true,
-		}).format(d);
-	} catch {
-		return isoOrNyWall;
-	}
+function toCheckListDriver(driver: CheckListVersionDriver): CheckListDriver {
+	return {
+		id: driver.id,
+		firstName: driver.firstName,
+		lastName: driver.lastName,
+		email: driver.email,
+		externalId: driver.externalId,
+		phone: driver.phone,
+		driverStatus: null,
+		lastActiveApp: null,
+		lastLocationUpdateAt: null,
+		trackingLoadId: null,
+	};
 }
 
-export const CHECK_LIST_DRIVER_STATUS_VALUES = ["all", "available", "loaded_enroute"] as const;
-export type CheckListDriverStatusFilter = (typeof CHECK_LIST_DRIVER_STATUS_VALUES)[number];
-export type CheckListLastLocationSort = "asc" | "desc";
-
-async function fetchCheckListPage(
+async function fetchCheckListDriverDevicesPage(
+	apiPath: string,
 	page: number,
 	perPage: number,
-	driverStatus: CheckListDriverStatusFilter,
 	search: string,
-	lastLocationSort: CheckListLastLocationSort,
-): Promise<CheckListResponse> {
+	appVersionSort: CheckListAppVersionSort,
+): Promise<CheckListVersionResponse> {
 	const q = search.trim();
-	const res = await axios.get<CheckListResponse>("/api/users/drivers/check-list", {
+	const res = await axios.get<CheckListVersionResponse>(apiPath, {
 		params: {
 			page,
 			limit: perPage,
-			lastLocationSort,
-			...(driverStatus !== "all" ? { driverStatus } : {}),
+			appVersionSort,
 			...(q ? { search: q } : {}),
 		},
 		withCredentials: true,
@@ -73,19 +64,27 @@ async function fetchCheckListPage(
 	return res.data;
 }
 
-export type { CheckListDriver } from "./checkListTypes";
+type CheckListDriverDevicesTableProps = {
+	apiPath: string;
+	queryKey: string;
+	getEmptyMessage: (minimumAppVersion?: string) => string;
+	getPushDefaultMessage: (minimumAppVersion: string) => string;
+};
 
-export default function CheckListTable() {
+export default function CheckListDriverDevicesTable({
+	apiPath,
+	queryKey,
+	getEmptyMessage,
+	getPushDefaultMessage,
+}: CheckListDriverDevicesTableProps) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
-	const [statusFilter, setStatusFilter] = useState<CheckListDriverStatusFilter>("all");
 	const [searchInput, setSearchInput] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
-	const [lastLocationSort, setLastLocationSort] =
-		useState<CheckListLastLocationSort>("asc");
+	const [appVersionSort, setAppVersionSort] = useState<CheckListAppVersionSort>("asc");
+	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
 	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [chatModalDrivers, setChatModalDrivers] = useState<CheckListDriver[] | null>(null);
-	const [selectedDriverIds, setSelectedDriverIds] = useState<Set<string>>(new Set());
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -99,24 +98,17 @@ export default function CheckListTable() {
 
 	useEffect(() => {
 		setSelectedDriverIds(new Set());
-	}, [currentPage, itemsPerPage, statusFilter, debouncedSearch, lastLocationSort]);
+	}, [currentPage, itemsPerPage, debouncedSearch, appVersionSort]);
 
 	const query = useQuery({
-		queryKey: [
-			"drivers-check-list",
-			currentPage,
-			itemsPerPage,
-			statusFilter,
-			debouncedSearch,
-			lastLocationSort,
-		],
+		queryKey: [queryKey, currentPage, itemsPerPage, debouncedSearch, appVersionSort],
 		queryFn: () =>
-			fetchCheckListPage(
+			fetchCheckListDriverDevicesPage(
+				apiPath,
 				currentPage,
 				itemsPerPage,
-				statusFilter,
 				debouncedSearch,
-				lastLocationSort,
+				appVersionSort,
 			),
 		placeholderData: keepPreviousData,
 	});
@@ -129,6 +121,7 @@ export default function CheckListTable() {
 	}, [query.data?.pagination?.total_pages, currentPage]);
 
 	const drivers = query.data?.drivers ?? [];
+	const minimumAppVersion = query.data?.minimumAppVersion ?? "";
 	const totalItems = query.data?.pagination?.total_count ?? 0;
 	const totalPages = query.data?.pagination?.total_pages ?? 0;
 
@@ -177,10 +170,13 @@ export default function CheckListTable() {
 		});
 	};
 
-	const toggleLastLocationSort = () => {
-		setLastLocationSort((prev) => (prev === "asc" ? "desc" : "asc"));
+	const toggleAppVersionSort = () => {
+		setAppVersionSort(prev => (prev === "asc" ? "desc" : "asc"));
 		setCurrentPage(1);
 	};
+
+	const emptyMessage = getEmptyMessage(minimumAppVersion);
+	const pushDefaultMessage = getPushDefaultMessage(minimumAppVersion);
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -206,7 +202,7 @@ export default function CheckListTable() {
 					<div className="min-w-0 flex-1 lg:max-w-xl lg:px-2">
 						<Input
 							type="text"
-							placeholder="Search by name, driver ID, email, load ID…"
+							placeholder="Search by name, driver ID, email…"
 							value={searchInput}
 							onChange={e => setSearchInput(e.target.value)}
 							className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
@@ -220,7 +216,9 @@ export default function CheckListTable() {
 								variant="primary"
 								className="h-10 shrink-0 whitespace-nowrap"
 								onClick={() => {
-									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+									const selected = drivers
+										.filter(d => selectedDriverIds.has(d.id))
+										.map(toCheckListDriver);
 									if (selected.length > 0) {
 										setChatModalDrivers(selected);
 									}
@@ -234,7 +232,9 @@ export default function CheckListTable() {
 								variant="primary"
 								className="h-10 shrink-0 whitespace-nowrap"
 								onClick={() => {
-									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+									const selected = drivers
+										.filter(d => selectedDriverIds.has(d.id))
+										.map(toCheckListDriver);
 									if (selected.length > 0) {
 										setPushModalDrivers(selected);
 									}
@@ -245,25 +245,6 @@ export default function CheckListTable() {
 						</>
 					)}
 				</div>
-				<div className="flex flex-wrap items-center gap-2 shrink-0 lg:justify-end">
-					<span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-						Driver status
-					</span>
-					<div className="min-w-[10rem]">
-						<CustomStaticSelect
-							options={[
-								{ value: "all", label: "All" },
-								{ value: "available", label: "Available" },
-								{ value: "loaded_enroute", label: "Load & Enroute" },
-							]}
-							value={statusFilter}
-							onChangeAction={val => {
-								setStatusFilter(val as CheckListDriverStatusFilter);
-								setCurrentPage(1);
-							}}
-						/>
-					</div>
-				</div>
 			</div>
 
 			<CheckListTablePagination
@@ -272,12 +253,12 @@ export default function CheckListTable() {
 				itemsPerPage={itemsPerPage}
 				totalItems={totalItems}
 				totalPages={totalPages}
-				paginationKey={`top-${currentPage}-${totalPages}-${itemsPerPage}-${statusFilter}-${debouncedSearch}-${lastLocationSort}`}
+				paginationKey={`top-${currentPage}-${totalPages}-${itemsPerPage}-${debouncedSearch}-${appVersionSort}`}
 				onPageChange={setCurrentPage}
 			/>
 
 			<div className="overflow-x-auto border-x border-gray-100 dark:border-white/[0.05]">
-				<div className="min-w-[900px]">
+				<div className="min-w-[800px]">
 					<Table>
 						<TableHeader className="border-b border-gray-100 bg-gray-50 text-gray-700 dark:border-white/[0.05] dark:bg-gray-900 dark:text-gray-300">
 							<TableRow>
@@ -301,19 +282,13 @@ export default function CheckListTable() {
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Status
-								</TableCell>
-								<TableCell
-									isHeader
-									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
-								>
 									Driver
 								</TableCell>
 								<TableCell
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Last open app
+									Platform
 								</TableCell>
 								<TableCell
 									isHeader
@@ -323,26 +298,26 @@ export default function CheckListTable() {
 										role="button"
 										tabIndex={0}
 										className="flex cursor-pointer items-center justify-between gap-2 text-left"
-										onClick={toggleLastLocationSort}
-										onKeyDown={(e) => {
+										onClick={toggleAppVersionSort}
+										onKeyDown={e => {
 											if (e.key === "Enter" || e.key === " ") {
 												e.preventDefault();
-												toggleLastLocationSort();
+												toggleAppVersionSort();
 											}
 										}}
 									>
-										<span>Last location update</span>
+										<span>App Version</span>
 										<span className="flex flex-col gap-0.5 shrink-0" aria-hidden>
 											<AngleUpIcon
 												className={
-													lastLocationSort === "asc"
+													appVersionSort === "asc"
 														? "text-brand-500"
 														: "text-gray-300 dark:text-gray-700"
 												}
 											/>
 											<AngleDownIcon
 												className={
-													lastLocationSort === "desc"
+													appVersionSort === "desc"
 														? "text-brand-500"
 														: "text-gray-300 dark:text-gray-700"
 												}
@@ -354,7 +329,13 @@ export default function CheckListTable() {
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Load Id
+									Device Name
+								</TableCell>
+								<TableCell
+									isHeader
+									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
+								>
+									Model
 								</TableCell>
 								<TableCell
 									isHeader
@@ -378,89 +359,85 @@ export default function CheckListTable() {
 										colSpan={7}
 										className="px-5 py-8 text-center text-gray-500 dark:text-gray-400"
 									>
-										No drivers match the criteria
+										{emptyMessage}
 									</TableCell>
 								</TableRow>
 							)}
-							{drivers.map(row => (
-								<TableRow key={row.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-									<TableCell className="px-3 py-3 sm:px-4 align-middle">
-										<input
-											type="checkbox"
-											className="h-4 w-4 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
-											checked={selectedDriverIds.has(row.id)}
-											onChange={e => toggleRowSelected(row.id, e.target.checked)}
-											aria-label={`Select ${`${row.firstName} ${row.lastName}`.trim() || "driver"}`}
-										/>
-									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 whitespace-nowrap font-mono text-xs">
-										{row.driverStatus ?? "—"}
-									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200">
-										<div className="flex flex-col gap-0.5">
-											<span className="font-medium">
-												<CheckListDriverNameLink
-													firstName={row.firstName}
-													lastName={row.lastName}
-													externalId={row.externalId}
-												/>
-											</span>
-											<span className="text-xs text-gray-500 dark:text-gray-400">
-												ID: {row.externalId ?? "—"}
-											</span>
-											<span className="text-xs text-gray-500 dark:text-gray-400 break-all">
-												{row.email || "—"}
-											</span>
-											<span className="text-xs text-gray-500 dark:text-gray-400">
-												<CheckListPhoneLink phone={row.phone} />
-											</span>
-										</div>
-									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-										{formatInNy(row.lastActiveApp)}
-									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-										{formatInNy(row.lastLocationUpdateAt)}
-									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs">
-										{row.trackingLoadId?.trim() ? (
-											<span className="inline-flex items-center gap-2">
-												<a
-													href={`https://www.endurance-tms.com/add-load/?post_id=${encodeURIComponent(
-														row.trackingLoadId.trim()
-													)}`}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="text-brand-500 hover:underline dark:text-brand-400"
+							{drivers.flatMap((driver: CheckListVersionDriver) =>
+								driver.devices.map((device, deviceIndex) => (
+									<TableRow
+										key={`${driver.id}-${device.id}`}
+										className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+									>
+										{deviceIndex === 0 && (
+											<>
+												<TableCell
+													rowSpan={driver.devices.length}
+													className="px-3 py-3 sm:px-4 align-middle"
 												>
-													{row.trackingLoadId.trim()}
-												</a>
-												<Link
-													href={`/tracking/load/${encodeURIComponent(row.trackingLoadId.trim())}`}
-													className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400"
-													aria-label="Track load on map"
-													title="Track load"
+													<input
+														type="checkbox"
+														className="h-4 w-4 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+														checked={selectedDriverIds.has(driver.id)}
+														onChange={e =>
+															toggleRowSelected(driver.id, e.target.checked)
+														}
+														aria-label={`Select ${`${driver.firstName} ${driver.lastName}`.trim() || "driver"}`}
+													/>
+												</TableCell>
+												<TableCell
+													rowSpan={driver.devices.length}
+													className="px-4 py-3 text-gray-800 dark:text-gray-200 align-top"
 												>
-													<LoadTrackingChatIcon className="h-[22px] w-[22px]" />
-												</Link>
-											</span>
-										) : (
-											"—"
+													<div className="flex flex-col gap-0.5">
+														<span className="font-medium">
+															<CheckListDriverNameLink
+																firstName={driver.firstName}
+																lastName={driver.lastName}
+																externalId={driver.externalId}
+															/>
+														</span>
+														<span className="text-xs text-gray-500 dark:text-gray-400">
+															ID: {driver.externalId ?? "—"}
+														</span>
+														<span className="text-xs text-gray-500 dark:text-gray-400 break-all">
+															{driver.email || "—"}
+														</span>
+														<span className="text-xs text-gray-500 dark:text-gray-400">
+															<CheckListPhoneLink phone={driver.phone} />
+														</span>
+													</div>
+												</TableCell>
+											</>
 										)}
-									</TableCell>
-									<TableCell className="px-4 py-3 text-right whitespace-nowrap">
-										<Button
-											size="sm"
-											variant="primary"
-											type="button"
-											className="h-9"
-											onClick={() => setPushModalDrivers([row])}
-										>
-											Send push
-										</Button>
-									</TableCell>
-								</TableRow>
-							))}
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+											{device.platform || "—"}
+										</TableCell>
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+											{device.appVersion || "—"}
+										</TableCell>
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+											{device.deviceName || "—"}
+										</TableCell>
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+											{device.model || "—"}
+										</TableCell>
+										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
+											<Button
+												size="sm"
+												variant="primary"
+												type="button"
+												className="h-9"
+												onClick={() =>
+													setPushModalDrivers([toCheckListDriver(driver)])
+												}
+											>
+												Send push
+											</Button>
+										</TableCell>
+									</TableRow>
+								)),
+							)}
 						</TableBody>
 					</Table>
 				</div>
@@ -472,7 +449,7 @@ export default function CheckListTable() {
 				itemsPerPage={itemsPerPage}
 				totalItems={totalItems}
 				totalPages={totalPages}
-				paginationKey={`bottom-${currentPage}-${totalPages}-${itemsPerPage}-${statusFilter}-${debouncedSearch}-${lastLocationSort}`}
+				paginationKey={`bottom-${currentPage}-${totalPages}-${itemsPerPage}-${debouncedSearch}-${appVersionSort}`}
 				onPageChange={setCurrentPage}
 			/>
 
@@ -493,6 +470,7 @@ export default function CheckListTable() {
 				isOpen={pushModalDrivers !== null && pushModalDrivers.length > 0}
 				onClose={() => setPushModalDrivers(null)}
 				drivers={pushModalDrivers}
+				defaultMessage={pushDefaultMessage}
 			/>
 		</div>
 	);

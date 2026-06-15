@@ -1066,8 +1066,9 @@ export default function AppSettingsPage() {
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
 						Counts are based on <code className="text-xs">users.status=ACTIVE</code>,
-						presence of a row in <code className="text-xs">user_devices</code> (one row
-						per <code className="text-xs">externalId</code>), and drivers with{" "}
+						presence of at least one row in <code className="text-xs">user_devices</code>{" "}
+						(multiple physical devices per account allowed; counts dedupe by{" "}
+						<code className="text-xs">externalId</code> per platform), and drivers with{" "}
 						<code className="text-xs">driverStatus</code>{" "}
 						<code className="text-xs">blocked</code> or{" "}
 						<code className="text-xs">expired_documents</code> are excluded.
