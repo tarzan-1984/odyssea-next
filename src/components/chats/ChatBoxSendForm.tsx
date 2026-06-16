@@ -36,6 +36,7 @@ export type ChatAttachmentPayload = {
 };
 
 interface ChatBoxSendFormProps {
+	chatRoomId?: string;
 	onSendMessage?: (message: {
 		content: string;
 		fileData?: ChatAttachmentPayload[];
@@ -73,7 +74,15 @@ function computeEmojiPickerPosition(anchor: DOMRect): { top: number; left: numbe
 
 const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 	function ChatBoxSendForm(
-		{ onSendMessage, onTyping, disabled = false, isLoading = false, replyingTo, onCancelReply },
+		{
+			chatRoomId,
+			onSendMessage,
+			onTyping,
+			disabled = false,
+			isLoading = false,
+			replyingTo,
+			onCancelReply,
+		},
 		ref
 	) {
 		const [message, setMessage] = useState<string>("");
@@ -375,6 +384,17 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		useEffect(() => {
 			setEmojiPickerMounted(true);
 		}, []);
+
+		// Clear compose state when switching chat rooms
+		useEffect(() => {
+			if (!chatRoomId) return;
+
+			setMessage("");
+			setComposeResetKey(k => k + 1);
+			setAttachedFiles([]);
+			setShowEmojiPicker(false);
+			onTyping?.(false);
+		}, [chatRoomId]);
 
 		const updateEmojiPickerPosition = useCallback(() => {
 			if (!emojiButtonRef.current) return;

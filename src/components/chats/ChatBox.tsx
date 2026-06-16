@@ -311,6 +311,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			isLoadingMoreRef.current = false;
 			isProgrammaticScrollRef.current = false;
 		}
+		setReplyingTo(null);
 	}, [selectedChatRoomId]);
 
 	useEffect(() => {
@@ -656,6 +657,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			{!isLoadArchivedReadOnlyChat && (
 				<ChatBoxSendForm
 					ref={sendFormRef}
+					chatRoomId={selectedChatRoomId}
 					onSendMessage={handleSendMessage}
 					onTyping={sendTyping}
 					isLoading={sending}
