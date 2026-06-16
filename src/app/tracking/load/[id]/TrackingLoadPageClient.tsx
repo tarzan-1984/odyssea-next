@@ -1202,7 +1202,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 													<div className="w-full rounded-md border border-gray-100 bg-gray-50 p-3 text-left text-xs text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
 														<div className="mb-2">
 															<p className="font-semibold text-gray-900 dark:text-white">
-																Current location
+																Last location update
 															</p>
 														</div>
 														<p>
