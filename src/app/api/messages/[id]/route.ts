@@ -27,8 +27,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		});
 
 		if (!response.ok) {
-			const errorData = await response.text();
-			return NextResponse.json({ error: errorData }, { status: response.status });
+			const errorText = await response.text();
+			let errorMessage = errorText;
+			try {
+				const parsed = JSON.parse(errorText) as { message?: string; error?: string };
+				errorMessage = parsed.message || parsed.error || errorText;
+			} catch {
+				// keep raw text
+			}
+			return NextResponse.json({ error: errorMessage }, { status: response.status });
 		}
 
 		const data = await response.json();

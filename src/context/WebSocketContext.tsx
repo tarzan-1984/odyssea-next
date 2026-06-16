@@ -17,6 +17,7 @@ import { Message, ChatRoom } from "@/app-api/chatApi";
 import { clientAuth } from "@/utils/auth";
 import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { removeChatMessageLocally } from "@/lib/chatMessageDelete";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
@@ -691,37 +692,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				deletedBy: string;
 				deletedByRole: string;
 			}) => {
-				const state = useChatStore.getState();
-
-				// Remove message from store
-				const updatedMessages = state.messages.filter(msg => msg.id !== data.messageId);
-				state.setMessages(updatedMessages);
-
-				// Update IndexedDB cache
-				indexedDBChatService.deleteMessage(data.messageId).catch((error: Error) => {
-					console.error("Failed to delete message from IndexedDB:", error);
-				});
-
-				// Update chat room's last message if the deleted message was the last one
-				const chatRoom = state.chatRooms.find(room => room.id === data.chatRoomId);
-				if (chatRoom && chatRoom.lastMessage?.id === data.messageId) {
-					// Find the new last message
-					const remainingMessages = updatedMessages.filter(
-						msg => msg.chatRoomId === data.chatRoomId
-					);
-					const newLastMessage =
-						remainingMessages.length > 0
-							? remainingMessages[remainingMessages.length - 1]
-							: null;
-
-					// Update chat room with new last message
-					const updatedChatRooms = state.chatRooms.map(room =>
-						room.id === data.chatRoomId
-							? { ...room, lastMessage: newLastMessage || undefined }
-							: room
-					);
-					state.setChatRooms(updatedChatRooms);
-				}
+				removeChatMessageLocally(data.messageId);
 			}
 		);
 

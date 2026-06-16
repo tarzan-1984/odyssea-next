@@ -14,6 +14,10 @@ import { UserData } from "@/app-api/api-types";
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
+import {
+	removeChatMessageLocally,
+	restoreChatMessageLocally,
+} from "@/lib/chatMessageDelete";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -373,6 +377,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Handle message dropdown actions
 	const handleDeleteMessage = async (messageId: string) => {
+		const snapshot = removeChatMessageLocally(messageId);
+		if (!snapshot) {
+			return;
+		}
+
 		try {
 			const response = await fetch(`/api/messages/${messageId}`, {
 				method: "DELETE",
@@ -384,48 +393,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.message || "Failed to delete message");
+				throw new Error(errorData.error || errorData.message || "Failed to delete message");
 			}
-
-			const result = await response.json();
-			console.log("Message deleted successfully:", result);
-
-			// Immediately remove message from store and cache for better UX
-			const state = useChatStore.getState();
-			const updatedMessages = state.messages.filter(msg => msg.id !== messageId);
-			state.setMessages(updatedMessages);
-
-			// Update IndexedDB cache immediately
-			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
-			indexedDBChatService.deleteMessage(messageId).catch((error: Error) => {
-				console.error("Failed to delete message from IndexedDB:", error);
-			});
-
-			// Update chat room's last message if the deleted message was the last one
-			const chatRoom = state.chatRooms.find(room => room.id === result.chatRoomId);
-			if (chatRoom && chatRoom.lastMessage?.id === messageId) {
-				// Find the new last message
-				const remainingMessages = updatedMessages.filter(
-					msg => msg.chatRoomId === result.chatRoomId
-				);
-				const newLastMessage =
-					remainingMessages.length > 0
-						? remainingMessages[remainingMessages.length - 1]
-						: null;
-
-				// Update chat room with new last message
-				const updatedChatRooms = state.chatRooms.map(room =>
-					room.id === result.chatRoomId
-						? { ...room, lastMessage: newLastMessage || undefined }
-						: room
-				);
-				state.setChatRooms(updatedChatRooms);
-			}
-
-			// The WebSocket event will also handle updating the UI (redundant but safe)
 		} catch (error) {
+			restoreChatMessageLocally(snapshot);
 			console.error("Failed to delete message:", error);
-			// You might want to show a toast notification here
 		}
 	};
 
