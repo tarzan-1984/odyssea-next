@@ -15,6 +15,7 @@ import CheckListEmailModal from "./CheckListEmailModal";
 import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
+import { copyDriverPhoneNumbers } from "./copyCheckListPhoneNumbers";
 import type {
 	CheckListDriver,
 	CheckListVersionDriver,
@@ -238,6 +239,18 @@ export default function CheckListDriverDevicesTable({
 					</div>
 					{selectedDriverIds.size > 0 && (
 						<>
+							<Button
+								type="button"
+								size="sm"
+								variant="primary"
+								className="h-10 shrink-0 whitespace-nowrap"
+								onClick={() => {
+									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
+									void copyDriverPhoneNumbers(selected.map(d => d.phone));
+								}}
+							>
+								Copy all numbers
+							</Button>
 							<Button
 								type="button"
 								size="sm"
