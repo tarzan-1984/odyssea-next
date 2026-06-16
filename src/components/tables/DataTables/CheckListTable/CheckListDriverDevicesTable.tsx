@@ -244,9 +244,9 @@ export default function CheckListDriverDevicesTable({
 								size="sm"
 								variant="primary"
 								className="h-10 shrink-0 whitespace-nowrap"
-								onClick={() => {
+								onClick={async () => {
 									const selected = drivers.filter(d => selectedDriverIds.has(d.id));
-									void copyDriverPhoneNumbers(selected.map(d => d.phone));
+									await copyDriverPhoneNumbers(selected.map(d => d.phone));
 								}}
 							>
 								Copy all numbers
