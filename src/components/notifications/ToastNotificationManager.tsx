@@ -6,8 +6,10 @@ import { Message, ChatRoom } from '@/app-api/chatApi';
 import {
   CHAT_TOAST_AUTO_CLOSE_MS,
   SYSTEM_TOAST_AUTO_CLOSE_MS,
-  TOAST_CONTAINER_CLASS,
+  getToastContainerClass,
+  getToastStackOffset,
 } from '@/constants/toastNotifications';
+import { useToastPositionStore } from '@/stores/toastPositionStore';
 
 interface ToastData {
   id: string;
@@ -18,6 +20,7 @@ interface ToastData {
 export const ToastNotificationManager: React.FC = () => {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const [systemToasts, setSystemToasts] = useState<SystemToastData[]>([]);
+  const position = useToastPositionStore(s => s.position);
 
   const addToast = useCallback((message: Message, chatRoom: ChatRoom) => {
     setToasts(prev => {
@@ -61,14 +64,14 @@ export const ToastNotificationManager: React.FC = () => {
   }, [addToast, addSystemToastNotification]);
 
   return (
-    <div className={TOAST_CONTAINER_CLASS}>
+    <div className={getToastContainerClass(position)}>
       {toasts.map((toast, index) => (
         <div
           key={toast.id}
           className="transform transition-all duration-300 ease-in-out pointer-events-auto"
           style={{
-            transform: `translateY(${index * 8}px)`,
-            zIndex: 999999 - index,
+            transform: getToastStackOffset(position, index),
+            zIndex: 99990 - index,
           }}
         >
           <ToastNotification
@@ -84,8 +87,8 @@ export const ToastNotificationManager: React.FC = () => {
           key={toast.id}
           className="transform transition-all duration-300 ease-in-out pointer-events-auto"
           style={{
-            transform: `translateY(${(toasts.length + index) * 8}px)`,
-            zIndex: 999999 - toasts.length - index,
+            transform: getToastStackOffset(position, toasts.length + index),
+            zIndex: 99990 - toasts.length - index,
           }}
         >
           <SystemToastNotification

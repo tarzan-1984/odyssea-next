@@ -6,6 +6,7 @@ import { useUserInit } from "@/hooks/useUserInit";
 import UserContactCard from "@/components/user-profile/UserContactCard";
 import NotificationSoundSettings from "@/components/user-profile/NotificationSoundSettings";
 import ChatFontSizeSettings from "@/components/user-profile/ChatFontSizeSettings";
+import ToastPositionSettings from "@/components/user-profile/ToastPositionSettings";
 import Link from "next/link";
 
 export default function Profile() {
@@ -43,6 +44,7 @@ export default function Profile() {
 						<NotificationSoundSettings />
 						<ChatFontSizeSettings />
 					</div>
+					<ToastPositionSettings />
 					<UserContactCard user={currentUser} />
 				</div>
 			</div>

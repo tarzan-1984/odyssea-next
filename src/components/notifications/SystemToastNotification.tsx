@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { SYSTEM_TOAST_AUTO_CLOSE_MS } from "@/constants/toastNotifications";
+import {
+	SYSTEM_TOAST_AUTO_CLOSE_MS,
+	getToastSlideClasses,
+	isToastSlideFromLeft,
+} from "@/constants/toastNotifications";
+import { useToastPositionStore } from "@/stores/toastPositionStore";
 
 export type SystemToastVariant = "success" | "error" | "default";
 
@@ -29,6 +34,8 @@ export const SystemToastNotification: React.FC<SystemToastNotificationProps> = (
 	const [isClosing, setIsClosing] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
 	const [avatarError, setAvatarError] = useState(false);
+	const toastPosition = useToastPositionStore(state => state.position);
+	const slideFromLeft = isToastSlideFromLeft(toastPosition);
 
 	const handleClose = useCallback(() => {
 		setIsClosing(true);
@@ -68,9 +75,11 @@ export const SystemToastNotification: React.FC<SystemToastNotificationProps> = (
 
 	return (
 		<div
-			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 rounded-lg shadow-lg border ${variantClass} transform transition-all duration-300 ease-in-out ${
-				isVisible && !isClosing ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-			}`}
+			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 rounded-lg shadow-lg border ${variantClass} transform transition-all duration-300 ease-in-out ${getToastSlideClasses(
+				isVisible,
+				isClosing,
+				slideFromLeft
+			)}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>

@@ -1,9 +1,14 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Message, ChatRoom } from "@/app-api/chatApi";
-import { CHAT_TOAST_AUTO_CLOSE_MS } from "@/constants/toastNotifications";
+import {
+	CHAT_TOAST_AUTO_CLOSE_MS,
+	getToastSlideClasses,
+	isToastSlideFromLeft,
+} from "@/constants/toastNotifications";
 import { stripMarkdown } from "@/utils/chatMarkdown";
 import { useUserStore } from "@/stores/userStore";
+import { useToastPositionStore } from "@/stores/toastPositionStore";
 
 interface ToastNotificationProps {
 	message: Message;
@@ -23,6 +28,8 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	const [isHovered, setIsHovered] = useState(false);
 	const [avatarError, setAvatarError] = useState(false);
 	const currentUser = useUserStore(state => state.currentUser);
+	const toastPosition = useToastPositionStore(state => state.position);
+	const slideFromLeft = isToastSlideFromLeft(toastPosition);
 
 	useEffect(() => {
 		// Show notification with slight delay for smooth animation
@@ -96,9 +103,11 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 
 	return (
 		<div
-			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out ${
-				isVisible && !isClosing ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-			}`}
+			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out ${getToastSlideClasses(
+				isVisible,
+				isClosing,
+				slideFromLeft
+			)}`}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
