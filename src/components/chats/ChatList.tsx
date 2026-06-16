@@ -32,6 +32,22 @@ type FilterType = "all" | "muted" | "unread" | "favorite";
 type ChatTab = "chats" | "shipments" | "offers";
 
 const CHAT_LIST_TAB_STORAGE_KEY = "odyssea-chat-list-active-tab";
+const MAX_EXPANDED_OFFER_GROUPS = 3;
+
+function pushExpandedOfferId(prev: string[], offerId: string): string[] {
+	if (prev.includes(offerId)) return prev;
+	const next = [...prev, offerId];
+	return next.length > MAX_EXPANDED_OFFER_GROUPS
+		? next.slice(next.length - MAX_EXPANDED_OFFER_GROUPS)
+		: next;
+}
+
+function toggleExpandedOfferId(prev: string[], offerId: string): string[] {
+	if (prev.includes(offerId)) {
+		return prev.filter(id => id !== offerId);
+	}
+	return pushExpandedOfferId(prev, offerId);
+}
 
 function readStoredChatTab(): ChatTab {
 	if (typeof window === "undefined") return "chats";
@@ -178,12 +194,10 @@ export default function ChatList({
 	};
 
 	// Extract offerId from OFFER chat (from room.offerId or parse from name)
-	const getOfferId = getOfferIdFromChatRoom;
-
 	// Get accordion header: "Pick up - Delivery" and "(id: xxx)"
 	// Name format: "firstName lastName (id: offerId)\npickUp - delivery"
 	const getOfferAccordionTitle = (chatRoom: ChatRoom): { route: string; id: string } => {
-		const offerId = getOfferId(chatRoom) ?? chatRoom.id;
+		const offerId = getOfferIdFromChatRoom(chatRoom) ?? chatRoom.id;
 		if (!chatRoom.name) return { route: "Unknown route", id: offerId };
 		const lines = chatRoom.name.split("\n");
 		const route =
@@ -378,7 +392,7 @@ export default function ChatList({
 		if (activeTab !== "offers") return new Map<string, ChatRoom[]>();
 		const map = new Map<string, ChatRoom[]>();
 		for (const room of filteredChatRooms) {
-			const key = getOfferId(room) ?? room.id;
+			const key = getOfferIdFromChatRoom(room) ?? room.id;
 			const list = map.get(key) ?? [];
 			list.push(room);
 			map.set(key, list);
@@ -386,17 +400,17 @@ export default function ChatList({
 		return map;
 	}, [activeTab, filteredChatRooms]);
 
-	// Only one offer accordion section open at a time.
-	const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
+	// Up to MAX_EXPANDED_OFFER_GROUPS offer accordion sections open (FIFO when exceeding limit).
+	const [expandedOfferIds, setExpandedOfferIds] = useState<string[]>([]);
 
 	useEffect(() => {
 		if (offerFromUrl) {
-			setExpandedOfferId(offerFromUrl);
+			setExpandedOfferIds(prev => pushExpandedOfferId(prev, offerFromUrl));
 		}
 	}, [offerFromUrl, unitFromUrl]);
 
 	const toggleOfferAccordion = (offerId: string) => {
-		setExpandedOfferId(prev => (prev === offerId ? null : offerId));
+		setExpandedOfferIds(prev => toggleExpandedOfferId(prev, offerId));
 	};
 
 	useEffect(() => {
@@ -694,7 +708,7 @@ export default function ChatList({
 							{Array.from(groupedOfferChats.entries()).map(([offerId, rooms]) => {
 								const firstRoom = rooms[0];
 								const { route, id } = getOfferAccordionTitle(firstRoom);
-								const isExpanded = expandedOfferId === offerId;
+								const isExpanded = expandedOfferIds.includes(offerId);
 								const groupUnreadCount = rooms.reduce(
 									(sum, r) => sum + (r.unreadCount ?? 0),
 									0
