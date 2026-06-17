@@ -12,7 +12,7 @@ import {
 	mergeMessageLists,
 	messagesTailLagsBehindRoom,
 } from "@/utils/chatMessagesMerge";
-import { MAX_MESSAGES_IN_STORE } from "@/utils/trimChatMessagesWindow";
+import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 
 const SYNC_BATCH_CHUNK_SIZE = 50;
 /** Only need the newest message to compare tail vs server. */
@@ -85,7 +85,7 @@ async function applySyncBatchResults(results: SyncMessagesBatchRoomResult[]): Pr
 			const storeMsgs = filterMessagesForRoom(state.messages, chatRoomId);
 			const cachedRecent = await indexedDBChatService.getMessages(
 				chatRoomId,
-				MAX_MESSAGES_IN_STORE
+				MAX_CACHED_MESSAGES_PER_ROOM
 			);
 			const merged = mergeMessageLists(cachedRecent, storeMsgs, messages);
 			state.setMessages(merged);

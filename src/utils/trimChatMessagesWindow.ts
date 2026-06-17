@@ -1,7 +1,7 @@
 import type { Message } from "@/app-api/chatApi";
 
 /** Max messages kept in Zustand for the open chat (DOM window is smaller via virtualization). */
-export const MAX_MESSAGES_IN_STORE = 400;
+export const MAX_MESSAGES_IN_STORE = 250;
 
 /** Newest messages always kept in RAM while trimming the scroll-back buffer. */
 export const PINNED_TAIL_MESSAGES = 50;

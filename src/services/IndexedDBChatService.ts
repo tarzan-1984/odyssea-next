@@ -1,11 +1,11 @@
 import { Message, ChatRoom } from "@/app-api/chatApi";
+import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 
 // IndexedDB database configuration
 const DB_NAME = "OdysseaChatDB";
 const DB_VERSION = 1;
 const MESSAGES_STORE = "messages";
 const CHAT_ROOMS_STORE = "chatRooms";
-const MAX_CACHED_MESSAGES_PER_ROOM = 150;
 
 // Interface for stored message with additional metadata
 interface StoredMessage extends Message {
@@ -26,6 +26,7 @@ interface StoredChatRoom extends ChatRoom {
 class IndexedDBChatService {
 	private db: IDBDatabase | null = null;
 	private initPromise: Promise<void> | null = null;
+	private limitsEnforced = false;
 
 	// Initialize IndexedDB database
 	private init(): Promise<void> {
@@ -42,6 +43,9 @@ class IndexedDBChatService {
 
 			request.onsuccess = () => {
 				this.db = request.result;
+				this.enforceAllRoomMessageLimits().catch(error => {
+					console.error("Failed to enforce IndexedDB message limits:", error);
+				});
 				resolve();
 			};
 
@@ -628,6 +632,29 @@ class IndexedDBChatService {
 		} catch (error) {
 			console.error("Failed to update chat room in IndexedDB:", error);
 			throw error;
+		}
+	}
+
+	/** Trim every room to the current cache cap (runs once after DB open for existing users). */
+	private async enforceAllRoomMessageLimits(): Promise<void> {
+		if (this.limitsEnforced || !this.db) return;
+		this.limitsEnforced = true;
+
+		const db = this.db;
+		const transaction = db.transaction([MESSAGES_STORE], "readonly");
+		const store = transaction.objectStore(MESSAGES_STORE);
+
+		const roomIds = await new Promise<string[]>((resolve, reject) => {
+			const request = store.getAll();
+			request.onsuccess = () => {
+				const messages = request.result as StoredMessage[];
+				resolve([...new Set(messages.map(message => message.chatRoomId))]);
+			};
+			request.onerror = () => reject(request.error);
+		});
+
+		for (const chatRoomId of roomIds) {
+			await this.cleanupOldMessages(chatRoomId, MAX_CACHED_MESSAGES_PER_ROOM);
 		}
 	}
 

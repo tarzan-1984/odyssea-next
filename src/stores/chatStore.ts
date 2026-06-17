@@ -10,7 +10,8 @@ import {
 	sortArchiveDayMessages,
 	takeNextArchiveChunk,
 } from "@/utils/archiveChunkHelpers";
-import { trimChatMessagesWindow, MAX_MESSAGES_IN_STORE } from "@/utils/trimChatMessagesWindow";
+import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
+import { trimChatMessagesWindow } from "@/utils/trimChatMessagesWindow";
 import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin, unread, mute status, and last message date
@@ -601,7 +602,7 @@ export const useChatStore = create<ChatState>()(
 					try {
 						const cachedMessages = await indexedDBChatService.getMessages(
 							chatRoomId,
-							MAX_MESSAGES_IN_STORE
+							MAX_CACHED_MESSAGES_PER_ROOM
 						);
 						if (cachedMessages.length > 0) {
 							const { messages: currentMessages, currentChatRoom } = get();
