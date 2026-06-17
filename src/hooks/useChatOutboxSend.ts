@@ -18,10 +18,11 @@ import {
 	removeOptimisticByClientMessageId,
 } from "@/utils/optimisticChatMessage";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
+import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { useChatStore } from "@/stores/chatStore";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
-const SEND_ACK_TIMEOUT_MS = 60_000;
+const SEND_ACK_TIMEOUT_MS = 15_000;
 
 export type OutboundSendFn = (
 	content: string,
@@ -31,12 +32,15 @@ export type OutboundSendFn = (
 	clientMessageId?: string
 ) => Promise<void>;
 
+export type OutboundHttpSendFn = (item: ChatOutboxItem) => Promise<Message>;
+
 type Params = {
 	chatRoomId?: string;
 	sender?: User;
 	isConnected: boolean;
 	socket: Socket | null;
 	sendMessage: OutboundSendFn;
+	sendMessageHttp: OutboundHttpSendFn;
 	optimisticMessages: Message[];
 	setOptimisticMessages: Dispatch<SetStateAction<Message[]>>;
 	serverMessages: Message[];
@@ -58,6 +62,7 @@ export function useChatOutboxSend({
 	sender,
 	socket,
 	sendMessage,
+	sendMessageHttp,
 	optimisticMessages,
 	setOptimisticMessages,
 	serverMessages,
@@ -95,18 +100,6 @@ export function useChatOutboxSend({
 		}
 	}, []);
 
-	const scheduleAckTimeout = useCallback(
-		(clientMessageId: string) => {
-			clearAckTimer(clientMessageId);
-			const timer = setTimeout(() => {
-				ackTimersRef.current.delete(clientMessageId);
-				markOptimisticFailed(clientMessageId);
-			}, SEND_ACK_TIMEOUT_MS);
-			ackTimersRef.current.set(clientMessageId, timer);
-		},
-		[clearAckTimer, markOptimisticFailed]
-	);
-
 	const removeConfirmedOptimistic = useCallback(
 		async (clientMessageId: string) => {
 			clearAckTimer(clientMessageId);
@@ -116,6 +109,41 @@ export function useChatOutboxSend({
 			setOptimisticMessages(prev => removeOptimisticByClientMessageId(prev, clientMessageId));
 		},
 		[clearAckTimer, setOptimisticMessages]
+	);
+
+	const tryHttpFallback = useCallback(
+		async (clientMessageId: string): Promise<boolean> => {
+			const item = (await chatOutboxService.getAll()).find(
+				row => row.clientMessageId === clientMessageId
+			);
+			if (!item) return false;
+			try {
+				await sendMessageHttp(item);
+				await removeConfirmedOptimistic(clientMessageId);
+				return true;
+			} catch (error) {
+				console.error("[useChatOutboxSend] HTTP fallback failed:", error);
+				return false;
+			}
+		},
+		[sendMessageHttp, removeConfirmedOptimistic]
+	);
+
+	const scheduleAckTimeout = useCallback(
+		(clientMessageId: string) => {
+			clearAckTimer(clientMessageId);
+			const timer = setTimeout(() => {
+				ackTimersRef.current.delete(clientMessageId);
+				void (async () => {
+					const recovered = await tryHttpFallback(clientMessageId);
+					if (!recovered) {
+						markOptimisticFailed(clientMessageId);
+					}
+				})();
+			}, SEND_ACK_TIMEOUT_MS);
+			ackTimersRef.current.set(clientMessageId, timer);
+		},
+		[clearAckTimer, markOptimisticFailed, tryHttpFallback]
 	);
 
 	const dispatchOutboxSend = useCallback(
@@ -170,14 +198,19 @@ export function useChatOutboxSend({
 				awaitingAckRef.current.add(item.clientMessageId);
 				scheduleAckTimeout(item.clientMessageId);
 			} catch (error) {
-				console.error("[useChatOutboxSend] dispatch failed:", error);
-				markOptimisticFailed(item.clientMessageId);
-				throw error;
+				console.error("[useChatOutboxSend] WebSocket dispatch failed:", error);
+				const recovered = await tryHttpFallback(item.clientMessageId);
+				if (!recovered) {
+					markOptimisticFailed(item.clientMessageId);
+				}
+				if (!recovered) {
+					throw error;
+				}
 			} finally {
 				inFlightRef.current.delete(item.clientMessageId);
 			}
 		},
-		[chatRoomId, sender, sendMessage, markOptimisticFailed, scheduleAckTimeout, setOptimisticMessages]
+		[chatRoomId, sender, sendMessage, markOptimisticFailed, scheduleAckTimeout, setOptimisticMessages, tryHttpFallback]
 	);
 
 	const sendTextMessage = useCallback(
@@ -323,8 +356,10 @@ export function useChatOutboxSend({
 		const resolveClientMessageId = (data: {
 			clientMessageId?: string;
 			messageId?: string;
+			message?: Message;
 		}): string | null => {
 			if (data.clientMessageId) return data.clientMessageId;
+			if (data.message?.clientMessageId) return data.message.clientMessageId;
 			const pending = optimisticMessagesRef.current.filter(
 				msg =>
 					msg.chatRoomId === chatRoomId &&
@@ -367,13 +402,24 @@ export function useChatOutboxSend({
 
 		const onSocketError = (error: { message?: string; details?: string }) => {
 			if (error?.message !== "Failed to send message") return;
+			const isAuthError =
+				error.details?.toLowerCase().includes("unauthorized") ||
+				error.details?.toLowerCase().includes("jwt") ||
+				error.details?.toLowerCase().includes("token");
+			if (isAuthError) {
+				runBrowserAccessTokenRefresh().catch(() => {});
+			}
 			for (const clientMessageId of [...awaitingAckRef.current]) {
 				const pending = optimisticMessagesRef.current.find(
 					msg => msg.pendingOutgoing?.clientMessageId === clientMessageId
 				);
-				if (pending?.chatRoomId === chatRoomId) {
-					markOptimisticFailed(clientMessageId);
-				}
+				if (pending?.chatRoomId !== chatRoomId) continue;
+				void (async () => {
+					const recovered = await tryHttpFallback(clientMessageId);
+					if (!recovered) {
+						markOptimisticFailed(clientMessageId);
+					}
+				})();
 			}
 		};
 
@@ -422,6 +468,7 @@ export function useChatOutboxSend({
 		clearAckTimer,
 		removeConfirmedOptimistic,
 		markOptimisticFailed,
+		tryHttpFallback,
 	]);
 
 	useEffect(() => {

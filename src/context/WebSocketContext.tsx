@@ -18,7 +18,7 @@ import { clientAuth } from "@/utils/auth";
 import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { removeChatMessageLocally } from "@/lib/chatMessageDelete";
-import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
+import { ODYSSEA_WS_RECONNECTED_EVENT, ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT } from "@/lib/websocketSyncEvents";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
@@ -388,23 +388,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle message sent confirmation (full message body for fast client ack UI)
 		newSocket.on("messageSent", (data: any) => {
-			if (!data?.message || !data.chatRoomId || !currentUser?.id) return;
-			if (data.message.senderId !== currentUser.id) return;
+			if (!data?.chatRoomId || !currentUser?.id) return;
+			if (data.message && data.message.senderId !== currentUser.id) return;
 
-			const state = useChatStore.getState();
-			if (state.currentChatRoom?.id !== data.chatRoomId) return;
-
-			const serverMessage: Message = {
-				...data.message,
-				createdAt:
-					typeof data.message.createdAt === "string"
-						? data.message.createdAt
-						: new Date(data.message.createdAt).toISOString(),
-			};
-			state.addMessage(serverMessage);
-			indexedDBChatService.addMessage(serverMessage).catch((error: Error) => {
-				console.error("Failed to save ack message to IndexedDB:", error);
-			});
+			if (data.message) {
+				const serverMessage: Message = {
+					...data.message,
+					createdAt:
+						typeof data.message.createdAt === "string"
+							? data.message.createdAt
+							: new Date(data.message.createdAt).toISOString(),
+				};
+				useChatStore.getState().addMessage(serverMessage);
+				indexedDBChatService.addMessage(serverMessage).catch((error: Error) => {
+					console.error("Failed to save ack message to IndexedDB:", error);
+				});
+			}
 		});
 
 		// Handle new message from server
@@ -1117,13 +1116,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		runBrowserAccessTokenRefresh()
 			.then(outcome => {
 				if (outcome === "refreshed" || outcome === "skipped") {
-					if (socket && !socket.connected) {
-						const freshToken = getAuthToken();
-						if (freshToken) {
-							socket.auth = { token: freshToken };
-							socket.connect();
+					const freshToken = getAuthToken();
+					if (socket && freshToken) {
+						socket.auth = { token: freshToken };
+						if (socket.connected) {
+							socket.disconnect().connect();
 							return;
 						}
+						socket.connect();
+						return;
 					}
 					connect().catch(() => {});
 					return;
@@ -1267,6 +1268,27 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		return () =>
 			document.removeEventListener("visibilitychange", handleVisibilityChange);
 	}, [currentUser, socket]);
+
+	// JWT in the Socket.IO handshake is fixed at connect time — reconnect after proactive refresh.
+	useEffect(() => {
+		const onAccessTokenRefreshed = () => {
+			if (!socket) return;
+			const freshToken = getAuthToken();
+			if (!freshToken) return;
+			socket.auth = { token: freshToken };
+			if (socket.connected) {
+				socket.disconnect().connect();
+			} else if (!socket.active) {
+				socket.connect();
+			}
+		};
+		window.addEventListener(ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT, onAccessTokenRefreshed);
+		return () =>
+			window.removeEventListener(
+				ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT,
+				onAccessTokenRefreshed
+			);
+	}, [socket]);
 
 	// Cleanup on unmount
 	useEffect(() => {

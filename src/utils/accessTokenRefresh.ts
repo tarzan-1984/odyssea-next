@@ -5,6 +5,7 @@
 
 import authentication from "@/app-api/authentication";
 import { clientAuth } from "@/utils/auth";
+import { ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT } from "@/lib/websocketSyncEvents";
 
 export const ACCESS_TOKEN_REFRESH_THRESHOLD_SEC = 2 * 24 * 60 * 60;
 
@@ -65,6 +66,9 @@ export function runBrowserAccessTokenRefresh(): Promise<BrowserRefreshOutcome> {
 			}
 
 			clientAuth.setAccessToken(res.accessToken);
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(new CustomEvent(ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT));
+			}
 			return "refreshed";
 		} catch {
 			return "auth_lost";

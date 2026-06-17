@@ -88,6 +88,22 @@ function buildExtendBidTimePushMessage(offer: OfferRow): string {
 	return `Please extend the bid time for the offer - ${offerName}`;
 }
 
+const DRIVER_TABLE_COL_PHONE = "130px";
+const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
+const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
+
+function fixedDriverTableCol(width: string) {
+	return { width, minWidth: width, maxWidth: width };
+}
+
+function getDriversTableFixedColWidth(isDriverSelected: boolean): string {
+	const fixedWidth = isDriverSelected
+		? `130px + 88px + 96px + 96px + 180px`
+		: `130px + 88px + 96px + 88px + 156px + 168px`;
+
+	return `calc(100% - (${fixedWidth}))`;
+}
+
 function offerDriverToCheckListDriver(driver: OfferDriver): CheckListDriver {
 	return {
 		id: driver.driver_id,
@@ -475,26 +491,32 @@ const OffersList = () => {
 													<div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/[0.08]">
 													<Table className="border-collapse w-full table-fixed">
 												<colgroup>
-													<col style={{ width: "24%" }} />
-													<col style={{ width: "15%" }} />
-													<col style={{ width: "12%" }} />
-													<col style={{ width: "11%" }} />
-													<col style={{ width: row.is_driver_selected ? "14%" : "9%" }} />
-													<col style={{ width: row.is_driver_selected ? "24%" : "9%" }} />
-													{!row.is_driver_selected && <col style={{ width: "20%" }} />}
+													<col style={{ width: getDriversTableFixedColWidth(row.is_driver_selected) }} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
+													<col
+														style={fixedDriverTableCol(row.is_driver_selected ? "96px" : "88px")}
+													/>
+													<col
+														style={fixedDriverTableCol(row.is_driver_selected ? "180px" : "156px")}
+													/>
+													{!row.is_driver_selected && (
+														<col style={fixedDriverTableCol("168px")} />
+													)}
 												</colgroup>
 														<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 															<TableRow className="border-gray-200 dark:border-white/[0.08]">
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Unit
 															</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																	Phone
-																</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																Phone
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																Empty miles
 																</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	Total miles
 																</TableCell>
 																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
@@ -558,7 +580,7 @@ const OffersList = () => {
 																	)}
 																</span>
 															</TableCell>
-																<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	{driver.phone ? (
 																			<a
 																				href={`tel:${driver.phone.replace(/\s/g, "")}`}
@@ -570,12 +592,12 @@ const OffersList = () => {
 																			"—"
 																		)}
 																	</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																{driver.empty_miles != null
 																			? Math.round(driver.empty_miles)
 																			: "—"}
 																	</TableCell>
-																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08]">
+																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08] whitespace-nowrap">
 																		{driver.total_miles != null
 																			? Math.round(driver.total_miles)
 																			: "—"}

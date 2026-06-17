@@ -7,7 +7,8 @@ import Image from "next/image";
 import { Message, ChatRoom, isMessageReadByUser, chatApi } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatRoomMessagesQuery } from "@/hooks/useChatRoomMessagesQuery";
-import { useChatOutboxSend } from "@/hooks/useChatOutboxSend";
+import { useChatOutboxSend, type OutboundHttpSendFn } from "@/hooks/useChatOutboxSend";
+import type { ChatOutboxItem } from "@/services/chatOutboxService";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { messageReplacesOptimistic } from "@/utils/optimisticChatMessage";
 // WebSocket functionality is now passed via props
@@ -143,12 +144,48 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		[selectedChatRoomId, socket, wsSendMessage, addMessage]
 	);
 
+	const outboundSendHttp = useCallback<OutboundHttpSendFn>(
+		async (item: ChatOutboxItem) => {
+			if (!selectedChatRoomId) {
+				throw new Error("No chat room selected");
+			}
+
+			const uploaded = item.uploadedAttachments;
+			const multi = uploaded && uploaded.length >= 2 ? uploaded : null;
+			const newMessage = await chatApi.sendMessage({
+				chatRoomId: selectedChatRoomId,
+				content: item.content,
+				clientMessageId: item.clientMessageId,
+				replyData: item.replyData,
+				...(multi
+					? {
+							attachments: multi,
+							fileUrl: multi[0].fileUrl,
+							fileName: multi[0].fileName,
+							fileSize: multi[0].fileSize,
+						}
+					: uploaded?.[0]
+						? {
+								fileUrl: uploaded[0].fileUrl,
+								fileName: uploaded[0].fileName,
+								fileSize: uploaded[0].fileSize,
+							}
+						: {}),
+			});
+			addMessage(newMessage);
+			await indexedDBChatService.addMessage(newMessage);
+			return newMessage;
+		},
+		[selectedChatRoomId, addMessage]
+	);
+
 	const { sendTextMessage, sendMediaMessage, retryOptimisticMessage } = useChatOutboxSend({
 		chatRoomId: selectedChatRoomId,
 		sender: outgoingSender,
 		isConnected: Boolean(socket?.connected),
 		socket,
 		sendMessage: outboundSend,
+		sendMessageHttp: outboundSendHttp,
 		optimisticMessages,
 		setOptimisticMessages,
 		serverMessages: messages,
