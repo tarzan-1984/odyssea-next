@@ -129,21 +129,31 @@ export function useChatOutboxSend({
 		[sendMessageHttp, removeConfirmedOptimistic]
 	);
 
+	const recoverViaHttpOrFail = useCallback(
+		(clientMessageId: string) => {
+			tryHttpFallback(clientMessageId)
+				.then(recovered => {
+					if (!recovered) {
+						markOptimisticFailed(clientMessageId);
+					}
+				})
+				.catch(() => {
+					markOptimisticFailed(clientMessageId);
+				});
+		},
+		[tryHttpFallback, markOptimisticFailed]
+	);
+
 	const scheduleAckTimeout = useCallback(
 		(clientMessageId: string) => {
 			clearAckTimer(clientMessageId);
 			const timer = setTimeout(() => {
 				ackTimersRef.current.delete(clientMessageId);
-				void (async () => {
-					const recovered = await tryHttpFallback(clientMessageId);
-					if (!recovered) {
-						markOptimisticFailed(clientMessageId);
-					}
-				})();
+				recoverViaHttpOrFail(clientMessageId);
 			}, SEND_ACK_TIMEOUT_MS);
 			ackTimersRef.current.set(clientMessageId, timer);
 		},
-		[clearAckTimer, markOptimisticFailed, tryHttpFallback]
+		[clearAckTimer, recoverViaHttpOrFail]
 	);
 
 	const dispatchOutboxSend = useCallback(
@@ -414,12 +424,7 @@ export function useChatOutboxSend({
 					msg => msg.pendingOutgoing?.clientMessageId === clientMessageId
 				);
 				if (pending?.chatRoomId !== chatRoomId) continue;
-				void (async () => {
-					const recovered = await tryHttpFallback(clientMessageId);
-					if (!recovered) {
-						markOptimisticFailed(clientMessageId);
-					}
-				})();
+				recoverViaHttpOrFail(clientMessageId);
 			}
 		};
 
@@ -469,6 +474,7 @@ export function useChatOutboxSend({
 		removeConfirmedOptimistic,
 		markOptimisticFailed,
 		tryHttpFallback,
+		recoverViaHttpOrFail,
 	]);
 
 	useEffect(() => {
