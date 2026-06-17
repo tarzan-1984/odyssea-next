@@ -1,22 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Modal } from "@/components/ui/modal";
 import ChatPdfLightbox from "@/components/chats/ChatPdfLightbox";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 import {
 	HEIC_PREVIEW_CONVERT_ENABLED,
-	getHeicConvertPreviewUrl,
 } from "@/config/heicPreviewConvert";
 import {
-	getChatImageThumbnailUrl,
-	CHAT_IMAGE_PREVIEW_MAX_WIDTH,
-	CHAT_IMAGE_PREVIEW_QUALITY,
+	getChatImageListThumbOptions,
 	CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS,
-	isChatImageThumbnailUrl,
 	isChatImageThumbnailCandidate,
+	buildChatImagePreviewProxyUrl,
+	isLegacyChatImagePreviewProxyUrl,
 } from "@/config/chatImagePreview";
-import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
+import {
+	ensureChatImageThumbnail,
+} from "@/utils/ensureChatImageThumbnail";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
 import { useLazyInViewport } from "@/hooks/useLazyInViewport";
@@ -183,7 +183,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
 	const [isDownloading, setIsDownloading] = useState(false);
-	const [convertedImageUrl, setConvertedImageUrl] = useState<string | null>(null);
 	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
 	const [modalImageScale, setModalImageScale] = useState(1);
 	const [modalImgNaturalSize, setModalImgNaturalSize] = useState<{
@@ -195,14 +194,18 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const modalFitScaleRef = useRef(1);
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
 	const thumbEnsureAttemptedRef = useRef(false);
-	const heicConvertAttemptedRef = useRef(false);
+	const proxyFallbackAttemptedRef = useRef(false);
+	const imagePreviewLoadKeyRef = useRef<string | null>(null);
 	const chatImageGallery = useChatImageGalleryOptional();
 	const { mediaLoadEnabled, scrollRoot } = useChatMediaLoad();
 	const { elementRef, inView } = useLazyInViewport({
 		root: scrollRoot,
 		resetKey: fileUrl,
+		releaseOnExit: true,
 	});
 	const shouldLoadMedia = mediaLoadEnabled && inView;
+	const thumbOptions = useMemo(() => getChatImageListThumbOptions(compact), [compact]);
+	const { maxWidth: thumbMaxWidth, quality: thumbQuality } = thumbOptions;
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
 		fileExtension &&
@@ -221,31 +224,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		setIsImageModalOpen(true);
 	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension]);
 
-	const tryHeicConvertPreview = useCallback(async (): Promise<boolean> => {
-		const heicUrl = getHeicConvertPreviewUrl(fileUrl);
-		if (!heicUrl || heicConvertAttemptedRef.current) return false;
-		heicConvertAttemptedRef.current = true;
-		setError("");
-		setIsLoading(true);
-		try {
-			const response = await fetch(heicUrl, { credentials: "include", cache: "no-store" });
-			if (!response.ok) {
-				throw new Error("HEIC conversion failed");
-			}
-			const blob = await response.blob();
-			const objectUrl = URL.createObjectURL(blob);
-			setConvertedImageUrl(prev => {
-				if (prev) URL.revokeObjectURL(prev);
-				return objectUrl;
-			});
-			setPreviewContent(objectUrl);
-			return true;
-		} catch {
-			return false;
-		}
-	}, [fileUrl]);
-
-	/** Cached images may finish before React attaches onLoad — check complete on mount. */
 	const handleInlineImageMount = useCallback((img: HTMLImageElement | null) => {
 		if (!img) return;
 		if (img.complete) {
@@ -260,57 +238,60 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const handleInlineImageError = useCallback(
 		(e: React.SyntheticEvent<HTMLImageElement>) => {
 			const target = e.target as HTMLImageElement;
-			const failedSrc = target.src;
-			const isHeic = fileExtension === "heic" || fileExtension === "heif";
-
 			target.style.display = "";
 
-			if (isChatImageThumbnailUrl(failedSrc) && !thumbEnsureAttemptedRef.current) {
+			if (!thumbEnsureAttemptedRef.current && isChatImageThumbnailCandidate(fileName)) {
 				thumbEnsureAttemptedRef.current = true;
 				setError("");
-				prefetchChatImageThumbnail(fileUrl, fileName, {
-					maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
-					quality: CHAT_IMAGE_PREVIEW_QUALITY,
-				});
-
-				if (isHeic) {
-					tryHeicConvertPreview().then(ok => {
-						if (!ok) {
-							setError("Failed to load image preview");
-							setIsLoading(false);
-						}
-					}).catch(() => undefined);
-				} else {
-					setPreviewContent(fileUrl);
-					setIsLoading(true);
-				}
+				setIsLoading(true);
+				ensureChatImageThumbnail(fileUrl, fileName, thumbOptions)
+					.then(url => {
+						setPreviewContent(url);
+					})
+					.catch(() => {
+						proxyFallbackAttemptedRef.current = true;
+						setPreviewContent(buildChatImagePreviewProxyUrl(fileUrl, thumbOptions));
+					});
 				return;
 			}
 
-			if (isHeic && !heicConvertAttemptedRef.current) {
-				tryHeicConvertPreview().then(ok => {
-					if (ok) return;
-					target.style.display = "none";
-					setError("Failed to load image preview");
-					setIsLoading(false);
-				}).catch(() => undefined);
+			if (
+				!proxyFallbackAttemptedRef.current &&
+				!isLegacyChatImagePreviewProxyUrl(previewContent)
+			) {
+				proxyFallbackAttemptedRef.current = true;
+				setError("");
+				setIsLoading(true);
+				setPreviewContent(buildChatImagePreviewProxyUrl(fileUrl, thumbOptions));
 				return;
 			}
 
-			target.style.display = "none";
-			setError("Failed to load image preview");
+			setPreviewContent("");
+			setError("Tap to view image");
 			setIsLoading(false);
 		},
-		[fileUrl, fileName, fileExtension, tryHeicConvertPreview]
+		[fileUrl, fileName, thumbOptions, previewContent]
 	);
 
 	useEffect(() => {
 		thumbEnsureAttemptedRef.current = false;
-		heicConvertAttemptedRef.current = false;
+		proxyFallbackAttemptedRef.current = false;
+		imagePreviewLoadKeyRef.current = null;
 		setPreviewContent("");
 		setIsLoading(false);
 		setError("");
 	}, [fileUrl]);
+
+	useEffect(() => {
+		if (shouldLoadMedia) return;
+
+		setPreviewContent("");
+		setIsLoading(false);
+		setError("");
+		thumbEnsureAttemptedRef.current = false;
+		proxyFallbackAttemptedRef.current = false;
+		imagePreviewLoadKeyRef.current = null;
+	}, [shouldLoadMedia]);
 
 	const applyModalFitToViewport = useCallback(
 		(nat: { w: number; h: number }, rotationDeg = modalImageRotationDeg) => {
@@ -356,6 +337,12 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			return;
 		}
 
+		const loadKey = `${fileUrl}|${thumbMaxWidth}|${thumbQuality}`;
+		if (imagePreviewLoadKeyRef.current === loadKey) {
+			return;
+		}
+		imagePreviewLoadKeyRef.current = loadKey;
+
 		const loadPreview = async () => {
 			try {
 				setIsLoading(true);
@@ -389,35 +376,39 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 						"tiff",
 					].includes(fileExtension)
 				) {
-					const thumbOptions = {
-						maxWidth: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
-						quality: CHAT_IMAGE_PREVIEW_QUALITY,
-					};
 					const isHeicExt = fileExtension === "heic" || fileExtension === "heif";
-					const thumbUrl = getChatImageThumbnailUrl(fileUrl, fileName, thumbOptions);
 
-					if (thumbUrl && isChatImageThumbnailCandidate(fileName)) {
-						setPreviewContent(thumbUrl);
-						prefetchChatImageThumbnail(fileUrl, fileName, thumbOptions);
-					} else if (isHeicExt && !HEIC_PREVIEW_CONVERT_ENABLED) {
+					if (isHeicExt && !HEIC_PREVIEW_CONVERT_ENABLED) {
 						setPreviewContent("");
 						setIsLoading(false);
-					} else if (isHeicExt && HEIC_PREVIEW_CONVERT_ENABLED) {
-						prefetchChatImageThumbnail(fileUrl, fileName, thumbOptions);
-						const converted = await tryHeicConvertPreview();
-						if (!converted) {
-							setPreviewContent("");
-							setError(
-								"HEIC preview is not available. Please download the file to view it."
-							);
-							setIsLoading(false);
-						}
-					} else {
-						setPreviewContent(fileUrl);
-						if (isChatImageThumbnailCandidate(fileName)) {
-							prefetchChatImageThumbnail(fileUrl, fileName, thumbOptions);
-						}
+						return;
 					}
+
+					if (fileExtension === "svg") {
+						setPreviewContent(fileUrl);
+						return;
+					}
+
+					if (!isChatImageThumbnailCandidate(fileName)) {
+						setPreviewContent("");
+						setError("Tap to view image");
+						setIsLoading(false);
+						return;
+					}
+
+					thumbEnsureAttemptedRef.current = true;
+					const ensured = await ensureChatImageThumbnail(
+						fileUrl,
+						fileName,
+						thumbOptions
+					).catch(() => null);
+					if (ensured) {
+						setPreviewContent(ensured);
+						return;
+					}
+
+					proxyFallbackAttemptedRef.current = true;
+					setPreviewContent(buildChatImagePreviewProxyUrl(fileUrl, thumbOptions));
 				}
 			} catch (err) {
 				setError("Failed to load preview");
@@ -432,44 +423,34 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		};
 
 		loadPreview();
-
-		// Cleanup: revoke object URL when component unmounts or fileUrl changes
-		return () => {
-			if (convertedImageUrl) {
-				URL.revokeObjectURL(convertedImageUrl);
-				setConvertedImageUrl(null);
-			}
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [shouldLoadMedia, fileUrl, fileExtension, fileName, tryHeicConvertPreview]);
+	}, [shouldLoadMedia, fileUrl, fileExtension, fileName, thumbMaxWidth, thumbQuality]);
 
 	useEffect(() => {
 		if (!isLoading || !previewContent) return;
+		if (!isRasterChatImageExtension(fileExtension)) return;
+		if (fileExtension === "svg") return;
 
-		const isHeicExt = fileExtension === "heic" || fileExtension === "heif";
 		const timeoutId = window.setTimeout(() => {
-			if (previewContent === fileUrl) {
+			if (isLegacyChatImagePreviewProxyUrl(previewContent)) {
+				setPreviewContent("");
+				setError("Tap to view image");
 				setIsLoading(false);
-				setError("Failed to load image preview");
 				return;
 			}
-			if (isHeicExt) {
-				tryHeicConvertPreview().then(ok => {
-					if (!ok) {
-						setIsLoading(false);
-						setError("Failed to load image preview");
-					}
-				}).catch(() => undefined);
-				return;
-			}
-			setPreviewContent(fileUrl);
-			setIsLoading(true);
+
+			proxyFallbackAttemptedRef.current = true;
+			setPreviewContent(
+				buildChatImagePreviewProxyUrl(fileUrl, {
+					maxWidth: thumbMaxWidth,
+					quality: thumbQuality,
+				})
+			);
 		}, CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS);
 
 		return () => window.clearTimeout(timeoutId);
-	}, [isLoading, previewContent, fileUrl, fileExtension, tryHeicConvertPreview]);
+	}, [isLoading, previewContent, fileUrl, fileExtension, thumbMaxWidth, thumbQuality]);
 
-	const showPreviewContent = shouldLoadMedia || Boolean(previewContent);
+	const showPreviewContent = shouldLoadMedia;
 
 	const wrapWithLazyGate = (content: React.ReactNode) => (
 		<div ref={elementRef} className="w-full min-h-0">
@@ -596,7 +577,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`w-full ${
-							compact ? "max-w-none h-24" : "max-w-[400px]"
+							compact ? "max-w-none h-24" : "max-w-[280px]"
 						} overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity relative ${
 							compact ? "min-h-0" : "min-h-[180px]"
 						}`}
@@ -614,6 +595,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								ref={handleInlineImageMount}
 								src={previewContent}
 								alt="File preview"
+								loading="lazy"
+								decoding="async"
 								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
 									isLoading ? "opacity-0" : ""
 								}`}
@@ -661,6 +644,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								ref={handleInlineImageMount}
 								src={previewContent}
 								alt="File preview"
+								loading="lazy"
+								decoding="async"
 								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
 									isLoading ? "opacity-0" : ""
 								}`}

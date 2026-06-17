@@ -8,7 +8,7 @@ import MessageItem from "./MessageItem";
 import { estimateChatMessageHeight } from "@/utils/estimateChatMessageHeight";
 
 const MESSAGE_GAP_PX = 24;
-const VIRTUAL_OVERSCAN = 10;
+const VIRTUAL_OVERSCAN = 5;
 
 export interface ChatBoxVirtualMessageListHandle {
 	scrollToBottom: () => void;

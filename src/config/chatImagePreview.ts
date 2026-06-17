@@ -5,10 +5,25 @@
 export const CHAT_IMAGE_PREVIEW_ENABLED = true;
 
 /** Max width for thumbnails in the message list (px). */
-export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 400;
+export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 240;
+
+/** Smaller thumbs for compact multi-attach grid cells. */
+export const CHAT_IMAGE_PREVIEW_COMPACT_MAX_WIDTH = 160;
 
 /** JPEG quality for chat thumbnails (40–90). Lower = smaller files, faster chat load. */
-export const CHAT_IMAGE_PREVIEW_QUALITY = 50;
+export const CHAT_IMAGE_PREVIEW_QUALITY = 40;
+
+export function getChatImageListThumbOptions(compact = false): {
+	maxWidth: number;
+	quality: number;
+} {
+	return {
+		maxWidth: compact
+			? CHAT_IMAGE_PREVIEW_COMPACT_MAX_WIDTH
+			: CHAT_IMAGE_PREVIEW_MAX_WIDTH,
+		quality: CHAT_IMAGE_PREVIEW_QUALITY,
+	};
+}
 
 /** Abort inline preview if the image has not loaded within this time (ms). */
 export const CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS = 8_000;
@@ -76,6 +91,16 @@ export function getChatImageThumbnailUrl(
 		options?.maxWidth ?? CHAT_IMAGE_PREVIEW_MAX_WIDTH,
 		options?.quality ?? CHAT_IMAGE_PREVIEW_QUALITY
 	);
+}
+
+export function buildChatImagePreviewProxyUrl(
+	fileUrl: string,
+	options?: { maxWidth?: number; quality?: number }
+): string {
+	const params = new URLSearchParams({ url: fileUrl });
+	params.set("w", String(options?.maxWidth ?? CHAT_IMAGE_PREVIEW_MAX_WIDTH));
+	params.set("q", String(options?.quality ?? CHAT_IMAGE_PREVIEW_QUALITY));
+	return `/api/storage/image-preview?${params.toString()}`;
 }
 
 export function isStoredChatImageThumbnailUrl(url: string): boolean {

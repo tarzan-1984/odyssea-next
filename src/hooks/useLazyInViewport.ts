@@ -7,32 +7,48 @@ type UseLazyInViewportOptions = {
 	rootMargin?: string;
 	/** Reset visibility tracking when this key changes (e.g. fileUrl). */
 	resetKey?: string;
+	/** When true, inView flips false when the element leaves the viewport (releases media). */
+	releaseOnExit?: boolean;
 };
 
 /**
- * Fires once when the element enters the scroll root viewport (or browser viewport if root is null).
+ * Tracks whether an element is inside the scroll root viewport.
+ * Default: fires once when entering (legacy lazy load).
+ * With releaseOnExit: toggles on enter/leave so media can unload off-screen.
  */
 export function useLazyInViewport(options?: UseLazyInViewportOptions) {
-	const { root = null, rootMargin = "80px", resetKey } = options ?? {};
+	const {
+		root = null,
+		rootMargin = "80px",
+		resetKey,
+		releaseOnExit = false,
+	} = options ?? {};
 	const elementRef = useRef<HTMLDivElement>(null);
 	const [inView, setInView] = useState(false);
 
-	// Re-check only when the file changes. Resetting on scrollRoot attach unmounted in-flight
-	// images and left previews stuck on "Loading image..." (cached img skips onLoad).
 	useEffect(() => {
 		setInView(false);
 	}, [resetKey]);
 
 	useEffect(() => {
-		if (inView) return;
-
 		const element = elementRef.current;
 		if (!element) return;
+
+		if (!releaseOnExit && inView) {
+			return;
+		}
 
 		const observer = new IntersectionObserver(
 			entries => {
 				const entry = entries[0];
-				if (entry?.isIntersecting) {
+				if (!entry) return;
+
+				if (releaseOnExit) {
+					setInView(entry.isIntersecting);
+					return;
+				}
+
+				if (entry.isIntersecting) {
 					setInView(true);
 					observer.disconnect();
 				}
@@ -42,7 +58,7 @@ export function useLazyInViewport(options?: UseLazyInViewportOptions) {
 
 		observer.observe(element);
 		return () => observer.disconnect();
-	}, [root, rootMargin, inView, resetKey]);
+	}, [root, rootMargin, inView, resetKey, releaseOnExit]);
 
 	return { elementRef, inView };
 }
