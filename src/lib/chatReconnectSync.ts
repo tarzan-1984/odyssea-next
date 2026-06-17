@@ -12,8 +12,11 @@ import {
 	mergeMessageLists,
 	messagesTailLagsBehindRoom,
 } from "@/utils/chatMessagesMerge";
+import { MAX_MESSAGES_IN_STORE } from "@/utils/trimChatMessagesWindow";
 
 const SYNC_BATCH_CHUNK_SIZE = 50;
+/** Only need the newest message to compare tail vs server. */
+const RECONNECT_TAIL_LIMIT = 1;
 
 const normalizeParticipants = (participants: ChatRoom["participants"]) =>
 	participants.map(p => ({
@@ -43,11 +46,19 @@ async function resolveLocalLastMessageId(
 	storeMessages: Message[],
 	storeRoomLastId?: string | null
 ): Promise<string | null> {
-	const cached = await indexedDBChatService.getMessages(chatRoomId);
-	const cachedLast = cached.length > 0 ? cached[cached.length - 1].id : null;
 	const storeLast =
 		storeMessages.length > 0 ? storeMessages[storeMessages.length - 1].id : null;
-	return storeLast ?? cachedLast ?? storeRoomLastId ?? null;
+	if (storeLast) {
+		return storeLast;
+	}
+
+	const cachedTail = await indexedDBChatService.getMessages(
+		chatRoomId,
+		RECONNECT_TAIL_LIMIT
+	);
+	const cachedLast =
+		cachedTail.length > 0 ? cachedTail[cachedTail.length - 1].id : null;
+	return cachedLast ?? storeRoomLastId ?? null;
 }
 
 async function applySyncBatchResults(results: SyncMessagesBatchRoomResult[]): Promise<void> {
@@ -68,12 +79,15 @@ async function applySyncBatchResults(results: SyncMessagesBatchRoomResult[]): Pr
 			continue;
 		}
 
-		const cached = await indexedDBChatService.getMessages(chatRoomId);
-		const storeMsgs = filterMessagesForRoom(state.messages, chatRoomId);
-		const merged = mergeMessageLists(cached, storeMsgs, messages);
-		await indexedDBChatService.saveMessages(chatRoomId, merged);
+		await indexedDBChatService.saveMessages(chatRoomId, messages);
 
 		if (currentChatRoomId === chatRoomId) {
+			const storeMsgs = filterMessagesForRoom(state.messages, chatRoomId);
+			const cachedRecent = await indexedDBChatService.getMessages(
+				chatRoomId,
+				MAX_MESSAGES_IN_STORE
+			);
+			const merged = mergeMessageLists(cachedRecent, storeMsgs, messages);
 			state.setMessages(merged);
 		}
 	}
@@ -111,9 +125,13 @@ export async function catchUpChatsOnReconnect(): Promise<void> {
 	for (const apiRoom of mergedRooms) {
 		const storeRoom = previousRooms.find(r => r.id === apiRoom.id);
 		const storeMessages = filterMessagesForRoom(state.messages, apiRoom.id);
-		const cachedMessages = await indexedDBChatService.getMessages(apiRoom.id);
 		const localMessages =
-			storeMessages.length > 0 ? storeMessages : cachedMessages;
+			storeMessages.length > 0
+				? storeMessages
+				: await indexedDBChatService.getMessages(
+						apiRoom.id,
+						RECONNECT_TAIL_LIMIT
+					);
 
 		const localLastId = await resolveLocalLastMessageId(
 			apiRoom.id,

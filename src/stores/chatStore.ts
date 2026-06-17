@@ -2,7 +2,15 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { ChatRoom, Message, User, isMessageReadByUser } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
-import { mergeMessageLists, mergeReadByArrays } from "@/utils/chatMessagesMerge";
+import { mergeMessageLists, mergeReadByArrays, filterMessagesForRoom } from "@/utils/chatMessagesMerge";
+import {
+	archiveDayHasRemaining,
+	archiveDayKey,
+	ArchivedDayCacheEntry,
+	sortArchiveDayMessages,
+	takeNextArchiveChunk,
+} from "@/utils/archiveChunkHelpers";
+import { trimChatMessagesWindow, MAX_MESSAGES_IN_STORE } from "@/utils/trimChatMessagesWindow";
 import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin, unread, mute status, and last message date
@@ -64,7 +72,7 @@ interface ChatState {
 	hasArchivedMessages: boolean;
 	isLoadingArchivedMessages: boolean;
 	isLoadingAvailableArchives: boolean; // Loading list of available archives
-	archivedMessagesCache: Map<string, Message[]>; // key: "year-month-day", value: messages
+	archivedMessagesCache: Map<string, ArchivedDayCacheEntry>;
 	availableArchives: {
 		year: number;
 		month: number;
@@ -232,6 +240,7 @@ export const useChatStore = create<ChatState>()(
 							currentArchiveIndex: 0,
 							archiveDaysLoadedForRoomId: null,
 							archiveDaysInflightRoomId: null,
+							archivedMessagesCache: new Map(),
 						},
 						false,
 						"setCurrentChatRoom"
@@ -306,7 +315,11 @@ export const useChatStore = create<ChatState>()(
 
 				// Message actions
 				setMessages: messages => {
-					set({ messages, error: null }, false, "setMessages");
+					set(
+						{ messages: trimChatMessagesWindow(messages), error: null },
+						false,
+						"setMessages"
+					);
 				},
 
 				applyBulkMessagesMarkedAsRead: events => {
@@ -400,7 +413,7 @@ export const useChatStore = create<ChatState>()(
 
 					const patch: Partial<ChatState> = { error: null };
 					if (messagesChanged) {
-						patch.messages = nextMessages;
+						patch.messages = trimChatMessagesWindow(nextMessages);
 					}
 					if (roomsChanged) {
 						patch.chatRooms = sortChatRoomsByLastMessage(nextRooms);
@@ -502,7 +515,10 @@ export const useChatStore = create<ChatState>()(
 					}
 
 					set(
-						{ messages: [...roomMessages, message], chatRooms: sortedRooms },
+						{
+							messages: trimChatMessagesWindow([...roomMessages, message]),
+							chatRooms: sortedRooms,
+						},
 						false,
 						"addMessage"
 					);
@@ -539,7 +555,12 @@ export const useChatStore = create<ChatState>()(
 						newMsg => !messages.some(existingMsg => existingMsg.id === newMsg.id)
 					);
 					set(
-						{ messages: [...uniqueNewMessages, ...messages] },
+						{
+							messages: trimChatMessagesWindow([
+								...uniqueNewMessages,
+								...messages,
+							]),
+						},
 						false,
 						"prependMessages"
 					);
@@ -578,16 +599,22 @@ export const useChatStore = create<ChatState>()(
 				// Cache management actions
 				loadMessagesFromCache: async chatRoomId => {
 					try {
-						const cachedMessages = await indexedDBChatService.getMessages(chatRoomId);
+						const cachedMessages = await indexedDBChatService.getMessages(
+							chatRoomId,
+							MAX_MESSAGES_IN_STORE
+						);
 						if (cachedMessages.length > 0) {
 							const { messages: currentMessages, currentChatRoom } = get();
 							if (currentChatRoom?.id === chatRoomId) {
-								const roomStore = currentMessages.filter(
-									m => m.chatRoomId === chatRoomId
+								const roomStore = filterMessagesForRoom(
+									currentMessages,
+									chatRoomId
 								);
 								set(
 									{
-										messages: mergeMessageLists(cachedMessages, roomStore),
+										messages: trimChatMessagesWindow(
+											mergeMessageLists(cachedMessages, roomStore)
+										),
 									},
 									false,
 									"loadMessagesFromCache"
@@ -693,7 +720,10 @@ export const useChatStore = create<ChatState>()(
 							);
 
 							// Prepend only new messages to the beginning of the array
-							const updatedMessages = [...newMessages, ...messages];
+							const updatedMessages = trimChatMessagesWindow([
+								...newMessages,
+								...messages,
+							]);
 
 							set(
 								{
@@ -751,7 +781,10 @@ export const useChatStore = create<ChatState>()(
 					const { archivedMessagesCache } = get();
 					const key = `${year}-${month}`;
 					const newCache = new Map(archivedMessagesCache);
-					newCache.set(key, messages);
+					newCache.set(key, {
+						messages,
+						loadedFromTail: 0,
+					});
 
 					set({ archivedMessagesCache: newCache }, false, "addArchivedMessages");
 				},
@@ -760,41 +793,87 @@ export const useChatStore = create<ChatState>()(
 					set({ archivedMessagesCache: new Map() }, false, "clearArchivedMessagesCache");
 				},
 
-				// Action to load archived messages
+				// Action to load archived messages (one chunk at a time into the store)
 				loadArchivedMessages: async (year, month, day) => {
-					const { currentChatRoom, archivedMessagesCache, messages } = get();
+					const { currentChatRoom } = get();
 
 					if (!currentChatRoom) {
 						return;
 					}
 
-					const key = `${year}-${month}-${day}`;
+					const key = archiveDayKey(year, month, day);
 
-					// Check if already cached
-					if (archivedMessagesCache.has(key)) {
-						const cachedMessages = archivedMessagesCache.get(key)!;
+					const applyArchiveChunk = async (
+						entry: ArchivedDayCacheEntry
+					): Promise<boolean> => {
+						const { chunk, nextLoadedFromTail } = takeNextArchiveChunk(
+							entry.messages,
+							entry.loadedFromTail
+						);
+						if (chunk.length === 0) {
+							return false;
+						}
+
+						const {
+							messages,
+							archivedMessagesCache: cache,
+						} = get();
 						const existingMessageIds = new Set(messages.map(msg => msg.id));
-						const newMessages = cachedMessages.filter(
+						const newMessages = chunk.filter(
 							msg => !existingMessageIds.has(msg.id)
 						);
 
+						const newCache = new Map(cache);
+						newCache.set(key, {
+							messages: entry.messages,
+							loadedFromTail: nextLoadedFromTail,
+						});
+
+						set(
+							{
+								...(newMessages.length > 0
+									? {
+											messages: trimChatMessagesWindow([
+												...newMessages,
+												...messages,
+											]),
+										}
+									: {}),
+								archivedMessagesCache: newCache,
+								isLoadingArchivedMessages: false,
+							},
+							false,
+							"loadArchivedMessages"
+						);
+
 						if (newMessages.length > 0) {
-							set(
-								{
-									messages: [...newMessages, ...messages],
-								},
-								false,
-								"loadArchivedMessages"
+							await indexedDBChatService.saveMessages(
+								currentChatRoom.id,
+								newMessages
 							);
+						}
+
+						return newMessages.length > 0;
+					};
+
+					const cachedEntry = get().archivedMessagesCache.get(key);
+					if (cachedEntry) {
+						if (archiveDayHasRemaining(cachedEntry)) {
+							await applyArchiveChunk(cachedEntry);
 						}
 						return;
 					}
 
 					try {
-						set({ isLoadingArchivedMessages: true }, false, "loadArchivedMessages");
+						set(
+							{ isLoadingArchivedMessages: true },
+							false,
+							"loadArchivedMessages"
+						);
 
-						// Import messagesArchiveApi dynamically
-						const { messagesArchiveApi } = await import("@/app-api/messagesArchiveApi");
+						const { messagesArchiveApi } = await import(
+							"@/app-api/messagesArchiveApi"
+						);
 
 						const archiveFile = await messagesArchiveApi.loadArchivedMessages(
 							currentChatRoom.id,
@@ -803,50 +882,30 @@ export const useChatStore = create<ChatState>()(
 							day
 						);
 
-						if (archiveFile && archiveFile.messages.length > 0) {
-							const existingMessageIds = new Set(messages.map(msg => msg.id));
-							const newMessages = archiveFile.messages.filter(
-								msg => !existingMessageIds.has(msg.id)
-							);
-
-							if (newMessages.length > 0) {
-								// Add to cache and messages
-								const newCache = new Map(archivedMessagesCache);
-								newCache.set(key, archiveFile.messages);
-
-								set(
-									{
-										messages: [...newMessages, ...messages],
-										archivedMessagesCache: newCache,
-										isLoadingArchivedMessages: false,
-									},
-									false,
-									"loadArchivedMessages"
-								);
-
-								// Save to IndexedDB
-								await indexedDBChatService.saveMessages(
-									currentChatRoom.id,
-									newMessages
-								);
-							} else {
-								set(
-									{
-										isLoadingArchivedMessages: false,
-									},
-									false,
-									"loadArchivedMessages"
-								);
-							}
-						} else {
+						if (!archiveFile?.messages.length) {
 							set(
-								{
-									isLoadingArchivedMessages: false,
-								},
+								{ isLoadingArchivedMessages: false },
 								false,
 								"loadArchivedMessages"
 							);
+							return;
 						}
+
+						const dayMessages = sortArchiveDayMessages(archiveFile.messages);
+						const entry: ArchivedDayCacheEntry = {
+							messages: dayMessages,
+							loadedFromTail: 0,
+						};
+
+						const newCache = new Map(get().archivedMessagesCache);
+						newCache.set(key, entry);
+						set(
+							{ archivedMessagesCache: newCache },
+							false,
+							"loadArchivedMessages:cacheDay"
+						);
+
+						await applyArchiveChunk(entry);
 					} catch (error) {
 						console.error("❌ [ARCHIVE] Failed to load archived messages:", error);
 						set(
@@ -1037,6 +1096,27 @@ export const useChatStore = create<ChatState>()(
 
 				tryLoadNextArchivePage: async () => {
 					await get().ensureAvailableArchiveDays();
+					const { availableArchives, currentArchiveIndex, archivedMessagesCache } =
+						get();
+
+					if (currentArchiveIndex > 0 && availableArchives.length > 0) {
+						const activeDay = availableArchives[currentArchiveIndex - 1];
+						const activeKey = archiveDayKey(
+							activeDay.year,
+							activeDay.month,
+							activeDay.day
+						);
+						const activeEntry = archivedMessagesCache.get(activeKey);
+						if (activeEntry && archiveDayHasRemaining(activeEntry)) {
+							await get().loadArchivedMessages(
+								activeDay.year,
+								activeDay.month,
+								activeDay.day
+							);
+							return;
+						}
+					}
+
 					const nextArchive = get().getNextAvailableArchive();
 					if (nextArchive) {
 						await get().loadArchivedMessages(
@@ -1110,19 +1190,9 @@ export const useChatStore = create<ChatState>()(
 
 				// Trigger pending archive load (when user scrolled before archives loaded)
 				triggerPendingArchiveLoad: () => {
-					const { availableArchives, loadArchivedMessages, getNextAvailableArchive } =
-						get();
-
-					if (availableArchives.length > 0) {
-						const nextArchive = getNextAvailableArchive();
-						if (nextArchive) {
-							loadArchivedMessages(
-								nextArchive.year,
-								nextArchive.month,
-								nextArchive.day
-							);
-						}
-					}
+					get().tryLoadNextArchivePage().catch(error => {
+						console.error("Failed to load pending archive:", error);
+					});
 				},
 			}),
 			{

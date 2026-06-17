@@ -14,7 +14,9 @@ import { messageReplacesOptimistic } from "@/utils/optimisticChatMessage";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { UserData } from "@/app-api/api-types";
-import MessageItem from "./MessageItem";
+import ChatBoxVirtualMessageList, {
+	type ChatBoxVirtualMessageListHandle,
+} from "./ChatBoxVirtualMessageList";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 import {
@@ -32,8 +34,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [replyingTo, setReplyingTo] = useState<Message["replyData"] | null>(null);
-	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+	const virtualListRef = useRef<ChatBoxVirtualMessageListHandle>(null);
 	const [messagesScrollRoot, setMessagesScrollRoot] = useState<HTMLDivElement | null>(null);
 	const attachMessagesContainer = useCallback((node: HTMLDivElement | null) => {
 		messagesContainerRef.current = node;
@@ -41,6 +43,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	}, []);
 	const sendFormRef = useRef<ChatBoxSendFormHandle>(null);
 	const dragCounterRef = useRef(0);
+	const isLoadingMoreRef = useRef(false);
+	const hasUserScrolledRef = useRef(false);
+	const isProgrammaticScrollRef = useRef(false);
+	const isInitialScrollCompleteRef = useRef(false);
+	const pendingInitialScrollRef = useRef(false);
+	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
 	// Get current user for message display
 	const currentUser = useCurrentUser();
@@ -305,88 +313,84 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
 
-	// Function to scroll to bottom of messages
-	const scrollToBottom = (smooth: boolean = true) => {
+	const scrollToBottom = useCallback(() => {
 		isProgrammaticScrollRef.current = true;
-		messagesEndRef.current?.scrollIntoView({ behavior: "instant" }); // Always instant scroll
+		virtualListRef.current?.scrollToBottom();
+		const container = messagesContainerRef.current;
+		requestAnimationFrame(() => {
+			if (container) {
+				container.scrollTop = container.scrollHeight;
+			}
+			requestAnimationFrame(() => {
+				if (container) {
+					container.scrollTop = container.scrollHeight;
+				}
+				setTimeout(() => {
+					isProgrammaticScrollRef.current = false;
+				}, 50);
+			});
+		});
+	}, []);
 
-		// Reset the flag after a short delay to allow for scroll completion
-		setTimeout(() => {
-			isProgrammaticScrollRef.current = false;
-		}, 50); // Reduced delay since it's instant
-	};
-
-	// Check if user is scrolled up and handle infinite scroll
-	const isLoadingMoreRef = useRef(false);
-	const hasUserScrolledRef = useRef(false);
-	const isProgrammaticScrollRef = useRef(false);
+	const handleVirtualContentMeasured = useCallback(() => {
+		if (pendingInitialScrollRef.current || !isInitialScrollCompleteRef.current) {
+			scrollToBottom();
+			return;
+		}
+		if (!isUserScrolledUp) {
+			scrollToBottom();
+		}
+	}, [isUserScrolledUp, scrollToBottom]);
 
 	const handleScroll = useCallback(() => {
-		if (messagesContainerRef.current) {
-			const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-			const isAtBottom = scrollHeight - scrollTop - clientHeight < 100; // 100px threshold
-			setIsUserScrolledUp(!isAtBottom);
+		if (!messagesContainerRef.current) return;
 
-			// Skip tracking if this is a programmatic scroll
-			if (isProgrammaticScrollRef.current) {
-				return;
-			}
+		const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+		const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+		setIsUserScrolledUp(!isAtBottom);
 
-			// Track if user has actually scrolled (not just initial position or programmatic scroll)
-			if (scrollTop > 10) {
-				hasUserScrolledRef.current = true;
-			}
+		if (isProgrammaticScrollRef.current || !isInitialScrollCompleteRef.current) {
+			return;
+		}
 
-			// Check if there's actually scrollable content
-			const hasScrollableContent = scrollHeight > clientHeight;
+		const hasScrollableContent = scrollHeight > clientHeight;
 
-			// Load more messages when user scrolls near the top
-			// Only if:
-			// 1. There's scrollable content (more messages than fit in container)
-			// 2. User scrolled to top (scrollTop < 200px)
-			// 3. User has actually scrolled before (not initial position)
-			// 4. Not currently loading
-			// 5. Not already loading more messages
-			if (
-				hasScrollableContent &&
-				scrollTop < 200 &&
-				hasUserScrolledRef.current && // User has actually scrolled
-				!loading &&
-				!isLoadingMoreRef.current &&
-				!isLoadingArchivedMessages &&
-				uniqueMessages.length > 0 // Only after initial messages are loaded
-			) {
-				isLoadingMoreRef.current = true;
+		if (
+			hasScrollableContent &&
+			scrollTop < 200 &&
+			hasUserScrolledRef.current &&
+			!loading &&
+			!isLoadingMoreRef.current &&
+			!isLoadingArchivedMessages &&
+			uniqueMessages.length > 0
+		) {
+			isLoadingMoreRef.current = true;
+			setIsLoadingOlder(true);
 
-				// Stabilize scroll position after we prepend older messages
-				const container = messagesContainerRef.current;
-				const prevScrollHeight = container.scrollHeight;
-				const prevScrollTop = container.scrollTop;
+			const container = messagesContainerRef.current;
+			const prevScrollHeight = container.scrollHeight;
+			const prevScrollTop = container.scrollTop;
 
-				const finalize = () => {
-					// Adjust scroll so that the user's viewport stays anchored
-					const newScrollHeight = container.scrollHeight;
-					const delta = newScrollHeight - prevScrollHeight;
-					isProgrammaticScrollRef.current = true;
-					container.scrollTop = prevScrollTop + delta;
-					setTimeout(() => {
-						isProgrammaticScrollRef.current = false;
-						isLoadingMoreRef.current = false;
-					}, 50);
-				};
+			const finalize = () => {
+				const newScrollHeight = container.scrollHeight;
+				const delta = newScrollHeight - prevScrollHeight;
+				isProgrammaticScrollRef.current = true;
+				container.scrollTop = prevScrollTop + delta;
+				setTimeout(() => {
+					isProgrammaticScrollRef.current = false;
+					isLoadingMoreRef.current = false;
+					setIsLoadingOlder(false);
+				}, 50);
+			};
 
-				// First try to load from PostgreSQL
-				if (hasMoreMessages) {
-					Promise.resolve(loadMoreMessages()).finally(finalize);
-				} else {
-					// PostgreSQL is exhausted, try to load from archive (lazy S3 day list)
-					if (isLoadingAvailableArchives) {
-						setPendingArchiveLoad(true);
-						isLoadingMoreRef.current = false;
-					} else {
-						Promise.resolve(tryLoadNextArchivePage()).finally(finalize);
-					}
-				}
+			if (hasMoreMessages) {
+				Promise.resolve(loadMoreMessages()).finally(finalize);
+			} else if (isLoadingAvailableArchives) {
+				setPendingArchiveLoad(true);
+				isLoadingMoreRef.current = false;
+				setIsLoadingOlder(false);
+			} else {
+				Promise.resolve(tryLoadNextArchivePage()).finally(finalize);
 			}
 		}
 	}, [
@@ -400,16 +404,60 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		uniqueMessages.length,
 	]);
 
-	// Note: Messages are loaded via useChatRoomMessagesQuery (IndexedDB + useQuery with abort).
+	useEffect(() => {
+		const container = messagesContainerRef.current;
+		if (!container) return;
+
+		const markUserScroll = () => {
+			if (!isProgrammaticScrollRef.current) {
+				hasUserScrolledRef.current = true;
+			}
+		};
+
+		container.addEventListener("wheel", markUserScroll, { passive: true });
+		container.addEventListener("touchstart", markUserScroll, { passive: true });
+		container.addEventListener("pointerdown", markUserScroll);
+
+		return () => {
+			container.removeEventListener("wheel", markUserScroll);
+			container.removeEventListener("touchstart", markUserScroll);
+			container.removeEventListener("pointerdown", markUserScroll);
+		};
+	}, [messagesScrollRoot]);
 
 	useEffect(() => {
 		if (selectedChatRoomId) {
 			hasUserScrolledRef.current = false;
 			isLoadingMoreRef.current = false;
 			isProgrammaticScrollRef.current = false;
+			isInitialScrollCompleteRef.current = false;
+			pendingInitialScrollRef.current = true;
+			setIsLoadingOlder(false);
+			setIsUserScrolledUp(false);
 		}
 		setReplyingTo(null);
 	}, [selectedChatRoomId]);
+
+	useLayoutEffect(() => {
+		if (!messagesReady || !selectedChatRoomId || uniqueMessages.length === 0) return;
+		if (!pendingInitialScrollRef.current) return;
+
+		scrollToBottom();
+
+		const rafId = requestAnimationFrame(() => {
+			scrollToBottom();
+		});
+		const timeoutId = window.setTimeout(() => {
+			scrollToBottom();
+			pendingInitialScrollRef.current = false;
+			isInitialScrollCompleteRef.current = true;
+		}, 200);
+
+		return () => {
+			cancelAnimationFrame(rafId);
+			window.clearTimeout(timeoutId);
+		};
+	}, [messagesReady, selectedChatRoomId, uniqueMessages.length, scrollToBottom]);
 
 	useEffect(() => {
 		if (!messagesReady || !selectedChatRoomId) return;
@@ -417,17 +465,18 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		loadInitialArchiveIfPgEmpty().catch(error => {
 			console.error("Failed to load initial archive:", error);
 		});
-		setTimeout(() => {
-			scrollToBottom();
-		}, 10);
 	}, [messagesReady, selectedChatRoomId, loadInitialArchiveIfPgEmpty]);
 
-	// Scroll to bottom when messages change (for new messages)
 	useEffect(() => {
-		if (uniqueMessages.length > 0 && !isUserScrolledUp) {
+		if (
+			uniqueMessages.length > 0 &&
+			!isUserScrolledUp &&
+			isInitialScrollCompleteRef.current &&
+			!pendingInitialScrollRef.current
+		) {
 			scrollToBottom();
 		}
-	}, [uniqueMessages.length, isUserScrolledUp]);
+	}, [uniqueMessages.length, isUserScrolledUp, scrollToBottom]);
 
 	const handleSendMessage = async (messageData: {
 		content: string;
@@ -626,14 +675,14 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			<div
 				ref={attachMessagesContainer}
 				onScroll={handleScroll}
-				className="flex-1 max-h-full p-5 space-y-6 overflow-auto custom-scrollbar xl:space-y-8 xl:p-6"
+				className="flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
 			>
 				<ChatMediaLoadProvider
 					mediaLoadEnabled={messagesReady}
 					scrollRoot={messagesScrollRoot}
 				>
 				{/* Loading indicator for older messages */}
-				{(loading || isLoadingArchivedMessages) && uniqueMessages.length > 0 && (
+				{(isLoadingOlder || isLoadingArchivedMessages) && uniqueMessages.length > 0 && (
 					<div className="flex items-center justify-center py-4">
 						<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
 							<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -653,7 +702,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								/>
 							</svg>
 							<span className="text-sm">
-								{loading && "Loading older messages..."}
+								{isLoadingOlder && "Loading older messages..."}
 								{isLoadingArchivedMessages && "Loading archive..."}
 							</span>
 						</div>
@@ -676,27 +725,23 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						</div>
 					</div>
 				) : (
-					uniqueMessages.map((message, index) => (
-						<MessageItem
-							key={`${message.id}-${index}`}
-							message={message}
-							currentUser={currentUser}
-							chatRoomType={selectedChatRoom?.type}
-							chatParticipants={selectedChatRoom?.participants ?? []}
-							onDelete={handleDeleteMessage}
-							onReply={handleReplyToMessage}
-							onMarkUnread={handleMarkMessageUnread}
-							onRetry={
-								message.pendingOutgoing?.status === "failed"
-									? () => {
-											retryOptimisticMessage(message).catch(error => {
-												console.error("Failed to retry message:", error);
-											});
-										}
-									: undefined
-							}
-						/>
-					))
+					<ChatBoxVirtualMessageList
+						ref={virtualListRef}
+						messages={uniqueMessages}
+						currentUser={currentUser}
+						chatRoomType={selectedChatRoom?.type}
+						chatParticipants={selectedChatRoom?.participants ?? []}
+						scrollElement={messagesScrollRoot}
+						onContentMeasured={handleVirtualContentMeasured}
+						onDelete={handleDeleteMessage}
+						onReply={handleReplyToMessage}
+						onMarkUnread={handleMarkMessageUnread}
+						onRetry={message => {
+							retryOptimisticMessage(message).catch(error => {
+								console.error("Failed to retry message:", error);
+							});
+						}}
+					/>
 				)}
 				{/* Typing indicator */}
 				{Object.entries(isTyping).some(([userId, data]) => data.isTyping) && (
@@ -743,8 +788,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 					</div>
 				)}
 
-				{/* Invisible div to scroll to */}
-				<div ref={messagesEndRef} />
 				</ChatMediaLoadProvider>
 			</div>
 
