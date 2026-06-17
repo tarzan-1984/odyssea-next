@@ -179,6 +179,7 @@ export const useWebSocketMessages = ({
 	const sendMessageHandler = useCallback(
 		(data: {
 			content: string;
+			clientMessageId?: string;
 			fileUrl?: string;
 			fileName?: string;
 			fileSize?: number;

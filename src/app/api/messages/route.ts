@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
 		}
 
 		const body = await request.json();
-		const { chatRoomId, content, fileUrl, fileName, fileSize, attachments, replyData } = body;
+		const { chatRoomId, content, clientMessageId, fileUrl, fileName, fileSize, attachments, replyData } =
+			body;
 
 		const text = typeof content === "string" ? content.trim() : "";
 		const hasFile = Boolean(fileUrl);
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 			body: JSON.stringify({
 				chatRoomId,
 				content: typeof content === "string" ? content : "",
+				clientMessageId,
 				fileUrl,
 				fileName,
 				fileSize,

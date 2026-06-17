@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import ChatBoxHeader from "./ChatBoxHeader";
 import ChatBoxSendForm, { type ChatBoxSendFormHandle } from "./ChatBoxSendForm";
 import Image from "next/image";
-import { Message, ChatRoom, isMessageReadByUser } from "@/app-api/chatApi";
+import { Message, ChatRoom, isMessageReadByUser, chatApi } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatRoomMessagesQuery } from "@/hooks/useChatRoomMessagesQuery";
+import { useChatOutboxSend } from "@/hooks/useChatOutboxSend";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { messageReplacesOptimistic } from "@/utils/optimisticChatMessage";
 // WebSocket functionality is now passed via props
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -18,6 +21,7 @@ import {
 	removeChatMessageLocally,
 	restoreChatMessageLocally,
 } from "@/lib/chatMessageDelete";
+import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -58,11 +62,90 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const {
 		messages,
 		isLoadingMessages: loading,
-		isSendingMessage: sending,
-		sendMessage,
 		webSocketMessages: { sendTyping, isTyping },
 		isUserOnline,
 	} = webSocketChatSync;
+
+	const { sendMessage: wsSendMessage, socket } = useWebSocket();
+	const addMessage = useChatStore(state => state.addMessage);
+	const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
+
+	const outgoingSender = useMemo(() => {
+		if (!currentUser) return undefined;
+		return {
+			id: currentUser.id ?? "",
+			firstName: currentUser.firstName ?? "",
+			lastName: currentUser.lastName ?? "",
+			avatar: currentUser.avatar,
+			profilePhoto: currentUser.avatar,
+			role: currentUser.role,
+		};
+	}, [currentUser]);
+
+	const outboundSend = useCallback(
+		async (
+			content: string,
+			fileData?: { fileUrl: string; fileName: string; fileSize: number },
+			replyData?: Message["replyData"],
+			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[],
+			clientMessageId?: string
+		) => {
+			if (!selectedChatRoomId) {
+				throw new Error("No chat room selected");
+			}
+
+			const multi = attachments && attachments.length >= 2 ? attachments : null;
+			const wsPayload = {
+				chatRoomId: selectedChatRoomId,
+				content,
+				clientMessageId,
+				fileUrl: multi ? multi[0].fileUrl : fileData?.fileUrl,
+				fileName: multi ? multi[0].fileName : fileData?.fileName,
+				fileSize: multi ? multi[0].fileSize : fileData?.fileSize,
+				attachments: multi ?? undefined,
+				replyData,
+			};
+
+			if (socket?.connected) {
+				wsSendMessage(wsPayload);
+				return;
+			}
+
+			const newMessage = await chatApi.sendMessage({
+				chatRoomId: selectedChatRoomId,
+				content,
+				clientMessageId,
+				replyData,
+				...(multi
+					? {
+							attachments: multi,
+							fileUrl: multi[0].fileUrl,
+							fileName: multi[0].fileName,
+							fileSize: multi[0].fileSize,
+						}
+					: {
+							fileUrl: fileData?.fileUrl,
+							fileName: fileData?.fileName,
+							fileSize: fileData?.fileSize,
+						}),
+			});
+			addMessage(newMessage);
+			await indexedDBChatService.addMessage(newMessage);
+		},
+		[selectedChatRoomId, socket, wsSendMessage, addMessage]
+	);
+
+	const { sendTextMessage, sendMediaMessage, retryOptimisticMessage } = useChatOutboxSend({
+		chatRoomId: selectedChatRoomId,
+		sender: outgoingSender,
+		isConnected: Boolean(socket?.connected),
+		socket,
+		sendMessage: outboundSend,
+		optimisticMessages,
+		setOptimisticMessages,
+		serverMessages: messages,
+		currentUserId: currentUser?.id,
+	});
 
 	// Sync store before useChatRoomMessagesQuery hydrates (same tick as room switch).
 	useLayoutEffect(() => {
@@ -90,7 +173,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const isLoadArchivedReadOnlyChat =
 		selectedChatRoom?.type === "LOAD" && selectedChatRoom.isLoadArchived === true;
-	const canAttachFiles = !isLoadArchivedReadOnlyChat && !sending;
+	const canAttachFiles = !isLoadArchivedReadOnlyChat;
 
 	const hasFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
@@ -192,7 +275,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	);
 	const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
-	// Only show messages for the selected room (store holds one active transcript)
+	// Merge server messages with in-flight optimistic outgoing messages.
 	const uniqueMessages = React.useMemo(() => {
 		if (!selectedChatRoomId) return [];
 		const messageMap = new Map<string, Message>();
@@ -200,10 +283,24 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			if (message.chatRoomId !== selectedChatRoomId) continue;
 			messageMap.set(message.id, message);
 		}
-		return Array.from(messageMap.values()).sort(
+		const serverList = Array.from(messageMap.values());
+
+		const activeOptimistic = optimisticMessages.filter(
+			opt =>
+				opt.chatRoomId === selectedChatRoomId &&
+				!messageReplacesOptimistic(opt, serverList, currentUser?.id)
+		);
+
+		if (activeOptimistic.length === 0) {
+			return serverList.sort(
+				(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+			);
+		}
+
+		return [...serverList, ...activeOptimistic].sort(
 			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 		);
-	}, [messages, selectedChatRoomId]);
+	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id]);
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
@@ -340,37 +437,26 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		if (!selectedChatRoom) return;
 
 		try {
-			// Stop typing indicator before sending message
 			sendTyping(false);
 
 			const files = messageData.fileData ?? [];
 			if (files.length === 0) {
-				await sendMessage({
-					content: messageData.content,
-					replyData: messageData.replyData,
-				});
-			} else if (files.length === 1) {
-				await sendMessage({
-					content: messageData.content,
-					fileData: files[0],
-					replyData: messageData.replyData,
-				});
+				await sendTextMessage(messageData.content, messageData.replyData);
 			} else {
-				await sendMessage({
-					content: messageData.content,
-					attachments: files.map(f => ({
+				await sendMediaMessage(
+					messageData.content,
+					files.map(f => ({
 						fileUrl: f.fileUrl,
 						fileName: f.fileName,
 						fileSize: f.fileSize,
 					})),
-					replyData: messageData.replyData,
-				});
+					messageData.replyData
+				);
 			}
 
-			// Always scroll to the new message when user sends it
 			setTimeout(() => {
 				scrollToBottom();
-			}, 100);
+			}, 50);
 		} catch (err) {
 			console.error("Failed to send message:", err);
 		}
@@ -600,6 +686,15 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 							onDelete={handleDeleteMessage}
 							onReply={handleReplyToMessage}
 							onMarkUnread={handleMarkMessageUnread}
+							onRetry={
+								message.pendingOutgoing?.status === "failed"
+									? () => {
+											retryOptimisticMessage(message).catch(error => {
+												console.error("Failed to retry message:", error);
+											});
+										}
+									: undefined
+							}
 						/>
 					))
 				)}
@@ -660,8 +755,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 					chatRoomId={selectedChatRoomId}
 					onSendMessage={handleSendMessage}
 					onTyping={sendTyping}
-					isLoading={sending}
-					disabled={sending}
 					replyingTo={replyingTo || undefined}
 					onCancelReply={handleCancelReply}
 				/>

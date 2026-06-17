@@ -25,6 +25,7 @@ interface MessageItemProps {
 	onDelete: (messageId: string) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
+	onRetry?: () => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -35,10 +36,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onDelete,
 	onReply,
 	onMarkUnread,
+	onRetry,
 }) => {
 	const { isUserOnline } = useOnlineStatus();
 	const isSender = message.senderId === currentUser?.id;
 	const isOnline = isUserOnline(message.senderId);
+	const isPending = Boolean(message.pendingOutgoing);
+	const pendingStatus = message.pendingOutgoing?.status;
+	const isPendingSending = pendingStatus === "sending" || pendingStatus === "uploading" || pendingStatus === "acknowledged";
+	const isPendingFailed = pendingStatus === "failed";
 
 	const isImageFile = (fileName?: string): boolean => {
 		if (!fileName) return false;
@@ -104,6 +110,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const multiAttachments = getMessageMultiAttachments(message);
 	const legacyFileUrl = !multiAttachments ? message.fileUrl : undefined;
 	const showLegacySingleFile = Boolean(legacyFileUrl);
+	const showMessageMenu = !isPending;
+
+	const renderMessageMenu = () =>
+		showMessageMenu ? (
+			<MessageDropdown
+				message={message}
+				currentUser={currentUser}
+				onDelete={onDelete}
+				onReply={onReply}
+				onMarkUnread={onMarkUnread}
+			/>
+		) : null;
 
 	return (
 		<div
@@ -165,13 +183,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									<ChatMessageContent content={message.content} isOutgoing />
 								) : null}
 							</div>
-							<MessageDropdown
-								message={message}
-								currentUser={currentUser}
-								onDelete={onDelete}
-								onReply={onReply}
-								onMarkUnread={onMarkUnread}
-							/>
+							{renderMessageMenu()}
 						</div>
 					) : (
 						<>
@@ -424,13 +436,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									/>
 								</svg>
 							</a>
-							<MessageDropdown
-								message={message}
-								currentUser={currentUser}
-								onDelete={onDelete}
-								onReply={onReply}
-								onMarkUnread={onMarkUnread}
-							/>
+							{renderMessageMenu()}
 							</div>
 						)}
 					</div>
@@ -448,13 +454,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								)}
 								<ChatMessageContent content={message.content} isOutgoing />
 							</div>
-							<MessageDropdown
-								message={message}
-								currentUser={currentUser}
-								onDelete={onDelete}
-								onReply={onReply}
-								onMarkUnread={onMarkUnread}
-							/>
+							{renderMessageMenu()}
 						</div>
 					) : (
 						<>
@@ -485,24 +485,66 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				<MessageReactions
 					message={message}
 					currentUserId={currentUser?.id}
-					canReact={!isSender}
+					canReact={!isSender && !isPending}
 					align={isSender ? "right" : "left"}
 				/>
 
 				{/* Timestamp and read status (outgoing only) */}
 				{isSender && (
-					<div className="mt-2 flex items-center gap-1 justify-end">
-						<MessageReadStatus
-							isRead={message.isRead}
-							readBy={message.readBy}
-							participants={chatParticipants}
-							currentUserId={currentUser?.id ?? null}
-							senderId={message.senderId}
-							className="flex-shrink-0"
-						/>
-						<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
-							{formatNyWallClockDateTime(message.createdAt)}
-						</p>
+					<div className="mt-2 flex flex-col items-end gap-1">
+						{isPending ? (
+							<>
+								{isPendingSending ? (
+									<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+										<svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+												fill="none"
+											/>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											/>
+										</svg>
+										<span className="chat-msg-meta">Sending...</span>
+									</div>
+								) : null}
+								{isPendingFailed ? (
+									<div className="flex items-center gap-2">
+										<span className="chat-msg-meta text-error-500">Not sent</span>
+										{onRetry ? (
+											<button
+												type="button"
+												onClick={onRetry}
+												className="chat-msg-meta rounded-md bg-brand-500 px-2 py-0.5 font-medium text-white hover:bg-brand-600"
+											>
+												Retry
+											</button>
+										) : null}
+									</div>
+								) : null}
+							</>
+						) : (
+							<div className="flex items-center gap-1 justify-end">
+								<MessageReadStatus
+									isRead={message.isRead}
+									readBy={message.readBy}
+									participants={chatParticipants}
+									currentUserId={currentUser?.id ?? null}
+									senderId={message.senderId}
+									className="flex-shrink-0"
+								/>
+								<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
+									{formatNyWallClockDateTime(message.createdAt)}
+								</p>
+							</div>
+						)}
 					</div>
 				)}
 			</div>

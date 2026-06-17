@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { chatApi, ChatRoom } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { chatOutboxService } from "@/services/chatOutboxService";
 import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
 import { loadChatMessagesPage, CHAT_MESSAGES_QUERY_KEY } from "@/lib/chatMessagesQuery";
@@ -328,6 +329,7 @@ export const useChatSync = () => {
 	const sendMessage = useCallback(
 		async (messageData: {
 			content: string;
+			clientMessageId?: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
 			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
 			replyData?: {
@@ -337,7 +339,9 @@ export const useChatSync = () => {
 				senderName: string;
 			};
 		}) => {
-			if (!currentChatRoom || !currentUser) return;
+			if (!currentChatRoom || !currentUser) {
+				throw new Error("Cannot send message: no active chat room");
+			}
 
 			try {
 				const attachments = messageData.attachments;
@@ -347,6 +351,7 @@ export const useChatSync = () => {
 				const newMessage = await chatApi.sendMessage({
 					chatRoomId: currentChatRoom.id,
 					content: messageData.content,
+					clientMessageId: messageData.clientMessageId,
 					replyData: messageData.replyData,
 					...(multi
 						? {
@@ -370,6 +375,7 @@ export const useChatSync = () => {
 			} catch (error) {
 				console.error("Failed to send message:", error);
 				setError("Failed to send message");
+				throw error;
 			}
 		},
 		[currentChatRoom, currentUser, addMessage, setError]
@@ -461,6 +467,7 @@ export const useChatSync = () => {
 
 		// Clear cache
 		await indexedDBChatService.clearCache();
+		await chatOutboxService.clearAll();
 	}, []);
 
 	// Load a single chat room by ID (useful for newly added chat rooms)

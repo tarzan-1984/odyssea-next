@@ -70,6 +70,20 @@ export type MessageReactionGroup = {
 	hasCurrentUser: boolean;
 };
 
+export type PendingOutgoingStatus = "uploading" | "sending" | "acknowledged" | "failed";
+
+export type PendingOutgoingMeta = {
+	kind: "text" | "media";
+	status: PendingOutgoingStatus;
+	clientMessageId: string;
+	serverMessageId?: string;
+	expectedFileUrls?: string[];
+	retryPayload?: {
+		content: string;
+		replyData?: Message["replyData"];
+	};
+};
+
 export interface Message {
 	id: string;
 	chatRoomId: string;
@@ -93,6 +107,10 @@ export interface Message {
 	sender: User;
 	receiver?: User;
 	reactions?: MessageReactionGroup[];
+	/** Idempotent send key echoed by the server when provided on send. */
+	clientMessageId?: string;
+	/** Present only on optimistic outgoing bubbles before server confirmation. */
+	pendingOutgoing?: PendingOutgoingMeta;
 }
 
 /** Pipe-delimited multiple files in one message (fileUrl and fileName aligned by index). */
@@ -136,6 +154,7 @@ export function getMessageMultiAttachments(message: Message): ChatMessageAttachm
 export interface SendMessageDto {
 	chatRoomId: string;
 	content: string;
+	clientMessageId?: string;
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;

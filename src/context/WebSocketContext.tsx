@@ -40,6 +40,7 @@ interface WebSocketContextType {
 interface SendMessageData {
 	chatRoomId: string;
 	content: string;
+	clientMessageId?: string;
 	fileUrl?: string;
 	fileName?: string;
 	fileSize?: number;
@@ -385,9 +386,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			console.log("[WebSocket] User location update");
 		});
 
-		// Handle message sent confirmation
+		// Handle message sent confirmation (full message body for fast client ack UI)
 		newSocket.on("messageSent", (data: any) => {
-			// Update message status in store if needed
+			if (!data?.message || !data.chatRoomId || !currentUser?.id) return;
+			if (data.message.senderId !== currentUser.id) return;
+
+			const state = useChatStore.getState();
+			if (state.currentChatRoom?.id !== data.chatRoomId) return;
+
+			const serverMessage: Message = {
+				...data.message,
+				createdAt:
+					typeof data.message.createdAt === "string"
+						? data.message.createdAt
+						: new Date(data.message.createdAt).toISOString(),
+			};
+			state.addMessage(serverMessage);
+			indexedDBChatService.addMessage(serverMessage).catch((error: Error) => {
+				console.error("Failed to save ack message to IndexedDB:", error);
+			});
 		});
 
 		// Handle new message from server
@@ -1159,22 +1176,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	);
 
 	const sendMessage = (data: SendMessageData) => {
-		if (socket && isConnected) {
-			// Send message data in the format expected by the backend
-			const messageData = {
-				chatRoomId: data.chatRoomId,
-				content: data.content,
-				fileUrl: data.fileUrl,
-				fileName: data.fileName,
-				fileSize: data.fileSize,
-				attachments: data.attachments,
-				replyData: data.replyData,
-			};
-
-			socket.emit("sendMessage", messageData);
-		} else {
-			console.error("Cannot send message: socket not connected or not available");
+		if (!socket?.connected) {
+			throw new Error("WebSocket not connected");
 		}
+
+		const messageData = {
+			chatRoomId: data.chatRoomId,
+			content: data.content,
+			clientMessageId: data.clientMessageId,
+			fileUrl: data.fileUrl,
+			fileName: data.fileName,
+			fileSize: data.fileSize,
+			attachments: data.attachments,
+			replyData: data.replyData,
+		};
+
+		socket.emit("sendMessage", messageData);
 	};
 
 	const sendTyping = (chatRoomId: string, isTyping: boolean) => {

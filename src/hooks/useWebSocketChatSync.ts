@@ -166,6 +166,7 @@ export const useWebSocketChatSync = () => {
 	const sendMessageWithWebSocket = useCallback(
 		async (messageData: {
 			content: string;
+			clientMessageId?: string;
 			fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number };
 			attachments?: { fileUrl: string; fileName: string; fileSize?: number }[];
 			replyData?: { avatar?: string; time: string; content: string; senderName: string };
@@ -174,6 +175,7 @@ export const useWebSocketChatSync = () => {
 				const multi = messageData.attachments && messageData.attachments.length >= 2 ? messageData.attachments : null;
 				wsSendMessage({
 					content: messageData.content,
+					clientMessageId: messageData.clientMessageId,
 					fileUrl: multi ? multi[0].fileUrl : messageData.fileData?.fileUrl,
 					fileName: multi ? multi[0].fileName : messageData.fileData?.fileName,
 					fileSize: multi ? multi[0].fileSize : messageData.fileData?.fileSize,
