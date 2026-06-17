@@ -654,13 +654,11 @@ export const useChatStore = create<ChatState>()(
 					);
 				},
 
-				// Clear cache from IndexedDB and reset store
+				// Clear chat cache from IndexedDB and in-memory store (profile UI settings stay in localStorage)
 				clearCache: async () => {
 					try {
-						// Clear IndexedDB cache
 						await indexedDBChatService.clearCache();
 
-						// Clear Zustand store
 						set(
 							{
 								currentChatRoom: null,
@@ -672,6 +670,15 @@ export const useChatStore = create<ChatState>()(
 								error: null,
 								hasMoreMessages: false,
 								currentPage: 1,
+								hasArchivedMessages: false,
+								isLoadingArchivedMessages: false,
+								isLoadingAvailableArchives: false,
+								archivedMessagesCache: new Map(),
+								availableArchives: [],
+								currentArchiveIndex: 0,
+								pendingArchiveLoad: false,
+								archiveDaysLoadedForRoomId: null,
+								archiveDaysInflightRoomId: null,
 							},
 							false,
 							"clearCache"

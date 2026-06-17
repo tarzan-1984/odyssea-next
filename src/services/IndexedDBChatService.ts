@@ -703,33 +703,36 @@ class IndexedDBChatService {
 		}
 	}
 
-	// Cache management operations
+	private clearObjectStore(db: IDBDatabase, storeName: string): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction([storeName], "readwrite");
+			transaction.oncomplete = () => resolve();
+			transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+			transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+			transaction.objectStore(storeName).clear();
+		});
+	}
+
+	private resetDbConnection(): void {
+		if (this.db) {
+			this.db.close();
+		}
+		this.db = null;
+		this.initPromise = null;
+		this.limitsEnforced = false;
+	}
+
+	// Cache management operations — only OdysseaChatDB messages + chatRooms (not profile settings in localStorage)
 	async clearCache(): Promise<void> {
 		try {
 			const db = await this.ensureDB();
-
-			// Clear messages
-			const messagesTransaction = db.transaction([MESSAGES_STORE], "readwrite");
-			const messagesStore = messagesTransaction.objectStore(MESSAGES_STORE);
-			await new Promise<void>((resolve, reject) => {
-				const request = messagesStore.clear();
-				request.onsuccess = () => resolve();
-				request.onerror = () => reject(request.error);
-			});
-
-			// Clear chat rooms
-			const chatRoomsTransaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
-			const chatRoomsStore = chatRoomsTransaction.objectStore(CHAT_ROOMS_STORE);
-			await new Promise<void>((resolve, reject) => {
-				const request = chatRoomsStore.clear();
-				request.onsuccess = () => resolve();
-				request.onerror = () => reject(request.error);
-			});
-
-			// Cleared all cache from IndexedDB
+			await this.clearObjectStore(db, MESSAGES_STORE);
+			await this.clearObjectStore(db, CHAT_ROOMS_STORE);
 		} catch (error) {
 			console.error("Failed to clear cache from IndexedDB:", error);
 			throw error;
+		} finally {
+			this.resetDbConnection();
 		}
 	}
 

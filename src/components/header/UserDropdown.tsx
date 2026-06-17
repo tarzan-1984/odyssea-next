@@ -10,6 +10,10 @@ import { useCurrentUser } from "@/stores/userStore";
 import { TrashDeleteIcon } from "@/icons";
 import { useChatStore } from "@/stores/chatStore";
 import ConfirmModal from "../ui/ConfirmModal";
+import { chatOutboxService } from "@/services/chatOutboxService";
+import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { queryClient } from "@/lib/queryClient";
+import { CHAT_MESSAGES_QUERY_KEY } from "@/lib/chatMessagesQuery";
 
 export default function UserDropdown() {
 	const [isOpen, setIsOpen] = useState(false);
@@ -33,18 +37,24 @@ export default function UserDropdown() {
 
 	const handleConfirmClearCache = async () => {
 		if (isClearingCache) return;
-		
+
 		setIsClearingCache(true);
 		try {
-			// Clear cache and store
 			await clearCache();
-			console.log("Cache cleared successfully");
-			
-			// Reload chat data from API
+			await chatOutboxService.clearAll();
+			queryClient.removeQueries({ queryKey: [CHAT_MESSAGES_QUERY_KEY] });
+
+			const size = await indexedDBChatService.getCacheSize();
+			if (size.messages > 0 || size.chatRooms > 0) {
+				throw new Error(
+					`IndexedDB was not cleared (messages: ${size.messages}, chatRooms: ${size.chatRooms})`
+				);
+			}
+
+			console.log("Chat cache cleared successfully");
 			window.location.reload();
 		} catch (error) {
 			console.error("Failed to clear cache:", error);
-			// You could add a toast notification here
 		} finally {
 			setIsClearingCache(false);
 			setIsConfirmModalOpen(false);
@@ -211,7 +221,7 @@ export default function UserDropdown() {
 				onClose={handleCancelClearCache}
 				onConfirm={handleConfirmClearCache}
 				title="Clear Chat Cache"
-				message="Are you sure you want to clear the chat cache? This will remove all cached messages and chat data from your device. The page will automatically reload to fetch fresh data from the server."
+				message="Are you sure you want to clear the chat cache? This removes cached messages and chat rooms from IndexedDB on this device. Your profile settings (font size, sounds, theme, time zones) are kept. The page will reload and fetch fresh chat data from the server."
 				confirmText="Clear Cache"
 				cancelText="Cancel"
 				isLoading={isClearingCache}
