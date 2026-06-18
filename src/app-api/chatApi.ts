@@ -245,7 +245,8 @@ class ChatApiClient {
 	/** Paginated LOAD chats where is_load_archived (main list excludes these). */
 	async getArchivedLoadChatRooms(
 		page: number = 1,
-		limit: number = 10
+		limit: number = 10,
+		search?: string
 	): Promise<{
 		chatRooms: ChatRoom[];
 		pagination: { page: number; limit: number; hasMore: boolean };
@@ -254,6 +255,10 @@ class ChatApiClient {
 			page: page.toString(),
 			limit: limit.toString(),
 		});
+		const trimmedSearch = search?.trim();
+		if (trimmedSearch) {
+			params.set("search", trimmedSearch);
+		}
 
 		const response = await this.request<{
 			chatRooms: ChatRoom[];

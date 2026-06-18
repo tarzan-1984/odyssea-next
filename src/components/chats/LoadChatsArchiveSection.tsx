@@ -9,7 +9,6 @@ import { useCurrentUser } from "@/stores/userStore";
 import { ChevronDownIcon, ChevronUpIcon } from "@/icons";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "./loadArchivedChatsQueryKey";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
-import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 
 const PAGE_SIZE = 10;
 
@@ -65,40 +64,17 @@ export default function LoadChatsArchiveSection({
 		setDebouncedArchiveSearch("");
 	};
 
-	/** Mirrors `ChatList.getChatDisplayName` + LOAD fallback like GROUP (archived shipments are LOAD). */
-	const getArchiveChatDisplayName = React.useCallback(
-		(chatRoom: ChatRoom): string => {
-			if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
-				const otherParticipant = chatRoom.participants.find(
-					p => p.user.id !== currentUser?.id
-				);
-				if (otherParticipant) {
-					return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
-				}
-			}
-
-			if (chatRoom.name) {
-				return chatRoom.name;
-			}
-
-			if (chatRoom.type === "GROUP" || chatRoom.type === "LOAD") {
-				const participantNames = chatRoom.participants
-					.slice(0, 2)
-					.map(p => p.user.firstName)
-					.join(", ");
-				return participantNames + (chatRoom.participants.length > 2 ? "..." : "");
-			}
-
-			return "Unknown Chat";
-		},
-		[currentUser?.id]
-	);
+	const trimmedArchiveSearch = debouncedArchiveSearch.trim();
 
 	const { data, hasNextPage, isFetchingNextPage, fetchNextPage, isLoading, isError } =
 		useInfiniteQuery({
-			queryKey: ARCHIVED_LOAD_CHATS_QUERY_KEY,
+			queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY, trimmedArchiveSearch],
 			queryFn: ({ pageParam }) =>
-				chatApi.getArchivedLoadChatRooms(Number(pageParam) || 1, PAGE_SIZE),
+				chatApi.getArchivedLoadChatRooms(
+					Number(pageParam) || 1,
+					PAGE_SIZE,
+					trimmedArchiveSearch || undefined
+				),
 			enabled: tabActive && expanded,
 			initialPageParam: 1,
 			getNextPageParam: last =>
@@ -122,30 +98,18 @@ export default function LoadChatsArchiveSection({
 		[data]
 	);
 
-	const filteredArchivedRooms = React.useMemo(() => {
-		const q = debouncedArchiveSearch.trim().toLowerCase();
-		if (!q) return archivedRooms;
-		return archivedRooms.filter(room =>
-			chatRoomMatchesSearchQuery(room, q, getArchiveChatDisplayName, {
-				includeParticipantPhones: true,
-			})
-		);
-	}, [archivedRooms, debouncedArchiveSearch, getArchiveChatDisplayName]);
-
 	const visibleArchivedRooms = React.useMemo(() => {
-		if (!pinnedArchivedRoom) return filteredArchivedRooms;
-		if (filteredArchivedRooms.some(r => r.id === pinnedArchivedRoom.id)) {
-			return filteredArchivedRooms;
+		if (!pinnedArchivedRoom) return archivedRooms;
+		if (archivedRooms.some(r => r.id === pinnedArchivedRoom.id)) {
+			return archivedRooms;
 		}
-		return [pinnedArchivedRoom, ...filteredArchivedRooms];
-	}, [filteredArchivedRooms, pinnedArchivedRoom]);
-
-	const isArchiveSearchActive = debouncedArchiveSearch.trim().length > 0;
+		return [pinnedArchivedRoom, ...archivedRooms];
+	}, [archivedRooms, pinnedArchivedRoom]);
 
 	useEffect(() => {
 		const root = scrollRootRef.current;
 		const sentinel = sentinelRef.current;
-		if (!tabActive || !expanded || !root || !sentinel || isArchiveSearchActive) {
+		if (!tabActive || !expanded || !root || !sentinel) {
 			return;
 		}
 
@@ -162,15 +126,7 @@ export default function LoadChatsArchiveSection({
 		observer.observe(sentinel);
 
 		return () => observer.disconnect();
-	}, [
-		tabActive,
-		expanded,
-		isArchiveSearchActive,
-		hasNextPage,
-		isFetchingNextPage,
-		fetchNextPage,
-		data?.pages?.length,
-	]);
+	}, [tabActive, expanded, hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages?.length]);
 
 	return (
 		<div className="mt-auto flex min-h-0 shrink-0 flex-col pt-2">
@@ -261,17 +217,9 @@ export default function LoadChatsArchiveSection({
 								<div className="px-3 py-4 text-center text-sm text-red-500">
 									Failed to load archive
 								</div>
-							) : archivedRooms.length === 0 ? (
-								<div className="px-3 py-4 text-center text-sm text-gray-500">
-									No archived shipments yet
-								</div>
 							) : visibleArchivedRooms.length === 0 ? (
 								<div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-									{debouncedArchiveSearch.trim() ? (
-										<>No chats found</>
-									) : (
-										<>No archived shipments yet</>
-									)}
+									{trimmedArchiveSearch ? <>No chats found</> : <>No archived shipments yet</>}
 								</div>
 							) : (
 								<ul className="divide-y divide-gray-200 py-1 dark:divide-white/10">
