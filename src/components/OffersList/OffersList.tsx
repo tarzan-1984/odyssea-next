@@ -830,10 +830,6 @@ const OffersList = () => {
 				defaultMessage={
 					pushModalTarget ? buildExtendBidTimePushMessage(pushModalTarget.offer) : undefined
 				}
-				offerId={pushModalTarget?.offer.id}
-				onSent={async () => {
-					await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-				}}
 			/>
 		</div>
 	);

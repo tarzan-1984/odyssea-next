@@ -23,7 +23,6 @@ export function buildCheckListVersionPushDefaultMessage(
 function buildPushBody(
 	driver: CheckListDriver,
 	message: string,
-	offerId?: number,
 ): Record<string, unknown> {
 	const text = message.trim();
 	const ext = driver.externalId?.trim();
@@ -36,9 +35,6 @@ function buildPushBody(
 		body.userId = null;
 	} else {
 		body.userId = driver.id;
-	}
-	if (offerId != null && offerId > 0) {
-		body.offerId = offerId;
 	}
 	return body;
 }
@@ -54,8 +50,6 @@ type CheckListPushModalProps = {
 	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
 	drivers: CheckListDriver[] | null;
 	defaultMessage?: string;
-	/** When set, backend updates offers.update_time after a successful push. */
-	offerId?: number;
 	onSent?: () => void | Promise<void>;
 };
 
@@ -64,7 +58,6 @@ export default function CheckListPushModal({
 	onClose,
 	drivers,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
-	offerId,
 	onSent,
 }: CheckListPushModalProps) {
 	const [message, setMessage] = useState(defaultMessage);
@@ -103,7 +96,7 @@ export default function CheckListPushModal({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					credentials: "include",
-					body: JSON.stringify(buildPushBody(driver, text, offerId)),
+					body: JSON.stringify(buildPushBody(driver, text)),
 				});
 				const json = (await res.json().catch(() => ({}))) as {
 					error?: string;
