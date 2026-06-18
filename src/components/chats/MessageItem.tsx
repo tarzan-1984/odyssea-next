@@ -124,9 +124,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		) : null;
 
 	return (
-		<div
-			className={`flex ${isSender ? "justify-end" : "items-start gap-4"} mb-4`}
-		>
+		<div className={`flex ${isSender ? "justify-end" : "items-start gap-4"}`}>
 			{!isSender && (
 				<div className="relative h-10 w-10 shrink-0">
 					<div

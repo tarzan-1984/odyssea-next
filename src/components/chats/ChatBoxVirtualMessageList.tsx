@@ -1,6 +1,13 @@
 "use client";
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import React, {
+	forwardRef,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useLayoutEffect,
+	useRef,
+} from "react";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { Message, ChatRoomParticipant } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
@@ -54,28 +61,39 @@ function VirtualMessageRow({
 	onMarkUnread,
 	onRetry,
 }: VirtualMessageRowProps) {
-	const measureRow = useCallback(
-		(node: HTMLDivElement | null) => {
-			if (!node) return;
-			virtualizer.measureElement(node);
+	const rowRef = useRef<HTMLDivElement>(null);
+
+	useLayoutEffect(() => {
+		const node = rowRef.current;
+		if (!node) return;
+
+		virtualizer.measureElement(node);
+
+		const syncMeasuredHeight = () => {
 			const measured = node.getBoundingClientRect().height;
-			if (measured > 0) {
-				const prev = measuredHeightsRef.current.get(message.id);
-				if (prev !== measured) {
-					measuredHeightsRef.current.set(message.id, measured);
-					if (prev != null && Math.abs(prev - measured) > 4) {
-						virtualizer.measure();
-					}
-				}
+			if (measured <= 0) return;
+
+			const prev = measuredHeightsRef.current.get(message.id);
+			measuredHeightsRef.current.set(message.id, measured);
+			if (prev == null || Math.abs(prev - measured) > 2) {
+				virtualizer.measure();
 			}
-		},
-		[message.id, measuredHeightsRef, virtualizer]
-	);
+		};
+
+		syncMeasuredHeight();
+
+		const observer = new ResizeObserver(() => {
+			syncMeasuredHeight();
+		});
+		observer.observe(node);
+
+		return () => observer.disconnect();
+	}, [message.id, measuredHeightsRef, virtualizer]);
 
 	return (
 		<div
+			ref={rowRef}
 			data-index={virtualRow.index}
-			ref={measureRow}
 			className="absolute left-0 top-0 w-full"
 			style={{
 				transform: `translateY(${virtualRow.start}px)`,
@@ -125,10 +143,13 @@ const ChatBoxVirtualMessageList = forwardRef<
 			if (!message) return 96;
 			return (
 				measuredHeightsRef.current.get(message.id) ??
-				estimateChatMessageHeight(message)
+				estimateChatMessageHeight(message, {
+					currentUserId: currentUser?.id,
+					chatRoomType,
+				})
 			);
 		},
-		[messages]
+		[messages, currentUser?.id, chatRoomType]
 	);
 
 	const virtualizer = useVirtualizer({
@@ -138,7 +159,6 @@ const ChatBoxVirtualMessageList = forwardRef<
 		gap: MESSAGE_GAP_PX,
 		overscan: VIRTUAL_OVERSCAN,
 		getItemKey: index => messages[index]?.id ?? index,
-		measureElement: element => element.getBoundingClientRect().height,
 	});
 
 	const scrollToBottom = useCallback(() => {
