@@ -173,11 +173,14 @@ const ChatBoxVirtualMessageList = forwardRef<
 		gap: MESSAGE_GAP_PX,
 		overscan: VIRTUAL_OVERSCAN,
 		getItemKey: index => messages[index]?.id ?? index,
-		shouldAdjustScrollPositionOnItemSizeChange: (item, _delta, instance) => {
+	});
+
+	useLayoutEffect(() => {
+		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
 			const offset = instance.scrollOffset ?? 0;
 			return item.start < offset;
-		},
-	});
+		};
+	}, [virtualizer]);
 
 	const scrollToBottom = useCallback(() => {
 		if (messages.length === 0) return;
