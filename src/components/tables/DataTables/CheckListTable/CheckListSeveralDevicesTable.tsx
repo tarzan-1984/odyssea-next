@@ -8,6 +8,7 @@ export default function CheckListSeveralDevicesTable() {
 		<CheckListDriverDevicesTable
 			apiPath="/api/users/drivers/check-list/several-devices"
 			queryKey="drivers-check-list-several-devices"
+			showLastOpenAppColumn
 			getEmptyMessage={() => "No drivers match the criteria"}
 			getPushDefaultMessage={() => CHECK_LIST_PUSH_DEFAULT_MESSAGE}
 		/>

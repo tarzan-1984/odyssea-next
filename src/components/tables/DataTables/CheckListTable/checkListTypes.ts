@@ -17,6 +17,7 @@ export type CheckListVersionDevice = {
 	appVersion: string | null;
 	deviceName: string | null;
 	model: string | null;
+	lastActiveAt?: string | null;
 };
 
 export type CheckListVersionDriver = {

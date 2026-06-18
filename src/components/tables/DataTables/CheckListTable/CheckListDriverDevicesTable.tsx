@@ -16,6 +16,7 @@ import CheckListChatModal from "./CheckListChatModal";
 import CheckListPhoneLink from "./CheckListPhoneLink";
 import CheckListDriverNameLink from "./CheckListDriverNameLink";
 import { copyDriverPhoneNumbers } from "./copyCheckListPhoneNumbers";
+import { formatCheckListNyDate } from "./formatCheckListNyDate";
 import type {
 	CheckListDriver,
 	CheckListVersionDriver,
@@ -73,6 +74,8 @@ type CheckListDriverDevicesTableProps = {
 	getPushDefaultMessage: (minimumAppVersion: string) => string;
 	/** When true, shows the minimum allowed app version from App settings above the table. */
 	showMinimumAppVersion?: boolean;
+	/** When true, shows last_active_at per device (Several devices tab). */
+	showLastOpenAppColumn?: boolean;
 };
 
 export default function CheckListDriverDevicesTable({
@@ -81,6 +84,7 @@ export default function CheckListDriverDevicesTable({
 	getEmptyMessage,
 	getPushDefaultMessage,
 	showMinimumAppVersion = false,
+	showLastOpenAppColumn = false,
 }: CheckListDriverDevicesTableProps) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -183,6 +187,7 @@ export default function CheckListDriverDevicesTable({
 
 	const emptyMessage = getEmptyMessage(minimumAppVersion);
 	const pushDefaultMessage = getPushDefaultMessage(minimumAppVersion);
+	const tableColumnCount = showLastOpenAppColumn ? 8 : 7;
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -394,6 +399,14 @@ export default function CheckListDriverDevicesTable({
 								>
 									Model
 								</TableCell>
+								{showLastOpenAppColumn && (
+									<TableCell
+										isHeader
+										className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
+									>
+										Last open app
+									</TableCell>
+								)}
 								<TableCell
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap text-right"
@@ -405,7 +418,7 @@ export default function CheckListDriverDevicesTable({
 						<TableBody className="text-sm divide-y divide-gray-100 dark:divide-white/[0.05]">
 							{query.isError && (
 								<TableRow>
-									<TableCell colSpan={7} className="px-5 py-8 text-center text-red-500">
+									<TableCell colSpan={tableColumnCount} className="px-5 py-8 text-center text-red-500">
 										{(query.error as Error)?.message || "Failed to load check list"}
 									</TableCell>
 								</TableRow>
@@ -413,7 +426,7 @@ export default function CheckListDriverDevicesTable({
 							{!query.isError && !query.isPending && drivers.length === 0 && (
 								<TableRow>
 									<TableCell
-										colSpan={7}
+										colSpan={tableColumnCount}
 										className="px-5 py-8 text-center text-gray-500 dark:text-gray-400"
 									>
 										{emptyMessage}
@@ -479,6 +492,11 @@ export default function CheckListDriverDevicesTable({
 										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
 											{device.model || "—"}
 										</TableCell>
+										{showLastOpenAppColumn && (
+											<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+												{formatCheckListNyDate(device.lastActiveAt)}
+											</TableCell>
+										)}
 										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
 											<div className="flex flex-wrap justify-end gap-1.5">
 												<Button
