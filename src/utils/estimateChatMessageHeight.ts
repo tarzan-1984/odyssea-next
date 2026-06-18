@@ -1,4 +1,8 @@
 import { Message, getMessageMultiAttachments } from "@/app-api/chatApi";
+import {
+	CHAT_DOCUMENT_PREVIEW_HEIGHT_PX,
+	CHAT_IMAGE_PREVIEW_MIN_HEIGHT_PX,
+} from "@/config/chatImagePreview";
 
 const BASE_HEIGHT_PX = 88;
 const LINE_HEIGHT_PX = 20;
@@ -6,8 +10,8 @@ const CHARS_PER_LINE = 52;
 const MAX_TEXT_HEIGHT_PX = 480;
 const REPLY_BLOCK_PX = 68;
 const REACTIONS_PX = 40;
-const IMAGE_ATTACHMENT_PX = 260;
-const PDF_ATTACHMENT_PX = 210;
+const IMAGE_ATTACHMENT_PX = CHAT_IMAGE_PREVIEW_MIN_HEIGHT_PX + 20;
+const PDF_ATTACHMENT_PX = CHAT_DOCUMENT_PREVIEW_HEIGHT_PX;
 const GENERIC_FILE_PX = 76;
 const INCOMING_NAME_PX = 28;
 const INCOMING_FOOTER_PX = 24;

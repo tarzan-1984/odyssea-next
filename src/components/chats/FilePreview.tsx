@@ -201,7 +201,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 	const { elementRef, inView } = useLazyInViewport({
 		root: scrollRoot,
 		resetKey: fileUrl,
-		releaseOnExit: true,
 	});
 	const shouldLoadMedia = mediaLoadEnabled && inView;
 	const thumbOptions = useMemo(() => getChatImageListThumbOptions(compact), [compact]);
@@ -454,7 +453,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
 	const wrapWithLazyGate = (content: React.ReactNode) => (
 		<div ref={elementRef} className="w-full min-h-0">
-			{showPreviewContent ? content : <ChatMediaPreviewPlaceholder compact={compact} />}
+			{showPreviewContent ? (
+				content
+			) : (
+				<ChatMediaPreviewPlaceholder compact={compact} fileExtension={fileExtension} />
+			)}
 		</div>
 	);
 
@@ -483,7 +486,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				);
 			}
 			return (
-				<div className={`flex items-center justify-center ${compact ? "h-24" : "h-32"}`}>
+				<div className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);
@@ -492,7 +495,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		// Raster images keep isLoading true until <img onLoad>; they must mount the img (see case jpg/heic).
 		if (isLoading && !isRasterChatImageExtension(fileExtension)) {
 			return (
-				<div className={`flex items-center justify-center ${compact ? "h-24" : "h-32"}`}>
+				<div className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);

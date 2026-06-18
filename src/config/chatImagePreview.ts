@@ -10,6 +10,18 @@ export const CHAT_IMAGE_PREVIEW_MAX_WIDTH = 240;
 /** Smaller thumbs for compact multi-attach grid cells. */
 export const CHAT_IMAGE_PREVIEW_COMPACT_MAX_WIDTH = 160;
 
+/** Reserved inline preview height (px) — must match FilePreview / placeholder min-heights. */
+export const CHAT_IMAGE_PREVIEW_MIN_HEIGHT_PX = 180;
+
+/** Max rendered inline image height (Tailwind max-h-64). */
+export const CHAT_IMAGE_PREVIEW_MAX_HEIGHT_PX = 256;
+
+/** Compact grid cell height (Tailwind h-24). */
+export const CHAT_IMAGE_PREVIEW_COMPACT_HEIGHT_PX = 96;
+
+/** PDF/DOC inline iframe height (Tailwind h-64). */
+export const CHAT_DOCUMENT_PREVIEW_HEIGHT_PX = 256;
+
 /** JPEG quality for chat thumbnails (40–90). Lower = smaller files, faster chat load. */
 export const CHAT_IMAGE_PREVIEW_QUALITY = 40;
 

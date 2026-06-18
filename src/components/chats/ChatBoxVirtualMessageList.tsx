@@ -62,6 +62,7 @@ function VirtualMessageRow({
 	onRetry,
 }: VirtualMessageRowProps) {
 	const rowRef = useRef<HTMLDivElement>(null);
+	const measureRafRef = useRef<number | null>(null);
 
 	useLayoutEffect(() => {
 		const node = rowRef.current;
@@ -75,9 +76,17 @@ function VirtualMessageRow({
 
 			const prev = measuredHeightsRef.current.get(message.id);
 			measuredHeightsRef.current.set(message.id, measured);
-			if (prev == null || Math.abs(prev - measured) > 2) {
-				virtualizer.measure();
+			if (prev != null && Math.abs(prev - measured) <= 2) {
+				return;
 			}
+
+			if (measureRafRef.current != null) {
+				cancelAnimationFrame(measureRafRef.current);
+			}
+			measureRafRef.current = requestAnimationFrame(() => {
+				measureRafRef.current = null;
+				virtualizer.measureElement(node);
+			});
 		};
 
 		syncMeasuredHeight();
@@ -87,7 +96,12 @@ function VirtualMessageRow({
 		});
 		observer.observe(node);
 
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			if (measureRafRef.current != null) {
+				cancelAnimationFrame(measureRafRef.current);
+			}
+		};
 	}, [message.id, measuredHeightsRef, virtualizer]);
 
 	return (
@@ -159,6 +173,10 @@ const ChatBoxVirtualMessageList = forwardRef<
 		gap: MESSAGE_GAP_PX,
 		overscan: VIRTUAL_OVERSCAN,
 		getItemKey: index => messages[index]?.id ?? index,
+		shouldAdjustScrollPositionOnItemSizeChange: (item, _delta, instance) => {
+			const offset = instance.scrollOffset ?? 0;
+			return item.start < offset;
+		},
 	});
 
 	const scrollToBottom = useCallback(() => {
