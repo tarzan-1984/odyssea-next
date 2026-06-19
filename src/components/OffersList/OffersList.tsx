@@ -111,20 +111,13 @@ function buildExtendBidTimePushMessage(offer: OfferRow): string {
 	return `Please extend the bid time for the offer - ${offerName}`;
 }
 
+const DRIVER_TABLE_COL_UNIT = "280px";
 const DRIVER_TABLE_COL_PHONE = "130px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
 
 function fixedDriverTableCol(width: string) {
 	return { width, minWidth: width, maxWidth: width };
-}
-
-function getDriversTableFixedColWidth(isDriverSelected: boolean): string {
-	const fixedWidth = isDriverSelected
-		? `130px + 88px + 96px + 96px + 180px`
-		: `130px + 88px + 96px + 88px + 156px + 168px`;
-
-	return `calc(100% - (${fixedWidth}))`;
 }
 
 function offerDriverToCheckListDriver(driver: OfferDriver): CheckListDriver {
@@ -463,11 +456,19 @@ const OffersList = () => {
 								</div>
 									{isExpanded && (
 										<div className="border-t border-gray-100 dark:border-white/[0.05] px-4 py-3">
+											<div className="w-full max-w-[1300px]">
 											<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
 												Details
 											</h3>
-											<div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/[0.08]">
-												<Table className="border-collapse w-full">
+											<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
+												<Table className="w-full border-collapse table-fixed">
+													<colgroup>
+														<col style={{ width: "340px" }} />
+														<col style={{ width: "90px" }} />
+														<col style={{ width: "110px" }} />
+														<col style={{ width: "170px" }} />
+														<col style={{ width: "296px" }} />
+													</colgroup>
 													<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
@@ -517,10 +518,10 @@ const OffersList = () => {
 													<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
 														Drivers
 													</h3>
-													<div className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/[0.08]">
-													<Table className="border-collapse w-full table-fixed">
+													<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
+													<Table className="w-full border-collapse table-fixed">
 												<colgroup>
-													<col style={{ width: getDriversTableFixedColWidth(row.is_driver_selected) }} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_UNIT)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
@@ -747,7 +748,7 @@ const OffersList = () => {
 													</Table>
 													</div>
 													{row.active !== false && !row.is_driver_selected && (
-													<div className="mt-3 flex items-center justify-end gap-3">
+													<div className="mt-3 flex items-center justify-start gap-3">
 														<button
 															type="button"
 															onClick={() => {
@@ -779,6 +780,7 @@ const OffersList = () => {
 													)}
 												</div>
 											)}
+											</div>
 										</div>
 									)}
 									{(deactivatingOfferId === row.id ||

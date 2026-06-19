@@ -15,7 +15,7 @@
 	--breakpoint-lg: 1024px;
 	--breakpoint-xl: 1280px;
 	--breakpoint-2xl: 1536px;
-	/* 32" and larger (e.g. 1920px) — allow content to use full width */
+	/* 32" monitors and larger */
 	--breakpoint-fullhd: 1920px;
 
 	--text-title-2xl: 72px;
