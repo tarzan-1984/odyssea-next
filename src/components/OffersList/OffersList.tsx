@@ -107,6 +107,47 @@ function canExtendDriverBidTime(offer: OfferRow, driver: OfferDriver): boolean {
 	);
 }
 
+function getDriverBidSortPriority(driver: OfferDriver, nowUnixSeconds: number): number {
+	if (driver.active === false) return 3;
+
+	const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
+	const hasActiveTimer =
+		driver.rate != null &&
+		actionTimeUnix != null &&
+		actionTimeUnix > nowUnixSeconds;
+
+	if (hasActiveTimer) return 0;
+
+	const hasExpiredTimer = actionTimeUnix != null && actionTimeUnix <= nowUnixSeconds;
+	if (hasExpiredTimer) return 1;
+
+	return 2;
+}
+
+function sortOfferDriversByBidStatus(
+	drivers: OfferDriver[],
+	nowUnixSeconds: number
+): OfferDriver[] {
+	return [...drivers].sort((a, b) => {
+		const priorityA = getDriverBidSortPriority(a, nowUnixSeconds);
+		const priorityB = getDriverBidSortPriority(b, nowUnixSeconds);
+		if (priorityA !== priorityB) return priorityA - priorityB;
+
+		const actionTimeA = normalizeUnixSeconds(a.action_time);
+		const actionTimeB = normalizeUnixSeconds(b.action_time);
+
+		if (priorityA === 0) {
+			return (actionTimeA ?? Number.MAX_SAFE_INTEGER) - (actionTimeB ?? Number.MAX_SAFE_INTEGER);
+		}
+
+		if (priorityA === 1) {
+			return (actionTimeB ?? 0) - (actionTimeA ?? 0);
+		}
+
+		return 0;
+	});
+}
+
 function buildExtendBidTimePushMessage(offer: OfferRow): string {
 	const offerName = routeSummary(offer.route) || `Offer #${offer.id}`;
 	return `Please extend the bid time for the offer - ${offerName}`;
@@ -116,6 +157,7 @@ const DRIVER_TABLE_COL_UNIT = "280px";
 const DRIVER_TABLE_COL_PHONE = "130px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
+const DRIVER_TABLE_COL_BID_TIMER = "126px";
 
 function fixedDriverTableCol(width: string) {
 	return { width, minWidth: width, maxWidth: width };
@@ -536,9 +578,7 @@ const OffersList = () => {
 													<col
 														style={fixedDriverTableCol(row.is_driver_selected ? "96px" : "88px")}
 													/>
-													<col
-														style={fixedDriverTableCol(row.is_driver_selected ? "180px" : "156px")}
-													/>
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_BID_TIMER)} />
 													{!row.is_driver_selected && (
 														<col style={fixedDriverTableCol("168px")} />
 													)}
@@ -560,7 +600,7 @@ const OffersList = () => {
 																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Rate
 																</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<TableCell isHeader className="px-2 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	Bid timer
 																</TableCell>
 																{!row.is_driver_selected && (
@@ -571,7 +611,7 @@ const OffersList = () => {
 															</TableRow>
 														</TableHeader>
 														<TableBody>
-															{row.drivers.map((driver, driverIndex) => {
+															{sortOfferDriversByBidStatus(row.drivers ?? [], nowUnixSeconds).map((driver, driverIndex) => {
 																const driverUnitId = driver.externalId ?? driver.driver_id;
 																const driverDisplayName = [
 																	driver.externalId != null ? `(${driver.externalId})` : null,
@@ -643,7 +683,7 @@ const OffersList = () => {
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		{driver.rate != null ? `$${Number(driver.rate).toLocaleString("en-US")}` : "—"}
 																	</TableCell>
-																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																	<TableCell className="px-2 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																		{(() => {
 																			const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
 																			if (actionTimeUnix == null) return "—";
@@ -658,8 +698,8 @@ const OffersList = () => {
 																			}
 
 																			return (
-																				<span className="inline-flex items-center gap-1.5">
-																					<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+																				<span className="inline-flex items-center gap-1">
+																					<span className="text-theme-sm text-gray-800 dark:text-gray-200">
 																						Offer Expired
 																					</span>
 																					<ExtendBidTimeButton

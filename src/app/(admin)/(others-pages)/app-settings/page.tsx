@@ -10,6 +10,8 @@ import usersApi from "@/app-api/users";
 import type { UserListItem } from "@/app-api/api-types";
 import { renderAvatar } from "@/helpers";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
+import { useCurrentUser } from "@/stores/userStore";
+import { canModifyAppSettings } from "@/utils/roleAccess";
 
 type MobileAppSettingsPayload = {
 	id: string;
@@ -245,6 +247,8 @@ function getUserDisplayName(u: UserListItem): string {
 }
 
 export default function AppSettingsPage() {
+	const currentUser = useCurrentUser();
+	const canSaveAppSettings = canModifyAppSettings(currentUser?.role);
 	const [intervalMin, setIntervalMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
@@ -671,6 +675,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitDeletion(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingDeletion(true);
 		setErrorDeletion(null);
 		setSuccessDeletion(null);
@@ -715,6 +720,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitMinimumVersion(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingMinimumVersion(true);
 		setErrorMinimumVersion(null);
 		setSuccessMinimumVersion(null);
@@ -766,6 +772,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitOffers(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingOffers(true);
 		setErrorOffers(null);
 		setSuccessOffers(null);
@@ -812,6 +819,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitMobile(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingMobile(true);
 		setErrorMobile(null);
 		setSuccessMobile(null);
@@ -888,6 +896,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitTms(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingTms(true);
 		setErrorTms(null);
 		setSuccessTms(null);
@@ -947,6 +956,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitLoadChat(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingLoadChat(true);
 		setErrorLoadChat(null);
 		setSuccessLoadChat(null);
@@ -997,6 +1007,7 @@ export default function AppSettingsPage() {
 
 	async function onSubmitEnv(e: FormEvent) {
 		e.preventDefault();
+		if (!canSaveAppSettings) return;
 		setSavingEnv(true);
 		setErrorEnv(null);
 		setSuccessEnv(null);
@@ -1522,6 +1533,7 @@ export default function AppSettingsPage() {
 						<button
 							type="submit"
 							disabled={
+								!canSaveAppSettings ||
 								pageLoading ||
 								savingMobile ||
 								savingEnv ||
@@ -1589,7 +1601,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingMinimumVersion}
+							disabled={!canSaveAppSettings || pageLoading || savingMinimumVersion}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingMinimumVersion ? "Saving…" : "Save minimum version"}
@@ -1655,7 +1667,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingOffers}
+							disabled={!canSaveAppSettings || pageLoading || savingOffers}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingOffers ? "Saving…" : "Save offers settings"}
@@ -1714,7 +1726,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingDeletion}
+							disabled={!canSaveAppSettings || pageLoading || savingDeletion}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingDeletion ? "Saving…" : "Save account deletion settings"}
@@ -1802,7 +1814,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pageLoading || savingEnv}
+							disabled={!canSaveAppSettings || pageLoading || savingEnv}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingEnv ? "Saving…" : "Save live / test mode"}
@@ -1893,6 +1905,7 @@ export default function AppSettingsPage() {
 						<button
 							type="submit"
 							disabled={
+								!canSaveAppSettings ||
 								pageLoading ||
 								savingTms ||
 								savingEnv ||
@@ -1965,6 +1978,7 @@ export default function AppSettingsPage() {
 						<button
 							type="submit"
 							disabled={
+								!canSaveAppSettings ||
 								pageLoading ||
 								savingLoadChat ||
 								savingTms ||

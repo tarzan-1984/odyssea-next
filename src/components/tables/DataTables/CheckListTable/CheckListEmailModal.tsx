@@ -6,6 +6,8 @@ import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
+import { useCurrentUser } from "@/stores/userStore";
+import { canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
 import { CHECK_LIST_PUSH_DEFAULT_MESSAGE } from "./CheckListPushModal";
 import {
@@ -38,6 +40,8 @@ export default function CheckListEmailModal({
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
 	onSent,
 }: CheckListEmailModalProps) {
+	const currentUser = useCurrentUser();
+	const canSend = canSendCheckListMessages(currentUser?.role);
 	const [subject, setSubject] = useState(defaultSubject);
 	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
@@ -60,6 +64,7 @@ export default function CheckListEmailModal({
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
+		if (!canSend) return;
 		setError(null);
 		setSuccess(null);
 		const subj = subject.trim();
@@ -189,7 +194,12 @@ export default function CheckListEmailModal({
 					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
 						Cancel
 					</Button>
-					<Button type="submit" variant="primary" size="sm" disabled={sending || targets.length === 0}>
+					<Button
+						type="submit"
+						variant="primary"
+						size="sm"
+						disabled={!canSend || sending || targets.length === 0}
+					>
 						{sending ? progressLabel ?? "Sending…" : "Send"}
 					</Button>
 				</div>

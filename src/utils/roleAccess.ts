@@ -104,6 +104,15 @@ export function canAccessAppSettings(role: string | undefined | null): boolean {
 	return normalized === "ADMINISTRATOR" || isGastRole(role);
 }
 
+export function canModifyAppSettings(role: string | undefined | null): boolean {
+	if (!role) return false;
+	return role.trim().toUpperCase() === "ADMINISTRATOR";
+}
+
+export function canSendCheckListMessages(role: string | undefined | null): boolean {
+	return !isGastRole(role);
+}
+
 export function canCreateOffers(role: string | undefined | null): boolean {
 	return !isGastRole(role);
 }
