@@ -15,7 +15,8 @@ import MessageItem from "./MessageItem";
 import { estimateChatMessageHeight } from "@/utils/estimateChatMessageHeight";
 
 const MESSAGE_GAP_PX = 24;
-const VIRTUAL_OVERSCAN = 5;
+const VIRTUAL_OVERSCAN = 8;
+const SCROLL_IDLE_MEASURE_DELAY_MS = 1200;
 
 export interface ChatBoxVirtualMessageListHandle {
 	scrollToBottom: () => void;
@@ -32,12 +33,15 @@ interface ChatBoxVirtualMessageListProps {
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
 	onContentMeasured?: () => void;
+	isUserScrolledUp?: boolean;
 }
 
 interface VirtualMessageRowProps {
 	virtualRow: VirtualItem;
 	message: Message;
 	measuredHeightsRef: React.MutableRefObject<Map<string, number>>;
+	isScrollingRef: React.MutableRefObject<boolean>;
+	pendingMeasureRef: React.MutableRefObject<boolean>;
 	virtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>;
 	currentUser: UserData | null;
 	chatRoomType?: string;
@@ -52,6 +56,8 @@ function VirtualMessageRow({
 	virtualRow,
 	message,
 	measuredHeightsRef,
+	isScrollingRef,
+	pendingMeasureRef,
 	virtualizer,
 	currentUser,
 	chatRoomType,
@@ -68,7 +74,11 @@ function VirtualMessageRow({
 		const node = rowRef.current;
 		if (!node) return;
 
-		virtualizer.measureElement(node);
+		if (isScrollingRef.current) {
+			pendingMeasureRef.current = true;
+		} else {
+			virtualizer.measureElement(node);
+		}
 
 		const syncMeasuredHeight = () => {
 			const measured = node.getBoundingClientRect().height;
@@ -77,6 +87,11 @@ function VirtualMessageRow({
 			const prev = measuredHeightsRef.current.get(message.id);
 			measuredHeightsRef.current.set(message.id, measured);
 			if (prev != null && Math.abs(prev - measured) <= 2) {
+				return;
+			}
+
+			if (isScrollingRef.current) {
+				pendingMeasureRef.current = true;
 				return;
 			}
 
@@ -102,7 +117,7 @@ function VirtualMessageRow({
 				cancelAnimationFrame(measureRafRef.current);
 			}
 		};
-	}, [message.id, measuredHeightsRef, virtualizer]);
+	}, [isScrollingRef, measuredHeightsRef, message.id, pendingMeasureRef, virtualizer]);
 
 	return (
 		<div
@@ -146,10 +161,19 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onMarkUnread,
 		onRetry,
 		onContentMeasured,
+		isUserScrolledUp = false,
 	},
 	ref
 ) {
 	const measuredHeightsRef = useRef<Map<string, number>>(new Map());
+	const isScrollingRef = useRef(false);
+	const pendingMeasureRef = useRef(false);
+	const scrollIdleTimerRef = useRef<number | null>(null);
+	const virtualizerRef = useRef<ReturnType<
+		typeof useVirtualizer<HTMLDivElement, Element>
+	> | null>(null);
+	const onContentMeasuredRef = useRef(onContentMeasured);
+	const firstMessageChatRoomId = messages[0]?.chatRoomId;
 
 	const getEstimateSize = useCallback(
 		(index: number) => {
@@ -172,15 +196,62 @@ const ChatBoxVirtualMessageList = forwardRef<
 		estimateSize: getEstimateSize,
 		gap: MESSAGE_GAP_PX,
 		overscan: VIRTUAL_OVERSCAN,
+		isScrollingResetDelay: SCROLL_IDLE_MEASURE_DELAY_MS,
 		getItemKey: index => messages[index]?.id ?? index,
 	});
+	virtualizerRef.current = virtualizer;
+
+	useEffect(() => {
+		onContentMeasuredRef.current = onContentMeasured;
+	}, [onContentMeasured]);
+
+	useEffect(() => {
+		if (!scrollElement) return;
+
+		const markScrolling = () => {
+			isScrollingRef.current = true;
+			if (scrollIdleTimerRef.current != null) {
+				window.clearTimeout(scrollIdleTimerRef.current);
+			}
+			scrollIdleTimerRef.current = window.setTimeout(() => {
+				isScrollingRef.current = false;
+				scrollIdleTimerRef.current = null;
+				if (pendingMeasureRef.current) {
+					pendingMeasureRef.current = false;
+					virtualizerRef.current?.measure();
+					onContentMeasuredRef.current?.();
+				}
+			}, SCROLL_IDLE_MEASURE_DELAY_MS);
+		};
+
+		scrollElement.addEventListener("wheel", markScrolling, { passive: true, capture: true });
+		scrollElement.addEventListener("touchmove", markScrolling, {
+			passive: true,
+			capture: true,
+		});
+		scrollElement.addEventListener("scroll", markScrolling, { passive: true });
+		return () => {
+			scrollElement.removeEventListener("wheel", markScrolling, { capture: true });
+			scrollElement.removeEventListener("touchmove", markScrolling, { capture: true });
+			scrollElement.removeEventListener("scroll", markScrolling);
+			if (scrollIdleTimerRef.current != null) {
+				window.clearTimeout(scrollIdleTimerRef.current);
+				scrollIdleTimerRef.current = null;
+			}
+			isScrollingRef.current = false;
+			pendingMeasureRef.current = false;
+		};
+	}, [scrollElement]);
 
 	useLayoutEffect(() => {
 		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
+			if (isScrollingRef.current || !isUserScrolledUp) {
+				return false;
+			}
 			const offset = instance.scrollOffset ?? 0;
 			return item.start < offset;
 		};
-	}, [virtualizer]);
+	}, [isUserScrolledUp, virtualizer]);
 
 	const scrollToBottom = useCallback(() => {
 		if (messages.length === 0) return;
@@ -191,20 +262,24 @@ const ChatBoxVirtualMessageList = forwardRef<
 
 	useEffect(() => {
 		measuredHeightsRef.current.clear();
-	}, [messages[0]?.chatRoomId]);
+	}, [firstMessageChatRoomId]);
 
 	useEffect(() => {
 		if (!scrollElement || messages.length === 0) return;
-		virtualizer.measure();
-		onContentMeasured?.();
-	}, [scrollElement, messages.length, virtualizer.measure]);
+		if (isScrollingRef.current) {
+			pendingMeasureRef.current = true;
+			return;
+		}
+		virtualizerRef.current?.measure();
+		onContentMeasuredRef.current?.();
+	}, [scrollElement, messages.length, firstMessageChatRoomId]);
 
 	const virtualItems = virtualizer.getVirtualItems();
 
 	return (
 		<div
 			className="relative w-full"
-			style={{ height: `${virtualizer.getTotalSize()}px` }}
+			style={{ height: `${virtualizer.getTotalSize()}px`, overflowAnchor: "none" }}
 		>
 			{virtualItems.map(virtualRow => {
 				const message = messages[virtualRow.index];
@@ -216,6 +291,8 @@ const ChatBoxVirtualMessageList = forwardRef<
 						virtualRow={virtualRow}
 						message={message}
 						measuredHeightsRef={measuredHeightsRef}
+						isScrollingRef={isScrollingRef}
+						pendingMeasureRef={pendingMeasureRef}
 						virtualizer={virtualizer}
 						currentUser={currentUser}
 						chatRoomType={chatRoomType}

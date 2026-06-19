@@ -22,6 +22,31 @@ import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
+const CREATOR_ROLE_LABELS: Record<string, string> = {
+	ADMINISTRATOR: "Administrator",
+	DISPATCHER: "Dispatcher",
+	DISPATCHER_TL: "Dispatcher TL",
+	EXPEDITE_MANAGER: "Expedite Manager",
+	MORNING_TRACKING: "Morning Tracking",
+	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
+};
+
+function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
+	if (!creator) return null;
+
+	const name = [creator.firstName, creator.lastName].filter(Boolean).join(" ").trim();
+	const externalId = creator.externalId?.trim();
+	const role = creator.role?.trim();
+
+	if (!name && !externalId && !role) return null;
+
+	const parts = [name || "—"];
+	if (externalId) parts.push(`(${externalId})`);
+	if (role) parts.push(CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " "));
+
+	return parts.join(" ");
+}
+
 function formatDateMmDdYy(dateStr: string | null | undefined): string {
 	if (!dateStr) return "";
 	const trimmed = dateStr.trim();
@@ -273,6 +298,7 @@ const OffersList = () => {
 					<div className="space-y-3">
 						{results.map((row) => {
 							const isExpanded = expandedOfferId === row.id;
+							const creatorLabel = formatOfferCreatorLabel(row.creator);
 							const allDriversInactive =
 								(row.drivers?.length ?? 0) > 0 &&
 								row.drivers!.every((d) => d.active === false);
@@ -310,6 +336,11 @@ const OffersList = () => {
 												/>
 											)}
 										</div>
+										{creatorLabel && (
+											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+												{creatorLabel}
+											</p>
+										)}
 										{/* Driver row: only drivers who placed bid or were refused/deleted */}
 										{(() => {
 											const participatingDrivers =

@@ -24,11 +24,19 @@ export interface OfferRoutePoint {
 	time: string;
 }
 
+export interface OfferCreator {
+	firstName: string;
+	lastName: string;
+	externalId: string | null;
+	role: string;
+}
+
 export interface OfferRow {
 	id: number;
 	active?: boolean;
 	is_driver_selected: boolean;
 	external_user_id: string | null;
+	creator?: OfferCreator | null;
 	create_time: string;
 	update_time: string;
 	pick_up_location?: string;

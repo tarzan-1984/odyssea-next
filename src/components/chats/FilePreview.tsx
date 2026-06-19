@@ -4,9 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Modal } from "@/components/ui/modal";
 import ChatPdfLightbox from "@/components/chats/ChatPdfLightbox";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
-import {
-	HEIC_PREVIEW_CONVERT_ENABLED,
-} from "@/config/heicPreviewConvert";
+import { HEIC_PREVIEW_CONVERT_ENABLED } from "@/config/heicPreviewConvert";
 import {
 	getChatImageListThumbOptions,
 	CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS,
@@ -14,9 +12,7 @@ import {
 	buildChatImagePreviewProxyUrl,
 	isLegacyChatImagePreviewProxyUrl,
 } from "@/config/chatImagePreview";
-import {
-	ensureChatImageThumbnail,
-} from "@/utils/ensureChatImageThumbnail";
+import { ensureChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
 import { useLazyInViewport } from "@/hooks/useLazyInViewport";
@@ -486,7 +482,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				);
 			}
 			return (
-				<div className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}>
+				<div
+					className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}
+				>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);
@@ -495,7 +493,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		// Raster images keep isLoading true until <img onLoad>; they must mount the img (see case jpg/heic).
 		if (isLoading && !isRasterChatImageExtension(fileExtension)) {
 			return (
-				<div className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}>
+				<div
+					className={`flex items-center justify-center ${compact ? "h-24" : "min-h-[180px]"}`}
+				>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
 			);
@@ -580,18 +580,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`w-full ${
-							compact ? "max-w-none h-24" : "max-w-[280px]"
+							compact ? "max-w-none h-24" : "max-w-[280px] h-64"
 						} overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity relative ${
-							compact ? "min-h-0" : "min-h-[180px]"
+							compact ? "min-h-0" : "min-h-64"
 						}`}
 						onClick={e => {
 							e.stopPropagation();
 							openImageViewer();
 						}}
 					>
-						{isLoading ? (
-							<HeicConvertingOverlay message="Loading image..." />
-						) : null}
+						{isLoading ? <HeicConvertingOverlay message="Loading image..." /> : null}
 						{previewContent ? (
 							<img
 								key={previewContent}
@@ -600,7 +598,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 								alt="File preview"
 								loading="lazy"
 								decoding="async"
-								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-auto max-h-64"} ${
+								className={`object-cover w-full ${compact ? "h-24 max-h-24" : "h-64 max-h-64"} ${
 									isLoading ? "opacity-0" : ""
 								}`}
 								onLoad={() => setIsLoading(false)}
@@ -638,9 +636,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							openImageViewer();
 						}}
 					>
-						{isLoading ? (
-							<HeicConvertingOverlay message="Loading image..." />
-						) : null}
+						{isLoading ? <HeicConvertingOverlay message="Loading image..." /> : null}
 						{previewContent ? (
 							<img
 								key={previewContent}
@@ -680,90 +676,87 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
 	return (
 		<>
-			{compact ? (
-				wrapWithLazyGate(
-					<div className="w-full min-h-0 overflow-hidden">{renderPreview()}</div>
-				)
-			) : (
-				wrapWithLazyGate(
-				<div className="mb-2 w-full max-w-[400px] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-					{/* Header */}
-					<div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800">
-						<div className="flex items-center space-x-2">
-							<svg
-								className="w-4 h-4 text-gray-600 dark:text-gray-300"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-								/>
-							</svg>
-							<span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-								{fileName}
-							</span>
-							{fileSize && (
-								<span className="text-xs text-gray-500 dark:text-gray-400">
-									({Math.round(fileSize / 1024)}KB)
-								</span>
-							)}
+			{compact
+				? wrapWithLazyGate(
+						<div className="w-full min-h-0 overflow-hidden">{renderPreview()}</div>
+					)
+				: wrapWithLazyGate(
+						<div className="mb-2 w-full max-w-[400px] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+							{/* Header */}
+							<div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800">
+								<div className="flex items-center space-x-2">
+									<svg
+										className="w-4 h-4 text-gray-600 dark:text-gray-300"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth={2}
+											d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+										/>
+									</svg>
+									<span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+										{fileName}
+									</span>
+									{fileSize && (
+										<span className="text-xs text-gray-500 dark:text-gray-400">
+											({Math.round(fileSize / 1024)}KB)
+										</span>
+									)}
+								</div>
+							</div>
+
+							{/* Preview Content */}
+							<div className="relative p-2">
+								{renderPreview()}
+								{isDownloading &&
+									(fileExtension === "heic" || fileExtension === "heif") && (
+										<HeicConvertingOverlay className="z-20 rounded-none" />
+									)}
+							</div>
+
+							{/* Download Button */}
+							<div className="p-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+								<button
+									type="button"
+									disabled={isDownloading}
+									onClick={async e => {
+										e.preventDefault();
+										e.stopPropagation();
+										const { downloadChatFile } =
+											await import("@/utils/downloadChatFile");
+										try {
+											await downloadChatFile(fileUrl, fileName, {
+												onConvertingStart: () => setIsDownloading(true),
+												onConvertingEnd: () => setIsDownloading(false),
+											});
+										} catch {
+											setIsDownloading(false);
+										}
+									}}
+									className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									<svg
+										className="w-4 h-4"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth={2}
+											d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+										/>
+									</svg>
+									<span>Download</span>
+								</button>
+							</div>
 						</div>
-					</div>
-
-					{/* Preview Content */}
-					<div className="relative p-2">
-						{renderPreview()}
-						{isDownloading &&
-							(fileExtension === "heic" || fileExtension === "heif") && (
-								<HeicConvertingOverlay className="z-20 rounded-none" />
-							)}
-					</div>
-
-					{/* Download Button */}
-					<div className="p-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-						<button
-							type="button"
-							disabled={isDownloading}
-							onClick={async e => {
-								e.preventDefault();
-								e.stopPropagation();
-								const { downloadChatFile } = await import(
-									"@/utils/downloadChatFile"
-								);
-								try {
-									await downloadChatFile(fileUrl, fileName, {
-										onConvertingStart: () => setIsDownloading(true),
-										onConvertingEnd: () => setIsDownloading(false),
-									});
-								} catch {
-									setIsDownloading(false);
-								}
-							}}
-							className="flex items-center justify-center space-x-2 w-full px-3 py-2 text-sm bg-brand-500 text-white rounded hover:bg-brand-600 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-						>
-							<svg
-								className="w-4 h-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-								/>
-							</svg>
-							<span>Download</span>
-						</button>
-					</div>
-				</div>
-				)
-			)}
+					)}
 
 			{/* Fallback image modal when gallery provider is not available (e.g. Files modal) */}
 			{isImage && !chatImageGallery && (
@@ -929,9 +922,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 			)}
 
 			{/* Document Modal */}
-			{(fileExtension === "txt" ||
-				fileExtension === "docx" ||
-				fileExtension === "doc") && (
+			{(fileExtension === "txt" || fileExtension === "docx" || fileExtension === "doc") && (
 				<Modal
 					isOpen={isDocumentModalOpen}
 					onClose={() => setIsDocumentModalOpen(false)}
@@ -996,17 +987,18 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 							</div>
 						)}
 
-						{(fileExtension === "docx" || fileExtension === "doc") && previewContent && (
-							<div className="w-full h-full min-h-[600px] border rounded overflow-hidden">
-								<iframe
-									src={previewContent}
-									className="w-full h-full min-h-[600px]"
-									title="DOC/DOCX Preview"
-									allow="fullscreen"
-									allowFullScreen={true}
-								/>
-							</div>
-						)}
+						{(fileExtension === "docx" || fileExtension === "doc") &&
+							previewContent && (
+								<div className="w-full h-full min-h-[600px] border rounded overflow-hidden">
+									<iframe
+										src={previewContent}
+										className="w-full h-full min-h-[600px]"
+										title="DOC/DOCX Preview"
+										allow="fullscreen"
+										allowFullScreen={true}
+									/>
+								</div>
+							)}
 					</div>
 				</Modal>
 			)}

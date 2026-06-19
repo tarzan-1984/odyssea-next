@@ -1,7 +1,7 @@
 import { Message, getMessageMultiAttachments } from "@/app-api/chatApi";
 import {
 	CHAT_DOCUMENT_PREVIEW_HEIGHT_PX,
-	CHAT_IMAGE_PREVIEW_MIN_HEIGHT_PX,
+	CHAT_IMAGE_PREVIEW_MAX_HEIGHT_PX,
 } from "@/config/chatImagePreview";
 
 const BASE_HEIGHT_PX = 88;
@@ -10,7 +10,7 @@ const CHARS_PER_LINE = 52;
 const MAX_TEXT_HEIGHT_PX = 480;
 const REPLY_BLOCK_PX = 68;
 const REACTIONS_PX = 40;
-const IMAGE_ATTACHMENT_PX = CHAT_IMAGE_PREVIEW_MIN_HEIGHT_PX + 20;
+const IMAGE_ATTACHMENT_PX = CHAT_IMAGE_PREVIEW_MAX_HEIGHT_PX + 56;
 const PDF_ATTACHMENT_PX = CHAT_DOCUMENT_PREVIEW_HEIGHT_PX;
 const GENERIC_FILE_PX = 76;
 const INCOMING_NAME_PX = 28;
@@ -38,10 +38,7 @@ function attachmentHeight(fileName: string): number {
 	return GENERIC_FILE_PX;
 }
 
-function shouldEstimateIncomingPhone(
-	message: Message,
-	chatRoomType?: string,
-): boolean {
+function shouldEstimateIncomingPhone(message: Message, chatRoomType?: string): boolean {
 	const phone = String(message.sender.phone ?? "").trim();
 	if (!phone) return false;
 
@@ -54,24 +51,18 @@ function shouldEstimateIncomingPhone(
 		"NIGHTSHIFT_TRACKING",
 	].includes(role);
 
-	return chatRoomType === "LOAD"
-		? isDriverSender || isLoadTrackingRoleSender
-		: isDriverSender;
+	return chatRoomType === "LOAD" ? isDriverSender || isLoadTrackingRoleSender : isDriverSender;
 }
 
 function hasVisibleMessageBody(message: Message): boolean {
 	const multi = getMessageMultiAttachments(message);
-	return Boolean(
-		message.content?.trim() ||
-			message.fileUrl ||
-			(multi && multi.length > 0),
-	);
+	return Boolean(message.content?.trim() || message.fileUrl || (multi && multi.length > 0));
 }
 
 /** Heuristic row height for virtual list before/without DOM measurement. */
 export function estimateChatMessageHeight(
 	message: Message,
-	options?: EstimateChatMessageHeightOptions,
+	options?: EstimateChatMessageHeightOptions
 ): number {
 	let height = BASE_HEIGHT_PX;
 
@@ -98,9 +89,7 @@ export function estimateChatMessageHeight(
 		height += REACTIONS_PX;
 	}
 
-	const isSender =
-		options?.currentUserId != null &&
-		message.senderId === options.currentUserId;
+	const isSender = options?.currentUserId != null && message.senderId === options.currentUserId;
 
 	if (!isSender) {
 		if (hasVisibleMessageBody(message)) {

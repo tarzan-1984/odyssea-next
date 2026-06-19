@@ -19,10 +19,7 @@ import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
-import {
-	formatNyWallClockForDisplay,
-	isLastLocationOlderThanNy,
-} from "@/utils/nyWallClock";
+import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
 
 const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { hours: 3 };
 
@@ -141,6 +138,27 @@ type LoadTrackingPoint = {
 	updatedAt?: string | null;
 };
 
+type LoadHistoryDetail = {
+	id: string | null;
+	position: [number, number];
+	createdAt: string | null;
+	updatedAt: string | null;
+	externalDriverId: string | null;
+	driverName: string | null;
+	placeLabel: string | null;
+	deviceId: string | null;
+	deviceModel: string | null;
+	deviceName: string | null;
+	devicePlatform: string | null;
+	deviceLabel: string | null;
+};
+
+type TrackingDeviceHistoryGroup = {
+	key: string;
+	label: string;
+	points: LoadHistoryDetail[];
+};
+
 type LocationUpdatePayload = {
 	externalId?: string | null;
 	trackingLoadId?: string | null;
@@ -175,6 +193,37 @@ function formatTrackingDeviceLabel(point: {
 	}
 	const id = point.deviceId?.trim();
 	return id ? `Device ${id.slice(0, 8)}…` : null;
+}
+
+function getTrackingDeviceGroupKey(point: {
+	deviceId?: string | null;
+	deviceModel?: string | null;
+	deviceName?: string | null;
+	devicePlatform?: string | null;
+}): string {
+	const id = point.deviceId?.trim();
+	if (id) return `device:${id}`;
+	const fallback = [
+		point.deviceModel?.trim(),
+		point.deviceName?.trim(),
+		point.devicePlatform?.trim(),
+	]
+		.filter(Boolean)
+		.join("|");
+	return fallback ? `legacy:${fallback}` : "legacy:unknown";
+}
+
+function formatTrackingDeviceTabLabel(point: {
+	deviceId?: string | null;
+	deviceModel?: string | null;
+	deviceName?: string | null;
+}): string {
+	const model = point.deviceModel?.trim();
+	if (model) return model;
+	const name = point.deviceName?.trim();
+	if (name) return name;
+	const id = point.deviceId?.trim();
+	return id ? `Device ${id.slice(0, 8)}…` : "Unknown device";
 }
 
 /** Align with TMS / Nest: loaded-enroute → loaded_enroute */
@@ -223,6 +272,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [isAuthLoading, setIsAuthLoading] = useState(true);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+	const [activeTrackingDeviceKey, setActiveTrackingDeviceKey] = useState<string | null>(null);
 	const [selectedHistoryPointIndex, setSelectedHistoryPointIndex] = useState<number | null>(null);
 	const [editingHistoryPointIndex, setEditingHistoryPointIndex] = useState<number | null>(null);
 	const [historyDragDraft, setHistoryDragDraft] = useState<[number, number] | null>(null);
@@ -293,8 +343,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const cachedLoadDetails = queryClient.getQueryData(trackingLoadDetailsQueryKey) as
 		| LoadDetailsResponse
 		| undefined;
-	const isLoadDeliveredFromCache =
-		getLoadStatusFromDetails(cachedLoadDetails) === "delivered";
+	const isLoadDeliveredFromCache = getLoadStatusFromDetails(cachedLoadDetails) === "delivered";
 
 	const {
 		data: loadDetails,
@@ -413,32 +462,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		});
 	}, [loadDetails]);
 
-	const loadHistory = useMemo(() => {
-		return sortedTrackingPoints
-			.map(point => {
-				const latitude = Number(point.latitude);
-				const longitude = Number(point.longitude);
-				if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-					return null;
-				}
-				return [latitude, longitude] as [number, number];
-			})
-			.filter((point): point is [number, number] => point !== null);
-	}, [sortedTrackingPoints]);
-
-	const loadHistoryForMap = useMemo(() => {
-		if (
-			editingHistoryPointIndex === null ||
-			historyDragDraft === null ||
-			editingHistoryPointIndex >= loadHistory.length
-		) {
-			return loadHistory;
-		}
-		const next = [...loadHistory];
-		next[editingHistoryPointIndex] = historyDragDraft;
-		return next;
-	}, [editingHistoryPointIndex, historyDragDraft, loadHistory]);
-
 	const loadHistoryDetails = useMemo(() => {
 		return sortedTrackingPoints
 			.map(point => {
@@ -470,43 +493,87 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					deviceLabel: formatTrackingDeviceLabel(point),
 				};
 			})
-			.filter(
-				(
-					point
-				): point is {
-					id: string | null;
-					position: [number, number];
-					createdAt: string | null;
-					updatedAt: string | null;
-					externalDriverId: string | null;
-					driverName: string | null;
-					placeLabel: string | null;
-					deviceId: string | null;
-					deviceModel: string | null;
-					deviceName: string | null;
-					devicePlatform: string | null;
-					deviceLabel: string | null;
-				} => point !== null
-			);
+			.filter((point): point is LoadHistoryDetail => point !== null);
 	}, [loadDrivers, sortedTrackingPoints]);
 
-	const loadHistoryDetailsRef = useRef(loadHistoryDetails);
-	loadHistoryDetailsRef.current = loadHistoryDetails;
+	const trackingDeviceHistoryGroups = useMemo<TrackingDeviceHistoryGroup[]>(() => {
+		const groups = new Map<string, TrackingDeviceHistoryGroup>();
+
+		for (const point of loadHistoryDetails) {
+			const key = getTrackingDeviceGroupKey(point);
+			const existing = groups.get(key);
+			if (existing) {
+				existing.points.push(point);
+				continue;
+			}
+			groups.set(key, {
+				key,
+				label: formatTrackingDeviceTabLabel(point),
+				points: [point],
+			});
+		}
+
+		return Array.from(groups.values());
+	}, [loadHistoryDetails]);
+
+	useEffect(() => {
+		if (trackingDeviceHistoryGroups.length === 0) {
+			if (activeTrackingDeviceKey !== null) {
+				setActiveTrackingDeviceKey(null);
+			}
+			return;
+		}
+
+		if (
+			activeTrackingDeviceKey === null ||
+			!trackingDeviceHistoryGroups.some(group => group.key === activeTrackingDeviceKey)
+		) {
+			setActiveTrackingDeviceKey(trackingDeviceHistoryGroups[0].key);
+		}
+	}, [activeTrackingDeviceKey, trackingDeviceHistoryGroups]);
+
+	const activeLoadHistoryDetails = useMemo(() => {
+		const activeGroup =
+			trackingDeviceHistoryGroups.find(group => group.key === activeTrackingDeviceKey) ??
+			trackingDeviceHistoryGroups[0];
+		return activeGroup?.points ?? [];
+	}, [activeTrackingDeviceKey, trackingDeviceHistoryGroups]);
+
+	const activeLoadHistory = useMemo(
+		() => activeLoadHistoryDetails.map(point => point.position),
+		[activeLoadHistoryDetails]
+	);
+
+	const loadHistoryForMap = useMemo(() => {
+		if (
+			editingHistoryPointIndex === null ||
+			historyDragDraft === null ||
+			editingHistoryPointIndex >= activeLoadHistory.length
+		) {
+			return activeLoadHistory;
+		}
+		const next = [...activeLoadHistory];
+		next[editingHistoryPointIndex] = historyDragDraft;
+		return next;
+	}, [activeLoadHistory, editingHistoryPointIndex, historyDragDraft]);
+
+	const loadHistoryDetailsRef = useRef(activeLoadHistoryDetails);
+	loadHistoryDetailsRef.current = activeLoadHistoryDetails;
 
 	useEffect(() => {
 		if (
 			selectedHistoryPointIndex !== null &&
-			selectedHistoryPointIndex >= loadHistoryDetails.length
+			selectedHistoryPointIndex >= activeLoadHistoryDetails.length
 		) {
 			setSelectedHistoryPointIndex(null);
 		}
 		if (
 			editingHistoryPointIndex !== null &&
-			editingHistoryPointIndex >= loadHistoryDetails.length
+			editingHistoryPointIndex >= activeLoadHistoryDetails.length
 		) {
 			setEditingHistoryPointIndex(null);
 		}
-	}, [editingHistoryPointIndex, loadHistoryDetails.length, selectedHistoryPointIndex]);
+	}, [activeLoadHistoryDetails.length, editingHistoryPointIndex, selectedHistoryPointIndex]);
 
 	const handleDeleteHistoryPoint = useCallback(
 		async (pointId: string | null, pointIndex: number) => {
@@ -582,7 +649,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		const idx = editingHistoryPointIndex;
 		const draft = historyDragDraft;
 		if (idx === null || draft === null) return;
-		const pointId = loadHistoryDetails[idx]?.id;
+		const pointId = activeLoadHistoryDetails[idx]?.id;
 		if (!pointId || savingHistoryPointId) return;
 
 		setSavingHistoryPointId(pointId);
@@ -609,9 +676,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			setSavingHistoryPointId(null);
 		}
 	}, [
+		activeLoadHistoryDetails,
 		editingHistoryPointIndex,
 		historyDragDraft,
-		loadHistoryDetails,
 		loadId,
 		refreshLoadDetails,
 		savingHistoryPointId,
@@ -697,9 +764,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					? routeGeocodeFromApi
 					: null,
 			load_history: loadHistoryForMap,
-			load_history_details: loadHistoryDetails,
+			load_history_details: activeLoadHistoryDetails,
 		}),
 		[
+			activeLoadHistoryDetails,
 			driverCardData,
 			showDriverLiveMarker,
 			currentDriverLatitude,
@@ -708,7 +776,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			loadShippers,
 			routeGeocodeFromApi,
 			loadHistoryForMap,
-			loadHistoryDetails,
 		]
 	);
 
@@ -721,15 +788,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus);
 	const showStaleLocationMessage = Boolean(
 		isAuthenticated &&
-			currentTrackingDriver &&
-			driverUsesMobileApp &&
-			isDriverLoadedEnroute &&
-			loadQualifiesForStaleTrackingCheck &&
-			hasLastLocationUpdate &&
-			isLastLocationOlderThanNy(
-				currentTrackingDriver.lastLocationUpdateAt,
-				STALE_LOCATION_THRESHOLD
-			)
+		currentTrackingDriver &&
+		driverUsesMobileApp &&
+		isDriverLoadedEnroute &&
+		loadQualifiesForStaleTrackingCheck &&
+		hasLastLocationUpdate &&
+		isLastLocationOlderThanNy(
+			currentTrackingDriver.lastLocationUpdateAt,
+			STALE_LOCATION_THRESHOLD
+		)
 	);
 
 	const driverStatusLabel = getStatusLabelForFilter(currentTrackingDriver?.driverStatus ?? null);
@@ -751,24 +818,26 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const showMapAndTrackingTools = mapUiMode === "map";
 	const showLoadHistoryPanel = Boolean(
 		isAuthenticated &&
-			showMapAndTrackingTools &&
-			(isDriverLoadedEnroute || isLoadDelivered) &&
-			!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
+		showMapAndTrackingTools &&
+		(isDriverLoadedEnroute || isLoadDelivered) &&
+		!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
 	);
 	const showCurrentLocationHistoryCard = Boolean(
 		showLoadHistoryPanel &&
-			isDriverLoadedEnroute &&
-			LOAD_STATUSES_SHOW_CURRENT_LOCATION.has(normalizedLoadStatus) &&
-			hasCurrentDriverCoordinates &&
-			hasLastLocationUpdate
+		isDriverLoadedEnroute &&
+		LOAD_STATUSES_SHOW_CURRENT_LOCATION.has(normalizedLoadStatus) &&
+		hasCurrentDriverCoordinates &&
+		hasLastLocationUpdate
 	);
 	const currentLocationPlaceLabel = formatDriverLocationLine(
 		currentTrackingDriver?.city,
 		currentTrackingDriver?.state,
 		currentTrackingDriver?.zip
 	);
-	const loadHistoryPanelCount =
-		loadHistoryDetails.length + (showCurrentLocationHistoryCard ? 1 : 0);
+	const loadHistoryPanelCount = loadHistoryDetails.length;
+	const activeLoadHistoryPanelCount = activeLoadHistoryDetails.length;
+	const hasLoadHistoryPanelItems =
+		activeLoadHistoryPanelCount > 0 || showCurrentLocationHistoryCard;
 	/** Keep top banners centered in the same lane even when history panel is hidden. */
 	const reserveTopBannerRightLane = isAuthenticated && showMapAndTrackingTools;
 	const showBackButton =
@@ -786,13 +855,13 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		);
 	const showPickupRoadEta = Boolean(
 		showMapAndTrackingTools &&
-			isDriverLoadedEnroute &&
-			normalizedLoadStatus === "waiting_on_pu_date" &&
-			hasCurrentDriverCoordinates &&
-			hasFreshLastLocationUpdate &&
-			pickupGeocode &&
-			Number.isFinite(Number(pickupGeocode.lat)) &&
-			Number.isFinite(Number(pickupGeocode.lng))
+		isDriverLoadedEnroute &&
+		normalizedLoadStatus === "waiting_on_pu_date" &&
+		hasCurrentDriverCoordinates &&
+		hasFreshLastLocationUpdate &&
+		pickupGeocode &&
+		Number.isFinite(Number(pickupGeocode.lat)) &&
+		Number.isFinite(Number(pickupGeocode.lng))
 	);
 
 	const pickupEtaDriver = useMemo((): { lat: number; lng: number } | null => {
@@ -821,16 +890,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const showLoadedEnrouteStaleTopBanner = Boolean(
 		isAuthenticated &&
-			showMapAndTrackingTools &&
-			currentTrackingDriver &&
-			driverUsesMobileApp &&
-			isDriverLoadedEnroute &&
-			normalizedLoadStatus === "loaded_enroute" &&
-			hasLastLocationUpdate &&
-			isLastLocationOlderThanNy(
-				currentTrackingDriver.lastLocationUpdateAt,
-				STALE_LOCATION_THRESHOLD
-			)
+		showMapAndTrackingTools &&
+		currentTrackingDriver &&
+		driverUsesMobileApp &&
+		isDriverLoadedEnroute &&
+		normalizedLoadStatus === "loaded_enroute" &&
+		hasLastLocationUpdate &&
+		isLastLocationOlderThanNy(
+			currentTrackingDriver.lastLocationUpdateAt,
+			STALE_LOCATION_THRESHOLD
+		)
 	);
 	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
 
@@ -989,11 +1058,65 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 									{isHistoryOpen ? "Hide" : "Show"}
 								</span>
 							</button>
+							{isHistoryOpen && trackingDeviceHistoryGroups.length > 0 ? (
+								<div className="border-b border-gray-200 px-4 py-2 dark:border-gray-800">
+									<div
+										className="flex flex-wrap gap-2"
+										role="tablist"
+										aria-label="Tracking devices"
+									>
+										{trackingDeviceHistoryGroups.map(group => {
+											const selectedDeviceKey =
+												activeTrackingDeviceKey ??
+												trackingDeviceHistoryGroups[0]?.key;
+											const isActive = group.key === selectedDeviceKey;
+											return (
+												<button
+													key={group.key}
+													type="button"
+													role="tab"
+													aria-selected={isActive}
+													className={`inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+														isActive
+															? "border-brand-500 bg-brand-500 text-white shadow-sm"
+															: "border-gray-200 bg-gray-50 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-brand-500 dark:hover:bg-gray-800"
+													}`}
+													title={group.label}
+													onClick={() => {
+														if (group.key === activeTrackingDeviceKey)
+															return;
+														setActiveTrackingDeviceKey(group.key);
+														clearHistoryPointSelection();
+														historyCardRefs.current = [];
+													}}
+												>
+													<span className="truncate">{group.label}</span>
+													<span
+														className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+															isActive
+																? "bg-white/20 text-white"
+																: "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+														}`}
+													>
+														{group.points.length}
+													</span>
+												</button>
+											);
+										})}
+									</div>
+								</div>
+							) : null}
 							{isHistoryOpen && (
-								<div className="max-h-[calc(50vh-45px)] overflow-y-auto px-4 py-3">
-									{loadHistoryPanelCount > 0 ? (
+								<div
+									className={`overflow-y-auto px-4 py-3 ${
+										trackingDeviceHistoryGroups.length > 0
+											? "max-h-[calc(50vh-93px)]"
+											: "max-h-[calc(50vh-45px)]"
+									}`}
+								>
+									{hasLoadHistoryPanelItems ? (
 										<ol className="space-y-3">
-											{loadHistoryDetails.map((point, index) => {
+											{activeLoadHistoryDetails.map((point, index) => {
 												const isEditingCard =
 													editingHistoryPointIndex === index;
 												const isSelectedCard =
@@ -1176,7 +1299,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																	{point.deviceLabel}
 																	{point.deviceId ? (
 																		<span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
-																			({point.deviceId.slice(0, 8)}…)
+																			(
+																			{point.deviceId.slice(
+																				0,
+																				8
+																			)}
+																			…)
 																		</span>
 																	) : null}
 																</p>

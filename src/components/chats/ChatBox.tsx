@@ -18,12 +18,10 @@ import { UserData } from "@/app-api/api-types";
 import ChatBoxVirtualMessageList, {
 	type ChatBoxVirtualMessageListHandle,
 } from "./ChatBoxVirtualMessageList";
+import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
-import {
-	removeChatMessageLocally,
-	restoreChatMessageLocally,
-} from "@/lib/chatMessageDelete";
+import { removeChatMessageLocally, restoreChatMessageLocally } from "@/lib/chatMessageDelete";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 
 interface ChatBoxProps {
@@ -32,6 +30,7 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatBoxProps) {
+	const [useVirtualMessageList, setUseVirtualMessageList] = useState(true);
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [replyingTo, setReplyingTo] = useState<Message["replyData"] | null>(null);
@@ -50,6 +49,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const isInitialScrollCompleteRef = useRef(false);
 	const pendingInitialScrollRef = useRef(false);
 	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+
+	useEffect(() => {
+		setUseVirtualMessageList(
+			new URLSearchParams(window.location.search).get("chatVirtual") !== "0"
+		);
+	}, []);
 
 	// Get current user for message display
 	const currentUser = useCurrentUser();
@@ -315,9 +320,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const isLoadingArchivedMessages = useChatStore(state => state.isLoadingArchivedMessages);
 	const isLoadingAvailableArchives = useChatStore(state => state.isLoadingAvailableArchives);
 	const tryLoadNextArchivePage = useChatStore(state => state.tryLoadNextArchivePage);
-	const loadInitialArchiveIfPgEmpty = useChatStore(
-		state => state.loadInitialArchiveIfPgEmpty
-	);
+	const loadInitialArchiveIfPgEmpty = useChatStore(state => state.loadInitialArchiveIfPgEmpty);
 	const setPendingArchiveLoad = useChatStore(state => state.setPendingArchiveLoad);
 
 	// Merge server messages with in-flight optimistic outgoing messages.
@@ -409,15 +412,19 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			const prevScrollTop = container.scrollTop;
 
 			const finalize = () => {
-				const newScrollHeight = container.scrollHeight;
-				const delta = newScrollHeight - prevScrollHeight;
 				isProgrammaticScrollRef.current = true;
-				container.scrollTop = prevScrollTop + delta;
-				setTimeout(() => {
-					isProgrammaticScrollRef.current = false;
-					isLoadingMoreRef.current = false;
-					setIsLoadingOlder(false);
-				}, 50);
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						const newScrollHeight = container.scrollHeight;
+						const delta = newScrollHeight - prevScrollHeight;
+						container.scrollTop = prevScrollTop + delta;
+						setTimeout(() => {
+							isProgrammaticScrollRef.current = false;
+							isLoadingMoreRef.current = false;
+							setIsLoadingOlder(false);
+						}, 80);
+					});
+				});
 			};
 
 			if (hasMoreMessages) {
@@ -681,165 +688,199 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	return (
 		<ChatImageGalleryProvider messages={uniqueMessages}>
-		<div
-			data-chat-box
-			className="@container/size relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4"
-			onDragEnter={handleChatDragEnter}
-			onDragLeave={handleChatDragLeave}
-			onDragOver={handleChatDragOver}
-			onDrop={handleChatDrop}
-			onPaste={handleChatPaste}
-		>
-			{isDragOver && (
-				<div
-					className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-brand-500/10 backdrop-blur-[1px]"
-					aria-hidden
-				>
-					<div className="rounded-xl border-2 border-dashed border-brand-500 bg-white/90 px-8 py-6 text-center shadow-lg dark:bg-gray-900/90">
-						<p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
-							Drop files to attach
-						</p>
-						<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-							Images, PDF, DOC, DOCX, TXT — up to 10MB each
-						</p>
-					</div>
-				</div>
-			)}
-			{/* Header */}
-			<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
-
-			{/* Messages */}
 			<div
-				ref={attachMessagesContainer}
-				onScroll={handleScroll}
-				className="flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
+				data-chat-box
+				className="@container/size relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4"
+				onDragEnter={handleChatDragEnter}
+				onDragLeave={handleChatDragLeave}
+				onDragOver={handleChatDragOver}
+				onDrop={handleChatDrop}
+				onPaste={handleChatPaste}
 			>
-				<ChatMediaLoadProvider
-					mediaLoadEnabled={messagesReady}
-					scrollRoot={messagesScrollRoot}
-				>
-				{/* Loading indicator for older messages */}
-				{(isLoadingOlder || isLoadingArchivedMessages) && uniqueMessages.length > 0 && (
-					<div className="flex items-center justify-center py-4">
-						<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
-							<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-								<circle
-									className="opacity-25"
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									strokeWidth="4"
-									fill="none"
-								/>
-								<path
-									className="opacity-75"
-									fill="currentColor"
-									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-								/>
-							</svg>
-							<span className="text-sm">
-								{isLoadingOlder && "Loading older messages..."}
-								{isLoadingArchivedMessages && "Loading archive..."}
-							</span>
+				{isDragOver && (
+					<div
+						className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-brand-500/10 backdrop-blur-[1px]"
+						aria-hidden
+					>
+						<div className="rounded-xl border-2 border-dashed border-brand-500 bg-white/90 px-8 py-6 text-center shadow-lg dark:bg-gray-900/90">
+							<p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+								Drop files to attach
+							</p>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Images, PDF, DOC, DOCX, TXT — up to 10MB each
+							</p>
 						</div>
 					</div>
 				)}
+				{/* Header */}
+				<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
-				{loading && uniqueMessages.length === 0 ? (
-					<div className="flex items-center justify-center h-full">
-						<div className="text-gray-500">Loading messages...</div>
-					</div>
-				) : error ? (
-					<div className="flex items-center justify-center h-full">
-						<div className="text-red-500">{error}</div>
-					</div>
-				) : uniqueMessages.length === 0 ? (
-					<div className="flex items-center justify-center h-full">
-						<div className="text-center text-gray-500 dark:text-gray-400">
-							<p>No messages yet</p>
-							<p className="text-sm">Start the conversation!</p>
-						</div>
-					</div>
-				) : (
-					<ChatBoxVirtualMessageList
-						ref={virtualListRef}
-						messages={uniqueMessages}
-						currentUser={currentUser}
-						chatRoomType={selectedChatRoom?.type}
-						chatParticipants={selectedChatRoom?.participants ?? []}
-						scrollElement={messagesScrollRoot}
-						onContentMeasured={handleVirtualContentMeasured}
-						onDelete={handleDeleteMessage}
-						onReply={handleReplyToMessage}
-						onMarkUnread={handleMarkMessageUnread}
-						onRetry={message => {
-							retryOptimisticMessage(message).catch(error => {
-								console.error("Failed to retry message:", error);
-							});
-						}}
+				{/* Messages */}
+				<div
+					ref={attachMessagesContainer}
+					onScroll={handleScroll}
+					className="flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
+					style={{ overflowAnchor: "none" }}
+				>
+					<ChatMediaLoadProvider
+						mediaLoadEnabled={messagesReady}
+						scrollRoot={messagesScrollRoot}
+					>
+						{/* Loading indicator for older messages */}
+						{(isLoadingOlder || isLoadingArchivedMessages) &&
+							uniqueMessages.length > 0 && (
+								<div className="flex items-center justify-center py-4">
+									<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+										<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+												fill="none"
+											/>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+											/>
+										</svg>
+										<span className="text-sm">
+											{isLoadingOlder && "Loading older messages..."}
+											{isLoadingArchivedMessages && "Loading archive..."}
+										</span>
+									</div>
+								</div>
+							)}
+
+						{loading && uniqueMessages.length === 0 ? (
+							<div className="flex items-center justify-center h-full">
+								<div className="text-gray-500">Loading messages...</div>
+							</div>
+						) : error ? (
+							<div className="flex items-center justify-center h-full">
+								<div className="text-red-500">{error}</div>
+							</div>
+						) : uniqueMessages.length === 0 ? (
+							<div className="flex items-center justify-center h-full">
+								<div className="text-center text-gray-500 dark:text-gray-400">
+									<p>No messages yet</p>
+									<p className="text-sm">Start the conversation!</p>
+								</div>
+							</div>
+						) : useVirtualMessageList ? (
+							<ChatBoxVirtualMessageList
+								ref={virtualListRef}
+								messages={uniqueMessages}
+								currentUser={currentUser}
+								chatRoomType={selectedChatRoom?.type}
+								chatParticipants={selectedChatRoom?.participants ?? []}
+								scrollElement={messagesScrollRoot}
+								onContentMeasured={handleVirtualContentMeasured}
+								isUserScrolledUp={isUserScrolledUp}
+								onDelete={handleDeleteMessage}
+								onReply={handleReplyToMessage}
+								onMarkUnread={handleMarkMessageUnread}
+								onRetry={message => {
+									retryOptimisticMessage(message).catch(error => {
+										console.error("Failed to retry message:", error);
+									});
+								}}
+							/>
+						) : (
+							<div className="flex flex-col gap-6" data-chat-list-mode="plain">
+								{uniqueMessages.map(message => (
+									<MessageItem
+										key={message.id}
+										message={message}
+										currentUser={currentUser}
+										chatRoomType={selectedChatRoom?.type}
+										chatParticipants={selectedChatRoom?.participants ?? []}
+										onDelete={handleDeleteMessage}
+										onReply={handleReplyToMessage}
+										onMarkUnread={handleMarkMessageUnread}
+										onRetry={
+											message.pendingOutgoing?.status === "failed"
+												? () => {
+														retryOptimisticMessage(message).catch(
+															error => {
+																console.error(
+																	"Failed to retry message:",
+																	error
+																);
+															}
+														);
+													}
+												: undefined
+										}
+									/>
+								))}
+							</div>
+						)}
+						{/* Typing indicator */}
+						{Object.entries(isTyping).some(([userId, data]) => data.isTyping) && (
+							<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+								<div className="flex space-x-1">
+									<div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+									<div
+										className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+										style={{ animationDelay: "0.1s" }}
+									></div>
+									<div
+										className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+										style={{ animationDelay: "0.2s" }}
+									></div>
+								</div>
+								<span className="text-sm">
+									{(() => {
+										const typingUsers = Object.entries(isTyping).filter(
+											([userId, data]) => data.isTyping
+										);
+										if (typingUsers.length === 0) return "";
+
+										// Use firstName from WebSocket data or fallback to participant data
+										const typingUserNames = typingUsers.map(
+											([userId, data]) => {
+												if (data.firstName) {
+													return data.firstName;
+												}
+												// Fallback to participant data if firstName not available
+												const participant =
+													selectedChatRoom?.participants.find(
+														p => p.user.id === userId
+													);
+												return participant?.user.firstName || "User";
+											}
+										);
+
+										if (typingUserNames.length === 1) {
+											return `${typingUserNames[0]} is typing...`;
+										} else if (typingUserNames.length === 2) {
+											return `${typingUserNames[0]} and ${typingUserNames[1]} are typing...`;
+										} else {
+											return `${typingUserNames[0]} and ${typingUserNames.length - 1} others are typing...`;
+										}
+									})()}
+								</span>
+							</div>
+						)}
+					</ChatMediaLoadProvider>
+				</div>
+
+				{/* Send form hidden for archived LOAD shipments (read-only history) */}
+				{!isLoadArchivedReadOnlyChat && (
+					<ChatBoxSendForm
+						ref={sendFormRef}
+						chatRoomId={selectedChatRoomId}
+						onSendMessage={handleSendMessage}
+						onTyping={sendTyping}
+						replyingTo={replyingTo || undefined}
+						onCancelReply={handleCancelReply}
 					/>
 				)}
-				{/* Typing indicator */}
-				{Object.entries(isTyping).some(([userId, data]) => data.isTyping) && (
-					<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-						<div className="flex space-x-1">
-							<div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-							<div
-								className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-								style={{ animationDelay: "0.1s" }}
-							></div>
-							<div
-								className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-								style={{ animationDelay: "0.2s" }}
-							></div>
-						</div>
-						<span className="text-sm">
-							{(() => {
-								const typingUsers = Object.entries(isTyping).filter(
-									([userId, data]) => data.isTyping
-								);
-								if (typingUsers.length === 0) return "";
-
-								// Use firstName from WebSocket data or fallback to participant data
-								const typingUserNames = typingUsers.map(([userId, data]) => {
-									if (data.firstName) {
-										return data.firstName;
-									}
-									// Fallback to participant data if firstName not available
-									const participant = selectedChatRoom?.participants.find(
-										p => p.user.id === userId
-									);
-									return participant?.user.firstName || "User";
-								});
-
-								if (typingUserNames.length === 1) {
-									return `${typingUserNames[0]} is typing...`;
-								} else if (typingUserNames.length === 2) {
-									return `${typingUserNames[0]} and ${typingUserNames[1]} are typing...`;
-								} else {
-									return `${typingUserNames[0]} and ${typingUserNames.length - 1} others are typing...`;
-								}
-							})()}
-						</span>
-					</div>
-				)}
-
-				</ChatMediaLoadProvider>
 			</div>
-
-			{/* Send form hidden for archived LOAD shipments (read-only history) */}
-			{!isLoadArchivedReadOnlyChat && (
-				<ChatBoxSendForm
-					ref={sendFormRef}
-					chatRoomId={selectedChatRoomId}
-					onSendMessage={handleSendMessage}
-					onTyping={sendTyping}
-					replyingTo={replyingTo || undefined}
-					onCancelReply={handleCancelReply}
-				/>
-			)}
-		</div>
 		</ChatImageGalleryProvider>
 	);
 }
