@@ -48,6 +48,7 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
+import { canCreateOffers as canCreateOffersByRole } from "@/utils/roleAccess";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
@@ -306,6 +307,7 @@ export default function DriversListTable({
 			return item != null && isTestDriver(item);
 		});
 	const canCreateOffers =
+		canCreateOffersByRole(currentUser?.role) &&
 		selectedDriverIds.length > 0 &&
 		(showDistanceColumn || canCreateOffersWithoutAddress);
 
@@ -378,7 +380,10 @@ export default function DriversListTable({
 									size="sm"
 									variant="primary"
 									disabled={!canCreateOffers}
-									onClick={() => setCreateOfferModalOpen(true)}
+									onClick={() => {
+										if (!canCreateOffersByRole(currentUser?.role)) return;
+										setCreateOfferModalOpen(true);
+									}}
 									className="h-9"
 								>
 									Create Offers

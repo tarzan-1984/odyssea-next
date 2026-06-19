@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import {
+	canAccessAppSettings,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessUserListAndCheckList,
@@ -168,6 +169,7 @@ const AppSidebar: React.FC = () => {
 	const pathname = usePathname();
 	const currentUser = useCurrentUser();
 	const isAdmin = (currentUser?.role || "").trim().toUpperCase() === "ADMINISTRATOR";
+	const canAccessAdminPages = isAdmin || canAccessAppSettings(currentUser?.role);
 	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
 	const canSeeUserList = canAccessUserListAndCheckList(currentUser?.role);
 	const canSeeCheckList = canAccessCheckList(currentUser?.role);
@@ -176,14 +178,14 @@ const AppSidebar: React.FC = () => {
 		() =>
 			navItems.filter(
 				item =>
-					(!item.adminOnly || isAdmin) &&
+					(!item.adminOnly || canAccessAdminPages) &&
 					(!item.path ||
 						!DRIVERS_OFFERS_PATHS.includes(item.path) ||
 						canAccessDriversOffers) &&
 					(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
 					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList),
 			),
-		[isAdmin, canAccessDriversOffers, canSeeUserList, canSeeCheckList],
+		[isAdmin, canAccessAdminPages, canAccessDriversOffers, canSeeUserList, canSeeCheckList],
 	);
 
 	const renderMenuItems = (navItems: NavItem[], menuType: "main") => (

@@ -8,7 +8,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, AddPlusCircleIcon } from "@/icons";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
@@ -20,6 +20,7 @@ import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTa
 import UserFilterSelect from "./UserFilterSelect";
 import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
+import { canModifyOffers } from "@/utils/roleAccess";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 const CREATOR_ROLE_LABELS: Record<string, string> = {
@@ -139,10 +140,12 @@ function ExtendBidTimeButton({
 	offer,
 	driver,
 	onPushClick,
+	disabled = false,
 }: {
 	offer: OfferRow;
 	driver: OfferDriver;
 	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
+	disabled?: boolean;
 }) {
 	const driverKey = driver.externalId ?? driver.driver_id;
 	const canExtend = canExtendDriverBidTime(offer, driver);
@@ -153,11 +156,13 @@ function ExtendBidTimeButton({
 		<button
 			type="button"
 			title="Send push notification"
+			disabled={disabled}
 			onClick={(e) => {
 				e.stopPropagation();
+				if (disabled) return;
 				onPushClick(offer, driver);
 			}}
-			className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-brand-600 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-brand-400"
+			className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-600 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-brand-400 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-300"
 		>
 			<ExtendBidTimeIcon className="h-4 w-4" />
 		</button>
@@ -189,6 +194,7 @@ const OffersList = () => {
 	);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
+	const canModifyOffersByRole = canModifyOffers(currentUser?.role);
 	const queryParams = {
 		page: currentPage,
 		limit: itemsPerPage,
@@ -401,6 +407,7 @@ const OffersList = () => {
 																	<ExtendBidTimeButton
 																		offer={row}
 																		driver={driver}
+																		disabled={!canModifyOffersByRole}
 																		onPushClick={(offer, driverItem) => {
 																			setPushModalTarget({ offer, driver: driverItem });
 																		}}
@@ -417,9 +424,10 @@ const OffersList = () => {
 										{row.active !== false && (
 											<button
 												type="button"
-												disabled={deactivatingOfferId === row.id}
+												disabled={!canModifyOffersByRole || deactivatingOfferId === row.id}
 												onClick={async (e) => {
 													e.stopPropagation();
+													if (!canModifyOffersByRole) return;
 													setDeactivatingOfferId(row.id);
 													const res = await offersApi.deactivateOffer(row.id);
 													setDeactivatingOfferId(null);
@@ -657,6 +665,7 @@ const OffersList = () => {
 																					<ExtendBidTimeButton
 																						offer={row}
 																						driver={driver}
+																						disabled={!canModifyOffersByRole}
 																						onPushClick={(offer, driverItem) => {
 																							setPushModalTarget({ offer, driver: driverItem });
 																						}}
@@ -670,8 +679,12 @@ const OffersList = () => {
 																			{driver.active === false ? (
 																				<button
 																					type="button"
-																					disabled={returningDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																					disabled={
+																						!canModifyOffersByRole ||
+																						returningDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`
+																					}
 																					onClick={async () => {
+																						if (!canModifyOffersByRole) return;
 																						const key = driver.externalId ?? driver.driver_id;
 																						if (!key) return;
 																						setReturningDriverKey(`${row.id}-${key}`);
@@ -691,8 +704,12 @@ const OffersList = () => {
 																				<div className="flex items-center gap-1.5">
 																					<button
 																						type="button"
-																						disabled={deletingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`}
+																						disabled={
+																							!canModifyOffersByRole ||
+																							deletingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`
+																						}
 																						onClick={async () => {
+																							if (!canModifyOffersByRole) return;
 																							const key = driver.externalId ?? driver.driver_id;
 																							if (!key) return;
 																							setDeletingDriverKey(`${row.id}-${key}`);
@@ -711,11 +728,13 @@ const OffersList = () => {
 																					<button
 																						type="button"
 																						disabled={
+																							!canModifyOffersByRole ||
 																							acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}` ||
 																							driver.rate == null
 																						}
 																						title={driver.rate == null ? 'Rate is not set' : undefined}
 																					onClick={() => {
+																						if (!canModifyOffersByRole) return;
 																						const key = driver.externalId ?? driver.driver_id;
 																						if (!key) return;
 																						setAcceptingDriverKey(`${row.id}-${key}`);
@@ -751,7 +770,9 @@ const OffersList = () => {
 													<div className="mt-3 flex items-center justify-start gap-3">
 														<button
 															type="button"
+															disabled={!canModifyOffersByRole}
 															onClick={() => {
+																if (!canModifyOffersByRole) return;
 																setAddDriversOfferId(row.id);
 																setAddDriversExistingDriverIds(
 																	Array.from(
@@ -765,16 +786,10 @@ const OffersList = () => {
 																	)
 																);
 															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 dark:disabled:hover:bg-brand-500"
 														>
 									Add drivers
-									<Image
-										src="/images/add_icon.png"
-										alt=""
-										width={31}
-										height={31}
-										className="h-[31px] w-auto shrink-0"
-															/>
+									<AddPlusCircleIcon />
 														</button>
 													</div>
 													)}

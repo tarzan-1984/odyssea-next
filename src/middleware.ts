@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { tokenEncoder } from "@/utils/tokenEncoder";
 import {
+	canAccessAppSettings,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessUserListAndCheckList,
@@ -118,12 +119,12 @@ export function middleware(request: NextRequest) {
 		}
 	}
 
-	// App settings: only for ADMINISTRATOR
+	// App settings: administrators and GAST guests
 	const isAppSettingsPage =
 		pathname === "/app-settings" || pathname.startsWith("/app-settings/");
 	if (isAppSettingsPage && hasToken) {
 		const role = getUserRoleFromCookie(request);
-		if ((role || "").trim().toUpperCase() !== "ADMINISTRATOR") {
+		if (!canAccessAppSettings(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}

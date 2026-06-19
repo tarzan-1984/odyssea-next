@@ -2,6 +2,7 @@
 
 import { Modal } from "@/components/ui/modal";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
+import { AddPlusCircleIcon } from "@/icons";
 import DriversListTable from "./DriversListTable";
 
 export interface AddDriversModalProps {
@@ -76,15 +77,7 @@ export default function AddDriversModal({
 					existingDriverIds={existingDriverIds}
 					footerButton={{
 						label: "Add drivers",
-						icon: (
-							<img
-								src="/images/add_icon.png"
-								alt=""
-								width={24}
-								height={24}
-								className="shrink-0"
-							/>
-						),
+						icon: <AddPlusCircleIcon className="h-5 w-5 shrink-0 fill-green-500" />,
 						isLoading: isSubmitting,
 						onClick: async (selectedDriverIds, driverEmptyMiles) => {
 							await onAddDrivers?.(
