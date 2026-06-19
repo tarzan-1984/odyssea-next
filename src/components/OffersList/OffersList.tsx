@@ -298,7 +298,7 @@ const OffersList = () => {
 					<div className="space-y-3">
 						{results.map((row) => {
 							const isExpanded = expandedOfferId === row.id;
-							const creatorLabel = formatOfferCreatorLabel(row.creator);
+							const creatorLabel = isAdmin ? formatOfferCreatorLabel(row.creator) : null;
 							const allDriversInactive =
 								(row.drivers?.length ?? 0) > 0 &&
 								row.drivers!.every((d) => d.active === false);
