@@ -35,13 +35,11 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 	if (!creator) return null;
 
 	const name = [creator.firstName, creator.lastName].filter(Boolean).join(" ").trim();
-	const externalId = creator.externalId?.trim();
 	const role = creator.role?.trim();
 
-	if (!name && !externalId && !role) return null;
+	if (!name && !role) return null;
 
 	const parts = [name || "—"];
-	if (externalId) parts.push(`(${externalId})`);
 	if (role) parts.push(CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " "));
 
 	return parts.join(" ");
