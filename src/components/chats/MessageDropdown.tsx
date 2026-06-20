@@ -38,12 +38,13 @@ export default function MessageDropdown({
 
 	const role = currentUser?.role?.trim().toUpperCase();
 	const isAdmin = role === "ADMINISTRATOR";
-	const canEdit =
-		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
-		Boolean(message.content?.trim());
 
 	// Check if message is from current user
 	const isOwnMessage = message.senderId === currentUser?.id;
+	const canEdit =
+		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
+		isOwnMessage &&
+		Boolean(message.content?.trim());
 
 	const visibleActionCount = (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (isAdmin ? 1 : 0);
 
