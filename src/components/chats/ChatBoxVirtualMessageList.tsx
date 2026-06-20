@@ -29,6 +29,7 @@ interface ChatBoxVirtualMessageListProps {
 	chatParticipants: ChatRoomParticipant[];
 	scrollElement: HTMLDivElement | null;
 	onDelete: (messageId: string) => void;
+	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
@@ -47,6 +48,7 @@ interface VirtualMessageRowProps {
 	chatRoomType?: string;
 	chatParticipants: ChatRoomParticipant[];
 	onDelete: (messageId: string) => void;
+	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
@@ -63,6 +65,7 @@ function VirtualMessageRow({
 	chatRoomType,
 	chatParticipants,
 	onDelete,
+	onEdit,
 	onReply,
 	onMarkUnread,
 	onRetry,
@@ -134,6 +137,7 @@ function VirtualMessageRow({
 				chatRoomType={chatRoomType}
 				chatParticipants={chatParticipants}
 				onDelete={onDelete}
+				onEdit={onEdit}
 				onReply={onReply}
 				onMarkUnread={onMarkUnread}
 				onRetry={
@@ -157,6 +161,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		chatParticipants,
 		scrollElement,
 		onDelete,
+		onEdit,
 		onReply,
 		onMarkUnread,
 		onRetry,
@@ -298,6 +303,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 						chatRoomType={chatRoomType}
 						chatParticipants={chatParticipants}
 						onDelete={onDelete}
+						onEdit={onEdit}
 						onReply={onReply}
 						onMarkUnread={onMarkUnread}
 						onRetry={onRetry}

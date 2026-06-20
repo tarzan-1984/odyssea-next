@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Message } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 
@@ -8,24 +9,82 @@ interface MessageDropdownProps {
 	message: Message;
 	currentUser?: UserData | null;
 	onDelete?: (messageId: string) => void;
+	onEdit?: (message: Message) => void;
 	onReply?: (message: Message) => void;
 	onMarkUnread?: (messageId: string) => void;
 }
+
+const MENU_WIDTH_PX = 176;
+const MENU_GAP_PX = 8;
+const VIEWPORT_PADDING_PX = 8;
+const MENU_ITEM_HEIGHT_PX = 32;
+const MENU_VERTICAL_PADDING_PX = 8;
 
 export default function MessageDropdown({
 	message,
 	currentUser,
 	onDelete,
+	onEdit,
 	onReply,
 	onMarkUnread,
 }: MessageDropdownProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(
+		null
+	);
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	const buttonRef = useRef<HTMLButtonElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
+
+	const role = currentUser?.role?.trim().toUpperCase();
+	const isAdmin = role === "ADMINISTRATOR";
+	const canEdit =
+		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
+		Boolean(message.content?.trim());
+
+	// Check if message is from current user
+	const isOwnMessage = message.senderId === currentUser?.id;
+
+	const visibleActionCount = (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (isAdmin ? 1 : 0);
+
+	const updateMenuPosition = useCallback(() => {
+		const button = buttonRef.current;
+		if (!button) return;
+
+		const buttonRect = button.getBoundingClientRect();
+		const menuHeight =
+			menuRef.current?.getBoundingClientRect().height ||
+			visibleActionCount * MENU_ITEM_HEIGHT_PX + MENU_VERTICAL_PADDING_PX;
+		const viewportWidth = window.innerWidth;
+		const viewportHeight = window.innerHeight;
+		const composerTop = document.querySelector("[data-chat-box] form")?.getBoundingClientRect()
+			.top;
+		const bottomBoundary =
+			typeof composerTop === "number" ? Math.min(composerTop, viewportHeight) : viewportHeight;
+
+		let left = buttonRect.right - MENU_WIDTH_PX;
+		left = Math.min(left, viewportWidth - MENU_WIDTH_PX - VIEWPORT_PADDING_PX);
+		left = Math.max(left, VIEWPORT_PADDING_PX);
+
+		let top = buttonRect.bottom + MENU_GAP_PX;
+		if (top + menuHeight > bottomBoundary - VIEWPORT_PADDING_PX) {
+			top = buttonRect.top - menuHeight - MENU_GAP_PX;
+		}
+		top = Math.min(top, bottomBoundary - menuHeight - VIEWPORT_PADDING_PX);
+		top = Math.max(top, VIEWPORT_PADDING_PX);
+
+		setMenuPosition({ top, left });
+	}, [visibleActionCount]);
 
 	// Close dropdown when clicking outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+			const target = event.target as Node;
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(target) &&
+				!menuRef.current?.contains(target)
+			) {
 				setIsOpen(false);
 			}
 		};
@@ -36,9 +95,32 @@ export default function MessageDropdown({
 		};
 	}, []);
 
+	useLayoutEffect(() => {
+		if (!isOpen) {
+			setMenuPosition(null);
+			return;
+		}
+
+		updateMenuPosition();
+		window.addEventListener("resize", updateMenuPosition);
+		window.addEventListener("scroll", updateMenuPosition, true);
+
+		return () => {
+			window.removeEventListener("resize", updateMenuPosition);
+			window.removeEventListener("scroll", updateMenuPosition, true);
+		};
+	}, [isOpen, updateMenuPosition]);
+
 	const handleDelete = () => {
 		if (onDelete) {
 			onDelete(message.id);
+		}
+		setIsOpen(false);
+	};
+
+	const handleEdit = () => {
+		if (onEdit) {
+			onEdit(message);
 		}
 		setIsOpen(false);
 	};
@@ -57,16 +139,11 @@ export default function MessageDropdown({
 		setIsOpen(false);
 	};
 
-	// Check if current user is admin
-	const isAdmin = currentUser?.role === "ADMINISTRATOR";
-
-	// Check if message is from current user
-	const isOwnMessage = message.senderId === currentUser?.id;
-
 	return (
 		<div className="relative" ref={dropdownRef}>
 			{/* Dropdown trigger button */}
 			<button
+				ref={buttonRef}
 				onClick={() => setIsOpen(!isOpen)}
 				className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 				aria-label="Message options"
@@ -86,8 +163,19 @@ export default function MessageDropdown({
 			</button>
 
 			{/* Dropdown menu */}
-			{isOpen && (
-				<div className="absolute right-0 top-8 z-50 w-44 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+			{isOpen &&
+				menuPosition &&
+				typeof document !== "undefined" &&
+				createPortal(
+				<div
+					ref={menuRef}
+					data-message-dropdown-menu
+					className="fixed z-[10050] w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+					style={{
+						top: menuPosition.top,
+						left: menuPosition.left,
+					}}
+				>
 					{/* Show Reply and Mark as unread only for messages from other users */}
 					{!isOwnMessage && (
 						<>
@@ -139,6 +227,31 @@ export default function MessageDropdown({
 						</>
 					)}
 
+					{canEdit && (
+						<button
+							onClick={handleEdit}
+							className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+								className="text-gray-500 dark:text-gray-400"
+							>
+								<path
+									d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+							Edit
+						</button>
+					)}
+
 					{/* Show delete button only for admin users */}
 					{isAdmin && (
 						<button
@@ -164,7 +277,8 @@ export default function MessageDropdown({
 							Delete
 						</button>
 					)}
-				</div>
+				</div>,
+				document.body
 			)}
 		</div>
 	);

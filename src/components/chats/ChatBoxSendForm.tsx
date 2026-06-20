@@ -47,6 +47,9 @@ interface ChatBoxSendFormProps {
 	isLoading?: boolean;
 	replyingTo?: Message["replyData"];
 	onCancelReply?: () => void;
+	editingMessage?: Message | null;
+	editDraftKey?: number;
+	onCancelEdit?: () => void;
 }
 
 export type ChatBoxSendFormHandle = {
@@ -82,6 +85,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			isLoading = false,
 			replyingTo,
 			onCancelReply,
+			editingMessage,
+			editDraftKey = 0,
+			onCancelEdit,
 		},
 		ref
 	) {
@@ -107,6 +113,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			editorRef,
 			composeResetKey
 		);
+		const isEditing = Boolean(editingMessage);
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -160,6 +167,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				// Cancel reply if we were replying
 				if (replyingTo && onCancelReply) {
 					onCancelReply();
+				}
+				if (editingMessage && onCancelEdit) {
+					onCancelEdit();
 				}
 
 				// Focus back to input after sending message
@@ -394,7 +404,17 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setAttachedFiles([]);
 			setShowEmojiPicker(false);
 			onTyping?.(false);
-		}, [chatRoomId]);
+			onCancelEdit?.();
+		}, [chatRoomId, onCancelEdit, onTyping]);
+
+		useEffect(() => {
+			if (!editingMessage) return;
+			setAttachedFiles([]);
+			setShowEmojiPicker(false);
+			if (replyingTo && onCancelReply) {
+				onCancelReply();
+			}
+		}, [editingMessage, replyingTo, onCancelReply]);
 
 		const updateEmojiPickerPosition = useCallback(() => {
 			if (!emojiButtonRef.current) return;
@@ -448,11 +468,42 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setAttachedFiles(prev => prev.filter(f => f.localId !== localId));
 		};
 
+		const handleCancelEdit = () => {
+			onCancelEdit?.();
+			setMessage("");
+			setComposeResetKey(k => k + 1);
+			setShowEmojiPicker(false);
+			onTyping?.(false);
+			requestAnimationFrame(() => {
+				editorRef.current?.focus();
+			});
+		};
+
 		return (
 			<div className="sticky bottom-0 p-3 border-t border-gray-200 dark:border-gray-800">
 				{/* Reply Preview */}
 				{replyingTo && (
 					<ReplyPreview replyData={replyingTo} onCancel={() => onCancelReply?.()} />
+				)}
+
+				{isEditing && editingMessage && (
+					<div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 dark:border-brand-500/30 dark:bg-brand-500/10">
+						<div className="min-w-0">
+							<p className="text-xs font-semibold text-brand-600 dark:text-brand-300">
+								Editing message
+							</p>
+							<p className="truncate text-xs text-gray-600 dark:text-gray-300">
+								{editingMessage.content}
+							</p>
+						</div>
+						<button
+							type="button"
+							onClick={handleCancelEdit}
+							className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-white hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+						>
+							Cancel
+						</button>
+					</div>
 				)}
 
 				{/* Hidden file input */}
@@ -568,8 +619,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					}}
 				>
 					<div className="relative w-full min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40">
-						<ChatFormatToolbar
-							disabled={disabled || isSending || isUploadingAttachments}
+							<ChatFormatToolbar
+								disabled={disabled || isSending || isUploadingAttachments}
 							activeFormats={formatState}
 							onAction={applyFormatAction}
 						/>
@@ -608,7 +659,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								</button>
 								<button
 									type="button"
-									disabled={disabled || isSending || isUploadingAttachments}
+									disabled={disabled || isSending || isUploadingAttachments || isEditing}
 									onClick={() => setTemplatesModalOpen(true)}
 									className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 									aria-label="Message templates"
@@ -636,6 +687,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 							<ChatRichComposeInput
 								editorRef={editorRef}
 								resetKey={composeResetKey}
+								draftKey={editDraftKey}
+								draftContent={editingMessage?.content ?? ""}
 								onContentChange={handleContentChange}
 								onKeyDown={handleKeyDown}
 								onPaste={handlePaste}
@@ -649,7 +702,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						<button
 							type="button"
 							onClick={handleFileButtonClick}
-							disabled={disabled || isSending || isUploadingAttachments}
+							disabled={disabled || isSending || isUploadingAttachments || isEditing}
 							className="mr-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 						>
 							<svg

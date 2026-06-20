@@ -23,6 +23,9 @@ export type ChatRichComposeInputProps = {
 	placeholder?: string;
 	/** Increment to clear editor (e.g. after send). */
 	resetKey?: number;
+	/** Increment to replace editor content with draftContent. */
+	draftKey?: number;
+	draftContent?: string;
 };
 
 export default function ChatRichComposeInput({
@@ -33,6 +36,8 @@ export default function ChatRichComposeInput({
 	disabled,
 	placeholder = "Type a message",
 	resetKey = 0,
+	draftKey = 0,
+	draftContent = "",
 }: ChatRichComposeInputProps) {
 	const [showPlaceholder, setShowPlaceholder] = useState(true);
 
@@ -46,6 +51,7 @@ export default function ChatRichComposeInput({
 	}, [editorRef, onContentChange]);
 
 	const prevResetKeyRef = useRef(resetKey);
+	const prevDraftKeyRef = useRef(draftKey);
 
 	useEffect(() => {
 		if (resetKey === prevResetKeyRef.current) return;
@@ -62,6 +68,34 @@ export default function ChatRichComposeInput({
 			resetComposeEditorHeight(node);
 		});
 	}, [resetKey, editorRef, onContentChange]);
+
+	useEffect(() => {
+		if (draftKey === prevDraftKeyRef.current) return;
+		prevDraftKeyRef.current = draftKey;
+		const el = editorRef.current;
+		if (!el) return;
+		el.textContent = draftContent;
+		setShowPlaceholder(!draftContent.trim());
+		onContentChange(draftContent, draftContent.trim());
+		requestAnimationFrame(() => {
+			const node = editorRef.current;
+			if (!node) return;
+			node.focus();
+			const selection = window.getSelection();
+			const range = document.createRange();
+			range.selectNodeContents(node);
+			range.collapse(false);
+			selection?.removeAllRanges();
+			selection?.addRange(range);
+			node.style.height = "auto";
+			const chatBox = node.closest("[data-chat-box]") as HTMLElement | null;
+			const max = getComposeEditorMaxHeightPx(chatBox);
+			node.style.height = `${Math.min(
+				Math.max(node.scrollHeight, COMPOSE_EDITOR_MIN_HEIGHT_PX),
+				max
+			)}px`;
+		});
+	}, [draftKey, draftContent, editorRef, onContentChange]);
 
 	const adjustHeight = useCallback(() => {
 		const el = editorRef.current;

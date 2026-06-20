@@ -34,6 +34,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [replyingTo, setReplyingTo] = useState<Message["replyData"] | null>(null);
+	const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+	const [editDraftKey, setEditDraftKey] = useState(0);
 	const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 	const virtualListRef = useRef<ChatBoxVirtualMessageListHandle>(null);
 	const [messagesScrollRoot, setMessagesScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -59,18 +61,29 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	// Get current user for message display
 	const currentUser = useCurrentUser();
 
-	const handleReplyToMessage = (message: Message) => {
+	const handleReplyToMessage = useCallback((message: Message) => {
+		setEditingMessage(null);
 		setReplyingTo({
 			avatar: message.sender.avatar,
 			time: message.createdAt,
 			content: message.content,
 			senderName: `${message.sender.firstName} ${message.sender.lastName}`,
 		});
-	};
+	}, []);
 
-	const handleCancelReply = () => {
+	const handleCancelReply = useCallback(() => {
 		setReplyingTo(null);
-	};
+	}, []);
+
+	const handleEditMessage = useCallback((message: Message) => {
+		setEditingMessage(message);
+		setReplyingTo(null);
+		setEditDraftKey(key => key + 1);
+	}, []);
+
+	const handleCancelEdit = useCallback(() => {
+		setEditingMessage(null);
+	}, []);
 
 	// Use WebSocket chat sync for real-time functionality from props
 	const {
@@ -82,6 +95,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const { sendMessage: wsSendMessage, socket } = useWebSocket();
 	const addMessage = useChatStore(state => state.addMessage);
+	const updateMessage = useChatStore(state => state.updateMessage);
+	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
 
 	const outgoingSender = useMemo(() => {
@@ -480,6 +495,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			setIsUserScrolledUp(false);
 		}
 		setReplyingTo(null);
+		setEditingMessage(null);
 	}, [selectedChatRoomId]);
 
 	useLayoutEffect(() => {
@@ -532,6 +548,48 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		try {
 			sendTyping(false);
 
+			if (editingMessage) {
+				const content = messageData.content.trim();
+				if (!content) return;
+
+				const previousMessage = editingMessage;
+				const previousLastMessage = selectedChatRoom.lastMessage;
+				updateMessage(previousMessage.id, { content });
+				if (previousLastMessage?.id === previousMessage.id) {
+					updateChatRoom(selectedChatRoom.id, {
+						lastMessage: {
+							...previousLastMessage,
+							content,
+						},
+					});
+				}
+
+				try {
+					const updatedMessage = await chatApi.updateMessage(previousMessage.id, content);
+					updateMessage(updatedMessage.id, updatedMessage);
+					const state = useChatStore.getState();
+					const room = state.chatRooms.find(r => r.id === updatedMessage.chatRoomId);
+					if (room?.lastMessage?.id === updatedMessage.id) {
+						updateChatRoom(updatedMessage.chatRoomId, {
+							lastMessage: {
+								...room.lastMessage,
+								...updatedMessage,
+							},
+						});
+					}
+					setEditingMessage(null);
+				} catch (error) {
+					updateMessage(previousMessage.id, previousMessage);
+					if (previousLastMessage?.id === previousMessage.id) {
+						updateChatRoom(selectedChatRoom.id, {
+							lastMessage: previousLastMessage,
+						});
+					}
+					throw error;
+				}
+				return;
+			}
+
 			const files = messageData.fileData ?? [];
 			if (files.length === 0) {
 				await sendTextMessage(messageData.content, messageData.replyData);
@@ -552,6 +610,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			}, 50);
 		} catch (err) {
 			console.error("Failed to send message:", err);
+			throw err;
 		}
 	};
 
@@ -781,6 +840,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								onContentMeasured={handleVirtualContentMeasured}
 								isUserScrolledUp={isUserScrolledUp}
 								onDelete={handleDeleteMessage}
+								onEdit={handleEditMessage}
 								onReply={handleReplyToMessage}
 								onMarkUnread={handleMarkMessageUnread}
 								onRetry={message => {
@@ -799,6 +859,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										chatRoomType={selectedChatRoom?.type}
 										chatParticipants={selectedChatRoom?.participants ?? []}
 										onDelete={handleDeleteMessage}
+										onEdit={handleEditMessage}
 										onReply={handleReplyToMessage}
 										onMarkUnread={handleMarkMessageUnread}
 										onRetry={
@@ -878,6 +939,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						onTyping={sendTyping}
 						replyingTo={replyingTo || undefined}
 						onCancelReply={handleCancelReply}
+						editingMessage={editingMessage}
+						editDraftKey={editDraftKey}
+						onCancelEdit={handleCancelEdit}
 					/>
 				)}
 			</div>

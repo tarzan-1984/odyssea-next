@@ -23,6 +23,7 @@ interface MessageItemProps {
 	/** Room participants for resolving read receipt names */
 	chatParticipants?: ChatRoomParticipant[];
 	onDelete: (messageId: string) => void;
+	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: () => void;
@@ -34,6 +35,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	chatRoomType,
 	chatParticipants = [],
 	onDelete,
+	onEdit,
 	onReply,
 	onMarkUnread,
 	onRetry,
@@ -118,6 +120,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				message={message}
 				currentUser={currentUser}
 				onDelete={onDelete}
+				onEdit={onEdit}
 				onReply={onReply}
 				onMarkUnread={onMarkUnread}
 			/>
@@ -203,6 +206,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									message={message}
 									currentUser={currentUser}
 									onDelete={onDelete}
+									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
 								/>
@@ -235,6 +239,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									message={message}
 									currentUser={currentUser}
 									onDelete={onDelete}
+									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
 								/>
@@ -267,6 +272,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									message={message}
 									currentUser={currentUser}
 									onDelete={onDelete}
+									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
 								/>
@@ -469,6 +475,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									message={message}
 									currentUser={currentUser}
 									onDelete={onDelete}
+									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
 								/>

@@ -11,7 +11,7 @@ import type { UserListItem } from "@/app-api/api-types";
 import { renderAvatar } from "@/helpers";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import { useCurrentUser } from "@/stores/userStore";
-import { canModifyAppSettings } from "@/utils/roleAccess";
+import { canModifyAppSettings, canSendCheckListMessages } from "@/utils/roleAccess";
 
 type MobileAppSettingsPayload = {
 	id: string;
@@ -249,6 +249,7 @@ function getUserDisplayName(u: UserListItem): string {
 export default function AppSettingsPage() {
 	const currentUser = useCurrentUser();
 	const canSaveAppSettings = canModifyAppSettings(currentUser?.role);
+	const canSendPush = canSendCheckListMessages(currentUser?.role);
 	const [intervalMin, setIntervalMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
@@ -405,6 +406,7 @@ export default function AppSettingsPage() {
 
 	async function onSendPush(e: FormEvent) {
 		e.preventDefault();
+		if (!canSendPush) return;
 		setPushError(null);
 		setPushSuccess(null);
 
@@ -1386,7 +1388,7 @@ export default function AppSettingsPage() {
 					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
 						<button
 							type="submit"
-							disabled={pushSending || pageLoading}
+							disabled={!canSendPush || pushSending || pageLoading}
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{pushSending ? "Sending…" : "Send push"}

@@ -399,6 +399,14 @@ class ChatApiClient {
 		return response;
 	}
 
+	async updateMessage(messageId: string, content: string): Promise<Message> {
+		const response = await this.request<Message>(`/messages/${messageId}`, {
+			method: "PUT",
+			body: JSON.stringify({ content }),
+		});
+		return response;
+	}
+
 	setMessageReaction(
 		messageId: string,
 		emoji: string,

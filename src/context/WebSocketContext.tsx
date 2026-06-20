@@ -712,6 +712,43 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 		);
 
+		newSocket.on(
+			"messageUpdated",
+			(data: {
+				chatRoomId: string;
+				message: Message;
+			}) => {
+				if (!data?.chatRoomId || !data?.message?.id) {
+					return;
+				}
+
+				const state = useChatStore.getState();
+				const existingMessage = state.messages.find(
+					message => message.id === data.message.id
+				);
+
+				if (existingMessage) {
+					state.updateMessage(data.message.id, data.message);
+				}
+
+				const room = state.chatRooms.find(r => r.id === data.chatRoomId);
+				if (room?.lastMessage?.id === data.message.id) {
+					state.updateChatRoom(data.chatRoomId, {
+						lastMessage: {
+							...room.lastMessage,
+							...data.message,
+						},
+					});
+				}
+
+				indexedDBChatService
+					.updateMessage(data.message.id, data.message)
+					.catch((error: Error) => {
+						console.error("Failed to update edited message in IndexedDB:", error);
+					});
+			}
+		);
+
 		// Handle messages marked as unread
 		newSocket.on(
 			"messagesMarkedAsUnread",
