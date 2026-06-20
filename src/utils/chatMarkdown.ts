@@ -24,90 +24,22 @@ export function wrapTextSelection(
 	return { nextValue, selectionStart: nextStart, selectionEnd: nextEnd };
 }
 
-function getLineRangeAt(value: string, index: number): { start: number; end: number } {
-	const lineStart = value.lastIndexOf("\n", index - 1) + 1;
-	const nextBreak = value.indexOf("\n", index);
-	const lineEnd = nextBreak === -1 ? value.length : nextBreak;
-	return { start: lineStart, end: lineEnd };
-}
+/**
+ * Chat supports bold/italic/underline/strike only — escape list markers so
+ * CommonMark does not treat phone numbers (e.g. `215) 380-9284`) as lists.
+ */
+export function escapeChatListSyntax(content: string): string {
+	if (!content) return content;
 
-function getBlockLineRange(value: string, selectionStart: number, selectionEnd: number) {
-	const startLine = getLineRangeAt(value, selectionStart);
-	const endLine = getLineRangeAt(value, Math.max(selectionStart, selectionEnd - 1));
-	return { start: startLine.start, end: endLine.end };
-}
-
-const BULLET_RE = /^(\s*)[-*+]\s+/;
-const ORDERED_RE = /^(\s*)\d+\.\s+/;
-
-export function toggleBulletList(
-	value: string,
-	selectionStart: number,
-	selectionEnd: number
-): { nextValue: string; selectionStart: number; selectionEnd: number } {
-	return toggleListPrefix(value, selectionStart, selectionEnd, "- ");
-}
-
-export function toggleOrderedList(
-	value: string,
-	selectionStart: number,
-	selectionEnd: number
-): { nextValue: string; selectionStart: number; selectionEnd: number } {
-	const { start, end } = getBlockLineRange(value, selectionStart, selectionEnd);
-	const block = value.slice(start, end);
-	const lines = block.split("\n");
-	const allOrdered = lines.every(line => line.trim() === "" || ORDERED_RE.test(line));
-
-	let lineIndex = 0;
-	const nextLines = lines.map(line => {
-		if (line.trim() === "") return line;
-		lineIndex += 1;
-		if (allOrdered) {
-			return line.replace(ORDERED_RE, "$1");
-		}
-		const indent = line.match(/^(\s*)/)?.[1] ?? "";
-		const stripped = line.replace(BULLET_RE, "").replace(ORDERED_RE, "");
-		return `${indent}${lineIndex}. ${stripped}`;
-	});
-
-	const nextBlock = nextLines.join("\n");
-	const nextValue = value.slice(0, start) + nextBlock + value.slice(end);
-	return {
-		nextValue,
-		selectionStart: start,
-		selectionEnd: start + nextBlock.length,
-	};
-}
-
-function toggleListPrefix(
-	value: string,
-	selectionStart: number,
-	selectionEnd: number,
-	prefix: string
-): { nextValue: string; selectionStart: number; selectionEnd: number } {
-	const { start, end } = getBlockLineRange(value, selectionStart, selectionEnd);
-	const block = value.slice(start, end);
-	const lines = block.split("\n");
-	const bulletRe = new RegExp(`^(\\s*)${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
-	const allHavePrefix = lines.every(line => line.trim() === "" || bulletRe.test(line));
-
-	const nextLines = lines.map(line => {
-		if (line.trim() === "") return line;
-		if (allHavePrefix) {
-			return line.replace(bulletRe, "$1");
-		}
-		const indent = line.match(/^(\s*)/)?.[1] ?? "";
-		const stripped = line.replace(BULLET_RE, "").replace(ORDERED_RE, "");
-		return `${indent}${prefix}${stripped}`;
-	});
-
-	const nextBlock = nextLines.join("\n");
-	const nextValue = value.slice(0, start) + nextBlock + value.slice(end);
-	return {
-		nextValue,
-		selectionStart: start,
-		selectionEnd: start + nextBlock.length,
-	};
+	return content
+		.replace(
+			/^(\s*)(\d+)([.)])(\s+)/gm,
+			(_, indent, num, marker, space) => `${indent}${num}\\${marker}${space}`
+		)
+		.replace(
+			/^(\s*)([-*+])(\s+)/gm,
+			(_, indent, marker, space) => `${indent}\\${marker}${space}`
+		);
 }
 
 /** Closes unclosed markers so compose preview shows styles while typing. */
@@ -153,7 +85,7 @@ export function stripMarkdown(content: string): string {
 	text = text.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "$1");
 	text = text.replace(/~~([\s\S]*?)~~/g, "$1");
 	text = text.replace(/^[\t ]*[-*+]\s+/gm, "");
-	text = text.replace(/^[\t ]*\d+\.\s+/gm, "");
+	text = text.replace(/^[\t ]*\d+[.)]\s+/gm, "");
 	text = text.replace(/\*{1,3}/g, "");
 	text = text.replace(/\n{3,}/g, "\n\n");
 	return text.trim();

@@ -8,10 +8,11 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Schema } from "hast-util-sanitize";
 import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
+import { escapeChatListSyntax } from "@/utils/chatMarkdown";
 
 const chatMarkdownSanitizeSchema: Schema = {
 	...defaultSchema,
-	tagNames: ["p", "br", "strong", "em", "del", "u", "ul", "ol", "li", "a"],
+	tagNames: ["p", "br", "strong", "em", "del", "u", "a"],
 	attributes: {
 		...defaultSchema.attributes,
 		a: [
@@ -39,7 +40,7 @@ export default function ChatMessageContent({
 		return null;
 	}
 
-	const linkedContent = preprocessChatMessageLinks(content);
+	const renderContent = escapeChatListSyntax(preprocessChatMessageLinks(content));
 
 	const rootClass = [
 		"chat-markdown min-w-0 break-words",
@@ -78,17 +79,6 @@ export default function ChatMessageContent({
 						);
 					},
 					p: ({ children }) => <p className="chat-msg-body mb-0">{children}</p>,
-					ul: ({ children }) => (
-						<ul className="chat-msg-body my-1 list-disc space-y-0.5 pl-5">
-							{children}
-						</ul>
-					),
-					ol: ({ children }) => (
-						<ol className="chat-msg-body my-1 list-decimal space-y-0.5 pl-5">
-							{children}
-						</ol>
-					),
-					li: ({ children }) => <li className="chat-msg-body">{children}</li>,
 					strong: ({ children }) => <strong className="font-bold">{children}</strong>,
 					em: ({ children }) => <em className="italic">{children}</em>,
 					del: ({ children }) => (
@@ -97,7 +87,7 @@ export default function ChatMessageContent({
 					u: ({ children }) => <u className="underline">{children}</u>,
 				}}
 			>
-				{linkedContent}
+				{renderContent}
 			</ReactMarkdown>
 		</div>
 	);
