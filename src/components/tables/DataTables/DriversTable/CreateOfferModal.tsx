@@ -45,7 +45,14 @@ export interface CreateOfferFormValues {
 }
 
 /** Single row in the route UI (pickup or delivery) */
-type RouteRow = { id: string; type: "pickup" | "delivery"; location: string; time: string };
+type RouteRow = {
+	id: string;
+	type: "pickup" | "delivery";
+	location: string;
+	time: string;
+	/** "latitude,longitude" — filled on location blur via geocoding */
+	coordinates: string;
+};
 
 const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds" | "route"> = {
 	weight: "",
@@ -60,9 +67,24 @@ const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 	type,
 	location: "",
 	time: "",
+	coordinates: "",
 });
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
+
+function parseRouteCoordinates(
+	coordinates: string
+): { latitude: number; longitude: number } | null {
+	const trimmed = coordinates.trim();
+	if (!trimmed) return null;
+
+	const [latStr, lngStr] = trimmed.split(",");
+	const latitude = Number.parseFloat(latStr?.trim() ?? "");
+	const longitude = Number.parseFloat(lngStr?.trim() ?? "");
+	if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+
+	return { latitude, longitude };
+}
 
 /** Draggable wrapper for a route row (pickup or delivery) */
 function DraggableExtraRow({
@@ -81,7 +103,7 @@ function DraggableExtraRow({
 }: {
 	row: RouteRow;
 	index: number;
-	updateExtraRow: (index: number, field: "location" | "time", value: string) => void;
+	updateExtraRow: (index: number, field: "location" | "time" | "coordinates", value: string) => void;
 	removeExtraRow: (index: number) => void;
 	moveRow: (dragIndex: number, hoverIndex: number) => void;
 	pendingDropRef: React.MutableRefObject<number | null>;
@@ -186,6 +208,12 @@ function DraggableExtraRow({
 			{/* Location field */}
 			<div className="flex-1 min-w-0 relative">
 				<Label>{row.type === "pickup" ? "Pick up location" : "Delivery location"}</Label>
+				<input
+					type="hidden"
+					name={`route-${row.id}-coordinates`}
+					value={row.coordinates}
+					readOnly
+				/>
 				<Input
 					type="text"
 					value={row.location}
@@ -322,7 +350,7 @@ export default function CreateOfferModal({
 	}, []);
 
 	const updateExtraRow = useCallback(
-		(index: number, field: "location" | "time", value: string) => {
+		(index: number, field: "location" | "time" | "coordinates", value: string) => {
 			setRouteRows(prev => {
 				const next = [...prev];
 				next[index] = { ...next[index], [field]: value };
@@ -374,12 +402,26 @@ export default function CreateOfferModal({
 					delete next[rowId];
 					return next;
 				});
+				setRouteRows(prev => {
+					const next = [...prev];
+					if (next[index]) {
+						next[index] = { ...next[index], coordinates: "" };
+					}
+					return next;
+				});
 				return;
 			}
 
 			// Validate format: must be ZIP or "City, State"
 			if (!isValidLocationFormat(trimmed)) {
 				setRouteRowLocationErrors(prev => ({ ...prev, [rowId]: LOCATION_FORMAT_ERROR }));
+				setRouteRows(prev => {
+					const next = [...prev];
+					if (next[index]) {
+						next[index] = { ...next[index], coordinates: "" };
+					}
+					return next;
+				});
 				return;
 			}
 
@@ -390,30 +432,57 @@ export default function CreateOfferModal({
 			});
 
 			const geocodeAddress = normalizeLocationForGeocode(trimmed);
-			let finalRows: RouteRow[] | null = null;
+			let finalAddress = trimmed;
+
 			if (needsLocationGeocode(trimmed)) {
 				try {
 					const formatted = await offers.geocodeToFormattedAddress(geocodeAddress);
-					if (formatted && formatted !== trimmed) {
-						setRouteRows(prev => {
-							const next = [...prev];
-							if (next[index]) {
-								next[index] = { ...next[index], location: formatted };
-							}
-							finalRows = next;
-							return next;
-						});
+					if (formatted) {
+						finalAddress = formatted;
 					}
 				} catch {
 					// Keep original value on error
 				}
 			} else if (geocodeAddress !== trimmed) {
+				finalAddress = geocodeAddress;
+			}
+
+			if (finalAddress !== trimmed) {
 				setRouteRows(prev => {
 					const next = [...prev];
 					if (next[index]) {
-						next[index] = { ...next[index], location: geocodeAddress };
+						next[index] = { ...next[index], location: finalAddress };
 					}
-					finalRows = next;
+					return next;
+				});
+			}
+
+			try {
+				const coords = await offers.geocodeCoordinates(finalAddress);
+				if (coords) {
+					const coordinatesStr = `${coords.latitude},${coords.longitude}`;
+					setRouteRows(prev => {
+						const next = [...prev];
+						if (next[index]) {
+							next[index] = { ...next[index], coordinates: coordinatesStr };
+						}
+						return next;
+					});
+				} else {
+					setRouteRows(prev => {
+						const next = [...prev];
+						if (next[index]) {
+							next[index] = { ...next[index], coordinates: "" };
+						}
+						return next;
+					});
+				}
+			} catch {
+				setRouteRows(prev => {
+					const next = [...prev];
+					if (next[index]) {
+						next[index] = { ...next[index], coordinates: "" };
+					}
 					return next;
 				});
 			}
@@ -426,9 +495,6 @@ export default function CreateOfferModal({
 					return current;
 				});
 			}, 0);
-
-			// eslint-disable-next-line no-void
-			void finalRows; // suppress unused warning
 		},
 		[commitLocations]
 	);
@@ -500,7 +566,15 @@ export default function CreateOfferModal({
 					if (invalidLocation) {
 						routeError = LOCATION_FORMAT_ERROR;
 					} else {
-						routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
+						const missingCoordinates = trimmedRoute.some(
+							row => !parseRouteCoordinates(row.coordinates)
+						);
+						if (missingCoordinates) {
+							routeError =
+								"Each stop must have coordinates — blur each location field to resolve the address";
+						} else {
+							routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
+						}
 					}
 				}
 			}
@@ -549,13 +623,18 @@ export default function CreateOfferModal({
 
 		setIsSubmitting(true);
 		try {
-			const routePayload: CreateOfferRoutePoint[] = routeRows.map(row => ({
-				type: (row.type === "pickup"
-					? "pick_up_location"
-					: "delivery_location") as CreateOfferRoutePoint["type"],
-				location: row.location.trim(),
-				time: row.time.trim(),
-			}));
+			const routePayload: CreateOfferRoutePoint[] = routeRows.map(row => {
+				const coords = parseRouteCoordinates(row.coordinates);
+				return {
+					type: (row.type === "pickup"
+						? "pick_up_location"
+						: "delivery_location") as CreateOfferRoutePoint["type"],
+					location: row.location.trim(),
+					time: row.time.trim(),
+					latitude: coords?.latitude,
+					longitude: coords?.longitude,
+				};
+			});
 
 			const payload = {
 				externalId,
@@ -623,13 +702,18 @@ export default function CreateOfferModal({
 								moveRow={moveExtraRow}
 								pendingDropRef={pendingDropRef}
 								onAddressBlur={handleAddressBlur}
-								onLocationChange={rowId =>
+								onLocationChange={rowId => {
 									setRouteRowLocationErrors(prev => {
 										const next = { ...prev };
 										delete next[rowId];
 										return next;
-									})
-								}
+									});
+									setRouteRows(prev =>
+										prev.map(row =>
+											row.id === rowId ? { ...row, coordinates: "" } : row
+										)
+									);
+								}}
 								locationError={routeRowLocationErrors[row.id]}
 								canRemove={
 									(row.type === "pickup" &&

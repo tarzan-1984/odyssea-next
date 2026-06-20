@@ -22,6 +22,8 @@ export interface OfferRoutePoint {
 	type: "pick_up_location" | "delivery_location";
 	location: string;
 	time: string;
+	latitude?: number;
+	longitude?: number;
 }
 
 export interface OfferCreator {
@@ -111,6 +113,8 @@ export interface CreateOfferRoutePoint {
 	type: "pick_up_location" | "delivery_location";
 	location: string;
 	time: string;
+	latitude?: number;
+	longitude?: number;
 }
 
 export interface CreateOfferPayload {
@@ -192,6 +196,37 @@ const offers = {
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
+	},
+
+	/**
+	 * Geocode an address to latitude/longitude via Nominatim.
+	 * Returns null if geocoding fails.
+	 */
+	async geocodeCoordinates(
+		address: string
+	): Promise<{ latitude: number; longitude: number } | null> {
+		const response = await axios.post<{
+			latitude?: number;
+			longitude?: number;
+			error?: string;
+		}>(
+			"/api/offers/geocode-coordinates",
+			{ address: address.trim() },
+			{
+				headers: { "Content-Type": "application/json" },
+				withCredentials: true,
+				validateStatus: () => true,
+			}
+		);
+
+		if (response.status >= 200 && response.status < 300) {
+			const { latitude, longitude } = response.data ?? {};
+			if (typeof latitude === "number" && typeof longitude === "number") {
+				return { latitude, longitude };
+			}
+		}
+
+		return null;
 	},
 
 	/**
