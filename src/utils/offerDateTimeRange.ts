@@ -108,32 +108,28 @@ export function parseOfferDateTimeField(value: string): {
 	return { start: parseSingleOfferDateTime(trimmed), end: null };
 }
 
-function formatTimePart(d: Date, includeMinutes: boolean): string {
+function formatTimePart(d: Date): string {
 	let hours = d.getHours();
 	const period = hours >= 12 ? "PM" : "AM";
 	hours = hours % 12 || 12;
 	const minutes = d.getMinutes();
-	if (!includeMinutes || minutes === 0) {
-		return `${hours} ${period}`;
-	}
 	return `${hours}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-/** Client format: "4 June 2026 8 AM" */
+/** Client format: "4 June 2026 8:00 AM" */
 export function formatOfferDateTime(d: Date): string {
 	const day = d.getDate();
 	const month = MONTH_NAMES[d.getMonth()];
 	const year = d.getFullYear();
-	const includeMinutes = d.getMinutes() !== 0;
-	return `${day} ${month} ${year} ${formatTimePart(d, includeMinutes)}`;
+	return `${day} ${month} ${year} ${formatTimePart(d)}`;
 }
 
-/** Same day: "4 June 2026 8 AM — 12 PM"; different days: full end date */
+/** Same day: "4 June 2026 8:00 AM — 12:00 PM"; different days: full end date */
 export function formatOfferDateTimeRange(start: Date, end?: Date | null): string {
 	if (!end) return formatOfferDateTime(start);
 	const sameDay = start.toDateString() === end.toDateString();
 	if (sameDay) {
-		return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatTimePart(end, true)}`;
+		return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatTimePart(end)}`;
 	}
 	return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatOfferDateTime(end)}`;
 }

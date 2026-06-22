@@ -13,6 +13,10 @@ import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 const tmsCardButtonClass =
 	"inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors";
 
+export function getDriverInfoCardWidthClass(hasRoute: boolean): string {
+	return hasRoute ? "w-fit max-w-full" : "w-[min(calc(100vw-3rem),56rem)]";
+}
+
 interface DriverData {
 	id?: string | null;
 	email?: string | null;
@@ -38,6 +42,8 @@ interface DriverInfoProps {
 	loadId?: string;
 	/** Human-readable load status from TMS meta_data.load_status. */
 	loadStatusLabel?: string | null;
+	/** Multiline route details (pick up / delivery, address, time). */
+	routeDetails?: string | null;
 	/** Load tracking page: hide chat/TMS/push only when driver has no mobile app. */
 	showLoadTrackingActions?: boolean;
 }
@@ -49,6 +55,7 @@ export default function DriverInfo({
 	driverData,
 	loadId,
 	loadStatusLabel,
+	routeDetails,
 	showLoadTrackingActions = true,
 }: DriverInfoProps) {
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
@@ -120,12 +127,21 @@ export default function DriverInfo({
 	const showSendPushButton = usesMobileAppForUi && pushModalDriver !== null;
 	const showChatAndTmsButtons =
 		usesMobileAppForUi && Boolean(openChatUrl || tmsLoadPageUrl);
+	const hasRoute = Boolean(routeDetails?.trim());
 
 	return (
-		<div className="w-[min(calc(100vw-3rem),56rem)] rounded-lg border border-gray-200 bg-white px-8 py-5 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-			<div className="flex items-start gap-10">
+		<div
+			className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900 ${
+				hasRoute ? "px-4 py-3.5" : "px-8 py-5"
+			} ${getDriverInfoCardWidthClass(hasRoute)}`}
+		>
+			<div className={`flex min-w-0 items-start ${hasRoute ? "gap-4" : "gap-10"}`}>
 				{/* Avatar + Name */}
-				<div className="flex w-[14rem] max-w-[14rem] shrink-0 flex-col items-center sm:w-[16rem] sm:max-w-[16rem]">
+				<div
+					className={`flex shrink-0 flex-col items-center ${
+						hasRoute ? "w-[12.5rem] max-w-[12.5rem]" : "w-[14rem] max-w-[14rem] sm:w-[16rem] sm:max-w-[16rem]"
+					}`}
+				>
 					<div className="mb-2 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700">
 						{driverData.profilePhoto ? (
 							<img
@@ -169,9 +185,17 @@ export default function DriverInfo({
 					)}
 				</div>
 
-				{/* Details: 3 equal columns */}
-				<div className="grid min-w-0 flex-1 grid-cols-3 gap-x-8">
-					<div className="flex min-w-0 flex-col gap-4">
+				{/* Details */}
+				<div
+					className={
+						hasRoute
+							? "flex min-w-0 shrink-0 items-start gap-3"
+							: "grid min-w-0 flex-1 grid-cols-3 gap-x-8"
+					}
+				>
+					<div
+						className={`flex flex-col gap-3 ${hasRoute ? "w-[8rem] shrink-0" : "min-w-0"}`}
+					>
 						<div className="min-w-0">
 							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Phone</p>
 							<p className="break-words text-sm font-medium text-slate-900 dark:text-white">
@@ -203,7 +227,9 @@ export default function DriverInfo({
 						)}
 					</div>
 
-					<div className="flex min-w-0 flex-col gap-4">
+					<div
+						className={`flex flex-col gap-3 ${hasRoute ? "w-[8.5rem] shrink-0" : "min-w-0"}`}
+					>
 						<div className="min-w-0">
 							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Location</p>
 							<p className="select-all break-words text-sm font-medium text-slate-900 dark:text-white">
@@ -230,7 +256,9 @@ export default function DriverInfo({
 						)}
 					</div>
 
-					<div className="flex min-w-0 flex-col gap-4">
+					<div
+						className={`flex flex-col gap-3 ${hasRoute ? "w-[9.5rem] shrink-0" : "min-w-0"}`}
+					>
 						<div className="min-w-0">
 							<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
 								Last Driver Update
@@ -262,6 +290,17 @@ export default function DriverInfo({
 							</div>
 						)}
 					</div>
+
+					{hasRoute && (
+						<div className="flex max-w-[34rem] shrink-0 flex-col gap-3">
+							<div className="min-w-0">
+								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Route</p>
+								<p className="min-w-0 whitespace-pre-line text-sm font-medium leading-snug text-slate-900 dark:text-white">
+									{routeDetails}
+								</p>
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 			<CheckListPushModal

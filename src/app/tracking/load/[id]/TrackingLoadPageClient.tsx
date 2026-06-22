@@ -9,7 +9,7 @@ import { io } from "socket.io-client";
 import { clientAuth } from "@/utils/auth";
 import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
-import DriverInfo from "../../[id]/DriverInfo";
+import DriverInfo, { getDriverInfoCardWidthClass } from "../../[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrouteStaleLocationBanner";
@@ -20,6 +20,7 @@ import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
+import { formatTmsLoadRoute } from "@/utils/formatTmsLoadRoute";
 
 const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { hours: 3 };
 
@@ -394,6 +395,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
 	const isLoadDelivered = normalizedLoadStatus === "delivered";
 	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
+	const loadRouteDetails = useMemo(
+		() =>
+			formatTmsLoadRoute(
+				loadMetaData?.pick_up_location,
+				loadMetaData?.delivery_location
+			),
+		[loadMetaData?.pick_up_location, loadMetaData?.delivery_location]
+	);
 	const loadStatusAllowsDriverMarker =
 		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
 
@@ -1371,11 +1380,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						</div>
 					)}
 					{isAuthenticated && currentTrackingDriver && !isLoadDelivered && (
-						<div className="absolute bottom-[50px] left-1/2 z-[1000] w-[min(calc(100vw-3rem),56rem)] -translate-x-1/2">
+						<div
+							className={`absolute bottom-[50px] z-[1000] flex justify-center ${
+								loadRouteDetails.trim() ? "left-4 right-4" : "left-1/2 -translate-x-1/2"
+							} ${loadRouteDetails.trim() ? "" : getDriverInfoCardWidthClass(false)}`}
+						>
 							<DriverInfo
 								driverData={driverCardData}
 								loadId={loadId}
 								loadStatusLabel={loadStatusLabel}
+								routeDetails={loadRouteDetails}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
 							/>
 						</div>
