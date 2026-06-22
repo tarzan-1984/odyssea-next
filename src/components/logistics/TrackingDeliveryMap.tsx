@@ -77,6 +77,54 @@ function getHistoryMarkerRadiusByZoom(zoom: number): number {
 	);
 }
 
+/** Matches `createHistoryPointIcon` outer box so thinning uses real on-screen footprint. */
+function getHistoryPointMarkerOuterPx(historyMarkerRadius: number): number {
+	const diameterPx = historyMarkerRadius * 2;
+	const diameter = Math.round(Math.max(22, diameterPx + 6));
+	const ringSize = 2;
+	return Math.ceil(diameter * 1.5 + ringSize * 2);
+}
+
+/**
+ * Hide history markers that would overlap in screen space (Macropoint-style thinning).
+ * Points in route order stay visible when they are far enough from already shown markers.
+ */
+function computeVisibleHistoryPointIndices(
+	points: ReadonlyArray<{ position: [number, number] }>,
+	map: L.Map,
+	markerOuterPx: number,
+	forceVisibleIndices: ReadonlySet<number>
+): Set<number> {
+	if (points.length === 0) return new Set();
+
+	const minGapPx = Math.max(18, markerOuterPx * 0.9);
+	const minGapSq = minGapPx * minGapPx;
+	const visible = new Set<number>();
+	const placedPixels: L.Point[] = [];
+
+	for (let i = 0; i < points.length; i++) {
+		const [lat, lng] = points[i].position;
+		const pixel = map.latLngToContainerPoint(L.latLng(lat, lng));
+
+		let overlaps = false;
+		for (const placed of placedPixels) {
+			const dx = pixel.x - placed.x;
+			const dy = pixel.y - placed.y;
+			if (dx * dx + dy * dy < minGapSq) {
+				overlaps = true;
+				break;
+			}
+		}
+
+		if (!overlaps || forceVisibleIndices.has(i)) {
+			visible.add(i);
+			placedPixels.push(pixel);
+		}
+	}
+
+	return visible;
+}
+
 function getDriverMarkerSizeByZoom(zoom: number): number {
 	const minZoom = 6;
 	const maxZoom = 16;
@@ -606,9 +654,11 @@ const MapRefSetter = dynamic(
 			return function MapRefSetterComponent({
 				mapRef,
 				onZoomChange,
+				onMapViewChange,
 			}: {
 				mapRef: React.MutableRefObject<L.Map | null>;
 				onZoomChange?: (zoom: number) => void;
+				onMapViewChange?: () => void;
 			}) {
 				const map = useMap();
 				useEffect(() => {
@@ -622,15 +672,22 @@ const MapRefSetter = dynamic(
 							}
 						});
 						onZoomChange?.(map.getZoom());
+						onMapViewChange?.();
 						const handleZoomEnd = () => {
 							onZoomChange?.(map.getZoom());
+							onMapViewChange?.();
+						};
+						const handleMoveEnd = () => {
+							onMapViewChange?.();
 						};
 						map.on("zoomend", handleZoomEnd);
+						map.on("moveend", handleMoveEnd);
 						return () => {
 							map.off("zoomend", handleZoomEnd);
+							map.off("moveend", handleMoveEnd);
 						};
 					}
-				}, [map, mapRef, onZoomChange]);
+				}, [map, mapRef, onMapViewChange, onZoomChange]);
 				return null;
 			};
 		}),
@@ -806,6 +863,7 @@ export default function TrackingDeliveryMap({
 	const [historyMarkerRadius, setHistoryMarkerRadius] = useState(
 		getHistoryMarkerRadiusByZoom(initialZoom)
 	);
+	const [mapViewRevision, setMapViewRevision] = useState(0);
 	const mapRef = useRef<L.Map | null>(null);
 	const hasFitInitialBoundsRef = useRef(false);
 	const lastHistoryFocusCenterKeyRef = useRef<string | null>(null);
@@ -910,6 +968,10 @@ export default function TrackingDeliveryMap({
 		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
 	}, []);
 
+	const handleMapViewChange = useCallback(() => {
+		setMapViewRevision(revision => revision + 1);
+	}, []);
+
 	const pickupAddressCandidates = useMemo(
 		() => getLoadLocationAddressCandidates(driverData?.pick_up_location, "pick_up_location"),
 		[driverData?.pick_up_location]
@@ -950,6 +1012,36 @@ export default function TrackingDeliveryMap({
 
 		return filtered;
 	}, [driverData?.load_history_details, historyMarkerPositions]);
+
+	const visibleHistoryPointIndices = useMemo(() => {
+		const map = mapRef.current;
+		if (!map || historyMarkerDetails.length === 0) {
+			return new Set(historyMarkerDetails.map((_, index) => index));
+		}
+
+		const forced = new Set<number>();
+		forced.add(0);
+		forced.add(historyMarkerDetails.length - 1);
+		if (selectedLoadHistoryPointIndex !== null) {
+			forced.add(selectedLoadHistoryPointIndex);
+		}
+		if (editingLoadHistoryPointIndex !== null) {
+			forced.add(editingLoadHistoryPointIndex);
+		}
+
+		return computeVisibleHistoryPointIndices(
+			historyMarkerDetails,
+			map,
+			getHistoryPointMarkerOuterPx(historyMarkerRadius),
+			forced
+		);
+	}, [
+		editingLoadHistoryPointIndex,
+		historyMarkerDetails,
+		historyMarkerRadius,
+		mapViewRevision,
+		selectedLoadHistoryPointIndex,
+	]);
 
 	const formatHistoryPointTime = useCallback((dateString: string | null) => {
 		return formatNyWallClockForDisplay(dateString);
@@ -1385,7 +1477,11 @@ export default function TrackingDeliveryMap({
 				scrollWheelZoom={true}
 				key={`map-${mapUsesDarkTiles ? "dark" : "light"}`}
 			>
-				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
+				<MapRefSetter
+					mapRef={mapRef}
+					onZoomChange={handleZoomChange}
+					onMapViewChange={handleMapViewChange}
+				/>
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<ResilientBasemapTileLayer
 					mode={basemapMode}
@@ -1446,6 +1542,10 @@ export default function TrackingDeliveryMap({
 					const isSelected = index === selectedLoadHistoryPointIndex;
 					const isEditing = index === editingLoadHistoryPointIndex;
 					const isLastHistoryPoint = index === historyMarkerDetails.length - 1;
+
+					if (!isEditing && !visibleHistoryPointIndices.has(index)) {
+						return null;
+					}
 
 					if (isEditing) {
 						const position = (historyEditDragPosition ?? point.position) as [
