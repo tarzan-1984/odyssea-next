@@ -72,6 +72,7 @@ type CheckListDriverDevicesTableProps = {
 	queryKey: string;
 	getEmptyMessage: (minimumAppVersion?: string) => string;
 	getPushDefaultMessage: (minimumAppVersion: string) => string;
+	getEmailDefaultMessage?: (minimumAppVersion: string) => string;
 	/** When true, shows the minimum allowed app version from App settings above the table. */
 	showMinimumAppVersion?: boolean;
 	/** When true, shows last_active_at per device (Several devices tab). */
@@ -83,6 +84,7 @@ export default function CheckListDriverDevicesTable({
 	queryKey,
 	getEmptyMessage,
 	getPushDefaultMessage,
+	getEmailDefaultMessage,
 	showMinimumAppVersion = false,
 	showLastOpenAppColumn = false,
 }: CheckListDriverDevicesTableProps) {
@@ -187,6 +189,7 @@ export default function CheckListDriverDevicesTable({
 
 	const emptyMessage = getEmptyMessage(minimumAppVersion);
 	const pushDefaultMessage = getPushDefaultMessage(minimumAppVersion);
+	const emailDefaultMessage = (getEmailDefaultMessage ?? getPushDefaultMessage)(minimumAppVersion);
 	const tableColumnCount = showLastOpenAppColumn ? 8 : 7;
 
 	return (
@@ -566,7 +569,7 @@ export default function CheckListDriverDevicesTable({
 				isOpen={emailModalDrivers !== null && emailModalDrivers.length > 0}
 				onClose={() => setEmailModalDrivers(null)}
 				drivers={emailModalDrivers}
-				defaultMessage={pushDefaultMessage}
+				defaultMessage={emailDefaultMessage}
 			/>
 		</div>
 	);

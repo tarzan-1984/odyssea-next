@@ -1,5 +1,6 @@
 import CheckListDriverDevicesTable from "./CheckListDriverDevicesTable";
 import { buildCheckListVersionPushDefaultMessage } from "./CheckListPushModal";
+import { CHECK_LIST_VERSION_EMAIL_DEFAULT_MESSAGE } from "./CheckListEmailModal";
 
 export default function CheckListVersionTable() {
 	return (
@@ -15,6 +16,7 @@ export default function CheckListVersionTable() {
 			getPushDefaultMessage={minimumAppVersion =>
 				buildCheckListVersionPushDefaultMessage(minimumAppVersion)
 			}
+			getEmailDefaultMessage={() => CHECK_LIST_VERSION_EMAIL_DEFAULT_MESSAGE}
 		/>
 	);
 }

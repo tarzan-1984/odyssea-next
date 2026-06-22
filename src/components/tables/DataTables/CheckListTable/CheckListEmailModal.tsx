@@ -18,6 +18,18 @@ import {
 
 export const CHECK_LIST_EMAIL_DEFAULT_SUBJECT = "Odyssea";
 
+export const CHECK_LIST_VERSION_EMAIL_DEFAULT_MESSAGE = `Hello,
+
+Please update the Odysseia mobile application to the latest version at your earliest convenience.
+
+You are currently using an outdated version of the app. After performing this manual update, future updates should be installed automatically.
+
+We apologize for the inconvenience and appreciate your cooperation.
+
+iOS: https://apps.apple.com/ua/app/odysseia-app/id6756887777
+
+Android: https://play.google.com/store/search?q=odysseia&c=apps&hl=en`;
+
 function driverShortLabel(driver: CheckListDriver): string {
 	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
 	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
@@ -164,7 +176,7 @@ export default function CheckListEmailModal({
 					<div className="mt-1.5">
 						<TextArea
 							id="checklist-email-message"
-							rows={5}
+							rows={10}
 							value={message}
 							onChange={setMessage}
 							className="min-h-[120px] resize-y"
