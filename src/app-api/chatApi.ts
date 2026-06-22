@@ -137,6 +137,8 @@ export interface Message {
 	clientMessageId?: string;
 	/** Present only on optimistic outgoing bubbles before server confirmation. */
 	pendingOutgoing?: PendingOutgoingMeta;
+	/** TMS dispatch message from create_load_chat (Odysseia Team, no avatar). */
+	isSystemMessage?: boolean;
 }
 
 /** Pipe-delimited multiple files in one message (fileUrl and fileName aligned by index). */

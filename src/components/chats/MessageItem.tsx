@@ -60,6 +60,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
 
+	const isSystemMessage = Boolean(message.isSystemMessage);
 	const senderFirstName = String(message.sender.firstName ?? "").trim();
 	const senderExternalId = String(message.sender.externalId ?? "").trim();
 	const isDriverSender = message.sender.role?.toUpperCase().trim() === "DRIVER";
@@ -83,7 +84,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
 	const incomingRoleAndTime = !isSender ? (
 		<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
-			{`${incomingRoleLabel}, ${formatNyWallClockDateTime(message.createdAt)}`}
+			{`${isSystemMessage ? senderFirstName : incomingRoleLabel}, ${formatNyWallClockDateTime(message.createdAt)}`}
 		</p>
 	) : null;
 
@@ -127,8 +128,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		) : null;
 
 	return (
-		<div className={`flex ${isSender ? "justify-end" : "items-start gap-4"}`}>
-			{!isSender && (
+		<div className={`flex ${isSender ? "justify-end" : isSystemMessage ? "justify-start" : "items-start gap-4"}`}>
+			{!isSender && !isSystemMessage && (
 				<div className="relative h-10 w-10 shrink-0">
 					<div
 						className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full"
