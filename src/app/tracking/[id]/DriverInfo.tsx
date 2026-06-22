@@ -184,6 +184,23 @@ export default function DriverInfo({
 								{coordinates}
 							</p>
 						</div>
+						{tmsLoadId && tmsLoadPageUrl && (
+							<div className="min-w-0">
+								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
+									Load number
+								</p>
+								<p className="break-words text-sm font-medium text-slate-900 dark:text-white">
+									<a
+										href={tmsLoadPageUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
+									>
+										{tmsLoadId}
+									</a>
+								</p>
+							</div>
+						)}
 					</div>
 
 					<div className="flex min-w-0 flex-col gap-4">
