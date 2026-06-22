@@ -544,52 +544,51 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 									Uploading…
 								</div>
 							)}
-							{attachedFiles.map(af => (
-								<div
-									key={af.localId}
-									className="flex max-w-[14rem] shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-800"
-								>
-									<svg
-										className="shrink-0 text-gray-500 dark:text-gray-400"
-										width="16"
-										height="16"
-										viewBox="0 0 24 24"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-										<polyline
-											points="14,2 14,8 20,8"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
-									<div className="min-w-0 flex-1">
-										<p
-											className="truncate text-sm text-gray-800 dark:text-gray-200"
-											title={af.fileName}
-										>
-											{af.fileName}
-										</p>
-										<p className="text-xs text-gray-500 dark:text-gray-400">
-											{Math.round(af.fileSize / 1024)}KB
-										</p>
-									</div>
-									<button
-										type="button"
-										onClick={() => removeAttachedFile(af.localId)}
-										disabled={isUploadingAttachments}
-										className="shrink-0 text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
+							{attachedFiles.map(af => {
+								const isImage = isChatImageThumbnailCandidate(af.fileName);
+
+								if (isImage) {
+									return (
+										<div key={af.localId} className="relative shrink-0">
+											<img
+												src={af.fileUrl}
+												alt={af.fileName}
+												className="h-16 w-16 rounded-lg border border-gray-200 object-cover dark:border-gray-600"
+											/>
+											<button
+												type="button"
+												onClick={() => removeAttachedFile(af.localId)}
+												disabled={isUploadingAttachments}
+												aria-label={`Remove ${af.fileName}`}
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800/85 text-white shadow-sm hover:bg-gray-900 disabled:opacity-40 dark:bg-gray-900/90 dark:hover:bg-black"
+											>
+												<svg
+													width="12"
+													height="12"
+													viewBox="0 0 24 24"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+												>
+													<path
+														d="M18 6L6 18M6 6L18 18"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+												</svg>
+											</button>
+										</div>
+									);
+								}
+
+								return (
+									<div
+										key={af.localId}
+										className="flex max-w-[14rem] shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-800"
 									>
 										<svg
+											className="shrink-0 text-gray-500 dark:text-gray-400"
 											width="16"
 											height="16"
 											viewBox="0 0 24 24"
@@ -597,16 +596,56 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											xmlns="http://www.w3.org/2000/svg"
 										>
 											<path
-												d="M18 6L6 18M6 6L18 18"
+												d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+											<polyline
+												points="14,2 14,8 20,8"
 												stroke="currentColor"
 												strokeWidth="2"
 												strokeLinecap="round"
 												strokeLinejoin="round"
 											/>
 										</svg>
-									</button>
-								</div>
-							))}
+										<div className="min-w-0 flex-1">
+											<p
+												className="truncate text-sm text-gray-800 dark:text-gray-200"
+												title={af.fileName}
+											>
+												{af.fileName}
+											</p>
+											<p className="text-xs text-gray-500 dark:text-gray-400">
+												{Math.round(af.fileSize / 1024)}KB
+											</p>
+										</div>
+										<button
+											type="button"
+											onClick={() => removeAttachedFile(af.localId)}
+											disabled={isUploadingAttachments}
+											className="shrink-0 text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
+										>
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 24 24"
+												fill="none"
+												xmlns="http://www.w3.org/2000/svg"
+											>
+												<path
+													d="M18 6L6 18M6 6L18 18"
+													stroke="currentColor"
+													strokeWidth="2"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+											</svg>
+										</button>
+									</div>
+								);
+							})}
 						</div>
 					</div>
 				)}
