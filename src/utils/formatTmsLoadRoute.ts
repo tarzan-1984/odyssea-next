@@ -187,12 +187,17 @@ export function buildTmsLoadRoutePoints(
 	return [...pickupPoints, ...deliveryPoints];
 }
 
-/** Same multiline format as offers: "Pick up - City, ST ZIP - date time". */
+function formatRoutePointBlock(point: TmsLoadRoutePoint): string {
+	const lines = [`${point.label}:`, point.location];
+	if (point.time) {
+		lines.push(`Date & time: ${point.time}`);
+	}
+	return lines.join("\n");
+}
+
+/** Multiline route blocks: label, address, then date & time per stop. */
 export function formatTmsLoadRoute(pickUpRaw: unknown, deliveryRaw: unknown): string {
 	return buildTmsLoadRoutePoints(pickUpRaw, deliveryRaw)
-		.map(point => {
-			const timeSuffix = point.time ? ` - ${point.time}` : "";
-			return `${point.label} - ${point.location}${timeSuffix}`;
-		})
-		.join("\n");
+		.map(formatRoutePointBlock)
+		.join("\n\n");
 }
