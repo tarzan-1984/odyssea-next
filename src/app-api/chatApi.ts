@@ -10,6 +10,32 @@ type RequestOptions = {
 	signal?: AbortSignal;
 };
 
+function formatApiErrorMessage(
+	errorData: { error?: unknown; message?: unknown },
+	fallback: string
+): string {
+	const candidate = errorData.error ?? errorData.message;
+	if (typeof candidate === "string" && candidate.trim()) {
+		return candidate;
+	}
+	if (Array.isArray(candidate)) {
+		const messages = candidate
+			.map(item => {
+				if (typeof item === "string") return item;
+				if (item && typeof item === "object" && "constraints" in item) {
+					const constraints = (item as { constraints?: Record<string, string> }).constraints;
+					return constraints ? Object.values(constraints).join(", ") : "";
+				}
+				return "";
+			})
+			.filter(Boolean);
+		if (messages.length > 0) {
+			return messages.join("; ");
+		}
+	}
+	return fallback;
+}
+
 export interface User {
 	id: string;
 	firstName: string;
@@ -229,7 +255,9 @@ class ChatApiClient {
 
 		if (!response.ok) {
 			const errorData = await response.json().catch(() => ({}));
-			throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+			throw new Error(
+				formatApiErrorMessage(errorData, `HTTP error! status: ${response.status}`)
+			);
 		}
 
 		const data = await response.json();
