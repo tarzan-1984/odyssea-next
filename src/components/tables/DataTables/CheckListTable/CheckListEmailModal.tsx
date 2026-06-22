@@ -28,7 +28,9 @@ We apologize for the inconvenience and appreciate your cooperation.
 
 iOS: https://apps.apple.com/ua/app/odysseia-app/id6756887777
 
-Android: https://play.google.com/store/search?q=odysseia&c=apps&hl=en`;
+Android: https://play.google.com/store/search?q=odysseia&c=apps&hl=en
+
+Thank you.`;
 
 function driverShortLabel(driver: CheckListDriver): string {
 	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
