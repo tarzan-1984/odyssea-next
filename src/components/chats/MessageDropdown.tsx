@@ -63,10 +63,6 @@ export default function MessageDropdown({
 
 	const visibleActionCount = getMessageDropdownActionCount(message, currentUser);
 
-	if (visibleActionCount === 0) {
-		return null;
-	}
-
 	const updateMenuPosition = useCallback(() => {
 		const button = buttonRef.current;
 		if (!button) return;
