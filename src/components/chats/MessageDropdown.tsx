@@ -20,6 +20,21 @@ const VIEWPORT_PADDING_PX = 8;
 const MENU_ITEM_HEIGHT_PX = 32;
 const MENU_VERTICAL_PADDING_PX = 8;
 
+export function getMessageDropdownActionCount(
+	message: Message,
+	currentUser?: UserData | null
+): number {
+	const role = currentUser?.role?.trim().toUpperCase();
+	const isAdmin = role === "ADMINISTRATOR";
+	const isOwnMessage = message.senderId === currentUser?.id;
+	const canEdit =
+		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
+		isOwnMessage &&
+		Boolean(message.content?.trim());
+
+	return (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (isAdmin ? 1 : 0);
+}
+
 export default function MessageDropdown({
 	message,
 	currentUser,
@@ -46,7 +61,11 @@ export default function MessageDropdown({
 		isOwnMessage &&
 		Boolean(message.content?.trim());
 
-	const visibleActionCount = (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (isAdmin ? 1 : 0);
+	const visibleActionCount = getMessageDropdownActionCount(message, currentUser);
+
+	if (visibleActionCount === 0) {
+		return null;
+	}
 
 	const updateMenuPosition = useCallback(() => {
 		const button = buttonRef.current;

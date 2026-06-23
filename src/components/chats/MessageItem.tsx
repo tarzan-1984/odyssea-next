@@ -6,7 +6,7 @@ import { UserData } from "@/app-api/api-types";
 import { renderAvatar, getRoleDisplayLabel, resolveAvatarBackground } from "@/helpers";
 import { useOnlineStatus } from "@/context/OnlineStatusContext";
 import MessageReadStatus from "./MessageReadStatus";
-import MessageDropdown from "./MessageDropdown";
+import MessageDropdown, { getMessageDropdownActionCount } from "./MessageDropdown";
 import MessageReply from "./MessageReply";
 import ChatMessageContent from "./ChatMessageContent";
 import FilePreview from "./FilePreview";
@@ -113,7 +113,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const multiAttachments = getMessageMultiAttachments(message);
 	const legacyFileUrl = !multiAttachments ? message.fileUrl : undefined;
 	const showLegacySingleFile = Boolean(legacyFileUrl);
-	const showMessageMenu = !isPending;
+	const showMessageMenu = !isPending && getMessageDropdownActionCount(message, currentUser) > 0;
 
 	const renderMessageMenu = () =>
 		showMessageMenu ? (
