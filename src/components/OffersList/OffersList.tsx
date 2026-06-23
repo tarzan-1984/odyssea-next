@@ -40,7 +40,7 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 
 	if (!name && !role) return null;
 
-	const parts = [name || "—"];
+	const parts = [name || ""];
 	if (role) {
 		const roleLabel = CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " ");
 		parts.push(`(${roleLabel})`);
@@ -178,7 +178,7 @@ function OfferDriverBadge({
 }) {
 	const driverName = [
 		driver.externalId != null ? `(${driver.externalId})` : null,
-		[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
+		[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "",
 	]
 		.filter(Boolean)
 		.join(" ");
@@ -608,21 +608,21 @@ const OffersList = () => {
 													<TableBody>
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-pre-line">
-																{formatRoute(row.route) || "—"}
+																{formatRoute(row.route) || ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																{row.weight != null ? `${Number(row.weight).toLocaleString("en-US")} lbs` : "—"}
+																{row.weight != null ? `${Number(row.weight).toLocaleString("en-US")} lbs` : ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																{row.commodity ?? "—"}
+																{row.commodity ?? ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																{formatSpecialRequirements(row.special_requirements) || "—"}
+																{formatSpecialRequirements(row.special_requirements) || ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.notes && String(row.notes).trim()
 																	? String(row.notes).trim()
-																	: "—"}
+																	: ""}
 															</TableCell>
 														</TableRow>
 													</TableBody>
@@ -682,7 +682,7 @@ const OffersList = () => {
 																const driverUnitId = driver.externalId ?? driver.driver_id;
 																const driverDisplayName = [
 																	driver.externalId != null ? `(${driver.externalId})` : null,
-																	[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
+																	[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "",
 																]
 																	.filter(Boolean)
 																	.join(" ");
@@ -733,27 +733,25 @@ const OffersList = () => {
 																			>
 																				{driver.phone}
 																			</a>
-																		) : (
-																			"—"
-																		)}
+																		) : null}
 																	</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																{driver.empty_miles != null
 																			? Math.round(driver.empty_miles)
-																			: "—"}
+																			: ""}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08] whitespace-nowrap">
 																		{driver.total_miles != null
 																			? Math.round(driver.total_miles)
-																			: "—"}
+																			: ""}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																		{driver.rate != null ? `$${Number(driver.rate).toLocaleString("en-US")}` : "—"}
+																		{driver.rate != null ? `$${Number(driver.rate).toLocaleString("en-US")}` : ""}
 																	</TableCell>
 																	<TableCell className="px-2 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																		{(() => {
 																			const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
-																			if (actionTimeUnix == null) return "—";
+																			if (actionTimeUnix == null) return null;
 
 																			const remainingSeconds = Math.max(0, actionTimeUnix - nowUnixSeconds);
 																			if (remainingSeconds > 0) {
