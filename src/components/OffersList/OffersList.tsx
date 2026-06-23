@@ -41,7 +41,10 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 	if (!name && !role) return null;
 
 	const parts = [name || "—"];
-	if (role) parts.push(CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " "));
+	if (role) {
+		const roleLabel = CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+		parts.push(`(${roleLabel})`);
+	}
 
 	return parts.join(" ");
 }
@@ -146,6 +149,90 @@ function sortOfferDriversByBidStatus(
 
 		return 0;
 	});
+}
+
+function getParticipatingOfferDrivers(drivers: OfferDriver[] | undefined): OfferDriver[] {
+	return (
+		drivers?.filter(
+			(d) =>
+				d.active !== false &&
+				(d.rate != null || normalizeUnixSeconds(d.action_time) != null)
+		) ?? []
+	);
+}
+
+function OfferDriverBadge({
+	offer,
+	driver,
+	driverIdx,
+	nowUnixSeconds,
+	canModifyOffersByRole,
+	onPushClick,
+}: {
+	offer: OfferRow;
+	driver: OfferDriver;
+	driverIdx: number;
+	nowUnixSeconds: number;
+	canModifyOffersByRole: boolean;
+	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
+}) {
+	const driverName = [
+		driver.externalId != null ? `(${driver.externalId})` : null,
+		[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
+	]
+		.filter(Boolean)
+		.join(" ");
+	const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
+	const remainingSeconds =
+		actionTimeUnix != null ? Math.max(0, actionTimeUnix - nowUnixSeconds) : null;
+
+	const isInactiveDriver = driver.active === false;
+	const hasActiveTimer =
+		!isInactiveDriver && remainingSeconds != null && remainingSeconds > 0;
+	const isExpiredBid =
+		!isInactiveDriver &&
+		actionTimeUnix != null &&
+		(remainingSeconds == null || remainingSeconds <= 0);
+
+	return (
+		<div
+			className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
+				isInactiveDriver
+					? "border-transparent bg-[#f5b8ab] dark:border-red-800/35 dark:bg-red-950/50"
+					: hasActiveTimer
+						? "border-transparent bg-[#d4e8d7] dark:border-green-800/35 dark:bg-green-950/45"
+						: isExpiredBid
+							? "border-gray-300 bg-gray-200 dark:border-gray-600 dark:bg-gray-700/70"
+							: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
+			}`}
+		>
+			<span
+				className={`max-w-[180px] truncate text-xs font-medium ${
+					isInactiveDriver
+						? "font-semibold text-[#a20000] dark:text-red-100"
+						: hasActiveTimer
+							? "font-semibold text-green-900 dark:text-green-100"
+							: isExpiredBid
+								? "text-gray-600 dark:text-gray-300"
+								: "text-gray-700 dark:text-gray-300"
+				}`}
+			>
+				{driverName}
+			</span>
+			{isInactiveDriver ? null : remainingSeconds != null && remainingSeconds > 0 ? (
+				<span className="inline-flex min-w-[64px] items-center justify-center rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
+					{formatCountdown(remainingSeconds)}
+				</span>
+			) : actionTimeUnix != null ? (
+				<ExtendBidTimeButton
+					offer={offer}
+					driver={driver}
+					disabled={!canModifyOffersByRole}
+					onPushClick={onPushClick}
+				/>
+			) : null}
+		</div>
+	);
 }
 
 function buildExtendBidTimePushMessage(offer: OfferRow): string {
@@ -350,7 +437,7 @@ const OffersList = () => {
 									className="relative w-full rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/[0.05] dark:bg-gray-900 overflow-hidden"
 								>
 								<div
-									className={`px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+									className={`px-4 py-3 cursor-pointer select-none transition-colors ${
 										headerHighlightRed
 											? "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
 											: "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
@@ -359,8 +446,8 @@ const OffersList = () => {
 										setExpandedOfferId((id) => (id === row.id ? null : row.id))
 									}
 								>
-									<div className="flex flex-col gap-1 min-w-0 flex-1">
-										<div className="flex items-center gap-2">
+									<div className="flex items-start justify-between gap-3">
+										<div className="flex min-w-0 flex-1 items-center gap-2">
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
 												{routeSummary(row.route) ||
@@ -377,133 +464,111 @@ const OffersList = () => {
 												/>
 											)}
 										</div>
+										<div className="flex flex-shrink-0 items-center justify-center gap-2">
+											{row.active !== false && (
+												<button
+													type="button"
+													disabled={!canModifyOffersByRole || deactivatingOfferId === row.id}
+													onClick={async (e) => {
+														e.stopPropagation();
+														if (!canModifyOffersByRole) return;
+														setDeactivatingOfferId(row.id);
+														const res = await offersApi.deactivateOffer(row.id);
+														setDeactivatingOfferId(null);
+														if (res.success) {
+															await queryClient.invalidateQueries({
+																queryKey: ["offers-list-cards"],
+															});
+														} else {
+															console.error(res.error);
+														}
+													}}
+													className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+												>
+													Deactivate offer
+													<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
+												</button>
+											)}
+											<button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													setExpandedOfferId((id) => (id === row.id ? null : row.id));
+												}}
+												className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:text-brand-200 dark:hover:bg-gray-800"
+											>
+												<span>{isExpanded ? "Show less" : "Show more"}</span>
+												{isExpanded ? (
+													<ChevronUpIcon className="h-4 w-4" />
+												) : (
+													<ChevronDownIcon className="h-4 w-4" />
+												)}
+											</button>
+										</div>
+									</div>
+									<div className="flex flex-col gap-1 min-w-0">
 										{creatorLabel && (
 											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
 												{creatorLabel}
 											</p>
 										)}
-										{/* Driver row: only drivers who placed bid or were refused/deleted */}
+										{/* Driver rows: active timers first, expired timers below */}
 										{(() => {
-											const participatingDrivers =
-												row.drivers?.filter(
-													(d) =>
-														d.active === false ||
-														d.rate != null ||
-														normalizeUnixSeconds(d.action_time) != null
-												) ?? [];
-											if (participatingDrivers.length === 0) return null;
+											const participatingDrivers = getParticipatingOfferDrivers(row.drivers);
+											const activeTimerDrivers = sortOfferDriversByBidStatus(
+												participatingDrivers.filter(
+													(d) => getDriverBidSortPriority(d, nowUnixSeconds) === 0
+												),
+												nowUnixSeconds
+											);
+											const expiredTimerDrivers = sortOfferDriversByBidStatus(
+												participatingDrivers.filter(
+													(d) => getDriverBidSortPriority(d, nowUnixSeconds) !== 0
+												),
+												nowUnixSeconds
+											);
+											if (activeTimerDrivers.length === 0 && expiredTimerDrivers.length === 0) {
+												return null;
+											}
 											return (
-												<div className="mt-2 flex flex-wrap items-center gap-2">
-													{participatingDrivers.map((driver, driverIdx) => {
-														const driverName = [
-															driver.externalId != null ? `(${driver.externalId})` : null,
-															[driver.firstName, driver.lastName].filter(Boolean).join(" ") || "—",
-														]
-															.filter(Boolean)
-															.join(" ");
-														const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
-														const remainingSeconds =
-															actionTimeUnix != null
-																? Math.max(0, actionTimeUnix - nowUnixSeconds)
-																: null;
-
-														const isInactiveDriver = driver.active === false;
-														const hasActiveTimer =
-															!isInactiveDriver &&
-															remainingSeconds != null &&
-															remainingSeconds > 0;
-														const isExpiredBid =
-															!isInactiveDriver &&
-															actionTimeUnix != null &&
-															(remainingSeconds == null || remainingSeconds <= 0);
-
-														return (
-															<div
-																key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIdx}`}
-																className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
-																	isInactiveDriver
-																		? "border-transparent bg-[#f5b8ab] dark:border-red-800/35 dark:bg-red-950/50"
-																		: hasActiveTimer
-																			? "border-transparent bg-[#d4e8d7] dark:border-green-800/35 dark:bg-green-950/45"
-																			: isExpiredBid
-																				? "border-gray-300 bg-gray-200 dark:border-gray-600 dark:bg-gray-700/70"
-																				: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
-																}`}
-															>
-																<span
-																	className={`max-w-[180px] truncate text-xs font-medium ${
-																		isInactiveDriver
-																			? "font-semibold text-[#a20000] dark:text-red-100"
-																			: hasActiveTimer
-																				? "font-semibold text-green-900 dark:text-green-100"
-																				: isExpiredBid
-																					? "text-gray-600 dark:text-gray-300"
-																					: "text-gray-700 dark:text-gray-300"
-																	}`}
-																>
-																	{driverName}
-																</span>
-																{isInactiveDriver ? null : remainingSeconds != null && remainingSeconds > 0 ? (
-																	<span className="inline-flex min-w-[64px] items-center justify-center rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
-																		{formatCountdown(remainingSeconds)}
-																	</span>
-																) : actionTimeUnix != null ? (
-																	<ExtendBidTimeButton
-																		offer={row}
-																		driver={driver}
-																		disabled={!canModifyOffersByRole}
-																		onPushClick={(offer, driverItem) => {
-																			setPushModalTarget({ offer, driver: driverItem });
-																		}}
-																	/>
-																) : null}
-															</div>
-														);
-													})}
+												<div className="mt-2 flex flex-col gap-2">
+													{activeTimerDrivers.length > 0 && (
+														<div className="flex flex-wrap items-center gap-2">
+															{activeTimerDrivers.map((driver, driverIdx) => (
+																<OfferDriverBadge
+																	key={`${row.id}-active-${driver.driver_id ?? driver.externalId ?? driverIdx}`}
+																	offer={row}
+																	driver={driver}
+																	driverIdx={driverIdx}
+																	nowUnixSeconds={nowUnixSeconds}
+																	canModifyOffersByRole={canModifyOffersByRole}
+																	onPushClick={(offer, driverItem) => {
+																		setPushModalTarget({ offer, driver: driverItem });
+																	}}
+																/>
+															))}
+														</div>
+													)}
+													{expiredTimerDrivers.length > 0 && (
+														<div className="flex flex-wrap items-center gap-2">
+															{expiredTimerDrivers.map((driver, driverIdx) => (
+																<OfferDriverBadge
+																	key={`${row.id}-expired-${driver.driver_id ?? driver.externalId ?? driverIdx}`}
+																	offer={row}
+																	driver={driver}
+																	driverIdx={driverIdx}
+																	nowUnixSeconds={nowUnixSeconds}
+																	canModifyOffersByRole={canModifyOffersByRole}
+																	onPushClick={(offer, driverItem) => {
+																		setPushModalTarget({ offer, driver: driverItem });
+																	}}
+																/>
+															))}
+														</div>
+													)}
 												</div>
 											);
 										})()}
-									</div>
-									<div className="flex items-center justify-center flex-shrink-0 gap-2">
-										{row.active !== false && (
-											<button
-												type="button"
-												disabled={!canModifyOffersByRole || deactivatingOfferId === row.id}
-												onClick={async (e) => {
-													e.stopPropagation();
-													if (!canModifyOffersByRole) return;
-													setDeactivatingOfferId(row.id);
-													const res = await offersApi.deactivateOffer(row.id);
-													setDeactivatingOfferId(null);
-													if (res.success) {
-														await queryClient.invalidateQueries({
-															queryKey: ["offers-list-cards"],
-														});
-													} else {
-														console.error(res.error);
-													}
-												}}
-												className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-											>
-												Deactivate offer
-												<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
-											</button>
-										)}
-										<button
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation();
-												setExpandedOfferId((id) => (id === row.id ? null : row.id));
-											}}
-											className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:text-brand-200 dark:hover:bg-gray-800"
-										>
-											<span>{isExpanded ? "Show less" : "Show more"}</span>
-											{isExpanded ? (
-												<ChevronUpIcon className="h-4 w-4" />
-											) : (
-												<ChevronDownIcon className="h-4 w-4" />
-											)}
-										</button>
 									</div>
 								</div>
 									{isExpanded && (
