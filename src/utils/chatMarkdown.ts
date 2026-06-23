@@ -37,8 +37,8 @@ export function escapeChatListSyntax(content: string): string {
 			(_, indent, num, marker, space) => `${indent}${num}\\${marker}${space}`
 		)
 		.replace(
-			/^(\s*)([-*+])(\s+)/gm,
-			(_, indent, marker, space) => `${indent}\\${marker}${space}`
+			/^(\s*)([-*+])(?=\s|$)/gm,
+			(_, indent, marker) => `${indent}\\${marker}`
 		);
 }
 

@@ -14,6 +14,13 @@ describe("escapeChatListSyntax", () => {
 	it("escapes bullet list markers at line start", () => {
 		expect(escapeChatListSyntax("- item")).toBe("\\- item");
 		expect(escapeChatListSyntax("* item")).toBe("\\* item");
+		expect(escapeChatListSyntax("+ item")).toBe("\\+ item");
+	});
+
+	it("escapes lone list markers (GFM treats them as empty list items)", () => {
+		expect(escapeChatListSyntax("+")).toBe("\\+");
+		expect(escapeChatListSyntax("*")).toBe("\\*");
+		expect(escapeChatListSyntax("-")).toBe("\\-");
 	});
 
 	it("does not escape mid-line markers", () => {
