@@ -236,6 +236,8 @@ const OffersList = () => {
 	);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
+	const showOfferId =
+		isAdmin && String(currentUser?.externalId ?? "").trim() === "83";
 	const canModifyOffersByRole = canModifyOffers(currentUser?.role);
 	const queryParams = {
 		page: currentPage,
@@ -362,8 +364,8 @@ const OffersList = () => {
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
 												{routeSummary(row.route) ||
-													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}{" "}
-												(id: {row.id})
+													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}
+												{showOfferId && <> (id: {row.id})</>}
 											</p>
 											{hasHazmat(row.special_requirements) && (
 												<Image
