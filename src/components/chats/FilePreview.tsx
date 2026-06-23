@@ -164,7 +164,82 @@ interface FilePreviewProps {
 	compact?: boolean;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({
+function BrokenImagePreview({
+	compact,
+	message,
+	onClick,
+}: {
+	compact: boolean;
+	message: string;
+	onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+	return (
+		<div
+			className={`flex flex-col items-center justify-center gap-1 rounded-lg bg-gray-100 px-2 text-center text-gray-500 dark:bg-gray-800 dark:text-gray-400 ${
+				compact ? "h-24" : "min-h-[180px]"
+			} ${onClick ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700" : ""}`}
+			onClick={onClick}
+			role={onClick ? "button" : undefined}
+			tabIndex={onClick ? 0 : undefined}
+		>
+			<svg
+				className="h-6 w-6 opacity-70"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				aria-hidden
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					strokeWidth={1.8}
+					d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+				/>
+			</svg>
+			<p className={compact ? "text-[10px] leading-snug" : "text-xs"}>{message}</p>
+		</div>
+	);
+}
+
+class FilePreviewErrorBoundary extends React.Component<
+	React.PropsWithChildren<Pick<FilePreviewProps, "compact"> & { resetKey: string }>,
+	{ hasError: boolean }
+> {
+	state = { hasError: false };
+
+	static getDerivedStateFromError() {
+		return { hasError: true };
+	}
+
+	componentDidCatch(error: unknown) {
+		console.error("Chat file preview crashed:", error);
+	}
+
+	componentDidUpdate(
+		prevProps: React.PropsWithChildren<
+			Pick<FilePreviewProps, "compact"> & { resetKey: string }
+		>
+	) {
+		if (this.props.resetKey !== prevProps.resetKey && this.state.hasError) {
+			this.setState({ hasError: false });
+		}
+	}
+
+	render() {
+		if (this.state.hasError) {
+			return (
+				<BrokenImagePreview
+					compact={Boolean(this.props.compact)}
+					message="Preview unavailable"
+				/>
+			);
+		}
+
+		return this.props.children;
+	}
+}
+
+const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	fileUrl,
 	fileName,
 	fileSize,
@@ -418,7 +493,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		};
 
 		loadPreview();
-	}, [shouldLoadMedia, fileUrl, fileExtension, fileName, thumbMaxWidth, thumbQuality]);
+	}, [
+		shouldLoadMedia,
+		fileUrl,
+		fileExtension,
+		fileName,
+		thumbOptions,
+		thumbMaxWidth,
+		thumbQuality,
+	]);
 
 	useEffect(() => {
 		if (!isLoading || !previewContent) return;
@@ -459,6 +542,19 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
 	const renderPreview = () => {
 		if (error) {
+			if (isImage) {
+				return (
+					<BrokenImagePreview
+						compact={compact}
+						message={error}
+						onClick={e => {
+							e.stopPropagation();
+							openImageViewer();
+						}}
+					/>
+				);
+			}
+
 			return (
 				<div
 					className={`flex items-center justify-center ${compact ? "h-24" : "h-32"} text-red-500 px-1 text-center text-xs`}
@@ -897,13 +993,15 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 									onError={e => {
 										const target = e.target as HTMLImageElement;
 										target.style.display = "none";
-										setError("Failed to load image");
+										setPreviewContent("");
+										setError("Image unavailable");
 										setIsModalImageLoading(false);
+										setIsLoading(false);
 									}}
 								/>
 							) : (
-								<div className="flex items-center justify-center h-64">
-									<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+								<div className="flex h-64 items-center justify-center px-4 text-center text-sm text-white/80">
+									{error || "Image unavailable"}
 								</div>
 							)}
 						</div>
@@ -1015,5 +1113,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 		</>
 	);
 };
+
+const FilePreview: React.FC<FilePreviewProps> = props => (
+	<FilePreviewErrorBoundary compact={props.compact} resetKey={props.fileUrl}>
+		<FilePreviewContent {...props} />
+	</FilePreviewErrorBoundary>
+);
 
 export default FilePreview;
