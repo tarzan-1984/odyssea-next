@@ -50,6 +50,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const isProgrammaticScrollRef = useRef(false);
 	const isInitialScrollCompleteRef = useRef(false);
 	const pendingInitialScrollRef = useRef(false);
+	const isRestoringOlderScrollRef = useRef(false);
+	const [suppressVirtualScrollAdjustment, setSuppressVirtualScrollAdjustment] = useState(false);
 	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
 	useEffect(() => {
@@ -388,6 +390,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	}, []);
 
 	const handleVirtualContentMeasured = useCallback(() => {
+		if (isRestoringOlderScrollRef.current) {
+			return;
+		}
 		if (pendingInitialScrollRef.current || !isInitialScrollCompleteRef.current) {
 			scrollToBottom();
 			return;
@@ -427,6 +432,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			const prevScrollTop = container.scrollTop;
 
 			const finalize = () => {
+				isRestoringOlderScrollRef.current = true;
+				setSuppressVirtualScrollAdjustment(true);
 				isProgrammaticScrollRef.current = true;
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => {
@@ -434,6 +441,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						const delta = newScrollHeight - prevScrollHeight;
 						container.scrollTop = prevScrollTop + delta;
 						setTimeout(() => {
+							isRestoringOlderScrollRef.current = false;
+							setSuppressVirtualScrollAdjustment(false);
 							isProgrammaticScrollRef.current = false;
 							isLoadingMoreRef.current = false;
 							setIsLoadingOlder(false);
@@ -490,7 +499,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			isLoadingMoreRef.current = false;
 			isProgrammaticScrollRef.current = false;
 			isInitialScrollCompleteRef.current = false;
+			isRestoringOlderScrollRef.current = false;
 			pendingInitialScrollRef.current = true;
+			setSuppressVirtualScrollAdjustment(false);
 			setIsLoadingOlder(false);
 			setIsUserScrolledUp(false);
 		}
@@ -532,7 +543,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			uniqueMessages.length > 0 &&
 			!isUserScrolledUp &&
 			isInitialScrollCompleteRef.current &&
-			!pendingInitialScrollRef.current
+			!pendingInitialScrollRef.current &&
+			!isRestoringOlderScrollRef.current
 		) {
 			scrollToBottom();
 		}
@@ -778,7 +790,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				<div
 					ref={attachMessagesContainer}
 					onScroll={handleScroll}
-					className="flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
+					className="relative flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
 					style={{ overflowAnchor: "none" }}
 				>
 					<ChatMediaLoadProvider
@@ -788,8 +800,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						{/* Loading indicator for older messages */}
 						{(isLoadingOlder || isLoadingArchivedMessages) &&
 							uniqueMessages.length > 0 && (
-								<div className="flex items-center justify-center py-4">
-									<div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+								<div className="pointer-events-none absolute left-0 right-0 top-3 z-10 flex items-center justify-center">
+									<div className="flex items-center space-x-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-gray-500 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 dark:text-gray-400">
 										<svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
 											<circle
 												className="opacity-25"
@@ -839,6 +851,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								scrollElement={messagesScrollRoot}
 								onContentMeasured={handleVirtualContentMeasured}
 								isUserScrolledUp={isUserScrolledUp}
+								suppressScrollAdjustment={suppressVirtualScrollAdjustment}
 								onDelete={handleDeleteMessage}
 								onEdit={handleEditMessage}
 								onReply={handleReplyToMessage}

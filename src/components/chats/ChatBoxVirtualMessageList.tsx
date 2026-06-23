@@ -35,6 +35,7 @@ interface ChatBoxVirtualMessageListProps {
 	onRetry?: (message: Message) => void;
 	onContentMeasured?: () => void;
 	isUserScrolledUp?: boolean;
+	suppressScrollAdjustment?: boolean;
 }
 
 interface VirtualMessageRowProps {
@@ -167,6 +168,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onRetry,
 		onContentMeasured,
 		isUserScrolledUp = false,
+		suppressScrollAdjustment = false,
 	},
 	ref
 ) {
@@ -250,13 +252,13 @@ const ChatBoxVirtualMessageList = forwardRef<
 
 	useLayoutEffect(() => {
 		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
-			if (isScrollingRef.current || !isUserScrolledUp) {
+			if (suppressScrollAdjustment || isScrollingRef.current || !isUserScrolledUp) {
 				return false;
 			}
 			const offset = instance.scrollOffset ?? 0;
 			return item.start < offset;
 		};
-	}, [isUserScrolledUp, virtualizer]);
+	}, [isUserScrolledUp, suppressScrollAdjustment, virtualizer]);
 
 	const scrollToBottom = useCallback(() => {
 		if (messages.length === 0) return;
