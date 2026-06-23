@@ -632,9 +632,36 @@ const OffersList = () => {
 											{/* Drivers table */}
 											{row.drivers && row.drivers.length > 0 && (
 												<div className="mt-4">
-													<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-														Drivers
-													</h3>
+													<div className="mb-2 flex items-center justify-between gap-3">
+														<h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+															Drivers
+														</h3>
+														{row.active !== false && !row.is_driver_selected && (
+															<button
+																type="button"
+																disabled={!canModifyOffersByRole}
+																onClick={() => {
+																	if (!canModifyOffersByRole) return;
+																	setAddDriversOfferId(row.id);
+																	setAddDriversExistingDriverIds(
+																		Array.from(
+																			new Set(
+																				(row.drivers ?? []).flatMap(d =>
+																					[d.driver_id, d.externalId].filter(
+																						(x): x is string => Boolean(x)
+																					)
+																				)
+																			)
+																		)
+																	);
+																}}
+																className="inline-flex h-[39px] shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 dark:disabled:hover:bg-brand-500"
+															>
+																Add drivers
+																<AddPlusCircleIcon />
+															</button>
+														)}
+													</div>
 													<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
 													<Table className="w-full border-collapse table-fixed">
 												<colgroup>
@@ -871,33 +898,6 @@ const OffersList = () => {
 														</TableBody>
 													</Table>
 													</div>
-													{row.active !== false && !row.is_driver_selected && (
-													<div className="mt-3 flex items-center justify-start gap-3">
-														<button
-															type="button"
-															disabled={!canModifyOffersByRole}
-															onClick={() => {
-																if (!canModifyOffersByRole) return;
-																setAddDriversOfferId(row.id);
-																setAddDriversExistingDriverIds(
-																	Array.from(
-																		new Set(
-																			(row.drivers ?? []).flatMap(d =>
-																				[d.driver_id, d.externalId].filter(
-																					(x): x is string => Boolean(x)
-																				)
-																			)
-																		)
-																	)
-																);
-															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-0 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 dark:disabled:hover:bg-brand-500"
-														>
-									Add drivers
-									<AddPlusCircleIcon />
-														</button>
-													</div>
-													)}
 												</div>
 											)}
 											</div>
