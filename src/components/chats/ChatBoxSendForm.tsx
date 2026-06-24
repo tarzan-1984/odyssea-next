@@ -16,6 +16,7 @@ import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
 import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { isChatImageThumbnailCandidate } from "@/config/chatImagePreview";
+import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import ChatFormatToolbar, { type ChatFormatAction } from "./ChatFormatToolbar";
 import ChatRichComposeInput from "./ChatRichComposeInput";
 import { useEditorFormatState } from "@/hooks/useEditorFormatState";
@@ -114,6 +115,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			composeResetKey
 		);
 		const isEditing = Boolean(editingMessage);
+		const chatImageGallery = useChatImageGalleryOptional();
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -468,6 +470,33 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setAttachedFiles(prev => prev.filter(f => f.localId !== localId));
 		};
 
+		const openAttachedImagePreview = useCallback(
+			(attachment: ChatAttachmentPayload & { localId: string }) => {
+				if (!chatImageGallery) return;
+
+				const imageAttachments = attachedFiles.filter(file =>
+					isChatImageThumbnailCandidate(file.fileName)
+				);
+
+				chatImageGallery.openImage(
+					{
+						fileUrl: attachment.fileUrl,
+						fileName: attachment.fileName,
+						fileSize: attachment.fileSize,
+					},
+					{
+						viewOnly: true,
+						images: imageAttachments.map(file => ({
+							fileUrl: file.fileUrl,
+							fileName: file.fileName,
+							fileSize: file.fileSize,
+						})),
+					}
+				);
+			},
+			[attachedFiles, chatImageGallery]
+		);
+
 		const handleCancelEdit = () => {
 			onCancelEdit?.();
 			setMessage("");
@@ -550,11 +579,19 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								if (isImage) {
 									return (
 										<div key={af.localId} className="relative shrink-0">
-											<img
-												src={af.fileUrl}
-												alt={af.fileName}
-												className="h-16 w-16 rounded-lg border border-gray-200 object-cover dark:border-gray-600"
-											/>
+											<button
+												type="button"
+												onClick={() => openAttachedImagePreview(af)}
+												disabled={!chatImageGallery}
+												aria-label={`View ${af.fileName}`}
+												className="block overflow-hidden rounded-lg border border-gray-200 transition-opacity hover:opacity-90 disabled:cursor-default disabled:hover:opacity-100 dark:border-gray-600"
+											>
+												<img
+													src={af.fileUrl}
+													alt={af.fileName}
+													className="h-16 w-16 object-cover"
+												/>
+											</button>
 											<button
 												type="button"
 												onClick={() => removeAttachedFile(af.localId)}

@@ -190,6 +190,7 @@ type ChatImageLightboxProps = {
 	isOpen: boolean;
 	images: ChatGalleryImage[];
 	currentIndex: number;
+	viewOnly?: boolean;
 	onClose: () => void;
 	onPrev: () => void;
 	onNext: () => void;
@@ -199,6 +200,7 @@ export default function ChatImageLightbox({
 	isOpen,
 	images,
 	currentIndex,
+	viewOnly = false,
 	onClose,
 	onPrev,
 	onNext,
@@ -854,6 +856,8 @@ export default function ChatImageLightbox({
 							Done
 						</button>
 					</>
+				) : viewOnly ? (
+					zoomControls
 				) : (
 					<>
 						{zoomControls}
