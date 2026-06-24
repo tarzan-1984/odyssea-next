@@ -296,6 +296,34 @@ export default function DriversListTable({
 	const totalItems = driverList?.data?.pagination?.total_posts || 0;
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
+	const renderPaginationBar = (extraActions?: React.ReactNode) => (
+		<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
+			<div className="pb-3 xl:pb-0">
+				<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
+					{totalItems === 0
+						? "Showing 0 entries"
+						: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
+								currentPage * itemsPerPage,
+								totalItems
+							)} of ${totalItems} entries`}
+				</p>
+			</div>
+
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+				{totalPages > 1 && (
+					<PaginationWithIcon
+						totalPages={totalPages}
+						initialPage={currentPage}
+						onPageChange={(page: number) => {
+							setCurrentPage(page);
+						}}
+					/>
+				)}
+				{extraActions}
+			</div>
+		</div>
+	);
+
 	const showDistanceColumn =
 		Boolean(debouncedAddressFilter) && Boolean(driverList?.data?.has_distance_data);
 	const idPosts = driverList?.data?.id_posts ?? {};
@@ -553,6 +581,10 @@ export default function DriversListTable({
 				</div>
 			) : (
 				<>
+					<div className="border border-t-0 border-gray-100 px-4 py-3 dark:border-white/[0.05]">
+						{renderPaginationBar()}
+					</div>
+
 					{/* Table section — min-w-0 so container can shrink; table width controlled by colgroup so no horizontal scrollbar */}
 					<div className="min-w-0 overflow-x-hidden">
 						<div
@@ -1492,51 +1524,27 @@ export default function DriversListTable({
 
 					{/* Footer section with pagination info and controls */}
 					<div className="border border-t-0 rounded-b-xl border-gray-100 py-4 pl-[18px] pr-4 dark:border-white/[0.05]">
-						<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-							{/*Pagination info*/}
-							<div className="pb-3 xl:pb-0">
-								<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-									{totalItems === 0
-										? "Showing 0 entries"
-										: `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to ${Math.min(
-												currentPage * itemsPerPage,
-												totalItems
-											)} of ${totalItems} entries`}
-								</p>
-							</div>
-
-							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-								{/*Pagination controls*/}
-								{totalPages > 1 && (
-									<PaginationWithIcon
-										totalPages={totalPages}
-										initialPage={currentPage}
-										onPageChange={(page: number) => {
-											setCurrentPage(page);
-										}}
-									/>
-								)}
-								{footerButton && (
-									<Button
-										size="sm"
-										variant="primary"
-										disabled={
-											selectedDriverIds.length === 0 || footerButton.isLoading
-										}
-										onClick={() =>
-											footerButton.onClick(
-												selectedDriverIds,
-												driverEmptyMiles
-											)
-										}
-										className="inline-flex items-center gap-2"
-									>
-										{footerButton.label}
-										{footerButton.icon}
-									</Button>
-								)}
-							</div>
-						</div>
+						{renderPaginationBar(
+							footerButton ? (
+								<Button
+									size="sm"
+									variant="primary"
+									disabled={
+										selectedDriverIds.length === 0 || footerButton.isLoading
+									}
+									onClick={() =>
+										footerButton.onClick(
+											selectedDriverIds,
+											driverEmptyMiles
+										)
+									}
+									className="inline-flex items-center gap-2"
+								>
+									{footerButton.label}
+									{footerButton.icon}
+								</Button>
+							) : undefined
+						)}
 					</div>
 				</>
 			)}
