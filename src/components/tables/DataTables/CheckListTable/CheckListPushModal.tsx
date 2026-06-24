@@ -25,6 +25,7 @@ export function buildCheckListVersionPushDefaultMessage(
 function buildPushBody(
 	driver: CheckListDriver,
 	message: string,
+	offerContext?: { offerId: number; offerTitle: string },
 ): Record<string, unknown> {
 	const text = message.trim();
 	const ext = driver.externalId?.trim();
@@ -38,12 +39,19 @@ function buildPushBody(
 	} else {
 		body.userId = driver.id;
 	}
+	if (offerContext) {
+		body.offerId = offerContext.offerId;
+		body.offerTitle = offerContext.offerTitle;
+	}
 	return body;
 }
 
-function driverShortLabel(driver: CheckListDriver): string {
+function driverShortLabel(
+	driver: CheckListDriver,
+	externalIdLabel: "ID" | "U" = "ID",
+): string {
 	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
-	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
+	return driver.externalId ? `${name} (${externalIdLabel}: ${driver.externalId})` : name;
 }
 
 type CheckListPushModalProps = {
@@ -52,6 +60,8 @@ type CheckListPushModalProps = {
 	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
 	drivers: CheckListDriver[] | null;
 	defaultMessage?: string;
+	externalIdLabel?: "ID" | "U";
+	offerContext?: { offerId: number; offerTitle: string };
 	onSent?: () => void | Promise<void>;
 };
 
@@ -60,6 +70,8 @@ export default function CheckListPushModal({
 	onClose,
 	drivers,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
+	externalIdLabel = "ID",
+	offerContext,
 	onSent,
 }: CheckListPushModalProps) {
 	const currentUser = useCurrentUser();
@@ -101,7 +113,7 @@ export default function CheckListPushModal({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					credentials: "include",
-					body: JSON.stringify(buildPushBody(driver, text)),
+					body: JSON.stringify(buildPushBody(driver, text, offerContext)),
 				});
 				const json = (await res.json().catch(() => ({}))) as {
 					error?: string;
@@ -113,7 +125,7 @@ export default function CheckListPushModal({
 						(typeof json.error === "string" ? json.error : null) ??
 						(typeof json.message === "string" ? json.message : null) ??
 						"Failed to send push notification.";
-					failures.push(`${driverShortLabel(driver)}: ${msg}`);
+					failures.push(`${driverShortLabel(driver, externalIdLabel)}: ${msg}`);
 				}
 			}
 
@@ -145,7 +157,9 @@ export default function CheckListPushModal({
 	}
 
 	const summaryLabel =
-		targets.length === 1 ? driverShortLabel(targets[0]) : `${targets.length} drivers selected`;
+		targets.length === 1
+			? driverShortLabel(targets[0], externalIdLabel)
+			: `${targets.length} drivers selected`;
 
 	return (
 		<Modal
@@ -161,11 +175,16 @@ export default function CheckListPushModal({
 				{targets.length > 0 && (
 					<>
 						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{summaryLabel}</p>
+						{offerContext ? (
+							<p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+								Offer - {offerContext.offerTitle}
+							</p>
+						) : null}
 						{targets.length > 1 && (
 							<ul className="mt-2 max-h-28 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
 								{targets.map((d) => (
 									<li key={d.id} className="truncate py-0.5">
-										{driverShortLabel(d)}
+										{driverShortLabel(d, externalIdLabel)}
 									</li>
 								))}
 							</ul>

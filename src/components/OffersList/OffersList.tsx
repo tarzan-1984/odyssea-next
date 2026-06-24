@@ -236,12 +236,27 @@ function OfferDriverBadge({
 }
 
 function buildExtendBidTimePushMessage(offer: OfferRow): string {
-	const offerName = routeSummary(offer.route) || `Offer #${offer.id}`;
+	const offerName = getOfferTitle(offer);
 	return `Please extend the bid time for the offer - ${offerName}`;
 }
 
-export const OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE =
+function getOfferTitle(offer: OfferRow): string {
+	const fromRoute = routeSummary(offer.route);
+	if (fromRoute) return fromRoute;
+
+	const pickUp = abbreviateStateInLocationString(offer.pick_up_location ?? "").trim();
+	const delivery = abbreviateStateInLocationString(offer.delivery_location ?? "").trim();
+	if (pickUp && delivery) return `${pickUp} → ${delivery}`;
+
+	return pickUp || delivery || "";
+}
+
+const OFFER_UNAVAILABLE_PUSH_BODY =
 	"Unfortunately, this offer is no longer available. However, we are continuing to search for new load opportunities for you.\n\nWe apologize for the inconvenience and appreciate your understanding.";
+
+function buildOfferUnavailablePushMessage(_offer: OfferRow): string {
+	return OFFER_UNAVAILABLE_PUSH_BODY;
+}
 
 const DRIVER_TABLE_COL_UNIT = "280px";
 const DRIVER_TABLE_COL_PHONE = "130px";
@@ -318,6 +333,7 @@ const OffersList = () => {
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
 		defaultMessage: string;
+		offerContext?: { offerId: number; offerTitle: string };
 	} | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
@@ -486,9 +502,18 @@ const OffersList = () => {
 																queryKey: ["offers-list-cards"],
 															});
 															if (driversToNotify.length > 0) {
+																const offerTitle = getOfferTitle(row);
 																setPushModalState({
 																	drivers: driversToNotify,
-																	defaultMessage: OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE,
+																	defaultMessage: buildOfferUnavailablePushMessage(row),
+																	...(offerTitle
+																		? {
+																				offerContext: {
+																					offerId: row.id,
+																					offerTitle,
+																				},
+																			}
+																		: {}),
 																});
 															}
 														} else {
@@ -870,9 +895,18 @@ const OffersList = () => {
 																							setDeletingDriverKey(null);
 																							if (res.success) {
 																								await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																								const offerTitle = getOfferTitle(row);
 																								setPushModalState({
 																									drivers: [driver],
-																									defaultMessage: OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE,
+																									defaultMessage: buildOfferUnavailablePushMessage(row),
+																									...(offerTitle
+																										? {
+																												offerContext: {
+																													offerId: row.id,
+																													offerTitle,
+																												},
+																											}
+																										: {}),
 																								});
 																							} else {
 																								console.error(res.error);
@@ -1006,6 +1040,8 @@ const OffersList = () => {
 						: null
 				}
 				defaultMessage={pushModalState?.defaultMessage}
+				externalIdLabel="U"
+				offerContext={pushModalState?.offerContext}
 			/>
 		</div>
 	);
