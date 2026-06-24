@@ -240,6 +240,9 @@ function buildExtendBidTimePushMessage(offer: OfferRow): string {
 	return `Please extend the bid time for the offer - ${offerName}`;
 }
 
+export const OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE =
+	"Unfortunately, this offer is no longer available. However, we are continuing to search for new load opportunities for you.\n\nWe apologize for the inconvenience and appreciate your understanding.";
+
 const DRIVER_TABLE_COL_UNIT = "280px";
 const DRIVER_TABLE_COL_PHONE = "130px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
@@ -312,9 +315,9 @@ const OffersList = () => {
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
-	const [pushModalTarget, setPushModalTarget] = useState<{
-		offer: OfferRow;
-		driver: OfferDriver;
+	const [pushModalState, setPushModalState] = useState<{
+		drivers: OfferDriver[];
+		defaultMessage: string;
 	} | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
@@ -472,6 +475,9 @@ const OffersList = () => {
 													onClick={async (e) => {
 														e.stopPropagation();
 														if (!canModifyOffersByRole) return;
+														const driversToNotify = (row.drivers ?? []).filter(
+															(d) => d.active !== false
+														);
 														setDeactivatingOfferId(row.id);
 														const res = await offersApi.deactivateOffer(row.id);
 														setDeactivatingOfferId(null);
@@ -479,6 +485,12 @@ const OffersList = () => {
 															await queryClient.invalidateQueries({
 																queryKey: ["offers-list-cards"],
 															});
+															if (driversToNotify.length > 0) {
+																setPushModalState({
+																	drivers: driversToNotify,
+																	defaultMessage: OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE,
+																});
+															}
 														} else {
 															console.error(res.error);
 														}
@@ -543,7 +555,10 @@ const OffersList = () => {
 																	nowUnixSeconds={nowUnixSeconds}
 																	canModifyOffersByRole={canModifyOffersByRole}
 																	onPushClick={(offer, driverItem) => {
-																		setPushModalTarget({ offer, driver: driverItem });
+																		setPushModalState({
+																			drivers: [driverItem],
+																			defaultMessage: buildExtendBidTimePushMessage(offer),
+																		});
 																	}}
 																/>
 															))}
@@ -560,7 +575,10 @@ const OffersList = () => {
 																	nowUnixSeconds={nowUnixSeconds}
 																	canModifyOffersByRole={canModifyOffersByRole}
 																	onPushClick={(offer, driverItem) => {
-																		setPushModalTarget({ offer, driver: driverItem });
+																		setPushModalState({
+																			drivers: [driverItem],
+																			defaultMessage: buildExtendBidTimePushMessage(offer),
+																		});
 																	}}
 																/>
 															))}
@@ -799,7 +817,10 @@ const OffersList = () => {
 																						driver={driver}
 																						disabled={!canModifyOffersByRole}
 																						onPushClick={(offer, driverItem) => {
-																							setPushModalTarget({ offer, driver: driverItem });
+																							setPushModalState({
+																								drivers: [driverItem],
+																								defaultMessage: buildExtendBidTimePushMessage(offer),
+																							});
 																						}}
 																					/>
 																				</span>
@@ -849,6 +870,10 @@ const OffersList = () => {
 																							setDeletingDriverKey(null);
 																							if (res.success) {
 																								await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																								setPushModalState({
+																									drivers: [driver],
+																									defaultMessage: OFFER_UNAVAILABLE_PUSH_DEFAULT_MESSAGE,
+																								});
 																							} else {
 																								console.error(res.error);
 																							}
@@ -973,14 +998,14 @@ const OffersList = () => {
 			)}
 
 			<CheckListPushModal
-				isOpen={pushModalTarget != null}
-				onClose={() => setPushModalTarget(null)}
+				isOpen={pushModalState != null}
+				onClose={() => setPushModalState(null)}
 				drivers={
-					pushModalTarget ? [offerDriverToCheckListDriver(pushModalTarget.driver)] : null
+					pushModalState
+						? pushModalState.drivers.map(offerDriverToCheckListDriver)
+						: null
 				}
-				defaultMessage={
-					pushModalTarget ? buildExtendBidTimePushMessage(pushModalTarget.offer) : undefined
-				}
+				defaultMessage={pushModalState?.defaultMessage}
 			/>
 		</div>
 	);
