@@ -47,6 +47,7 @@ export interface OfferRow {
 	delivery_time?: string;
 	route?: OfferRoutePoint[] | null;
 	loaded_miles: number | null;
+	offered_rate: number | null;
 	empty_miles: number | null;
 	weight: number | null;
 	commodity: string | null;
@@ -122,6 +123,7 @@ export interface CreateOfferPayload {
 	driverIds: string[];
 	route: CreateOfferRoutePoint[];
 	loadedMiles?: number;
+	offeredRate?: number;
 	/** Map driverId -> empty_miles. Used for rate_offers: empty_miles per driver, total_miles = loaded_miles + empty_miles */
 	driverEmptyMiles?: Record<string, number>;
 	weight?: number;

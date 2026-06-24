@@ -76,6 +76,7 @@ import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
 import DeactivateOfferIcon from "./deactivate-offer.svg";
 import AddPlusCircleIcon from "./AddPlusCircleIcon";
+import RemoveMinusIcon from "./RemoveMinusIcon";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
 import Hazmat2Icon from "./additional/hazmat2.svg";
@@ -146,6 +147,7 @@ export {
 	ExtendBidTimeIcon,
 	DeactivateOfferIcon,
 	AddPlusCircleIcon,
+	RemoveMinusIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,

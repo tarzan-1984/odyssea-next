@@ -12,7 +12,7 @@ import DateTimePicker from "@/components/form/DateTimePicker";
 import TextArea from "@/components/form/input/TextArea";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
-import { DragHandleIcon } from "@/icons";
+import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { getRouteChronologyError } from "@/utils/offerDateTimeRange";
 import {
@@ -38,6 +38,7 @@ export interface CreateOfferFormValues {
 	externalId: string;
 	driverIds: string;
 	route: RouteRow[];
+	offeredRate: string;
 	weight: string;
 	commodity: string;
 	specialRequirements: string[];
@@ -55,6 +56,7 @@ type RouteRow = {
 };
 
 const initialFormState: Omit<CreateOfferFormValues, "externalId" | "driverIds" | "route"> = {
+	offeredRate: "",
 	weight: "",
 	commodity: "",
 	specialRequirements: [],
@@ -100,6 +102,7 @@ function DraggableExtraRow({
 	locationError,
 	canRemove = true,
 	rowCount,
+	onAddRow,
 }: {
 	row: RouteRow;
 	index: number;
@@ -114,6 +117,7 @@ function DraggableExtraRow({
 	/** When false, hide the remove button (e.g. only one row of this type remains) */
 	canRemove?: boolean;
 	rowCount: number;
+	onAddRow?: (afterIndex: number) => void;
 }) {
 	const rowRef = useRef<HTMLDivElement>(null);
 	const handleRef = useRef<HTMLDivElement>(null);
@@ -205,6 +209,20 @@ function DraggableExtraRow({
 				</div>
 			)}
 
+			{/* Add stop — icon is the button */}
+			{onAddRow && (
+				<button
+					type="button"
+					className="shrink-0 self-end p-0 border-0 bg-transparent cursor-pointer text-green-500 hover:text-green-600 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+					onClick={() => onAddRow(index)}
+					aria-label={
+						row.type === "pickup" ? "Add pick up stop" : "Add delivery stop"
+					}
+				>
+					<AddPlusCircleIcon className="h-11 w-11" />
+				</button>
+			)}
+
 			{/* Location field */}
 			<div className="flex-1 min-w-0 relative">
 				<Label>{row.type === "pickup" ? "Pick up location" : "Delivery location"}</Label>
@@ -252,18 +270,16 @@ function DraggableExtraRow({
 				</div>
 
 				{canRemove && (
-					<Button
+					<button
 						type="button"
-						variant="outline"
-						size="sm"
-						className="!p-0 shrink-0 w-11 h-11 flex items-center justify-center min-w-0 text-lg"
+						className="shrink-0 p-0 border-0 bg-transparent cursor-pointer text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors"
 						onClick={() => removeExtraRow(index)}
 						aria-label={
 							row.type === "pickup" ? "Remove pick up row" : "Remove delivery row"
 						}
 					>
-						−
-					</Button>
+						<RemoveMinusIcon className="h-11 w-11" />
+					</button>
 				)}
 			</div>
 		</div>
@@ -333,16 +349,22 @@ export default function CreateOfferModal({
 			: "Could not calculate route distance"
 		: null;
 
-	const addPickUpRow = () => {
-		// Adding an empty row — reset committed so calculation stops until new row is filled
+	const addPickUpRow = (afterIndex: number) => {
 		setCommittedLocations([]);
-		setRouteRows(prev => [...prev, initialRouteRow("pickup")]);
+		setRouteRows(prev => {
+			const next = [...prev];
+			next.splice(afterIndex + 1, 0, initialRouteRow("pickup"));
+			return next;
+		});
 	};
 
-	const addDeliveryRow = () => {
-		// Adding an empty row — reset committed so calculation stops until new row is filled
+	const addDeliveryRow = (afterIndex: number) => {
 		setCommittedLocations([]);
-		setRouteRows(prev => [...prev, initialRouteRow("delivery")]);
+		setRouteRows(prev => {
+			const next = [...prev];
+			next.splice(afterIndex + 1, 0, initialRouteRow("delivery"));
+			return next;
+		});
 	};
 
 	const validateRouteChronology = useCallback((rows: RouteRow[]) => {
@@ -597,6 +619,13 @@ export default function CreateOfferModal({
 		return Number.isNaN(n) ? undefined : n;
 	};
 
+	const parseOfferedRate = (v: string): number | undefined => {
+		const trimmed = String(v).replace(/,/g, "").trim();
+		if (!trimmed) return undefined;
+		const n = parseFloat(trimmed);
+		return Number.isNaN(n) ? undefined : n;
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		const { fieldErrors, routeError: nextRouteError } = validate();
@@ -616,6 +645,18 @@ export default function CreateOfferModal({
 
 		if (loadedMiles == null) {
 			setSubmitError("Route distance could not be calculated");
+			return;
+		}
+
+		const offeredRateRaw = formValues.offeredRate.trim();
+		const offeredRate =
+			offeredRateRaw === "" ? undefined : parseOfferedRate(offeredRateRaw);
+		if (offeredRateRaw !== "" && offeredRate == null) {
+			setErrors({ offeredRate: "Enter a valid number" });
+			return;
+		}
+		if (offeredRate != null && offeredRate < 0) {
+			setErrors({ offeredRate: "Must be 0 or greater" });
 			return;
 		}
 
@@ -641,6 +682,7 @@ export default function CreateOfferModal({
 				driverIds: selectedDriverIds,
 				route: routePayload,
 				loadedMiles: Math.round(milesToSend),
+				offeredRate,
 				driverEmptyMiles:
 					Object.keys(driverEmptyMiles).length > 0 ? driverEmptyMiles : undefined,
 				weight: parseWeight(formValues.weight),
@@ -722,11 +764,14 @@ export default function CreateOfferModal({
 										routeRows.filter(r => r.type === "delivery").length > 1)
 								}
 								rowCount={routeRows.length}
+								onAddRow={
+									row.type === "pickup" ? addPickUpRow : addDeliveryRow
+								}
 							/>
 						))}
 					</DndProvider>
 
-					{/* Loaded miles (left, 50%) and Add Pick Up / Add Delivery buttons (right) */}
+					{/* Loaded miles (left) and Offered rate (right, optional) */}
 					<div className="flex items-end gap-3 mt-2">
 						<div className="relative w-1/2 min-w-0">
 							<Label htmlFor="loaded-miles-field">Loaded miles</Label>
@@ -755,23 +800,19 @@ export default function CreateOfferModal({
 								)}
 							</div>
 						</div>
-						<div className="flex gap-2 w-1/2 min-w-0">
-							<Button
-								type="button"
-								variant="primary"
-								className="h-11 flex-1 !py-0"
-								onClick={addPickUpRow}
-							>
-								Add Pick Up
-							</Button>
-							<Button
-								type="button"
-								variant="primary"
-								className="h-11 flex-1 !py-0"
-								onClick={addDeliveryRow}
-							>
-								Add Delivery
-							</Button>
+						<div className="w-1/2 min-w-0">
+							<Label htmlFor="offered-rate-field">Offered rate</Label>
+							<Input
+								id="offered-rate-field"
+								type="text"
+								inputMode="decimal"
+								value={formValues.offeredRate ?? ""}
+								onChange={e => handleChange("offeredRate", e.target.value)}
+								placeholder="e.g. 2500.50"
+								className="dark:bg-gray-900"
+								error={!!errors.offeredRate}
+								hint={errors.offeredRate}
+							/>
 						</div>
 					</div>
 

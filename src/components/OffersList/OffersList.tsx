@@ -623,11 +623,12 @@ const OffersList = () => {
 											<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
 												<Table className="w-full border-collapse table-fixed">
 													<colgroup>
-														<col style={{ width: "340px" }} />
+														<col style={{ width: "320px" }} />
 														<col style={{ width: "90px" }} />
-														<col style={{ width: "110px" }} />
-														<col style={{ width: "170px" }} />
-														<col style={{ width: "296px" }} />
+														<col style={{ width: "100px" }} />
+														<col style={{ width: "100px" }} />
+														<col style={{ width: "160px" }} />
+														<col style={{ width: "276px" }} />
 													</colgroup>
 													<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
@@ -636,6 +637,9 @@ const OffersList = () => {
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Weight
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																Offered Rate
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Commodity
@@ -655,6 +659,11 @@ const OffersList = () => {
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.weight != null ? `${Number(row.weight).toLocaleString("en-US")} lbs` : ""}
+															</TableCell>
+															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																{row.offered_rate != null
+																	? `$${Number(row.offered_rate).toLocaleString("en-US")}`
+																	: ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.commodity ?? ""}

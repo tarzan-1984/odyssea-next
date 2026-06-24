@@ -60,6 +60,8 @@ const Input: FC<InputProps> = ({
 		inputClasses += ` bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800`;
 	}
 
+	const isControlled = onChange != null;
+
 	return (
 		<div className="relative">
 			<input
@@ -67,8 +69,13 @@ const Input: FC<InputProps> = ({
 				id={id}
 				name={name}
 				placeholder={placeholder}
-				value={value}
-				defaultValue={defaultValue}
+				{...(isControlled
+					? { value: value ?? "" }
+					: value !== undefined
+						? { value }
+						: defaultValue !== undefined
+							? { defaultValue }
+							: {})}
 				onChange={onChange}
 				onBlur={onBlur}
 				min={min}
