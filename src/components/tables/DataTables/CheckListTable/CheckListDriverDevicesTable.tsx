@@ -22,6 +22,7 @@ import type {
 	CheckListVersionDriver,
 	CheckListVersionResponse,
 } from "./checkListTypes";
+import { formatDriverUnitLine } from "./checkListTypes";
 
 export type CheckListAppVersionSort = "asc" | "desc";
 
@@ -239,7 +240,7 @@ export default function CheckListDriverDevicesTable({
 					<div className="min-w-0 flex-1 lg:max-w-xl lg:px-2">
 						<Input
 							type="text"
-							placeholder="Search by name, driver ID, email…"
+							placeholder="Search by name, driver U, email…"
 							value={searchInput}
 							onChange={e => setSearchInput(e.target.value)}
 							className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
@@ -471,7 +472,7 @@ export default function CheckListDriverDevicesTable({
 															/>
 														</span>
 														<span className="text-xs text-gray-500 dark:text-gray-400">
-															ID: {driver.externalId ?? "—"}
+															{formatDriverUnitLine(driver.externalId)}
 														</span>
 														<span className="text-xs text-gray-500 dark:text-gray-400 break-all">
 															{driver.email || "—"}

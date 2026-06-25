@@ -11,6 +11,21 @@ export type CheckListDriver = {
 	trackingLoadId: string | null;
 };
 
+export const DRIVER_UNIT_LABEL = "U";
+
+export function formatDriverUnitLine(externalId: string | null | undefined): string {
+	const id = externalId?.trim();
+	return id ? `${DRIVER_UNIT_LABEL}: ${id}` : "—";
+}
+
+export function formatDriverShortLabel(
+	driver: Pick<CheckListDriver, "firstName" | "lastName" | "externalId">,
+): string {
+	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
+	const id = driver.externalId?.trim();
+	return id ? `${name} (${DRIVER_UNIT_LABEL}: ${id})` : name;
+}
+
 export type CheckListVersionDevice = {
 	id: string;
 	platform: string;

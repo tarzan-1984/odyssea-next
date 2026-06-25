@@ -9,6 +9,7 @@ import Button from "@/components/ui/button/Button";
 import { useCurrentUser } from "@/stores/userStore";
 import { canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
+import { formatDriverShortLabel } from "./checkListTypes";
 import { CHECK_LIST_PUSH_DEFAULT_MESSAGE } from "./CheckListPushModal";
 import {
 	bulkSendCheckListEmails,
@@ -33,8 +34,7 @@ Android: https://play.google.com/store/search?q=odysseia&c=apps&hl=en
 Thank you.`;
 
 function driverShortLabel(driver: CheckListDriver): string {
-	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
-	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
+	return formatDriverShortLabel(driver);
 }
 
 type CheckListEmailModalProps = {

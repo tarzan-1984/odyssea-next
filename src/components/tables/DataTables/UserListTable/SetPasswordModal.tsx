@@ -21,7 +21,8 @@ type SetPasswordModalProps = {
 function driverLabel(driver: SetPasswordDriver | null): string {
 	if (!driver) return "";
 	const name = `${driver.firstName ?? ""} ${driver.lastName ?? ""}`.trim() || "Driver";
-	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
+	const id = driver.externalId?.trim();
+	return id ? `${name} (U: ${id})` : name;
 }
 
 export default function SetPasswordModal({ isOpen, onClose, driver }: SetPasswordModalProps) {

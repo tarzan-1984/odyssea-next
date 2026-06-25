@@ -8,6 +8,7 @@ import Button from "@/components/ui/button/Button";
 import { useCurrentUser } from "@/stores/userStore";
 import { canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
+import { formatDriverShortLabel } from "./checkListTypes";
 
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
 	"We haven't received location updates from you in a while. Please check if the app is running.";
@@ -46,12 +47,8 @@ function buildPushBody(
 	return body;
 }
 
-function driverShortLabel(
-	driver: CheckListDriver,
-	externalIdLabel: "ID" | "U" = "ID",
-): string {
-	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
-	return driver.externalId ? `${name} (${externalIdLabel}: ${driver.externalId})` : name;
+function driverShortLabel(driver: CheckListDriver): string {
+	return formatDriverShortLabel(driver);
 }
 
 type CheckListPushModalProps = {
@@ -60,7 +57,6 @@ type CheckListPushModalProps = {
 	/** When null, modal is treated as closed. Otherwise send to this list (one or many). */
 	drivers: CheckListDriver[] | null;
 	defaultMessage?: string;
-	externalIdLabel?: "ID" | "U";
 	offerContext?: { offerId: number; offerTitle: string };
 	onSent?: () => void | Promise<void>;
 };
@@ -70,7 +66,6 @@ export default function CheckListPushModal({
 	onClose,
 	drivers,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
-	externalIdLabel = "ID",
 	offerContext,
 	onSent,
 }: CheckListPushModalProps) {
@@ -125,7 +120,7 @@ export default function CheckListPushModal({
 						(typeof json.error === "string" ? json.error : null) ??
 						(typeof json.message === "string" ? json.message : null) ??
 						"Failed to send push notification.";
-					failures.push(`${driverShortLabel(driver, externalIdLabel)}: ${msg}`);
+					failures.push(`${driverShortLabel(driver)}: ${msg}`);
 				}
 			}
 
@@ -158,7 +153,7 @@ export default function CheckListPushModal({
 
 	const summaryLabel =
 		targets.length === 1
-			? driverShortLabel(targets[0], externalIdLabel)
+			? driverShortLabel(targets[0])
 			: `${targets.length} drivers selected`;
 
 	return (
@@ -184,7 +179,7 @@ export default function CheckListPushModal({
 							<ul className="mt-2 max-h-28 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
 								{targets.map((d) => (
 									<li key={d.id} className="truncate py-0.5">
-										{driverShortLabel(d, externalIdLabel)}
+										{driverShortLabel(d)}
 									</li>
 								))}
 							</ul>

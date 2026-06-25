@@ -1069,7 +1069,6 @@ const OffersList = () => {
 						: null
 				}
 				defaultMessage={pushModalState?.defaultMessage}
-				externalIdLabel="U"
 				offerContext={pushModalState?.offerContext}
 			/>
 		</div>

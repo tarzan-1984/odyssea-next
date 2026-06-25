@@ -1,4 +1,5 @@
 import type { CheckListDriver } from "./checkListTypes";
+import { formatDriverShortLabel } from "./checkListTypes";
 
 export const CHECK_LIST_BULK_EMAIL_BATCH_SIZE = 5;
 const CHECK_LIST_BULK_EMAIL_REQUEST_TIMEOUT_MS = 120_000;
@@ -22,8 +23,7 @@ export type BulkEmailSummary = {
 };
 
 function driverShortLabel(driver: CheckListDriver): string {
-	const name = `${driver.firstName} ${driver.lastName}`.trim() || "—";
-	return driver.externalId ? `${name} (ID: ${driver.externalId})` : name;
+	return formatDriverShortLabel(driver);
 }
 
 function buildEmailBody(
