@@ -16,6 +16,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
+import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -193,6 +194,25 @@ export default function ChatList({
 		return "Unknown Chat";
 	};
 
+	function formatOfferRouteForDisplay(route: string): string {
+		const trimmed = route.trim();
+		if (!trimmed) return trimmed;
+
+		const separators = [" — ", " - ", " → ", "–"] as const;
+		for (const sep of separators) {
+			const idx = trimmed.indexOf(sep);
+			if (idx === -1) continue;
+
+			const pickUp = trimmed.slice(0, idx).trim();
+			const delivery = trimmed.slice(idx + sep.length).trim();
+			if (pickUp && delivery) {
+				return `${abbreviateStateInLocationString(pickUp)} - ${abbreviateStateInLocationString(delivery)}`;
+			}
+		}
+
+		return abbreviateStateInLocationString(trimmed);
+	}
+
 	// Extract offerId from OFFER chat (from room.offerId or parse from name)
 	// Get accordion header: "Pick up - Delivery" and "(id: xxx)"
 	// Name format: "firstName lastName (id: offerId)\npickUp - delivery"
@@ -202,7 +222,7 @@ export default function ChatList({
 		const lines = chatRoom.name.split("\n");
 		const route =
 			lines[1]?.trim() || lines[0]?.replace(/\(id:\s*[^)]+\)/, "").trim() || "Unknown route";
-		return { route, id: offerId };
+		return { route: formatOfferRouteForDisplay(route), id: offerId };
 	};
 
 	function toggleDropdownTwo() {
@@ -726,21 +746,21 @@ export default function ChatList({
 											type="button"
 											onClick={() => toggleOfferAccordion(offerId)}
 											aria-expanded={isExpanded}
-											className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${
+											className={`w-full flex items-start justify-between gap-2 px-3 py-2.5 text-left transition-colors ${
 												isExpanded
 													? "bg-gray-100/90 dark:bg-white/[0.04]"
 													: "hover:bg-gray-100/80 dark:hover:bg-white/5"
 											}`}
 										>
 											<div className="min-w-0 flex-1">
-												<div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+												<div className="font-medium text-gray-800 dark:text-gray-200 break-words leading-snug">
 													{route}
 												</div>
 												<div className="text-xs text-gray-500 dark:text-gray-400">
 													(id: {id})
 												</div>
 											</div>
-											<div className="flex items-center gap-2 flex-shrink-0">
+											<div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
 												{groupUnreadCount > 0 && (
 													<div className="w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
 														{groupUnreadCount > 99
