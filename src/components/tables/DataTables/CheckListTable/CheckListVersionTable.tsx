@@ -8,6 +8,7 @@ export default function CheckListVersionTable() {
 			apiPath="/api/users/drivers/check-list/version"
 			queryKey="drivers-check-list-version"
 			showMinimumAppVersion
+			showLastOpenAppColumn
 			getEmptyMessage={minimumAppVersion =>
 				!minimumAppVersion
 					? "Minimum app version is not configured in App settings."
