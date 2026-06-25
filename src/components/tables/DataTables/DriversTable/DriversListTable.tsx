@@ -456,7 +456,13 @@ export default function DriversListTable({
 				</>
 			)}
 
-			<div className="relative z-10 px-4 pb-4 border border-t-0 border-gray-100 dark:border-white/[0.05]">
+			<div
+				className={`relative z-10 px-4 border border-t-0 border-gray-100 dark:border-white/[0.05] ${
+					!showActionsInHeader
+						? "sticky top-0 z-30 bg-white py-4 dark:bg-gray-900 shadow-sm"
+						: "pb-4"
+				}`}
+			>
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
 					{/* Capabilities (multiselect) */}
 					<div className="flex min-w-0 flex-col md:min-w-[220px]">
