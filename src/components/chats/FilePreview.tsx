@@ -27,6 +27,7 @@ const IMAGE_PREVIEW_EXTENSIONS = [
 	"svg",
 	"bmp",
 	"tiff",
+	"dng",
 ] as const;
 
 function isRasterChatImageExtension(fileExtension: string | undefined): boolean {
@@ -279,7 +280,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	const fileExtension = fileName.toLowerCase().split(".").pop();
 	const isImage =
 		fileExtension &&
-		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff"].includes(
+		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff", "dng"].includes(
 			fileExtension
 		);
 
@@ -444,6 +445,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 						"heif",
 						"bmp",
 						"tiff",
+						"dng",
 					].includes(fileExtension)
 				) {
 					const isHeicExt = fileExtension === "heic" || fileExtension === "heif";
@@ -673,6 +675,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 			case "svg":
 			case "bmp":
 			case "tiff":
+			case "dng":
 				return (
 					<div
 						className={`w-full ${

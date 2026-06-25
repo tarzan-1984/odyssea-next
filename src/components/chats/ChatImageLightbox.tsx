@@ -244,6 +244,7 @@ export default function ChatImageLightbox({
 	const hasNext = currentIndex < images.length - 1;
 	const fileExtension = current?.fileName.toLowerCase().split(".").pop();
 	const isHeic = fileExtension === "heic" || fileExtension === "heif";
+	const needsServerPreview = isHeic || fileExtension === "dng";
 	const isEditing = viewMode === "edit";
 	const isCropMode = isEditing && editSubTool === "crop";
 	const isEraserMode = isEditing && editSubTool === "eraser";
@@ -351,7 +352,7 @@ export default function ChatImageLightbox({
 
 			if (!isChatImageFileName(current.fileName)) return;
 
-			if (isHeic) {
+			if (needsServerPreview) {
 				setIsModalImageLoading(true);
 				try {
 					const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
@@ -365,7 +366,7 @@ export default function ChatImageLightbox({
 					previewBlobUrlRef.current = blobUrl;
 					setPreviewUrl(blobUrl);
 				} catch (error) {
-					console.error("[ChatImageLightbox] Failed to load HEIC preview:", error);
+					console.error("[ChatImageLightbox] Failed to load image preview:", error);
 					if (!cancelled) {
 						setPreviewLoadError(
 							"Failed to load image. Please try downloading the file."
@@ -388,7 +389,7 @@ export default function ChatImageLightbox({
 				previewBlobUrlRef.current = null;
 			}
 		};
-	}, [isOpen, current?.fileUrl, current?.fileName, currentIndex, isHeic, resetView]);
+	}, [isOpen, current?.fileUrl, current?.fileName, currentIndex, needsServerPreview, resetView]);
 
 	useEffect(() => {
 		if (!isOpen || !modalImgNaturalSize || isEditing) return;
@@ -1029,7 +1030,7 @@ export default function ChatImageLightbox({
 					/>
 				) : (
 					<div className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
-						{isModalImageLoading && isHeic ? <HeicConvertingOverlay variant="modal" /> : null}
+						{isModalImageLoading && needsServerPreview ? <HeicConvertingOverlay variant="modal" /> : null}
 						{previewLoadError ? (
 							<p className="max-w-md px-4 text-center text-sm text-red-300">{previewLoadError}</p>
 						) : previewUrl ? (

@@ -16,6 +16,7 @@ const IMAGE_EXTENSIONS = new Set([
 	"heif",
 	"bmp",
 	"tiff",
+	"dng",
 ]);
 
 export type ChatGalleryImage = ChatMessageAttachment & {

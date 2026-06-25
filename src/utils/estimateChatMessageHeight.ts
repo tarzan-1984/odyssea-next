@@ -25,7 +25,7 @@ export interface EstimateChatMessageHeightOptions {
 }
 
 function isImageFileName(fileName: string): boolean {
-	return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff|svg)$/i.test(fileName);
+	return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff|svg|dng)$/i.test(fileName);
 }
 
 function isPdfFileName(fileName: string): boolean {
