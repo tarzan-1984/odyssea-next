@@ -101,6 +101,11 @@ function formatCountdown(totalSeconds: number): string {
 		.join(":");
 }
 
+function formatDriverBidRate(rate: number | null | undefined): string | null {
+	if (rate == null) return null;
+	return `$${Number(rate).toLocaleString("en-US")}`;
+}
+
 function canExtendDriverBidTime(offer: OfferRow, driver: OfferDriver): boolean {
 	return (
 		offer.active !== false &&
@@ -206,6 +211,21 @@ function OfferDriverBadge({
 							: "border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.04]"
 			}`}
 		>
+			{driver.rate != null ? (
+				<span
+					className={`shrink-0 text-[10px] font-medium tabular-nums ${
+						isInactiveDriver
+							? "text-[#a20000] dark:text-red-200"
+							: hasActiveTimer
+								? "text-green-800 dark:text-green-200"
+								: isExpiredBid
+									? "text-gray-500 dark:text-gray-400"
+									: "text-gray-500 dark:text-gray-400"
+					}`}
+				>
+					{formatDriverBidRate(driver.rate)}
+				</span>
+			) : null}
 			<span
 				className={`max-w-[180px] truncate text-xs font-medium ${
 					isInactiveDriver
@@ -825,7 +845,7 @@ const OffersList = () => {
 																			: ""}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																		{driver.rate != null ? `$${Number(driver.rate).toLocaleString("en-US")}` : ""}
+																		{formatDriverBidRate(driver.rate) ?? ""}
 																	</TableCell>
 																	<TableCell className="px-2 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																		{(() => {
