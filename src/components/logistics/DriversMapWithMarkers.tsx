@@ -15,6 +15,7 @@ import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import type { ChatRoom } from "@/app-api/chatApi";
 import type { TMSDriverResponse } from "@/app-api/api-types";
 import DriverInfoModal from "./DriverInfoModal";
+import { driverUsesMobileApp } from "@/components/tables/DataTables/DriversTable/DriverMobileAppIcon";
 import {
 	DRIVER_STATUS_LABELS,
 	driverMapStatusMatchesFilter,
@@ -162,7 +163,7 @@ export default function DriversMapWithMarkers({
 	const setZipFilter = onZipFilterChange ?? setInternalZipFilter;
 
 	const [selectedDriverUserId, setSelectedDriverUserId] = useState<string | null>(null);
-	const [selectedDriverStatus, setSelectedDriverStatus] = useState<string | null>(null); // users.status from our DB (ACTIVE/INACTIVE)
+	const [selectedDriverUsesMobileApp, setSelectedDriverUsesMobileApp] = useState(false);
 	const [selectedDriverTMS, setSelectedDriverTMS] = useState<Record<string, unknown> | null>(
 		null
 	);
@@ -195,7 +196,7 @@ export default function DriversMapWithMarkers({
 	const handleMarkerClick = useCallback(async (driver: DriverForMap) => {
 		if (!driver.externalId) return;
 		setSelectedDriverUserId(driver.id);
-		setSelectedDriverStatus(driver.status ?? null); // From our backend drivers/map response (users.status)
+		setSelectedDriverUsesMobileApp(driverUsesMobileApp(driver.activateApplication));
 		setIsLoadingDriverData(true);
 		setIsPopupVisible(true);
 		setSelectedDriverTMS(null);
@@ -294,7 +295,7 @@ export default function DriversMapWithMarkers({
 	const handleClosePopup = useCallback(() => {
 		if (!isChatActionLoading) {
 			setSelectedDriverUserId(null);
-			setSelectedDriverStatus(null);
+			setSelectedDriverUsesMobileApp(false);
 		}
 		setIsPopupVisible(false);
 		setSelectedDriverTMS(null);
@@ -460,7 +461,7 @@ export default function DriversMapWithMarkers({
 				showChatButton={Boolean(selectedDriverUserId)}
 				onChatPress={handleGoToChat}
 				isChatActionLoading={isChatActionLoading}
-				isDriverActive={selectedDriverStatus === "ACTIVE"}
+				usesMobileApp={selectedDriverUsesMobileApp}
 			/>
 		</div>
 	);

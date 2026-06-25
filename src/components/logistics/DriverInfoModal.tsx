@@ -31,7 +31,7 @@ interface DriverInfoModalProps {
 	showChatButton?: boolean;
 	onChatPress?: () => void;
 	isChatActionLoading?: boolean;
-	isDriverActive?: boolean;
+	usesMobileApp?: boolean;
 }
 
 export default function DriverInfoModal({
@@ -42,7 +42,7 @@ export default function DriverInfoModal({
 	showChatButton = false,
 	onChatPress,
 	isChatActionLoading = false,
-	isDriverActive = true,
+	usesMobileApp = true,
 }: DriverInfoModalProps) {
 	if (!visible) return null;
 
@@ -171,7 +171,7 @@ export default function DriverInfoModal({
 
 				{showChatButton && (
 					<div className="mt-4">
-						{isDriverActive ? (
+						{usesMobileApp ? (
 							<button
 								type="button"
 								onClick={() => onChatPress?.()}

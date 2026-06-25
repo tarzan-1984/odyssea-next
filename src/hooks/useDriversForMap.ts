@@ -17,6 +17,7 @@ export interface DriverForMap {
 	driverStatus: string | null;
 	status?: string | null;
 	zip?: string | null;
+	activateApplication?: string | number | boolean | null;
 }
 
 export interface DriversMapFilterParams {
@@ -39,6 +40,7 @@ function mapDriverToDriverForMap(driver: {
 		driver_status?: string;
 		current_zipcode?: string;
 		driver_id?: string;
+		activate_application?: string | number | boolean | null;
 	};
 	status_post?: string;
 }): DriverForMap | null {
@@ -55,6 +57,7 @@ function mapDriverToDriverForMap(driver: {
 		driverStatus: driver.meta_data?.driver_status ?? null,
 		status: driver.status_post ?? null,
 		zip: driver.meta_data?.current_zipcode ?? null,
+		activateApplication: driver.meta_data?.activate_application ?? null,
 	};
 }
 
