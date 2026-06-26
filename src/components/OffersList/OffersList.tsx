@@ -661,19 +661,19 @@ const OffersList = () => {
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Route
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Weight
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Offered Rate
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Commodity
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Special Requirements
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Notes
 															</TableCell>
 														</TableRow>
@@ -683,21 +683,21 @@ const OffersList = () => {
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-pre-line">
 																{formatRoute(row.route) || ""}
 															</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.weight != null ? `${Number(row.weight).toLocaleString("en-US")} lbs` : ""}
 															</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.offered_rate != null
 																	? `$${Number(row.offered_rate).toLocaleString("en-US")}`
 																	: ""}
 															</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.commodity ?? ""}
 															</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{formatSpecialRequirements(row.special_requirements) || ""}
 															</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.notes && String(row.notes).trim()
 																	? String(row.notes).trim()
 																	: ""}
@@ -760,23 +760,23 @@ const OffersList = () => {
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Unit
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																Phone
 															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																Empty miles
 																</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	Total miles
 																</TableCell>
-																<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Rate
 																</TableCell>
-																<TableCell isHeader className="px-2 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																<TableCell isHeader className="px-2 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	Bid timer
 																</TableCell>
 																{!row.is_driver_selected && (
-																	<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
+																	<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/[0.08]">
 																		Actions
 																	</TableCell>
 																)}
@@ -830,7 +830,7 @@ const OffersList = () => {
 																	)}
 																</span>
 															</TableCell>
-																<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	{driver.phone ? (
 																			<a
 																				href={`tel:${driver.phone.replace(/\s/g, "")}`}
@@ -840,20 +840,20 @@ const OffersList = () => {
 																			</a>
 																		) : null}
 																	</TableCell>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																{driver.empty_miles != null
 																			? Math.round(driver.empty_miles)
 																			: ""}
 																	</TableCell>
-																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08] whitespace-nowrap">
+																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 border-r dark:border-white/[0.08] whitespace-nowrap">
 																		{driver.total_miles != null
 																			? Math.round(driver.total_miles)
 																			: ""}
 																	</TableCell>
-																	<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		{formatDriverBidRate(driver.rate) ?? ""}
 																	</TableCell>
-																	<TableCell className="px-2 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																	<TableCell className="px-2 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																		{(() => {
 																			const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
 																			if (actionTimeUnix == null) return null;
@@ -868,7 +868,7 @@ const OffersList = () => {
 																			}
 
 																			return (
-																				<span className="inline-flex items-center gap-1">
+																				<span className="inline-flex items-center justify-center gap-1">
 																					<span className="text-theme-sm text-gray-800 dark:text-gray-200">
 																						Offer Expired
 																					</span>
@@ -888,7 +888,7 @@ const OffersList = () => {
 																		})()}
 																	</TableCell>
 																	{!row.is_driver_selected && (
-																		<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
+																		<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
 																			{driver.active === false ? (
 																				<button
 																					type="button"
@@ -914,7 +914,7 @@ const OffersList = () => {
 																					Return
 																				</button>
 																			) : (
-																				<div className="flex items-center gap-1.5">
+																				<div className="flex items-center justify-center gap-1.5">
 																					<button
 																						type="button"
 																						disabled={
