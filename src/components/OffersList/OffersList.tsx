@@ -8,7 +8,9 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, AddPlusCircleIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, AddPlusCircleIcon, CheckCircleIcon } from "@/icons";
+import { Modal } from "@/components/ui/modal";
+import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
@@ -21,6 +23,9 @@ import UserFilterSelect from "./UserFilterSelect";
 import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 import { canModifyOffers } from "@/utils/roleAccess";
+
+const DRIVER_ACCEPTED_MESSAGE =
+	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
 
 /** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 const CREATOR_ROLE_LABELS: Record<string, string> = {
@@ -349,6 +354,7 @@ const OffersList = () => {
 	const [deletingDriverKey, setDeletingDriverKey] = useState<string | null>(null);
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
+	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
@@ -964,6 +970,7 @@ const OffersList = () => {
 																								if (res.success) {
 																									await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 																									await queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
+																									setShowDriverAcceptedModal(true);
 																								} else {
 																									console.error(res.error);
 																								}
@@ -1071,6 +1078,32 @@ const OffersList = () => {
 				defaultMessage={pushModalState?.defaultMessage}
 				offerContext={pushModalState?.offerContext}
 			/>
+
+			<Modal
+				isOpen={showDriverAcceptedModal}
+				onClose={() => setShowDriverAcceptedModal(false)}
+				className="relative m-5 w-full max-w-md rounded-3xl bg-white p-6 dark:bg-gray-900 sm:m-0"
+				closeOnBackdropClick
+			>
+				<div className="text-center">
+					<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
+						<CheckCircleIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
+					</div>
+					<h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+						Driver accepted
+					</h3>
+					<p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+						{DRIVER_ACCEPTED_MESSAGE}
+					</p>
+					<Button
+						variant="primary"
+						onClick={() => setShowDriverAcceptedModal(false)}
+						className="w-full"
+					>
+						OK
+					</Button>
+				</div>
+			</Modal>
 		</div>
 	);
 };
