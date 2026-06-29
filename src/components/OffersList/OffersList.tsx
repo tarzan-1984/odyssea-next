@@ -8,7 +8,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, AddPlusCircleIcon, CheckCircleIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,9 @@ import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import type { OfferRow, OfferDriver } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
+import CreateOfferModal, {
+	type EditOfferData,
+} from "@/components/tables/DataTables/DriversTable/CreateOfferModal";
 import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
 import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import UserFilterSelect from "./UserFilterSelect";
@@ -59,6 +62,94 @@ function formatSpecialRequirements(value: unknown): string {
 	if (Array.isArray(value)) return value.map(String).join(", ");
 	if (typeof value === "string") return value;
 	return String(value);
+}
+
+function parseSpecialRequirementsArray(value: unknown): string[] {
+	if (value == null) return [];
+	if (Array.isArray(value)) {
+		return value.map(v => String(v).trim()).filter(Boolean);
+	}
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed) return [];
+		try {
+			const parsed = JSON.parse(trimmed);
+			if (Array.isArray(parsed)) {
+				return parsed.map(v => String(v).trim()).filter(Boolean);
+			}
+		} catch {
+			// fall through to comma-separated
+		}
+		return trimmed
+			.split(",")
+			.map(v => v.trim())
+			.filter(Boolean);
+	}
+	return [];
+}
+
+function buildEditOfferData(offer: OfferRow): EditOfferData {
+	const route =
+		offer.route && offer.route.length > 0
+			? offer.route.map(point => ({
+					type: point.type,
+					location: point.location ?? "",
+					time: point.time ?? "",
+					latitude: point.latitude,
+					longitude: point.longitude,
+				}))
+			: [
+					...(offer.pick_up_location
+						? [
+								{
+									type: "pick_up_location" as const,
+									location: offer.pick_up_location,
+									time: offer.pick_up_time ?? "",
+								},
+							]
+						: []),
+					...(offer.delivery_location
+						? [
+								{
+									type: "delivery_location" as const,
+									location: offer.delivery_location,
+									time: offer.delivery_time ?? "",
+								},
+							]
+						: []),
+				];
+
+	const selectedDriverIds = Array.from(
+		new Set(
+			(offer.drivers ?? []).flatMap(d => {
+				const id = d.externalId ?? d.driver_id;
+				return id ? [String(id)] : [];
+			})
+		)
+	);
+
+	const driverEmptyMiles: Record<string, number> = {};
+	for (const driver of offer.drivers ?? []) {
+		const id = driver.externalId ?? driver.driver_id;
+		if (id && driver.empty_miles != null && Number.isFinite(Number(driver.empty_miles))) {
+			const rounded = Math.round(Number(driver.empty_miles));
+			driverEmptyMiles[String(id)] = rounded;
+		}
+	}
+
+	return {
+		offerId: offer.id,
+		externalId: offer.external_user_id ?? offer.creator?.externalId ?? "",
+		selectedDriverIds,
+		driverEmptyMiles,
+		offeredRate: offer.offered_rate != null ? String(offer.offered_rate) : "",
+		weight: offer.weight != null ? String(offer.weight) : "",
+		commodity: offer.commodity ?? "",
+		specialRequirements: parseSpecialRequirementsArray(offer.special_requirements),
+		notes: offer.notes ?? "",
+		route,
+		loadedMiles: offer.loaded_miles,
+	};
 }
 
 function hasHazmat(specialRequirements: unknown): boolean {
@@ -336,6 +427,7 @@ const OffersList = () => {
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
+	const [editOfferData, setEditOfferData] = useState<EditOfferData | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
 		defaultMessage: string;
@@ -489,6 +581,21 @@ const OffersList = () => {
 											)}
 										</div>
 										<div className="flex flex-shrink-0 items-center justify-center gap-2">
+											{row.active !== false && (
+												<button
+													type="button"
+													disabled={!canModifyOffersByRole}
+													title="Edit offer"
+													onClick={(e) => {
+														e.stopPropagation();
+														if (!canModifyOffersByRole) return;
+														setEditOfferData(buildEditOfferData(row));
+													}}
+													className="inline-flex h-[39px] w-[39px] shrink-0 items-center justify-center p-0 border-0 bg-transparent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+												>
+													<EditOfferIcon className="h-[39px] w-[39px] shrink-0" aria-hidden />
+												</button>
+											)}
 											{row.active !== false && (
 												<button
 													type="button"
@@ -1044,6 +1151,20 @@ const OffersList = () => {
 						} finally {
 							setIsAddingDrivers(false);
 						}
+					}}
+				/>
+			)}
+
+			{editOfferData && (
+				<CreateOfferModal
+					isOpen={true}
+					onClose={() => setEditOfferData(null)}
+					externalId={editOfferData.externalId}
+					selectedDriverIds={editOfferData.selectedDriverIds}
+					driverEmptyMiles={editOfferData.driverEmptyMiles}
+					editData={editOfferData}
+					onSubmit={async () => {
+						await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 					}}
 				/>
 			)}

@@ -75,6 +75,7 @@ import CheckListIcon from "./check-list.svg";
 import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
 import DeactivateOfferIcon from "./deactivate-offer.svg";
+import EditOfferIcon from "./edit-offer.svg";
 import AddPlusCircleIcon from "./AddPlusCircleIcon";
 import RemoveMinusIcon from "./RemoveMinusIcon";
 import TwicIcon from "./additional/twic.svg";
@@ -146,6 +147,7 @@ export {
 	OfferDriverChatIcon,
 	ExtendBidTimeIcon,
 	DeactivateOfferIcon,
+	EditOfferIcon,
 	AddPlusCircleIcon,
 	RemoveMinusIcon,
 	BoxTapped,

@@ -139,6 +139,13 @@ export interface CreateOfferResponse {
 	errors?: string[];
 }
 
+export interface UpdateOfferResponse {
+	success: boolean;
+	data?: { id: number; [key: string]: unknown };
+	error?: string;
+	errors?: string[];
+}
+
 export interface AddDriversToOfferResponse {
 	success: boolean;
 	addedCount?: number;
@@ -320,6 +327,58 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in createOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Update an existing offer.
+	 */
+	async updateOffer(
+		offerId: number,
+		payload: CreateOfferPayload
+	): Promise<UpdateOfferResponse> {
+		try {
+			const response = await axios.patch<{ id?: number; [key: string]: unknown }>(
+				`/api/offers/${offerId}`,
+				payload,
+				{
+					headers: { "Content-Type": "application/json" },
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+
+			const data = response.data;
+
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					data: data as { id: number; [key: string]: unknown },
+				};
+			}
+
+			const errData = data as {
+				error?: string;
+				message?: string;
+				errors?: string[];
+			};
+			const errorMsg =
+				errData?.error ?? errData?.message ?? "Failed to update offer";
+			const errorDetails =
+				Array.isArray(errData?.errors) && errData.errors.length > 0
+					? errData.errors.join(". ")
+					: "";
+			return {
+				success: false,
+				error: errorDetails ? `${errorMsg}: ${errorDetails}` : errorMsg,
+				errors: errData?.errors,
+			};
+		} catch (error) {
+			console.error("Error in updateOffer:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

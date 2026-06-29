@@ -24,6 +24,26 @@ import {
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
+export interface EditOfferData {
+	offerId: number;
+	externalId: string;
+	selectedDriverIds: string[];
+	driverEmptyMiles?: Record<string, number>;
+	offeredRate: string;
+	weight: string;
+	commodity: string;
+	specialRequirements: string[];
+	notes: string;
+	route: Array<{
+		type: "pick_up_location" | "delivery_location";
+		location: string;
+		time: string;
+		latitude?: number;
+		longitude?: number;
+	}>;
+	loadedMiles?: number | null;
+}
+
 export interface CreateOfferModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -32,6 +52,8 @@ export interface CreateOfferModalProps {
 	/** Map driverId -> empty_miles (rounded). Passed to backend for rate_offers. */
 	driverEmptyMiles?: Record<string, number>;
 	onSubmit?: (values: CreateOfferFormValues) => void;
+	/** When set, modal opens in edit mode with pre-filled values. */
+	editData?: EditOfferData | null;
 }
 
 export interface CreateOfferFormValues {
@@ -71,6 +93,25 @@ const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 	time: "",
 	coordinates: "",
 });
+
+function routePointToRow(
+	point: EditOfferData["route"][number],
+	index: number
+): RouteRow {
+	return {
+		id: `row-edit-${index}-${Math.random().toString(36).slice(2, 9)}`,
+		type: point.type === "pick_up_location" ? "pickup" : "delivery",
+		location: point.location ?? "",
+		time: point.time ?? "",
+		coordinates:
+			point.latitude != null &&
+			point.longitude != null &&
+			!Number.isNaN(point.latitude) &&
+			!Number.isNaN(point.longitude)
+				? `${point.latitude},${point.longitude}`
+				: "",
+	};
+}
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
 
@@ -293,7 +334,13 @@ export default function CreateOfferModal({
 	selectedDriverIds,
 	driverEmptyMiles = {},
 	onSubmit,
+	editData = null,
 }: CreateOfferModalProps) {
+	const isEditMode = Boolean(editData);
+	const effectiveExternalId = editData?.externalId ?? externalId;
+	const effectiveDriverIds = editData?.selectedDriverIds ?? selectedDriverIds;
+	const effectiveDriverEmptyMiles = editData?.driverEmptyMiles ?? driverEmptyMiles;
+
 	const [formValues, setFormValues] = useState(initialFormState);
 	const [routeRows, setRouteRows] = useState<RouteRow[]>([]);
 	const [errors, setErrors] = useState<Partial<Record<keyof typeof initialFormState, string>>>(
@@ -306,6 +353,7 @@ export default function CreateOfferModal({
 	);
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [editFallbackLoadedMiles, setEditFallbackLoadedMiles] = useState<number | null>(null);
 
 	/**
 	 * committedLocations is updated ONLY on blur (after user leaves a field).
@@ -316,16 +364,40 @@ export default function CreateOfferModal({
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
-		if (isOpen) {
+		if (!isOpen) return;
+
+		if (editData) {
+			setFormValues({
+				offeredRate: editData.offeredRate,
+				weight: editData.weight,
+				commodity: editData.commodity,
+				specialRequirements: editData.specialRequirements,
+				notes: editData.notes,
+			});
+			const rows =
+				editData.route.length > 0
+					? editData.route.map(routePointToRow)
+					: [initialRouteRow("pickup"), initialRouteRow("delivery")];
+			setRouteRows(rows);
+			setEditFallbackLoadedMiles(editData.loadedMiles ?? null);
+			const locs = rows
+				.map(r => r.location.trim())
+				.filter(l => l !== "" && isValidLocationFormat(l));
+			setCommittedLocations(
+				locs.length === rows.length && rows.length >= 2 ? locs : []
+			);
+		} else {
 			setFormValues({ ...initialFormState });
 			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
-			setErrors({});
-			setRouteError(null);
-			setRouteRowLocationErrors({});
-			setSubmitError("");
+			setEditFallbackLoadedMiles(null);
 			setCommittedLocations([]);
 		}
-	}, [isOpen]);
+
+		setErrors({});
+		setRouteError(null);
+		setRouteRowLocationErrors({});
+		setSubmitError("");
+	}, [isOpen, editData?.offerId]);
 
 	const allLocationsFilledAndValid = (locs: string[]) =>
 		locs.length >= 2 && locs.every(l => l.trim() !== "" && isValidLocationFormat(l.trim()));
@@ -342,7 +414,7 @@ export default function CreateOfferModal({
 		retry: 1,
 	});
 
-	const loadedMiles = routeDistanceData?.loadedMiles ?? null;
+	const loadedMiles = routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
 	const routeDistanceError = routeDistanceQueryError
 		? routeDistanceQueryError instanceof Error
 			? routeDistanceQueryError.message
@@ -605,7 +677,7 @@ export default function CreateOfferModal({
 		return { fieldErrors, routeError };
 	};
 
-	const driverIdsValue = selectedDriverIds.join(",");
+	const driverIdsValue = effectiveDriverIds.join(",");
 
 	const handleChange = (field: keyof typeof formValues, value: string | string[]) => {
 		setFormValues(prev => ({ ...prev, [field]: value }));
@@ -678,13 +750,15 @@ export default function CreateOfferModal({
 			});
 
 			const payload = {
-				externalId,
-				driverIds: selectedDriverIds,
+				externalId: effectiveExternalId,
+				driverIds: effectiveDriverIds,
 				route: routePayload,
 				loadedMiles: Math.round(milesToSend),
 				offeredRate,
 				driverEmptyMiles:
-					Object.keys(driverEmptyMiles).length > 0 ? driverEmptyMiles : undefined,
+					Object.keys(effectiveDriverEmptyMiles).length > 0
+						? effectiveDriverEmptyMiles
+						: undefined,
 				weight: parseWeight(formValues.weight),
 				commodity: formValues.commodity.trim() || undefined,
 				specialRequirements:
@@ -693,17 +767,23 @@ export default function CreateOfferModal({
 						: undefined,
 				notes: formValues.notes.trim() || undefined,
 			};
-			const result = await offers.createOffer(payload);
+
+			const result = isEditMode && editData
+				? await offers.updateOffer(editData.offerId, payload)
+				: await offers.createOffer(payload);
 			if (result.success) {
 				onSubmit?.({
-					externalId,
+					externalId: effectiveExternalId,
 					driverIds: driverIdsValue,
 					route: routeRows,
 					...formValues,
 				});
 				onClose();
 			} else {
-				setSubmitError(result.error ?? "Failed to create offer");
+				setSubmitError(
+					result.error ??
+						(isEditMode ? "Failed to update offer" : "Failed to create offer")
+				);
 			}
 		} finally {
 			setIsSubmitting(false);
@@ -723,11 +803,11 @@ export default function CreateOfferModal({
 			>
 				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-6 [scrollbar-gutter:stable] sm:p-8">
 					<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-						Create Offer
+						{isEditMode ? "Edit Offer" : "Create Offer"}
 					</h4>
 
 					{/* Hidden: externalId */}
-					<input type="hidden" name="externalId" value={externalId} readOnly />
+					<input type="hidden" name="externalId" value={effectiveExternalId} readOnly />
 
 					{/* Hidden: selected driver IDs (comma-separated) */}
 					<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
@@ -860,6 +940,11 @@ export default function CreateOfferModal({
 									{ value: "hazmat", text: "Hazmat", selected: false },
 									{ value: "tanker-end", text: "Tanker End", selected: false },
 									{
+										value: "direct-delivery",
+										text: "Direct Delivery",
+										selected: false,
+									},
+									{
 										value: "driver-assist",
 										text: "Driver assist",
 										selected: false,
@@ -965,7 +1050,13 @@ export default function CreateOfferModal({
 							Boolean(routeError)
 						}
 					>
-						{isSubmitting ? "Creating…" : "Create"}
+						{isSubmitting
+							? isEditMode
+								? "Saving…"
+								: "Creating…"
+							: isEditMode
+								? "Save"
+								: "Create"}
 					</Button>
 				</div>
 			</form>
