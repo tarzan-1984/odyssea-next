@@ -13,6 +13,7 @@ import { useWebSocket } from "@/context/WebSocketContext";
 import { S3Uploader } from "@/app-api/S3Uploader";
 import { useChatStore } from "@/stores/chatStore";
 import Image from "next/image";
+import { userMatchesSearchQuery } from "@/utils/chatSearch";
 
 interface ChatParticipantsModalProps {
 	isOpen: boolean;
@@ -358,9 +359,7 @@ export default function ChatParticipantsModal({
 		setAvatarPreview(f ? URL.createObjectURL(f) : null);
 	};
 
-	const filteredUsers = users.filter(user =>
-		`${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-	);
+	const filteredUsers = users.filter((user) => userMatchesSearchQuery(user, searchQuery));
 
 	return (
 		<Modal
