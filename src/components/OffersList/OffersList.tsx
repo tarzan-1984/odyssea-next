@@ -23,11 +23,11 @@ import UserFilterSelect from "./UserFilterSelect";
 import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 import { canModifyOffers } from "@/utils/roleAccess";
+import { formatOfferCreateTimeEst } from "@/utils/nyWallClock";
 
 const DRIVER_ACCEPTED_MESSAGE =
 	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
 
-/** Format date string (e.g. "02/16/2026, 05:26:26" or ISO) to mm/dd/YY */
 const CREATOR_ROLE_LABELS: Record<string, string> = {
 	ADMINISTRATOR: "Administrator",
 	DISPATCHER: "Dispatcher",
@@ -52,26 +52,6 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 	}
 
 	return parts.join(" ");
-}
-
-function formatDateMmDdYy(dateStr: string | null | undefined): string {
-	if (!dateStr) return "";
-	const trimmed = dateStr.trim();
-	const comma = trimmed.indexOf(", ");
-	if (comma !== -1) {
-		const datePart = trimmed.slice(0, comma);
-		const [m, d, y] = datePart.split("/");
-		if (m && d && y) {
-			const yy = y.length >= 4 ? y.slice(-2) : y;
-			return `${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}/${yy}`;
-		}
-	}
-	const date = new Date(trimmed.replace(/\s+/, "T"));
-	if (Number.isNaN(date.getTime())) return dateStr;
-	const mm = (date.getMonth() + 1).toString().padStart(2, "0");
-	const dd = date.getDate().toString().padStart(2, "0");
-	const yy = date.getFullYear().toString().slice(-2);
-	return `${mm}/${dd}/${yy}`;
 }
 
 function formatSpecialRequirements(value: unknown): string {
@@ -494,7 +474,6 @@ const OffersList = () => {
 									<div className="flex items-start justify-between gap-3">
 										<div className="flex min-w-0 flex-1 items-center gap-2">
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
-												<span className="mr-3">{formatDateMmDdYy(row.create_time)}</span>
 												{routeSummary(row.route) ||
 													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}
 												{showOfferId && <> (id: {row.id})</>}
@@ -570,9 +549,11 @@ const OffersList = () => {
 										</div>
 									</div>
 									<div className="flex flex-col gap-1 min-w-0">
-										{creatorLabel && (
+										{(creatorLabel || row.create_time) && (
 											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
 												{creatorLabel}
+												{creatorLabel && row.create_time ? " " : null}
+												{row.create_time ? formatOfferCreateTimeEst(row.create_time) : null}
 											</p>
 										)}
 										{/* Driver rows: active timers first, expired timers below */}

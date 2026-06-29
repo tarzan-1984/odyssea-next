@@ -38,10 +38,32 @@ function parseNyWallClockParts(value: string): Date | null {
 	return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
+const NY_LOCALE_WALL_CLOCK_RE =
+	/^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s*(\d{1,2}):(\d{2}):(\d{2})$/;
+
+function parseNyLocaleWallClockParts(value: string): Date | null {
+	const match = value.match(NY_LOCALE_WALL_CLOCK_RE);
+	if (!match) return null;
+	const [, month, day, year, hour, minute, second] = match;
+	const parsed = new Date(
+		Date.UTC(
+			Number(year),
+			Number(month) - 1,
+			Number(day),
+			Number(hour),
+			Number(minute),
+			Number(second)
+		)
+	);
+	return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
 /** Parse DB/API timestamps stored as NY wall-clock (naive or ISO with Z). */
 export function parseNaiveNyDateTime(value: string | null | undefined): Date | null {
 	const trimmed = value?.trim();
 	if (!trimmed) return null;
+	const parsedLocale = parseNyLocaleWallClockParts(trimmed);
+	if (parsedLocale) return parsedLocale;
 	const parsed = parseNyWallClockParts(trimmed);
 	if (parsed) return parsed;
 	const parsedFallback = new Date(trimmed.replace(" ", "T"));
@@ -80,6 +102,25 @@ export function formatNyWallClockForDisplay(
 		second: "2-digit",
 		hour12: false,
 	}).format(date);
+}
+
+/** Offer card creation time in NY wall-clock: MM/DD/YYYY H:MM AM/PM EST */
+export function formatOfferCreateTimeEst(value: string | null | undefined): string {
+	const date = parseNaiveNyDateTime(value);
+	if (!date) return "";
+	const datePart = date.toLocaleDateString("en-US", {
+		month: "2-digit",
+		day: "2-digit",
+		year: "numeric",
+		timeZone: "UTC",
+	});
+	const timePart = date.toLocaleTimeString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+		timeZone: "UTC",
+	});
+	return `${datePart} ${timePart} EST`;
 }
 
 /** Format chat message date and time in New York wall-clock (e.g. Jun 10, 2026, 11:27 AM). */
