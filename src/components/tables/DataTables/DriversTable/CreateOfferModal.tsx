@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { useQuery } from "@tanstack/react-query";
@@ -114,6 +114,90 @@ function routePointToRow(
 }
 
 const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
+
+type EditComparableSnapshot = {
+	externalId: string;
+	driverIds: string[];
+	offeredRate: string;
+	weight: string;
+	commodity: string;
+	specialRequirements: string[];
+	notes: string;
+	route: Array<{
+		type: "pick_up_location" | "delivery_location";
+		location: string;
+		time: string;
+		coordinates: string;
+	}>;
+};
+
+function normalizeComparableString(value: string): string {
+	return value.trim();
+}
+
+function normalizeComparableStringArray(values: string[]): string[] {
+	return [...values].map(v => v.trim()).filter(Boolean).sort();
+}
+
+function coordinatesFromRoutePoint(point: {
+	latitude?: number;
+	longitude?: number;
+}): string {
+	if (
+		point.latitude != null &&
+		point.longitude != null &&
+		!Number.isNaN(point.latitude) &&
+		!Number.isNaN(point.longitude)
+	) {
+		return `${point.latitude},${point.longitude}`;
+	}
+	return "";
+}
+
+function snapshotFromEditData(data: EditOfferData): EditComparableSnapshot {
+	return {
+		externalId: normalizeComparableString(data.externalId),
+		driverIds: normalizeComparableStringArray(data.selectedDriverIds),
+		offeredRate: normalizeComparableString(data.offeredRate),
+		weight: normalizeComparableString(data.weight),
+		commodity: normalizeComparableString(data.commodity),
+		specialRequirements: normalizeComparableStringArray(data.specialRequirements),
+		notes: normalizeComparableString(data.notes),
+		route: data.route.map(point => ({
+			type: point.type,
+			location: normalizeComparableString(point.location),
+			time: normalizeComparableString(point.time),
+			coordinates: coordinatesFromRoutePoint(point),
+		})),
+	};
+}
+
+function snapshotFromCurrentState(
+	externalId: string,
+	driverIds: string[],
+	formValues: Omit<CreateOfferFormValues, "externalId" | "driverIds" | "route">,
+	routeRows: RouteRow[]
+): EditComparableSnapshot {
+	return {
+		externalId: normalizeComparableString(externalId),
+		driverIds: normalizeComparableStringArray(driverIds),
+		offeredRate: normalizeComparableString(formValues.offeredRate),
+		weight: normalizeComparableString(formValues.weight),
+		commodity: normalizeComparableString(formValues.commodity),
+		specialRequirements: normalizeComparableStringArray(formValues.specialRequirements),
+		notes: normalizeComparableString(formValues.notes),
+		route: routeRows.map(row => ({
+			type: row.type === "pickup" ? "pick_up_location" : "delivery_location",
+			location: normalizeComparableString(row.location),
+			time: normalizeComparableString(row.time),
+			coordinates: normalizeComparableString(row.coordinates),
+		})),
+	};
+}
+
+function editSnapshotsEqual(a: EditComparableSnapshot, b: EditComparableSnapshot): boolean {
+	return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function parseRouteCoordinates(
 	coordinates: string
@@ -354,6 +438,9 @@ export default function CreateOfferModal({
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [editFallbackLoadedMiles, setEditFallbackLoadedMiles] = useState<number | null>(null);
+	const [initialEditSnapshot, setInitialEditSnapshot] = useState<EditComparableSnapshot | null>(
+		null
+	);
 
 	/**
 	 * committedLocations is updated ONLY on blur (after user leaves a field).
@@ -367,6 +454,7 @@ export default function CreateOfferModal({
 		if (!isOpen) return;
 
 		if (editData) {
+			setInitialEditSnapshot(snapshotFromEditData(editData));
 			setFormValues({
 				offeredRate: editData.offeredRate,
 				weight: editData.weight,
@@ -387,6 +475,7 @@ export default function CreateOfferModal({
 				locs.length === rows.length && rows.length >= 2 ? locs : []
 			);
 		} else {
+			setInitialEditSnapshot(null);
 			setFormValues({ ...initialFormState });
 			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
 			setEditFallbackLoadedMiles(null);
@@ -398,6 +487,24 @@ export default function CreateOfferModal({
 		setRouteRowLocationErrors({});
 		setSubmitError("");
 	}, [isOpen, editData?.offerId]);
+
+	const hasEditChanges = useMemo(() => {
+		if (!isEditMode || !initialEditSnapshot) return false;
+		const currentSnapshot = snapshotFromCurrentState(
+			effectiveExternalId,
+			effectiveDriverIds,
+			formValues,
+			routeRows
+		);
+		return !editSnapshotsEqual(initialEditSnapshot, currentSnapshot);
+	}, [
+		isEditMode,
+		initialEditSnapshot,
+		effectiveExternalId,
+		effectiveDriverIds,
+		formValues,
+		routeRows,
+	]);
 
 	const allLocationsFilledAndValid = (locs: string[]) =>
 		locs.length >= 2 && locs.every(l => l.trim() !== "" && isValidLocationFormat(l.trim()));
@@ -700,6 +807,11 @@ export default function CreateOfferModal({
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+
+		if (isEditMode && !hasEditChanges) {
+			return;
+		}
+
 		const { fieldErrors, routeError: nextRouteError } = validate();
 		if (Object.keys(fieldErrors).length > 0 || nextRouteError) {
 			setErrors(fieldErrors);
@@ -1047,15 +1159,16 @@ export default function CreateOfferModal({
 							isCalculatingRoute ||
 							loadedMiles == null ||
 							loadedMiles === 0 ||
-							Boolean(routeError)
+							Boolean(routeError) ||
+							(isEditMode && !hasEditChanges)
 						}
 					>
 						{isSubmitting
 							? isEditMode
-								? "Saving…"
+								? "Editing…"
 								: "Creating…"
 							: isEditMode
-								? "Save"
+								? "Edit"
 								: "Create"}
 					</Button>
 				</div>
