@@ -9,13 +9,8 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useCurrentUser } from "@/stores/userStore";
 import offersApi, { formatRoute } from "@/app-api/offers";
 import type { OfferRow } from "@/app-api/offers";
-
-function formatSpecialRequirements(value: unknown): string {
-	if (value == null) return "";
-	if (Array.isArray(value)) return value.map(String).join(", ");
-	if (typeof value === "string") return value;
-	return String(value);
-}
+import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
+import { parseSpecialRequirements } from "@/icons/additional/specialRequirementIcons";
 
 function formatDrivers(drivers: OfferRow["drivers"]): string {
 	if (!drivers?.length) return "";
@@ -170,7 +165,11 @@ const OffersListTable = () => {
 											{row.commodity ?? "—"}
 										</TableCell>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm">
-											{formatSpecialRequirements(row.special_requirements) || "—"}
+											{parseSpecialRequirements(row.special_requirements).length > 0 ? (
+												<SpecialRequirementsList value={row.special_requirements} />
+											) : (
+												"—"
+											)}
 										</TableCell>
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-pre-line">
 											{formatDrivers(row.drivers) || "—"}

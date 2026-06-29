@@ -27,6 +27,7 @@ import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 import { canModifyOffers } from "@/utils/roleAccess";
 import { formatOfferCreateTimeEst } from "@/utils/nyWallClock";
+import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
 
 const DRIVER_ACCEPTED_MESSAGE =
 	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
@@ -55,13 +56,6 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 	}
 
 	return parts.join(" ");
-}
-
-function formatSpecialRequirements(value: unknown): string {
-	if (value == null) return "";
-	if (Array.isArray(value)) return value.map(String).join(", ");
-	if (typeof value === "string") return value;
-	return String(value);
 }
 
 function parseSpecialRequirementsArray(value: unknown): string[] {
@@ -783,7 +777,7 @@ const OffersList = () => {
 																{row.commodity ?? ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																{formatSpecialRequirements(row.special_requirements) || ""}
+																<SpecialRequirementsList value={row.special_requirements} />
 															</TableCell>
 															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.notes && String(row.notes).trim()

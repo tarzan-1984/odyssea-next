@@ -9,7 +9,7 @@ import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useOnlineStatus } from "@/context/OnlineStatusContext";
-import type { ChatRoomParticipant } from "@/app-api/chatApi";
+import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 
 /**
  * Enhanced chat sync hook that integrates WebSocket real-time functionality
@@ -56,15 +56,10 @@ export const useWebSocketChatSync = () => {
 
 			const normalizedRoom = {
 				...chatRoom,
-				participants: Array.isArray(chatRoom.participants)
-					? chatRoom.participants.map((p: ChatRoomParticipant) => ({
-							...p,
-							user: {
-								...p.user,
-								avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
-							},
-						}))
-					: [],
+				participants: mergeChatRoomParticipants(
+					chatRoom.participants,
+					existingRoom?.participants
+				),
 				unreadCount: chatRoom.unreadCount ?? existingRoom?.unreadCount ?? 0,
 			};
 

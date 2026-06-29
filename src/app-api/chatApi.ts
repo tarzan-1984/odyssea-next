@@ -77,6 +77,7 @@ export interface ChatRoomParticipant {
 	userId: string;
 	joinedAt: string;
 	user: User;
+	hideParticipant?: boolean;
 }
 
 export type ChatMessageAttachment = {

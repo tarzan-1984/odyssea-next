@@ -7,6 +7,10 @@ import chatRoomsApi from "@/app-api/chatRooms";
 import { useCurrentUser } from "@/stores/userStore";
 import { loadChatMessagesPage, CHAT_MESSAGES_QUERY_KEY } from "@/lib/chatMessagesQuery";
 import { queryClient } from "@/lib/queryClient";
+import {
+	mergeChatRoomParticipants,
+	normalizeChatParticipants,
+} from "@/utils/normalizeChatParticipants";
 
 /** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
 const mergeSourcesUnreadCount = (
@@ -51,21 +55,7 @@ export const useChatSync = () => {
 	} = useChatStore();
 
 	// Helper function to normalize participants data
-	const normalizeParticipants = (participants: any[]): any[] => {
-		return participants.map((p: any) => ({
-			...p,
-			user: {
-				id: p.user.id,
-				firstName: p.user.firstName,
-				lastName: p.user.lastName,
-				avatar: p.user.profilePhoto ?? p.user.avatar ?? "",
-				role: p.user.role ?? "USER",
-				userColor: p.user.userColor ?? null,
-				externalId: p.user.externalId ?? null,
-				phone: p.user.phone ?? null,
-			},
-		}));
-	};
+	const normalizeParticipants = normalizeChatParticipants;
 
 	// Load chat rooms from API and sync with cache
 	const loadChatRooms = useCallback(
@@ -497,22 +487,25 @@ export const useChatSync = () => {
 	const loadSingleChatRoom = useCallback(async (chatRoomId: string) => {
 		try {
 			const chatRoom = await chatApi.getChatRoom(chatRoomId);
-
-			// Normalize participants data
-			const normalizedRoom = {
-				...chatRoom,
-				participants: normalizeParticipants(chatRoom.participants || []),
-			};
-
-			// Add to store
 			const state = useChatStore.getState();
 			const existingRooms = state.chatRooms;
+			const existingRoom = existingRooms.find(room => room.id === chatRoomId);
+
+			const normalizedRoom = {
+				...chatRoom,
+				participants: mergeChatRoomParticipants(
+					chatRoom.participants,
+					existingRoom?.participants
+				),
+			};
+
 			const roomExists = existingRooms.some(room => room.id === chatRoomId);
 
 			if (!roomExists) {
 				state.addChatRoom(normalizedRoom);
-				// Save to cache
 				await indexedDBChatService.saveChatRooms([...existingRooms, normalizedRoom]);
+			} else {
+				state.updateChatRoom(chatRoomId, normalizedRoom);
 			}
 		} catch (error) {
 			console.error("Failed to load single chat room:", error);

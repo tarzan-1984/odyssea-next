@@ -18,6 +18,7 @@ import {
 } from "@/utils/offerChatUrl";
 import { useCurrentUser } from "@/stores/userStore";
 import { upsertArchivedLoadChatInCache } from "@/utils/upsertArchivedLoadChatInCache";
+import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
@@ -79,7 +80,15 @@ export default function ChatContainer() {
 			}
 			try {
 				const { chatApi } = await import("@/app-api/chatApi");
-				const room = await chatApi.getChatRoom(roomFromUrl);
+				const roomFromApi = await chatApi.getChatRoom(roomFromUrl);
+				const fromList = chatRooms.find(r => r.id === roomFromUrl);
+				const room = {
+					...roomFromApi,
+					participants: mergeChatRoomParticipants(
+						roomFromApi.participants,
+						fromList?.participants
+					),
+				};
 				roomResolvedRef.current = roomFromUrl;
 				applySelectedRoom(room);
 			} catch {

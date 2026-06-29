@@ -107,6 +107,20 @@ import Local from "./additional/local.svg";
 import Regional from "./additional/regional.svg";
 import Canada from "./additional/canada.svg";
 import Mexico from "./additional/mexico.svg";
+import AceIcon from "./additional/ACE.svg";
+import AciIcon from "./additional/ACI.svg";
+import AirportIcon from "./additional/airport.svg";
+import AlcoholIcon from "./additional/alcohol.svg";
+import BlindShipmentIcon from "./additional/blind_shipment.svg";
+import DriverAssistIcon from "./additional/driver_assist.svg";
+import FakeTeamIcon from "./additional/fake _team.svg";
+import FragileIcon from "./additional/fragile.svg";
+import GloveIcon from "./additional/glove.svg";
+import HempProductIcon from "./additional/hemp_product.svg";
+import HighValueFreightIcon from "./additional/high_value _reight.svg";
+import PartialIcon from "./additional/partial.svg";
+import RoundTripIcon from "./additional/round_trip.svg";
+import TemperatureControlIcon from "./additional/temperature_control.svg";
 import FlagEn from "./flags/flag-en.svg";
 import FlagSp from "./flags/flag-sp.svg";
 import FlagAr from "./flags/flag-ar.svg";
@@ -233,5 +247,19 @@ export {
 	TeamIcon,
 	CdlIcon,
 	TsaIcon,
+	AceIcon,
+	AciIcon,
+	AirportIcon,
+	AlcoholIcon,
+	BlindShipmentIcon,
+	DriverAssistIcon,
+	FakeTeamIcon,
+	FragileIcon,
+	GloveIcon,
+	HempProductIcon,
+	HighValueFreightIcon,
+	PartialIcon,
+	RoundTripIcon,
+	TemperatureControlIcon,
 	DragHandleIcon,
 };
