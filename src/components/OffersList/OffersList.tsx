@@ -650,6 +650,11 @@ const OffersList = () => {
 										</div>
 									</div>
 									<div className="flex flex-col gap-1 min-w-0">
+										{row.update_date?.trim() ? (
+											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+												Update at {formatOfferCreateTimeEst(row.update_date)}
+											</p>
+										) : null}
 										{(creatorLabel || row.create_time) && (
 											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
 												{creatorLabel}

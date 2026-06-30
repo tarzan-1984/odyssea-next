@@ -41,6 +41,7 @@ export interface OfferRow {
 	creator?: OfferCreator | null;
 	create_time: string;
 	update_time: string;
+	update_date?: string | null;
 	pick_up_location?: string;
 	pick_up_time?: string;
 	delivery_location?: string;
