@@ -120,7 +120,7 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
 		.filter((d): d is DriverForMap => d !== null);
 
-	// Client-side status filter when address filter is present (API only sends extended_search when no address)
+	// Client-side status filter fallback when API does not apply extended_search
 	const allDrivers = useMemo(() => {
 		const statusFilter = baseParams.statusFilter;
 		if (!statusFilter) return rawDrivers;

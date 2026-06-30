@@ -176,6 +176,15 @@ export default function DriversListTable({
 		}, 1500);
 		return () => clearTimeout(timer);
 	}, [addressFilter]);
+
+	useEffect(() => {
+		const hasAddress = Boolean(debouncedAddressFilter.trim());
+		if (hasAddress) {
+			setStatusFilter("for_offers");
+		} else {
+			setStatusFilter(prev => (prev === "for_offers" ? "" : prev));
+		}
+	}, [debouncedAddressFilter]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
@@ -228,7 +237,7 @@ export default function DriversListTable({
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
-			if (!statusFilter) return true;
+			if (!statusFilter || statusFilter === "for_offers") return true;
 			const status = item?.meta_data?.driver_status as string | null | undefined;
 			const statusLabel = getStatusLabel(status);
 			return statusLabel === statusFilter;
@@ -556,6 +565,7 @@ export default function DriversListTable({
 							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[160px] md:w-auto"
 						>
 							<option value="">All statuses</option>
+							<option value="for_offers">Default</option>
 							<option value="Available">Available</option>
 							<option value="Available on">Available on</option>
 							<option value="Not available">Not available</option>

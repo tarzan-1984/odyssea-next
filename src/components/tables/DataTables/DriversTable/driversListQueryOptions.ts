@@ -40,11 +40,13 @@ export async function fetchDriversPage(
 		searchParams.set("role", "administrator");
 	}
 
-	 if (addressFilter && radiusFilter && locationFilter) {
+	if (addressFilter && radiusFilter && locationFilter) {
 		searchParams.set("my_search", addressFilter);
 		searchParams.set("radius", radiusFilter);
 		searchParams.set("country", locationFilter);
-	} else if (!addressFilter && statusFilter) {
+	}
+
+	if (statusFilter) {
 		searchParams.set("extended_search", statusFilter);
 	}
 
