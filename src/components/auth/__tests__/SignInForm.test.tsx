@@ -19,14 +19,14 @@ jest.mock("@/components/form/input/Checkbox", () => {
 });
 
 jest.mock("@/components/form/input/InputField", () => {
-	return function MockInput({ type, id, name, placeholder, defaultValue, onChange }: any) {
+	return function MockInput({ type, id, name, placeholder, value, onChange }: any) {
 		return (
 			<input
 				type={type}
 				id={id}
 				name={name}
 				placeholder={placeholder}
-				defaultValue={defaultValue}
+				value={value}
 				onChange={onChange}
 				data-testid={`input-${name || id}`}
 			/>

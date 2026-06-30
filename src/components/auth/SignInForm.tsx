@@ -246,7 +246,7 @@ export default function SignInForm() {
 											<Input
 												placeholder="info@gmail.com"
 												name="email"
-												defaultValue={emailValue}
+												value={emailValue}
 												onChange={onEmailChange}
 											/>
 											{emailErrors.email?.message && (
@@ -317,7 +317,7 @@ export default function SignInForm() {
 													type={showPassword ? "text" : "password"}
 													placeholder="Enter your password"
 													name="password"
-													defaultValue={passwordValue}
+													value={passwordValue}
 													onChange={onPasswordChange}
 												/>
 												<span

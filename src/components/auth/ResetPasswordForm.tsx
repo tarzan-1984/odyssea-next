@@ -86,7 +86,7 @@ export default function ResetPasswordForm() {
 									id="email"
 									name="email"
 									placeholder="Enter your email"
-									defaultValue={emailValue}
+									value={emailValue}
 									onChange={onEmailChange}
 								/>
 								{errors.email?.message && (

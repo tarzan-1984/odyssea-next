@@ -107,7 +107,7 @@ export default function ChangePasswordForm() {
 									id="newPassword"
 									name="newPassword"
 									placeholder="Enter new password"
-									defaultValue={newPasswordValue}
+									value={newPasswordValue}
 									onChange={onNewPasswordChange}
 								/>
 								<span
@@ -137,7 +137,7 @@ export default function ChangePasswordForm() {
 									id="confirmPassword"
 									name="confirmPassword"
 									placeholder="Confirm new password"
-									defaultValue={confirmPasswordValue}
+									value={confirmPasswordValue}
 									onChange={onConfirmPasswordChange}
 								/>
 								<span
