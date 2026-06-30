@@ -180,6 +180,17 @@ export default function DriversListTable({
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const [hoveredStatusRowIndex, setHoveredStatusRowIndex] = useState<number | null>(null);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [
+		debouncedAddressFilter,
+		locationFilter,
+		radiusFilter,
+		statusFilter,
+		capabilitiesFilter.join(","),
+		itemsPerPage,
+	]);
 	const dragSelectRef = useRef({
 		isActive: false,
 		startIndex: -1,
