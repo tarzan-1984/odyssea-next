@@ -9,6 +9,8 @@ export interface DriversListQueryParams {
 	radiusFilter: string;
 	locationFilter: "USA" | "Canada";
 	statusFilter: string;
+	/** True when status was auto-set to for_offers because address was entered */
+	statusAutoAppliedByAddress?: boolean;
 	role: string;
 }
 
@@ -17,11 +19,12 @@ const STALE_TIME_MS = 10 * 60 * 1000;
 /** for_offers is auto-applied only during address search; omit it once address is cleared */
 export function resolveStatusFilterForQuery(
 	addressFilter: string,
-	statusFilter: string
+	statusFilter: string,
+	statusAutoAppliedByAddress = false
 ): string {
 	const hasAddress = Boolean(addressFilter.trim());
 	if (hasAddress) return "for_offers";
-	if (statusFilter === "for_offers") return "";
+	if (statusFilter === "for_offers" && statusAutoAppliedByAddress) return "";
 	return statusFilter;
 }
 
@@ -57,7 +60,11 @@ export async function fetchDriversPage(
 		searchParams.set("country", locationFilter);
 	}
 
-	const effectiveStatusFilter = resolveStatusFilterForQuery(addressFilter, statusFilter);
+	const effectiveStatusFilter = resolveStatusFilterForQuery(
+		addressFilter,
+		statusFilter,
+		params.statusAutoAppliedByAddress
+	);
 	if (effectiveStatusFilter) {
 		searchParams.set("extended_search", effectiveStatusFilter);
 	}
@@ -81,7 +88,8 @@ export async function fetchDriversPage(
 export function driversListQueryKey(params: DriversListQueryParams) {
 	const effectiveStatusFilter = resolveStatusFilterForQuery(
 		params.addressFilter,
-		params.statusFilter
+		params.statusFilter,
+		params.statusAutoAppliedByAddress
 	);
 	return [
 		"drivers-list",

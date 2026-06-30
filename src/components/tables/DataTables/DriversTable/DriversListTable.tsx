@@ -180,12 +180,19 @@ export default function DriversListTable({
 	useEffect(() => {
 		if (addressFilter.trim()) {
 			setStatusFilter("for_offers");
+			setStatusAutoAppliedByAddress(true);
 		} else {
-			setStatusFilter(prev => (prev === "for_offers" ? "" : prev));
+			setStatusAutoAppliedByAddress(wasAuto => {
+				if (wasAuto) {
+					setStatusFilter(prev => (prev === "for_offers" ? "" : prev));
+				}
+				return false;
+			});
 		}
 	}, [addressFilter]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [statusFilter, setStatusFilter] = useState<string>("");
+	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const [hoveredStatusRowIndex, setHoveredStatusRowIndex] = useState<number | null>(null);
 
@@ -219,6 +226,7 @@ export default function DriversListTable({
 		radiusFilter,
 		locationFilter,
 		statusFilter,
+		statusAutoAppliedByAddress,
 		role: currentUser?.role?.toLowerCase() ?? "",
 	};
 
@@ -560,7 +568,10 @@ export default function DriversListTable({
 						<select
 							id="drivers-list-status-filter"
 							value={statusFilter}
-							onChange={e => setStatusFilter(e.target.value)}
+							onChange={e => {
+								setStatusFilter(e.target.value);
+								setStatusAutoAppliedByAddress(false);
+							}}
 							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[160px] md:w-auto"
 						>
 							<option value="">All statuses</option>
@@ -589,6 +600,7 @@ export default function DriversListTable({
 								setLocationFilter("USA");
 								setRadiusFilter("500");
 								setStatusFilter("");
+								setStatusAutoAppliedByAddress(false);
 								setCapabilitiesFilter([]);
 							}}
 							className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus:border-brand-800 md:w-auto"
