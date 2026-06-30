@@ -178,13 +178,12 @@ export default function DriversListTable({
 	}, [addressFilter]);
 
 	useEffect(() => {
-		const hasAddress = Boolean(debouncedAddressFilter.trim());
-		if (hasAddress) {
+		if (addressFilter.trim()) {
 			setStatusFilter("for_offers");
 		} else {
 			setStatusFilter(prev => (prev === "for_offers" ? "" : prev));
 		}
-	}, [debouncedAddressFilter]);
+	}, [addressFilter]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);

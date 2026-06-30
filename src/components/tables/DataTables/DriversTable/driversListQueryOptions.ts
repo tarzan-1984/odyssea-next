@@ -14,6 +14,17 @@ export interface DriversListQueryParams {
 
 const STALE_TIME_MS = 10 * 60 * 1000;
 
+/** for_offers is auto-applied only during address search; omit it once address is cleared */
+export function resolveStatusFilterForQuery(
+	addressFilter: string,
+	statusFilter: string
+): string {
+	const hasAddress = Boolean(addressFilter.trim());
+	if (hasAddress) return "for_offers";
+	if (statusFilter === "for_offers") return "";
+	return statusFilter;
+}
+
 export async function fetchDriversPage(
 	params: DriversListQueryParams
 ): Promise<DriversPage> {
@@ -46,8 +57,9 @@ export async function fetchDriversPage(
 		searchParams.set("country", locationFilter);
 	}
 
-	if (statusFilter) {
-		searchParams.set("extended_search", statusFilter);
+	const effectiveStatusFilter = resolveStatusFilterForQuery(addressFilter, statusFilter);
+	if (effectiveStatusFilter) {
+		searchParams.set("extended_search", effectiveStatusFilter);
 	}
 
 	try {
@@ -67,6 +79,10 @@ export async function fetchDriversPage(
 }
 
 export function driversListQueryKey(params: DriversListQueryParams) {
+	const effectiveStatusFilter = resolveStatusFilterForQuery(
+		params.addressFilter,
+		params.statusFilter
+	);
 	return [
 		"drivers-list",
 		{
@@ -76,7 +92,7 @@ export function driversListQueryKey(params: DriversListQueryParams) {
 			addressFilter: params.addressFilter,
 			radiusFilter: params.radiusFilter,
 			locationFilter: params.locationFilter,
-			statusFilter: params.statusFilter,
+			statusFilter: effectiveStatusFilter,
 			role: params.role,
 		},
 	] as const;
