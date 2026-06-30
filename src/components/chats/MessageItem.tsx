@@ -22,6 +22,8 @@ interface MessageItemProps {
 	chatRoomType?: string;
 	/** Room participants for resolving read receipt names */
 	chatParticipants?: ChatRoomParticipant[];
+	/** Pre-built lookup from participants + loaded messages. */
+	chatUserNameLookup?: Map<string, string>;
 	onDelete: (messageId: string) => void;
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
@@ -34,6 +36,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	currentUser,
 	chatRoomType,
 	chatParticipants = [],
+	chatUserNameLookup,
 	onDelete,
 	onEdit,
 	onReply,
@@ -542,6 +545,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									isRead={message.isRead}
 									readBy={message.readBy}
 									participants={chatParticipants}
+									userNameLookup={chatUserNameLookup}
 									currentUserId={currentUser?.id ?? null}
 									senderId={message.senderId}
 									className="flex-shrink-0"

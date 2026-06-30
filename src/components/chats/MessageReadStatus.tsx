@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatRoomParticipant } from "@/app-api/chatApi";
+import { resolveChatUserDisplayName } from "@/utils/resolveChatUserName";
 
 interface MessageReadStatusProps {
 	isRead: boolean;
@@ -9,38 +10,19 @@ interface MessageReadStatusProps {
 	readBy?: string[];
 	/** Room participants — used to resolve names for ids in `readBy`. */
 	participants?: ChatRoomParticipant[];
+	/** Pre-built lookup from participants + loaded messages. */
+	userNameLookup?: Map<string, string>;
 	currentUserId?: string | null;
 	/** Message author — excluded from the list (sender is always in `readBy` on send). */
 	senderId?: string;
 	className?: string;
 }
 
-function readerLabel(
-	userId: string,
-	participants: ChatRoomParticipant[],
-	currentUserId: string | null | undefined,
-): string {
-	if (userId === currentUserId) {
-		return "You";
-	}
-	const participant = participants.find(
-		(p) => p.userId === userId || p.user?.id === userId,
-	);
-	if (participant?.user) {
-		const name = [participant.user.firstName, participant.user.lastName]
-			.map((x) => (x == null ? "" : String(x).trim()))
-			.filter(Boolean)
-			.join(" ")
-			.trim();
-		if (name) return name;
-	}
-	return `User ${userId.slice(0, 8)}${userId.length > 8 ? "…" : ""}`;
-}
-
 export default function MessageReadStatus({
 	isRead,
 	readBy = [],
 	participants = [],
+	userNameLookup,
 	currentUserId,
 	senderId,
 	className = "",
@@ -51,12 +33,19 @@ export default function MessageReadStatus({
 	const readers = useMemo(() => {
 		const ids = [...new Set(readBy)]
 			.filter(Boolean)
-			.filter((id) => !(senderId && id === senderId));
-		return ids.map((id) => ({
-			id,
-			label: readerLabel(id, participants, currentUserId),
-		}));
-	}, [readBy, participants, currentUserId, senderId]);
+			.filter(id => !(senderId && id === senderId));
+
+		return ids
+			.map(id => ({
+				id,
+				label: resolveChatUserDisplayName(id, {
+					currentUserId,
+					participants,
+					nameLookup: userNameLookup,
+				}),
+			}))
+			.filter((reader): reader is { id: string; label: string } => Boolean(reader.label));
+	}, [readBy, participants, userNameLookup, currentUserId, senderId]);
 
 	const canOpenDetails = isRead && readers.length > 0;
 
@@ -123,7 +112,7 @@ export default function MessageReadStatus({
 			{canOpenDetails ? (
 				<button
 					type="button"
-					onClick={() => setOpen((v) => !v)}
+					onClick={() => setOpen(v => !v)}
 					className="inline-flex items-center justify-center rounded p-0.5 text-blue-500 hover:bg-blue-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
 					aria-label="Who read this message"
 					aria-expanded={open}
@@ -146,7 +135,7 @@ export default function MessageReadStatus({
 						Read by
 					</p>
 					<ul className="custom-scrollbar max-h-[10rem] min-h-0 space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs text-gray-800 dark:text-gray-100 sm:max-h-[11rem]">
-						{readers.map((r) => (
+						{readers.map(r => (
 							<li key={r.id} className="whitespace-normal break-words leading-snug">
 								{r.label}
 							</li>

@@ -12,6 +12,7 @@ import {
 } from "@/utils/archiveChunkHelpers";
 import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 import { trimChatMessagesWindow } from "@/utils/trimChatMessagesWindow";
+import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { useUserStore } from "./userStore";
 
 // Helper function to sort chat rooms by pin, unread, mute status, and last message date
@@ -251,11 +252,33 @@ export const useChatStore = create<ChatState>()(
 				setChatRooms: chatRooms => {
 					// Sort chat rooms by last message date when setting
 					const sortedRooms = sortChatRoomsByLastMessage(chatRooms);
-					set({ chatRooms: sortedRooms, error: null }, false, "setChatRooms");
+					const { currentChatRoom } = get();
+					let nextCurrentChatRoom = currentChatRoom;
+					if (currentChatRoom) {
+						const matchingRoom = sortedRooms.find(r => r.id === currentChatRoom.id);
+						if (matchingRoom) {
+							nextCurrentChatRoom = {
+								...currentChatRoom,
+								participants: mergeChatRoomParticipants(
+									matchingRoom.participants,
+									currentChatRoom.participants
+								),
+							};
+						}
+					}
+					set(
+						{
+							chatRooms: sortedRooms,
+							currentChatRoom: nextCurrentChatRoom,
+							error: null,
+						},
+						false,
+						"setChatRooms"
+					);
 				},
 
 				addChatRoom: chatRoom => {
-					const { chatRooms } = get();
+					const { chatRooms, currentChatRoom } = get();
 					const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
 
 					if (existingIndex >= 0) {
@@ -264,7 +287,18 @@ export const useChatStore = create<ChatState>()(
 						updatedRooms[existingIndex] = chatRoom;
 						// Sort after update
 						const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
-						set({ chatRooms: sortedRooms }, false, "addChatRoom:update");
+						const patch: Partial<ChatState> = { chatRooms: sortedRooms };
+						if (currentChatRoom?.id === chatRoom.id) {
+							patch.currentChatRoom = {
+								...currentChatRoom,
+								...chatRoom,
+								participants: mergeChatRoomParticipants(
+									chatRoom.participants,
+									currentChatRoom.participants
+								),
+							};
+						}
+						set(patch, false, "addChatRoom:update");
 					} else {
 						// Add new room and sort
 						const newRooms = [chatRoom, ...chatRooms];

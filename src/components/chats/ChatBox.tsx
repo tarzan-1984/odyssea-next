@@ -23,6 +23,8 @@ import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 import { removeChatMessageLocally, restoreChatMessageLocally } from "@/lib/chatMessageDelete";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
+import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -237,6 +239,16 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		}
 		return state.chatRooms.find(r => r.id === selectedChatRoomId);
 	});
+	const chatRooms = useChatStore(state => state.chatRooms);
+
+	const chatParticipants = React.useMemo(() => {
+		if (!selectedChatRoomId) return [];
+		const fromList = chatRooms.find(r => r.id === selectedChatRoomId);
+		return mergeChatRoomParticipants(
+			fromList?.participants ?? [],
+			selectedChatRoom?.participants ?? []
+		);
+	}, [selectedChatRoomId, chatRooms, selectedChatRoom?.participants]);
 
 	const isLoadArchivedReadOnlyChat =
 		selectedChatRoom?.type === "LOAD" && selectedChatRoom.isLoadArchived === true;
@@ -366,6 +378,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 		);
 	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id]);
+
+	const chatUserNameLookup = React.useMemo(
+		() => buildChatUserNameLookup(chatParticipants, uniqueMessages),
+		[chatParticipants, uniqueMessages]
+	);
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
 	// No need to duplicate useWebSocketMessages here
@@ -847,7 +864,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								messages={uniqueMessages}
 								currentUser={currentUser}
 								chatRoomType={selectedChatRoom?.type}
-								chatParticipants={selectedChatRoom?.participants ?? []}
+								chatParticipants={chatParticipants}
+								chatUserNameLookup={chatUserNameLookup}
 								scrollElement={messagesScrollRoot}
 								onContentMeasured={handleVirtualContentMeasured}
 								isUserScrolledUp={isUserScrolledUp}
@@ -870,7 +888,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										message={message}
 										currentUser={currentUser}
 										chatRoomType={selectedChatRoom?.type}
-										chatParticipants={selectedChatRoom?.participants ?? []}
+										chatParticipants={chatParticipants}
+										chatUserNameLookup={chatUserNameLookup}
 										onDelete={handleDeleteMessage}
 										onEdit={handleEditMessage}
 										onReply={handleReplyToMessage}
