@@ -76,7 +76,7 @@ export default function MessageAttachmentsGrid({
 						className={`${cellFrame} relative flex h-full min-h-0 flex-col overflow-hidden`}
 					>
 						{isDownloadingThis && isHeic && (
-							<HeicConvertingOverlay className="z-30 rounded-lg" />
+							<HeicConvertingOverlay className="z-30 rounded-lg" message="Converting HEIC..." />
 						)}
 						<div className="shrink-0">
 							<FilePreview

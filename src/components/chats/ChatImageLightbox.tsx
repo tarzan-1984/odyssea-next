@@ -984,7 +984,9 @@ export default function ChatImageLightbox({
 			)}
 
 			<div ref={modalScrollViewportRef} className="relative min-h-0 flex-1 overflow-auto">
-				{isEditBusy && !editCanvas ? <HeicConvertingOverlay variant="modal" /> : null}
+				{isEditBusy && !editCanvas ? (
+					<HeicConvertingOverlay variant="modal" message="Loading image..." />
+				) : null}
 
 				{isCropMode && cropSourceUrl ? (
 					<div className="box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
@@ -1030,7 +1032,12 @@ export default function ChatImageLightbox({
 					/>
 				) : (
 					<div className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
-						{isModalImageLoading && needsServerPreview ? <HeicConvertingOverlay variant="modal" /> : null}
+						{isModalImageLoading && needsServerPreview ? (
+							<HeicConvertingOverlay
+								variant="modal"
+								message={isHeic ? "Converting HEIC..." : "Loading image..."}
+							/>
+						) : null}
 						{previewLoadError ? (
 							<p className="max-w-md px-4 text-center text-sm text-red-300">{previewLoadError}</p>
 						) : previewUrl ? (

@@ -575,7 +575,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 							compact ? "h-24" : "min-h-[180px]"
 						} overflow-hidden rounded-lg`}
 					>
-						<HeicConvertingOverlay />
+						<HeicConvertingOverlay message="Converting HEIC..." />
 					</div>
 				);
 			}
@@ -813,7 +813,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 								{renderPreview()}
 								{isDownloading &&
 									(fileExtension === "heic" || fileExtension === "heif") && (
-										<HeicConvertingOverlay className="z-20 rounded-none" />
+										<HeicConvertingOverlay className="z-20 rounded-none" message="Converting HEIC..." />
 									)}
 							</div>
 
@@ -952,7 +952,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 						>
 							{isModalImageLoading &&
 								(fileExtension === "heic" || fileExtension === "heif") && (
-									<HeicConvertingOverlay variant="modal" />
+									<HeicConvertingOverlay variant="modal" message="Converting HEIC..." />
 								)}
 
 							{/* Image */}

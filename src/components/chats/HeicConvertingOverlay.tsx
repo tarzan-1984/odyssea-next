@@ -12,7 +12,7 @@ type HeicConvertingOverlayProps = {
 export function HeicConvertingOverlay({
 	className = "",
 	variant = "preview",
-	message = "Converting HEIC...",
+	message = "Loading...",
 }: HeicConvertingOverlayProps) {
 	if (variant === "modal") {
 		return (

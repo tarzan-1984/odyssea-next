@@ -769,7 +769,7 @@ export default function ChatPdfLightbox({
 						{pdfError ? (
 							<p className="text-sm text-red-300">{pdfError}</p>
 						) : (
-							<HeicConvertingOverlay variant="modal" />
+							<HeicConvertingOverlay variant="modal" message="Loading PDF..." />
 						)}
 					</div>
 				) : isCropMode && cropSourceUrl ? (
