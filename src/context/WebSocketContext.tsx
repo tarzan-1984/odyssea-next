@@ -19,6 +19,11 @@ import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { removeChatMessageLocally } from "@/lib/chatMessageDelete";
 import { ODYSSEA_WS_RECONNECTED_EVENT, ODYSSEA_ACCESS_TOKEN_REFRESHED_EVENT } from "@/lib/websocketSyncEvents";
+import {
+	SOCKET_IO_CLIENT_OPTIONS,
+	SOCKET_OFFLINE_UI_DEBOUNCE_MS,
+	SOCKET_PERIODIC_RETRY_MS,
+} from "@/lib/socketIoClientOptions";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 
@@ -26,6 +31,8 @@ import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedCh
 interface WebSocketContextType {
 	socket: Socket | null;
 	isConnected: boolean;
+	/** Debounced offline flag for UI — avoids flicker during brief reconnects. */
+	isDisplayOffline: boolean;
 	connect: () => void;
 	disconnect: () => void;
 	joinChatRoom: (chatRoomId: string) => void;
@@ -143,6 +150,9 @@ interface WebSocketProviderProps {
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [isConnected, setIsConnected] = useState(false);
+	const [isDisplayOffline, setIsDisplayOffline] = useState(false);
+	const socketRef = useRef<Socket | null>(null);
+	const offlineUiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const queryClient = useQueryClient();
 	const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const periodicRetryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -241,16 +251,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 
 			const newSocket = io(wsUrl, {
-				auth: {
-					token,
+				...SOCKET_IO_CLIENT_OPTIONS,
+				auth: cb => {
+					void runBrowserAccessTokenRefresh()
+						.then(() => {
+							cb({ token: getAuthToken() || "" });
+						})
+						.catch(() => {
+							cb({ token: getAuthToken() || "" });
+						});
 				},
 				transports: ["websocket", "polling"],
-				timeout: 20000,
-				reconnection: true,
-				reconnectionAttempts: Infinity,
-				reconnectionDelay: 1000,
-				reconnectionDelayMax: 30000,
-				randomizationFactor: 0.5,
 			});
 
 		const restoreChatRoomById = async (chatRoomId: string) => {
@@ -303,7 +314,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Connection event handlers
 		newSocket.on("connect", () => {
+			if (offlineUiTimerRef.current) {
+				clearTimeout(offlineUiTimerRef.current);
+				offlineUiTimerRef.current = null;
+			}
 			setIsConnected(true);
+			setIsDisplayOffline(false);
 			reconnectAttempts.current = 0;
 			isConnectingRef.current = false;
 
@@ -327,7 +343,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.io.on("reconnect_attempt", () => {
-			runBrowserAccessTokenRefresh()
+			void runBrowserAccessTokenRefresh()
 				.then(() => {
 					const freshToken = getAuthToken();
 					if (freshToken) {
@@ -339,9 +355,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.io.on("reconnect", () => {
 			reconnectAttempts.current = 0;
-			if (typeof window !== "undefined") {
-				window.dispatchEvent(new CustomEvent(ODYSSEA_WS_RECONNECTED_EVENT));
-			}
+			// Catch-up sync is triggered from the "connect" handler when
+			// hadSuccessfulSocketConnectionRef is set — avoid dispatching twice.
 		});
 
 		newSocket.io.on("reconnect_failed", () => {
@@ -353,12 +368,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				if (!currentUser) {
 					return;
 				}
-				const activeSocket = socket;
+				const activeSocket = socketRef.current;
 				if (activeSocket?.connected || activeSocket?.active) {
 					return;
 				}
 				connect().catch(() => {});
-			}, 30000);
+			}, SOCKET_PERIODIC_RETRY_MS);
 		});
 
 		// Handle server's connected event (with user data)
@@ -931,6 +946,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.on("disconnect", (reason: string) => {
 			setIsConnected(false);
+			if (offlineUiTimerRef.current) {
+				clearTimeout(offlineUiTimerRef.current);
+			}
+			offlineUiTimerRef.current = setTimeout(() => {
+				setIsDisplayOffline(true);
+				offlineUiTimerRef.current = null;
+			}, SOCKET_OFFLINE_UI_DEBOUNCE_MS);
 			isConnectingRef.current = false;
 			// Socket.IO handles automatic reconnection unless the client disconnected intentionally
 		});
@@ -949,6 +971,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Avoid dev overlay if error object has throwing getters
 			}
 			setIsConnected(false);
+			if (offlineUiTimerRef.current) {
+				clearTimeout(offlineUiTimerRef.current);
+			}
+			offlineUiTimerRef.current = setTimeout(() => {
+				setIsDisplayOffline(true);
+				offlineUiTimerRef.current = null;
+			}, SOCKET_OFFLINE_UI_DEBOUNCE_MS);
 			isConnectingRef.current = false;
 
 			if (
@@ -1144,6 +1173,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		setSocket(newSocket);
+		socketRef.current = newSocket;
 		} finally {
 			isConnectingRef.current = false;
 		}
@@ -1176,9 +1206,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const disconnect = () => {
 		isConnectingRef.current = false;
 		hadSuccessfulSocketConnectionRef.current = false;
+		if (offlineUiTimerRef.current) {
+			clearTimeout(offlineUiTimerRef.current);
+			offlineUiTimerRef.current = null;
+		}
+		setIsDisplayOffline(false);
 		if (socket) {
 			socket.disconnect();
 			setSocket(null);
+			socketRef.current = null;
 			setIsConnected(false);
 		}
 
@@ -1288,23 +1324,36 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 	}, [currentUser, socket, isConnected]);
 
-	// Reconnect when tab becomes visible (browser may have disconnected WebSocket in background)
+	// Reconnect when tab becomes visible or browser regains network
 	const connectRef = useRef(connect);
 	connectRef.current = connect;
+	const nudgeReconnect = useCallback(() => {
+		if (!currentUser) return;
+		const activeSocket = socketRef.current;
+		if (activeSocket?.connected) return;
+		if (activeSocket?.active || isConnectingRef.current) return;
+		if (activeSocket && !activeSocket.connected) {
+			activeSocket.connect();
+			return;
+		}
+		connectRef.current();
+	}, [currentUser]);
+
 	useEffect(() => {
 		const handleVisibilityChange = () => {
-			if (document.visibilityState !== "visible" || !currentUser) {
-				return;
-			}
-			if (socket?.connected || socket?.active || isConnectingRef.current) {
-				return;
-			}
-			connectRef.current();
+			if (document.visibilityState !== "visible") return;
+			nudgeReconnect();
+		};
+		const handleOnline = () => {
+			nudgeReconnect();
 		};
 		document.addEventListener("visibilitychange", handleVisibilityChange);
-		return () =>
+		window.addEventListener("online", handleOnline);
+		return () => {
 			document.removeEventListener("visibilitychange", handleVisibilityChange);
-	}, [currentUser, socket]);
+			window.removeEventListener("online", handleOnline);
+		};
+	}, [nudgeReconnect]);
 
 	// JWT in the Socket.IO handshake is fixed at connect time — reconnect after proactive refresh.
 	useEffect(() => {
@@ -1330,6 +1379,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
+			if (offlineUiTimerRef.current) {
+				clearTimeout(offlineUiTimerRef.current);
+			}
 			if (reconnectTimeoutRef.current) {
 				clearTimeout(reconnectTimeoutRef.current);
 			}
@@ -1345,6 +1397,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const value: WebSocketContextType = {
 		socket,
 		isConnected,
+		isDisplayOffline,
 		connect,
 		disconnect,
 		joinChatRoom,

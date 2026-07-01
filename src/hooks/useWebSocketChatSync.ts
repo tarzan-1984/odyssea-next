@@ -16,7 +16,7 @@ import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
  * with the existing chat synchronization system
  */
 export const useWebSocketChatSync = () => {
-	const { isConnected } = useWebSocket();
+	const { isConnected, isDisplayOffline } = useWebSocket();
 	const currentUser = useCurrentUser();
 	const { isUserOnline, onlineStatus } = useOnlineStatus();
 
@@ -234,7 +234,7 @@ export const useWebSocketChatSync = () => {
 		...chatSync,
 
 		// WebSocket status
-		isWebSocketConnected: isConnected,
+		isWebSocketConnected: isConnected && !isDisplayOffline,
 
 		// Enhanced functions that use WebSocket when available
 		sendMessage: sendMessageWithWebSocket,

@@ -98,7 +98,14 @@ async function applySyncBatchResults(results: SyncMessagesBatchRoomResult[]): Pr
  * whose local message tail lags behind the server.
  */
 export async function catchUpChatsOnReconnect(): Promise<void> {
-	const apiRooms = await chatApi.getChatRooms();
+	let apiRooms: ChatRoom[];
+	try {
+		apiRooms = await chatApi.getChatRooms();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "getChatRooms failed";
+		console.warn("[ChatSync] Could not refresh chat rooms after reconnect:", message);
+		return;
+	}
 	const state = useChatStore.getState();
 	const previousRooms = state.chatRooms;
 
@@ -153,7 +160,13 @@ export async function catchUpChatsOnReconnect(): Promise<void> {
 
 	for (let i = 0; i < roomsToSync.length; i += SYNC_BATCH_CHUNK_SIZE) {
 		const chunk = roomsToSync.slice(i, i + SYNC_BATCH_CHUNK_SIZE);
-		const response = await chatApi.syncMessagesBatch(chunk);
-		await applySyncBatchResults(response.rooms);
+		try {
+			const response = await chatApi.syncMessagesBatch(chunk);
+			await applySyncBatchResults(response.rooms);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "syncMessagesBatch failed";
+			console.warn("[ChatSync] Message batch sync after reconnect failed:", message);
+			return;
+		}
 	}
 }

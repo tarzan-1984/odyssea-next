@@ -5,6 +5,7 @@ import { useChatSync } from "@/hooks/useChatSync";
 import { useCurrentUser, useUserStore } from "@/stores/userStore";
 import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 import { catchUpChatsOnReconnect } from "@/lib/chatReconnectSync";
+import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 
 /**
  * ChatSyncInitializer
@@ -62,13 +63,19 @@ export default function ChatSyncInitializer() {
 			if (isCatchUpRunningRef.current) return;
 
 			isCatchUpRunningRef.current = true;
-			catchUpChatsOnReconnect()
-				.catch((error: unknown) => {
-					console.error("[ChatSync] Failed to catch up chats after WS reconnect:", error);
-				})
-				.finally(() => {
+			void (async () => {
+				try {
+					// WS reconnect_attempt starts refresh in parallel; wait so API cookies are fresh.
+					await runBrowserAccessTokenRefresh();
+					await catchUpChatsOnReconnect();
+				} catch (error: unknown) {
+					const message =
+						error instanceof Error ? error.message : "Unknown chat catch-up error";
+					console.warn("[ChatSync] Chat catch-up after WS reconnect skipped:", message);
+				} finally {
 					isCatchUpRunningRef.current = false;
-				});
+				}
+			})();
 		};
 
 		window.addEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
