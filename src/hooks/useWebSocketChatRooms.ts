@@ -6,6 +6,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { ChatRoom, ChatRoomParticipant } from "@/app-api/chatApi";
 import { useQueryClient } from "@tanstack/react-query";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
+import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
 
 interface UseWebSocketChatRoomsProps {
 	onChatRoomCreated?: (chatRoom: ChatRoom) => void;
@@ -86,6 +87,8 @@ export const useWebSocketChatRooms = ({
 				queryClient
 					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
 					.catch(() => {});
+			} else if (patch.isLoadArchived === false) {
+				removeArchivedLoadChatFromCache(queryClient, data.chatRoomId);
 			}
 
 			onChatRoomUpdated?.(data);

@@ -26,6 +26,7 @@ import {
 } from "@/lib/socketIoClientOptions";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
+import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
 
 // WebSocket context interface
 interface WebSocketContextType {
@@ -1060,6 +1061,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.on("chatRoomUpdated", (data: ChatRoomUpdatedData) => {
 			updateChatRoom(data.chatRoomId, data.updatedChatRoom);
+
+			const patch = data.updatedChatRoom as Partial<ChatRoom> & {
+				isLoadArchived?: boolean;
+			};
+			if (patch.isLoadArchived === false) {
+				removeArchivedLoadChatFromCache(queryClient, data.chatRoomId);
+			} else if (patch.isLoadArchived === true) {
+				queryClient
+					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
+					.catch(() => {});
+			}
 		});
 
 		newSocket.on("participantsAdded", (data: ParticipantsAddedData) => {
