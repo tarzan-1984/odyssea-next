@@ -109,6 +109,19 @@ export function canModifyAppSettings(role: string | undefined | null): boolean {
 	return role.trim().toUpperCase() === "ADMINISTRATOR";
 }
 
+export const CHAT_MESSAGE_DELETE_ROLES = [
+	"ADMINISTRATOR",
+	"TRACKING_TL",
+	"HR_MANAGER",
+	"EXPEDITE_MANAGER",
+] as const;
+
+export function canDeleteChatMessages(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (CHAT_MESSAGE_DELETE_ROLES as readonly string[]).includes(normalized);
+}
+
 export function canSendCheckListMessages(role: string | undefined | null): boolean {
 	return !isGastRole(role);
 }

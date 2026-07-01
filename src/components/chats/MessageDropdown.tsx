@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { createPortal } from "react-dom";
 import { Message } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
+import { canDeleteChatMessages } from "@/utils/roleAccess";
 
 interface MessageDropdownProps {
 	message: Message;
@@ -25,14 +26,14 @@ export function getMessageDropdownActionCount(
 	currentUser?: UserData | null
 ): number {
 	const role = currentUser?.role?.trim().toUpperCase();
-	const isAdmin = role === "ADMINISTRATOR";
+	const canDelete = canDeleteChatMessages(role);
 	const isOwnMessage = message.senderId === currentUser?.id;
 	const canEdit =
 		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
 		isOwnMessage &&
 		Boolean(message.content?.trim());
 
-	return (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (isAdmin ? 1 : 0);
+	return (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (canDelete ? 1 : 0);
 }
 
 export default function MessageDropdown({
@@ -52,7 +53,7 @@ export default function MessageDropdown({
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	const role = currentUser?.role?.trim().toUpperCase();
-	const isAdmin = role === "ADMINISTRATOR";
+	const canDelete = canDeleteChatMessages(role);
 
 	// Check if message is from current user
 	const isOwnMessage = message.senderId === currentUser?.id;
@@ -268,8 +269,8 @@ export default function MessageDropdown({
 						</button>
 					)}
 
-					{/* Show delete button only for admin users */}
-					{isAdmin && (
+					{/* Show delete button for authorized roles */}
+					{canDelete && (
 						<button
 							onClick={handleDelete}
 							className="w-full px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5"
