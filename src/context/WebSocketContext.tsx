@@ -253,7 +253,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			const newSocket = io(wsUrl, {
 				...SOCKET_IO_CLIENT_OPTIONS,
 				auth: cb => {
-					void runBrowserAccessTokenRefresh()
+					runBrowserAccessTokenRefresh()
 						.then(() => {
 							cb({ token: getAuthToken() || "" });
 						})
@@ -343,7 +343,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.io.on("reconnect_attempt", () => {
-			void runBrowserAccessTokenRefresh()
+			runBrowserAccessTokenRefresh()
 				.then(() => {
 					const freshToken = getAuthToken();
 					if (freshToken) {

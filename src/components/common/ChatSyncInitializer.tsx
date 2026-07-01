@@ -63,7 +63,7 @@ export default function ChatSyncInitializer() {
 			if (isCatchUpRunningRef.current) return;
 
 			isCatchUpRunningRef.current = true;
-			void (async () => {
+			(async () => {
 				try {
 					// WS reconnect_attempt starts refresh in parallel; wait so API cookies are fresh.
 					await runBrowserAccessTokenRefresh();
@@ -75,7 +75,7 @@ export default function ChatSyncInitializer() {
 				} finally {
 					isCatchUpRunningRef.current = false;
 				}
-			})();
+			})().catch(() => {});
 		};
 
 		window.addEventListener(ODYSSEA_WS_RECONNECTED_EVENT, onWsReconnected);
