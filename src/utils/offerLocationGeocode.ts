@@ -9,6 +9,7 @@ import {
 	nominatimCountryLabel,
 	normalizePostalInput,
 	parseCityRegionCode,
+	parseCityRegionPostalLine,
 	resolveOfferGeocodeCountry,
 	type OfferGeocodeCountry,
 	US_ZIP_PATTERN,
@@ -192,16 +193,40 @@ async function coordsFromZippopotamCityRegion(
 function extractEmbeddedPostal(
 	address: string,
 	country: OfferGeocodeCountry,
-): string | null {
+): { postal: string; country: OfferGeocodeCountry } | null {
 	const trimmed = address.trim();
 	const caMatch = trimmed.match(/\b([A-Z]\d[A-Z](?:\s?\d[A-Z]\d)?)\b/i);
-	if (caMatch && (country === "ca" || isCanadianPostalCode(caMatch[1]))) {
-		return caMatch[1];
+	if (caMatch) {
+		return { postal: caMatch[1], country: "ca" };
 	}
 	const digitMatch = trimmed.match(/\b(\d{5})(?:-\d{4})?\b/);
 	if (digitMatch) {
-		return digitMatch[1];
+		const compact = digitMatch[1];
+		if (country === "mx" || country === "us") {
+			return { postal: compact, country };
+		}
+		return { postal: compact, country: "us" };
 	}
+	return null;
+}
+
+async function coordsFromFormattedLine(
+	line: ReturnType<typeof parseCityRegionPostalLine>,
+): Promise<{ lat: number; lon: number } | null> {
+	if (!line) return null;
+
+	const fromCity = await coordsFromZippopotamCityRegion(
+		line.city,
+		line.regionCode,
+		line.country,
+	);
+	if (fromCity) return fromCity;
+
+	const zipp = await tryZippopotamPostal(line.postal, line.country);
+	if (zipp?.lat != null && zipp.lon != null) {
+		return { lat: zipp.lat, lon: zipp.lon };
+	}
+
 	return null;
 }
 
@@ -246,6 +271,12 @@ export async function geocodeOfferAddressCoordinates(
 	if (!trimmed) return null;
 
 	const country = resolveOfferGeocodeCountry(trimmed);
+	const formattedLine = parseCityRegionPostalLine(trimmed);
+	if (formattedLine) {
+		const fromLine = await coordsFromFormattedLine(formattedLine);
+		if (fromLine) return fromLine;
+	}
+
 	const parsed = parseCityRegionCode(trimmed);
 
 	if (parsed) {
@@ -270,7 +301,7 @@ export async function geocodeOfferAddressCoordinates(
 
 	const embeddedPostal = extractEmbeddedPostal(trimmed, country);
 	if (embeddedPostal) {
-		const zipp = await tryZippopotamPostal(embeddedPostal, country);
+		const zipp = await tryZippopotamPostal(embeddedPostal.postal, embeddedPostal.country);
 		if (zipp?.lat != null && zipp.lon != null) {
 			return { lat: zipp.lat, lon: zipp.lon };
 		}

@@ -161,6 +161,12 @@ export function resolveOfferGeocodeCountry(address: string): OfferGeocodeCountry
 	const fromName = countryFromRegionName(trimmed);
 	if (fromName) return fromName;
 
+	const cityRegionPostal = /,\s*([A-Za-z]{2,4})\s+[A-Z0-9]/i.exec(trimmed);
+	if (cityRegionPostal) {
+		const fromCode = countryFromRegionCode(cityRegionPostal[1].toUpperCase());
+		if (fromCode) return fromCode;
+	}
+
 	const regionCode = extractTrailingRegionCode(trimmed);
 	if (regionCode) {
 		const fromCode = countryFromRegionCode(regionCode);
@@ -238,4 +244,85 @@ export function parseCityRegionCode(
 	if (!country) return null;
 
 	return { city, regionCode, country };
+}
+
+/** "City, AB T5A" / "Phoenix, AZ 85001" / "Wauseon, Ohio 43567" — after geocode-to-formatted. */
+export function parseCityRegionPostalLine(
+	address: string,
+): {
+	city: string;
+	regionCode: string;
+	postal: string;
+	country: OfferGeocodeCountry;
+} | null {
+	const trimmed = address.trim();
+	const commaIdx = trimmed.indexOf(",");
+	if (commaIdx <= 0) return null;
+
+	const city = trimmed.slice(0, commaIdx).trim();
+	const afterComma = trimmed.slice(commaIdx + 1).trim();
+	if (!city || !afterComma) return null;
+
+	let postal: string | null = null;
+	let regionToken: string | null = null;
+
+	const caMatch = afterComma.match(/^(.+?)\s+([A-Z]\d[A-Z](?:\s?\d[A-Z]\d)?)$/i);
+	if (caMatch) {
+		regionToken = caMatch[1].trim();
+		postal = caMatch[2].replace(/\s+/g, " ").trim().toUpperCase();
+	} else {
+		const zipMatch = afterComma.match(/^(.+?)\s+(\d{5}(?:-\d{4})?)$/);
+		if (zipMatch) {
+			regionToken = zipMatch[1].trim();
+			postal = zipMatch[2];
+		}
+	}
+
+	if (!regionToken || !postal) return null;
+
+	const regionResolved = resolveRegionToken(regionToken);
+	if (!regionResolved) return null;
+
+	return {
+		city,
+		regionCode: regionResolved.regionCode,
+		postal,
+		country: regionResolved.country,
+	};
+}
+
+function lettersOnlyKey(s: string): string {
+	return s
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.replace(/[^a-z]/g, "");
+}
+
+const REGION_NAME_TO_CODE: Record<string, { regionCode: string; country: OfferGeocodeCountry }> =
+	(() => {
+		const out: Record<string, { regionCode: string; country: OfferGeocodeCountry }> = {};
+		for (const [code, name] of Object.entries(US_STATE_ABBR_TO_NAME)) {
+			out[lettersOnlyKey(name)] = { regionCode: code, country: "us" };
+		}
+		for (const [code, name] of Object.entries(CA_PROVINCE_ABBR_TO_NAME)) {
+			out[lettersOnlyKey(name)] = { regionCode: code, country: "ca" };
+		}
+		for (const [code, name] of Object.entries(MX_STATE_ABBR_TO_NAME)) {
+			out[lettersOnlyKey(name)] = { regionCode: code, country: "mx" };
+		}
+		return out;
+	})();
+
+function resolveRegionToken(
+	token: string,
+): { regionCode: string; country: OfferGeocodeCountry } | null {
+	const upper = token.trim().toUpperCase();
+	const fromCode = countryFromRegionCode(upper);
+	if (fromCode) return { regionCode: upper, country: fromCode };
+
+	const fromName = REGION_NAME_TO_CODE[lettersOnlyKey(token)];
+	if (fromName) return fromName;
+
+	return null;
 }
