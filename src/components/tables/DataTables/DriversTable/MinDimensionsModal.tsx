@@ -7,6 +7,8 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import {
 	createEmptyDimensionsFilter,
+	DIMENSION_BORDER_CLASS_NAMES,
+	DIMENSION_VALUE_CLASS_NAMES,
 	type DimensionsFilterValues,
 } from "./dimensionsFilterUtils";
 
@@ -21,18 +23,15 @@ const inputBaseClassName =
 	"h-11 w-full rounded-lg border-2 bg-white px-3 py-2.5 text-center text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-3 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30";
 
 const dimensionInputClassName = {
-	// LENGTH — green arrow on diagram
-	dim_min_1: `${inputBaseClassName} border-[#16a34a] focus:border-[#16a34a] focus:ring-[#16a34a]/20 dark:border-[#22c55e] dark:focus:border-[#22c55e] dark:focus:ring-[#22c55e]/20`,
-	// WIDTH — orange arrow on diagram
-	dim_min_2: `${inputBaseClassName} border-[#ea580c] focus:border-[#ea580c] focus:ring-[#ea580c]/20 dark:border-[#f97316] dark:focus:border-[#f97316] dark:focus:ring-[#f97316]/20`,
-	// HEIGHT — blue arrow on diagram
-	dim_min_3: `${inputBaseClassName} border-[#2563eb] focus:border-[#2563eb] focus:ring-[#2563eb]/20 dark:border-[#3b82f6] dark:focus:border-[#3b82f6] dark:focus:ring-[#3b82f6]/20`,
+	dim_min_1: `${inputBaseClassName} ${DIMENSION_BORDER_CLASS_NAMES.dim_min_1}`,
+	dim_min_2: `${inputBaseClassName} ${DIMENSION_BORDER_CLASS_NAMES.dim_min_2}`,
+	dim_min_3: `${inputBaseClassName} ${DIMENSION_BORDER_CLASS_NAMES.dim_min_3}`,
 } as const;
 
 const dimensionLabelClassName = {
-	dim_min_1: "text-[#16a34a] dark:text-[#22c55e]",
-	dim_min_2: "text-[#ea580c] dark:text-[#f97316]",
-	dim_min_3: "text-[#2563eb] dark:text-[#3b82f6]",
+	dim_min_1: DIMENSION_VALUE_CLASS_NAMES.dim_min_1,
+	dim_min_2: DIMENSION_VALUE_CLASS_NAMES.dim_min_2,
+	dim_min_3: DIMENSION_VALUE_CLASS_NAMES.dim_min_3,
 } as const;
 
 export default function MinDimensionsModal({

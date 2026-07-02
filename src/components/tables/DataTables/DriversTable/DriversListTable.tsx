@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import {
 	Mc,
@@ -57,9 +57,9 @@ import DriverNotesModal from "./DriverNotesModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
 import MinDimensionsModal from "./MinDimensionsModal";
+import DimensionsFilterDisplay from "./DimensionsFilterDisplay";
 import {
 	createEmptyDimensionsFilter,
-	formatDimensionsFilterDisplay,
 	getActiveDimensionsQueryParams,
 	type DimensionsFilterValues,
 } from "./dimensionsFilterUtils";
@@ -141,7 +141,7 @@ export interface DriversListTableProps {
 			selectedDriverIds: string[],
 			driverEmptyMiles: Record<string, number>
 		) => void | Promise<void>;
-		icon?: React.ReactNode;
+		icon?: ReactNode;
 		isLoading?: boolean;
 	} | null;
 	/** Driver IDs that are already in the offer (e.g. when adding drivers to offer). These rows are disabled and styled as already added. */
@@ -340,7 +340,7 @@ export default function DriversListTable({
 	const totalItems = driverList?.data?.pagination?.total_posts || 0;
 	const totalPages = driverList?.data?.pagination?.total_pages || 0;
 
-	const renderPaginationBar = (extraActions?: React.ReactNode) => (
+	const renderPaginationBar = (extraActions?: ReactNode) => (
 		<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
 			<div className="pb-3 xl:pb-0">
 				<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
@@ -539,20 +539,14 @@ export default function DriversListTable({
 					{/* Dimensions (opens min dimensions modal) */}
 					<div className="flex min-w-0 flex-col">
 						<Label htmlFor="drivers-list-dimensions-filter">Dimensions</Label>
-						<input
+						<button
 							id="drivers-list-dimensions-filter"
-							type="text"
-							value={formatDimensionsFilterDisplay(dimensionsFilter)}
-							readOnly
+							type="button"
 							onClick={() => setDimensionsModalOpen(true)}
-							onKeyDown={e => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									setDimensionsModalOpen(true);
-								}
-							}}
-							className="h-11 w-full min-w-0 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 md:w-40"
-						/>
+							className="h-11 w-full min-w-0 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-left text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 md:w-40"
+						>
+							<DimensionsFilterDisplay values={dimensionsFilter} />
+						</button>
 					</div>
 
 					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
