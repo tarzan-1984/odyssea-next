@@ -1,43 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
+import { geocodeOfferAddressCoordinates } from "@/utils/offerLocationGeocode";
 
 const METERS_TO_MILES = 1 / 1609.344;
-const NOMINATIM_DELAY_MS = 1100; // ~1 sec between requests (Nominatim limit: 1 req/sec)
+const NOMINATIM_DELAY_MS = 1100;
 
 function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/** Geocode address via Nominatim (OpenStreetMap). Returns { lat, lon } or null. */
-async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
-	const trimmed = address.trim();
-	if (!trimmed) return null;
-
-	const query = trimmed.includes("USA") ? trimmed : `${trimmed}, USA`;
-	const params = new URLSearchParams({
-		q: query,
-		format: "json",
-		limit: "1",
-		countrycodes: "us",
-	});
-
-	const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-		headers: {
-			"User-Agent": "OdysseaApp/1.0 (route-distance)",
-			"Accept-Language": "en",
-		},
-	});
-
-	if (!res.ok) return null;
-
-	const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-	if (!Array.isArray(data) || data.length === 0) return null;
-
-	const lat = Number.parseFloat(data[0].lat);
-	const lon = Number.parseFloat(data[0].lon);
-	if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
-
-	return { lat, lon };
 }
 
 /** Get road distance in meters between two points via OSRM. Returns null on failure. */
@@ -80,12 +49,11 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Geocode each location (with delay for Nominatim rate limit)
 		const coords: { lat: number; lon: number }[] = [];
 		for (let i = 0; i < locations.length; i++) {
 			if (i > 0) await sleep(NOMINATIM_DELAY_MS);
 
-			const point = await geocodeAddress(locations[i]);
+			const point = await geocodeOfferAddressCoordinates(String(locations[i]));
 			if (!point) {
 				return NextResponse.json(
 					{ error: `Could not geocode address: ${String(locations[i]).slice(0, 80)}` },
@@ -95,7 +63,6 @@ export async function POST(request: NextRequest) {
 			coords.push(point);
 		}
 
-		// OSRM for each consecutive pair
 		let totalMeters = 0;
 		for (let i = 0; i < coords.length - 1; i++) {
 			const dist = await getOsrmDistanceMeters(coords[i], coords[i + 1]);
