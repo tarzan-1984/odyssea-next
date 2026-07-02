@@ -15,6 +15,9 @@ const SEARCH_PARAMS = [
 	"paged",
 	"per_page_loads",
 	"role",
+	"dim_min_1",
+	"dim_min_2",
+	"dim_min_3",
 ] as const;
 
 /**
@@ -26,6 +29,7 @@ const SEARCH_PARAMS = [
  * - country: Country filter
  * - capabilities: Comma-separated list (e.g. twic,lift_gate,hazmat_certificate)
  * - paged: Page number (default: 1)
+ * - dim_min_1, dim_min_2, dim_min_3: Minimum cargo dimensions (length, width, height)
  * Requires authentication.
  */
 export async function GET(request: NextRequest) {
@@ -39,8 +43,8 @@ export async function GET(request: NextRequest) {
 		const query = new URLSearchParams();
 
 		for (const key of SEARCH_PARAMS) {
-			const value = searchParams.get(key);
-			if (value != null && value !== "") {
+			const value = searchParams.get(key)?.trim();
+			if (value) {
 				query.set(key, value);
 			}
 		}

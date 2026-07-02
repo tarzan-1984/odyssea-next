@@ -56,6 +56,13 @@ import DriverMobileAppIcon, { driverUsesMobileApp } from "./DriverMobileAppIcon"
 import DriverNotesModal from "./DriverNotesModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
+import MinDimensionsModal from "./MinDimensionsModal";
+import {
+	createEmptyDimensionsFilter,
+	formatDimensionsFilterDisplay,
+	getActiveDimensionsQueryParams,
+	type DimensionsFilterValues,
+} from "./dimensionsFilterUtils";
 
 // Same status colors as on Drivers Map markers
 const STATUS_COLORS: Record<string, string> = {
@@ -194,6 +201,10 @@ export default function DriversListTable({
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
+	const [dimensionsFilter, setDimensionsFilter] = useState<DimensionsFilterValues>(
+		createEmptyDimensionsFilter
+	);
+	const [dimensionsModalOpen, setDimensionsModalOpen] = useState(false);
 	const [hoveredStatusRowIndex, setHoveredStatusRowIndex] = useState<number | null>(null);
 
 	useEffect(() => {
@@ -204,6 +215,9 @@ export default function DriversListTable({
 		radiusFilter,
 		statusFilter,
 		capabilitiesFilter.join(","),
+		dimensionsFilter.dim_min_1,
+		dimensionsFilter.dim_min_2,
+		dimensionsFilter.dim_min_3,
 		itemsPerPage,
 	]);
 	const dragSelectRef = useRef({
@@ -227,6 +241,9 @@ export default function DriversListTable({
 		locationFilter,
 		statusFilter,
 		statusAutoAppliedByAddress,
+		...(Object.keys(getActiveDimensionsQueryParams(dimensionsFilter)).length > 0
+			? { dimensionsFilter }
+			: {}),
 		role: currentUser?.role?.toLowerCase() ?? "",
 	};
 
@@ -519,6 +536,27 @@ export default function DriversListTable({
 
 					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
 
+					{/* Dimensions (opens min dimensions modal) */}
+					<div className="flex min-w-0 flex-col">
+						<Label htmlFor="drivers-list-dimensions-filter">Dimensions</Label>
+						<input
+							id="drivers-list-dimensions-filter"
+							type="text"
+							value={formatDimensionsFilterDisplay(dimensionsFilter)}
+							readOnly
+							onClick={() => setDimensionsModalOpen(true)}
+							onKeyDown={e => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									setDimensionsModalOpen(true);
+								}
+							}}
+							className="h-11 w-full min-w-0 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 md:w-40"
+						/>
+					</div>
+
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
 					{/* Location */}
 					<div className="flex min-w-0 flex-col">
 						<Label htmlFor="drivers-list-location-filter">Location</Label>
@@ -602,6 +640,9 @@ export default function DriversListTable({
 								setStatusFilter("");
 								setStatusAutoAppliedByAddress(false);
 								setCapabilitiesFilter([]);
+								setDimensionsFilter(createEmptyDimensionsFilter());
+								setDimensionsModalOpen(false);
+								setCurrentPage(1);
 							}}
 							className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus:border-brand-800 md:w-auto"
 						>
@@ -1604,6 +1645,13 @@ export default function DriversListTable({
 					notesCount={notesModalDriver.notesCount}
 				/>
 			)}
+
+			<MinDimensionsModal
+				isOpen={dimensionsModalOpen}
+				onClose={() => setDimensionsModalOpen(false)}
+				initialValues={dimensionsFilter}
+				onApply={setDimensionsFilter}
+			/>
 		</div>
 	);
 }

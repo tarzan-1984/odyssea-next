@@ -1,5 +1,9 @@
 import axios from "axios";
 import type { DriversPage } from "./Types";
+import {
+	getActiveDimensionsQueryParams,
+	type DimensionsFilterValues,
+} from "./dimensionsFilterUtils";
 
 export interface DriversListQueryParams {
 	currentPage: number;
@@ -11,6 +15,7 @@ export interface DriversListQueryParams {
 	statusFilter: string;
 	/** True when status was auto-set to for_offers because address was entered */
 	statusAutoAppliedByAddress?: boolean;
+	dimensionsFilter?: DimensionsFilterValues;
 	role: string;
 }
 
@@ -39,6 +44,7 @@ export async function fetchDriversPage(
 		radiusFilter,
 		locationFilter,
 		statusFilter,
+		dimensionsFilter,
 		role,
 	} = params;
 
@@ -67,6 +73,17 @@ export async function fetchDriversPage(
 	);
 	if (effectiveStatusFilter) {
 		searchParams.set("extended_search", effectiveStatusFilter);
+	}
+
+	const activeDimensions = getActiveDimensionsQueryParams(dimensionsFilter);
+	if (activeDimensions.dim_min_1) {
+		searchParams.set("dim_min_1", activeDimensions.dim_min_1);
+	}
+	if (activeDimensions.dim_min_2) {
+		searchParams.set("dim_min_2", activeDimensions.dim_min_2);
+	}
+	if (activeDimensions.dim_min_3) {
+		searchParams.set("dim_min_3", activeDimensions.dim_min_3);
 	}
 
 	try {
@@ -101,6 +118,7 @@ export function driversListQueryKey(params: DriversListQueryParams) {
 			radiusFilter: params.radiusFilter,
 			locationFilter: params.locationFilter,
 			statusFilter: effectiveStatusFilter,
+			dimensionsFilter: getActiveDimensionsQueryParams(params.dimensionsFilter),
 			role: params.role,
 		},
 	] as const;
