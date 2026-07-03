@@ -54,6 +54,8 @@ import CreateOfferModal from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
 import DriverMobileAppIcon, { driverUsesMobileApp } from "./DriverMobileAppIcon";
 import DriverNotesModal from "./DriverNotesModal";
+import DriverRatingBadge from "./DriverRatingBadge";
+import DriverRatingModal from "./DriverRatingModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
 import MinDimensionsModal from "./MinDimensionsModal";
@@ -169,6 +171,14 @@ export default function DriversListTable({
 		driverId: string;
 		name: string;
 		notesCount: number;
+	} | null>(null);
+
+	// Driver ratings modal
+	const [ratingModalDriver, setRatingModalDriver] = useState<{
+		driverId: string;
+		name: string;
+		ratingsCount: number;
+		avgRating: number | null;
 	} | null>(null);
 
 	// Local filters
@@ -1546,10 +1556,25 @@ export default function DriversListTable({
 															maxWidth: 72,
 														}}
 													>
-														{item?.rating?.avg_rating != null &&
-														item.rating.avg_rating > 0
-															? item.rating.avg_rating
-															: "—"}
+														<DriverRatingBadge
+															avgRating={item?.rating?.avg_rating}
+															count={item?.rating?.count}
+															onClick={() =>
+																setRatingModalDriver({
+																	driverId: String(
+																		item?.meta_data?.driver_id ??
+																			item?.id ??
+																			""
+																	),
+																	name:
+																		item?.meta_data?.driver_name ??
+																		"Driver",
+																	ratingsCount: item?.rating?.count ?? 0,
+																	avgRating:
+																		item?.rating?.avg_rating ?? null,
+																})
+															}
+														/>
 													</TableCell>
 
 													{/* Notes */}
@@ -1637,6 +1662,17 @@ export default function DriversListTable({
 					driverId={notesModalDriver.driverId}
 					driverName={notesModalDriver.name}
 					notesCount={notesModalDriver.notesCount}
+				/>
+			)}
+
+			{ratingModalDriver && (
+				<DriverRatingModal
+					isOpen
+					onClose={() => setRatingModalDriver(null)}
+					driverId={ratingModalDriver.driverId}
+					driverName={ratingModalDriver.name}
+					ratingsCount={ratingModalDriver.ratingsCount}
+					avgRating={ratingModalDriver.avgRating}
 				/>
 			)}
 
