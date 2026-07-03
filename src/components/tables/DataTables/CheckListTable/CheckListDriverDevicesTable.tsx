@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
@@ -19,6 +19,7 @@ import { copyDriverPhoneNumbers } from "./copyCheckListPhoneNumbers";
 import { formatCheckListNyDate } from "./formatCheckListNyDate";
 import type {
 	CheckListDriver,
+	CheckListVersionDevice,
 	CheckListVersionDriver,
 	CheckListVersionResponse,
 } from "./checkListTypes";
@@ -68,6 +69,47 @@ async function fetchCheckListDriverDevicesPage(
 	return res.data;
 }
 
+async function blockCheckListDevice(deviceRowId: string): Promise<void> {
+	const res = await axios.patch(
+		`/api/users/user-devices/${encodeURIComponent(deviceRowId)}/block`,
+		{},
+		{ withCredentials: true, validateStatus: () => true },
+	);
+	if (res.status < 200 || res.status >= 300) {
+		const msg =
+			(res.data as { error?: string })?.error ||
+			`Request failed with status ${res.status}`;
+		throw new Error(msg);
+	}
+}
+
+async function unblockCheckListDevice(deviceRowId: string): Promise<void> {
+	const res = await axios.patch(
+		`/api/users/user-devices/${encodeURIComponent(deviceRowId)}/unblock`,
+		{},
+		{ withCredentials: true, validateStatus: () => true },
+	);
+	if (res.status < 200 || res.status >= 300) {
+		const msg =
+			(res.data as { error?: string })?.error ||
+			`Request failed with status ${res.status}`;
+		throw new Error(msg);
+	}
+}
+
+async function deleteCheckListDevice(deviceRowId: string): Promise<void> {
+	const res = await axios.delete(`/api/users/user-devices/${encodeURIComponent(deviceRowId)}`, {
+		withCredentials: true,
+		validateStatus: () => true,
+	});
+	if (res.status < 200 || res.status >= 300) {
+		const msg =
+			(res.data as { error?: string })?.error ||
+			`Request failed with status ${res.status}`;
+		throw new Error(msg);
+	}
+}
+
 type CheckListDriverDevicesTableProps = {
 	apiPath: string;
 	queryKey: string;
@@ -89,6 +131,7 @@ export default function CheckListDriverDevicesTable({
 	showMinimumAppVersion = false,
 	showLastOpenAppColumn = false,
 }: CheckListDriverDevicesTableProps) {
+	const queryClient = useQueryClient();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
 	const [searchInput, setSearchInput] = useState("");
@@ -98,6 +141,8 @@ export default function CheckListDriverDevicesTable({
 	const [pushModalDrivers, setPushModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [emailModalDrivers, setEmailModalDrivers] = useState<CheckListDriver[] | null>(null);
 	const [chatModalDrivers, setChatModalDrivers] = useState<CheckListDriver[] | null>(null);
+	const [deviceActionError, setDeviceActionError] = useState<string | null>(null);
+	const [deviceActionLoadingId, setDeviceActionLoadingId] = useState<string | null>(null);
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
@@ -186,6 +231,55 @@ export default function CheckListDriverDevicesTable({
 	const toggleAppVersionSort = () => {
 		setAppVersionSort(prev => (prev === "asc" ? "desc" : "asc"));
 		setCurrentPage(1);
+	};
+
+	const handleBlockDevice = async (device: CheckListVersionDevice) => {
+		const isBlocked = Boolean(device.blocked);
+		const confirmed = isBlocked
+			? window.confirm("Unblock this device? The driver will be able to sign in from it again.")
+			: window.confirm(
+					"Block this device? The driver will be signed out and will not be able to sign in from this device.",
+				);
+		if (!confirmed) {
+			return;
+		}
+		setDeviceActionError(null);
+		setDeviceActionLoadingId(device.id);
+		try {
+			if (isBlocked) {
+				await unblockCheckListDevice(device.id);
+			} else {
+				await blockCheckListDevice(device.id);
+			}
+			await queryClient.invalidateQueries({ queryKey: [queryKey] });
+		} catch (err) {
+			setDeviceActionError(
+				(err as Error)?.message ||
+					(isBlocked ? "Failed to unblock device" : "Failed to block device"),
+			);
+		} finally {
+			setDeviceActionLoadingId(null);
+		}
+	};
+
+	const handleDeleteDevice = async (device: CheckListVersionDevice) => {
+		if (
+			!window.confirm(
+				"Remove this device from the driver's account? The driver will be signed out on that device.",
+			)
+		) {
+			return;
+		}
+		setDeviceActionError(null);
+		setDeviceActionLoadingId(device.id);
+		try {
+			await deleteCheckListDevice(device.id);
+			await queryClient.invalidateQueries({ queryKey: [queryKey] });
+		} catch (err) {
+			setDeviceActionError((err as Error)?.message || "Failed to delete device");
+		} finally {
+			setDeviceActionLoadingId(null);
+		}
 	};
 
 	const emptyMessage = getEmptyMessage(minimumAppVersion);
@@ -322,6 +416,12 @@ export default function CheckListDriverDevicesTable({
 				paginationKey={`top-${currentPage}-${totalPages}-${itemsPerPage}-${debouncedSearch}-${appVersionSort}`}
 				onPageChange={setCurrentPage}
 			/>
+
+			{deviceActionError && (
+				<div className="border-x border-gray-100 px-4 py-2 text-sm text-red-500 dark:border-white/[0.05]">
+					{deviceActionError}
+				</div>
+			)}
 
 			<div className="overflow-x-auto border-x border-gray-100 dark:border-white/[0.05]">
 				<div className="min-w-[800px]">
@@ -480,6 +580,18 @@ export default function CheckListDriverDevicesTable({
 														<span className="text-xs text-gray-500 dark:text-gray-400">
 															<CheckListPhoneLink phone={driver.phone} />
 														</span>
+														<Button
+															size="sm"
+															variant="outline"
+															type="button"
+															className="!mt-2 !px-2 !py-1 !text-xs h-auto w-fit rounded-md"
+															onClick={() =>
+																setEmailModalDrivers([toCheckListDriver(driver)])
+															}
+															disabled={!driver.email?.trim()}
+														>
+															Send Email
+														</Button>
 													</div>
 												</TableCell>
 											</>
@@ -502,7 +614,43 @@ export default function CheckListDriverDevicesTable({
 											</TableCell>
 										)}
 										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
-											<div className="flex flex-wrap justify-end gap-1.5">
+											<div className="flex flex-wrap items-center justify-end gap-2">
+												<Button
+													size="sm"
+													variant="outline"
+													type="button"
+													className={`!px-2 !py-1 !text-xs h-auto rounded-md ${
+														device.blocked
+															? "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+															: ""
+													}`}
+													onClick={() => handleBlockDevice(device)}
+													disabled={
+														deviceActionLoadingId === device.id || query.isPending
+													}
+												>
+													{deviceActionLoadingId === device.id
+														? device.blocked
+															? "Unblocking…"
+															: "Blocking…"
+														: device.blocked
+															? "Blocked"
+															: "Block"}
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													type="button"
+													className="!px-2 !py-1 !text-xs h-auto rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+													onClick={() => handleDeleteDevice(device)}
+													disabled={
+														deviceActionLoadingId === device.id || query.isPending
+													}
+												>
+													{deviceActionLoadingId === device.id
+														? "Deleting…"
+														: "Delete"}
+												</Button>
 												<Button
 													size="sm"
 													variant="primary"
@@ -513,18 +661,6 @@ export default function CheckListDriverDevicesTable({
 													}
 												>
 													Send push
-												</Button>
-												<Button
-													size="sm"
-													variant="outline"
-													type="button"
-													className="!px-2 !py-1 !text-xs h-auto rounded-md"
-													onClick={() =>
-														setEmailModalDrivers([toCheckListDriver(driver)])
-													}
-													disabled={!driver.email?.trim()}
-												>
-													Send Email
 												</Button>
 											</div>
 										</TableCell>

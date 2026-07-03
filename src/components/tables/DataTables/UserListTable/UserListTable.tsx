@@ -10,6 +10,7 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import { renderAvatar } from "@/helpers";
+import DriverMobileAppIcon from "@/components/tables/DataTables/DriversTable/DriverMobileAppIcon";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import SetPasswordModal, { type SetPasswordDriver } from "./SetPasswordModal";
@@ -299,12 +300,15 @@ export default function UserListTable() {
 												</Link>
 												<div>
 													<Link href={`users/${item?.id}`}>
-														<span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
+														<span className="inline-flex items-center gap-1.5 font-medium text-gray-800 text-theme-sm dark:text-white/90">
 															{item?.firstName && item?.lastName
 																? `${item.firstName} ${item.lastName}`
 																: item?.firstName ||
 																	item?.lastName ||
 																	"-"}
+															<DriverMobileAppIcon
+																usesApp={item?.hasUserDevice === true}
+															/>
 														</span>
 													</Link>
 													{showSetPasswordAction &&

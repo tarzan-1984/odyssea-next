@@ -347,6 +347,8 @@ export interface UserListItem {
 	userColor?: string | null;
 	status: string;
 	externalId?: string;
+	/** True when at least one row exists in user_devices for this user. */
+	hasUserDevice?: boolean;
 }
 
 export interface CreateUserResponse {

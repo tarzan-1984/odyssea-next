@@ -32,6 +32,7 @@ export type CheckListVersionDevice = {
 	appVersion: string | null;
 	deviceName: string | null;
 	model: string | null;
+	blocked?: boolean;
 	lastActiveAt?: string | null;
 };
 
