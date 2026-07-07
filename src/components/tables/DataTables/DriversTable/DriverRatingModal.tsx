@@ -204,6 +204,7 @@ export default function DriverRatingModal({
 			);
 
 			await queryClient.invalidateQueries({ queryKey: ["drivers-list"] });
+			await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 		},
 		onError: (err: Error) => {
 			setAddError(err.message || "Failed to add rating");

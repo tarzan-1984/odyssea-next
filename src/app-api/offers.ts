@@ -16,6 +16,7 @@ export interface OfferDriver {
 	action_time_display?: string | null;
 	empty_miles: number | null;
 	total_miles: number | null;
+	driver_rating?: number | null;
 }
 
 export interface OfferRoutePoint {

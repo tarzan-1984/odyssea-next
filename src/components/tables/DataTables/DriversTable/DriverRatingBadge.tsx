@@ -40,6 +40,11 @@ export function getDriverRatingStyle(
 	};
 }
 
+function formatRatingDisplay(rating: number): string {
+	const rounded = Math.round(rating * 100) / 100;
+	return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
 type DriverRatingBadgeProps = {
 	avgRating: number | null | undefined;
 	count?: number;
@@ -56,7 +61,7 @@ export default function DriverRatingBadge({
 			? Number(avgRating)
 			: null;
 	const hasRating = numericRating != null && numericRating > 0;
-	const displayValue = hasRating ? String(Math.round(numericRating)) : "—";
+	const displayValue = hasRating ? formatRatingDisplay(numericRating) : "—";
 	const style = getDriverRatingStyle(hasRating ? numericRating : null);
 	const title =
 		hasRating && count != null && count > 0
@@ -70,7 +75,7 @@ export default function DriverRatingBadge({
 			type="button"
 			title={title}
 			onClick={onClick}
-			className="inline-flex min-w-[3.5rem] max-w-full items-center justify-center rounded-md px-2 py-1 text-xs font-medium transition-opacity hover:opacity-90"
+			className="inline-flex h-[18px] w-[30px] shrink-0 items-center justify-center rounded px-0 text-[10px] font-medium tabular-nums leading-none transition-opacity hover:opacity-90"
 			style={{
 				backgroundColor: style.backgroundColor,
 				color: style.color,
