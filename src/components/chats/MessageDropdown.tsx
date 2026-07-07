@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Message } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 import { canDeleteChatMessages } from "@/utils/roleAccess";
+import { isDeletableChatMessage } from "@/lib/chatMessageDelete";
 
 interface MessageDropdownProps {
 	message: Message;
@@ -26,7 +27,8 @@ export function getMessageDropdownActionCount(
 	currentUser?: UserData | null
 ): number {
 	const role = currentUser?.role?.trim().toUpperCase();
-	const canDelete = canDeleteChatMessages(role);
+	const canDelete =
+		canDeleteChatMessages(role) && isDeletableChatMessage(message);
 	const isOwnMessage = message.senderId === currentUser?.id;
 	const canEdit =
 		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
@@ -53,7 +55,8 @@ export default function MessageDropdown({
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	const role = currentUser?.role?.trim().toUpperCase();
-	const canDelete = canDeleteChatMessages(role);
+	const canDelete =
+		canDeleteChatMessages(role) && isDeletableChatMessage(message);
 
 	// Check if message is from current user
 	const isOwnMessage = message.senderId === currentUser?.id;

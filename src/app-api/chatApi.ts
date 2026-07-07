@@ -140,6 +140,8 @@ export interface Message {
 	pendingOutgoing?: PendingOutgoingMeta;
 	/** TMS dispatch message from create_load_chat (Odysseia Team, no avatar). */
 	isSystemMessage?: boolean;
+	/** Loaded from S3 archive; row no longer exists in messages table. */
+	isArchivedMessage?: boolean;
 }
 
 /** Pipe-delimited multiple files in one message (fileUrl and fileName aligned by index). */

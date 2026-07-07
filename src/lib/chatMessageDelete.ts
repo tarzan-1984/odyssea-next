@@ -2,6 +2,14 @@ import type { Message } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { useChatStore } from "@/stores/chatStore";
 import { sortMessagesByCreatedAt } from "@/utils/chatMessagesMerge";
+import { isOptimisticMessageId } from "@/utils/optimisticChatMessage";
+
+export function isDeletableChatMessage(message: Message): boolean {
+	if (message.pendingOutgoing) return false;
+	if (isOptimisticMessageId(message.id)) return false;
+	if (message.isArchivedMessage) return false;
+	return true;
+}
 
 export type LocalMessageDeleteSnapshot = {
 	message: Message;

@@ -21,7 +21,7 @@ import ChatBoxVirtualMessageList, {
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
-import { removeChatMessageLocally, restoreChatMessageLocally } from "@/lib/chatMessageDelete";
+import { removeChatMessageLocally, restoreChatMessageLocally, isDeletableChatMessage } from "@/lib/chatMessageDelete";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
@@ -645,6 +645,12 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	// Handle message dropdown actions
 	const handleDeleteMessage = async (messageId: string) => {
+		const state = useChatStore.getState();
+		const targetMessage = state.messages.find(msg => msg.id === messageId);
+		if (!targetMessage || !isDeletableChatMessage(targetMessage)) {
+			return;
+		}
+
 		const snapshot = removeChatMessageLocally(messageId);
 		if (!snapshot) {
 			return;
@@ -659,13 +665,22 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				},
 			});
 
+			if (response.status === 404) {
+				// Already removed from DB (e.g. archived to S3) — keep local removal.
+				return;
+			}
+
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || errorData.message || "Failed to delete message");
+				const errorData = await response.json().catch(() => ({}));
+				restoreChatMessageLocally(snapshot);
+				console.warn(
+					"Failed to delete message:",
+					errorData.error || errorData.message || response.statusText
+				);
 			}
 		} catch (error) {
 			restoreChatMessageLocally(snapshot);
-			console.error("Failed to delete message:", error);
+			console.warn("Failed to delete message:", error);
 		}
 	};
 

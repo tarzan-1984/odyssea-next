@@ -861,9 +861,12 @@ export const useChatStore = create<ChatState>()(
 							archivedMessagesCache: cache,
 						} = get();
 						const existingMessageIds = new Set(messages.map(msg => msg.id));
-						const newMessages = chunk.filter(
-							msg => !existingMessageIds.has(msg.id)
-						);
+						const newMessages = chunk
+							.filter(msg => !existingMessageIds.has(msg.id))
+							.map(msg => ({
+								...msg,
+								isArchivedMessage: true,
+							}));
 
 						const newCache = new Map(cache);
 						newCache.set(key, {
