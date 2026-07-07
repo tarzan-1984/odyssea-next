@@ -19,7 +19,7 @@ export async function GET(
 			return NextResponse.json({ error: "externalId is required" }, { status: 400 });
 		}
 
-		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/external/${encodeURIComponent(id)}`;
+		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/users/external/${encodeURIComponent(id)}?role=DRIVER`;
 
 		const response = await fetch(backendUrl, {
 			headers: {

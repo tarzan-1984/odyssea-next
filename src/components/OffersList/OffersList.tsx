@@ -10,6 +10,7 @@ import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/Pagi
 import { useCurrentUser } from "@/stores/userStore";
 import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -423,6 +424,7 @@ const OffersList = () => {
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
+	const [deactivateConfirmOffer, setDeactivateConfirmOffer] = useState<OfferRow | null>(null);
 	const [editOfferData, setEditOfferData] = useState<EditOfferData | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
@@ -444,6 +446,38 @@ const OffersList = () => {
 	const showOfferId =
 		isAdmin && String(currentUser?.externalId ?? "").trim() === "83";
 	const canModifyOffersByRole = canModifyOffers(currentUser?.role);
+
+	const handleConfirmDeactivateOffer = async () => {
+		if (!deactivateConfirmOffer) return;
+		const offer = deactivateConfirmOffer;
+		const driversToNotify = (offer.drivers ?? []).filter((d) => d.active !== false);
+		setDeactivatingOfferId(offer.id);
+		const res = await offersApi.deactivateOffer(offer.id);
+		setDeactivatingOfferId(null);
+		setDeactivateConfirmOffer(null);
+		if (res.success) {
+			await queryClient.invalidateQueries({
+				queryKey: ["offers-list-cards"],
+			});
+			if (driversToNotify.length > 0) {
+				const offerTitle = getOfferTitle(offer);
+				setPushModalState({
+					drivers: driversToNotify,
+					defaultMessage: buildOfferUnavailablePushMessage(offer),
+					...(offerTitle
+						? {
+								offerContext: {
+									offerId: offer.id,
+									offerTitle,
+								},
+							}
+						: {}),
+				});
+			}
+		} else {
+			console.error(res.error);
+		}
+	};
 	const queryParams = {
 		page: currentPage,
 		limit: itemsPerPage,
@@ -601,37 +635,10 @@ const OffersList = () => {
 												<button
 													type="button"
 													disabled={!canModifyOffersByRole || deactivatingOfferId === row.id}
-													onClick={async (e) => {
+													onClick={(e) => {
 														e.stopPropagation();
 														if (!canModifyOffersByRole) return;
-														const driversToNotify = (row.drivers ?? []).filter(
-															(d) => d.active !== false
-														);
-														setDeactivatingOfferId(row.id);
-														const res = await offersApi.deactivateOffer(row.id);
-														setDeactivatingOfferId(null);
-														if (res.success) {
-															await queryClient.invalidateQueries({
-																queryKey: ["offers-list-cards"],
-															});
-															if (driversToNotify.length > 0) {
-																const offerTitle = getOfferTitle(row);
-																setPushModalState({
-																	drivers: driversToNotify,
-																	defaultMessage: buildOfferUnavailablePushMessage(row),
-																	...(offerTitle
-																		? {
-																				offerContext: {
-																					offerId: row.id,
-																					offerTitle,
-																				},
-																			}
-																		: {}),
-																});
-															}
-														} else {
-															console.error(res.error);
-														}
+														setDeactivateConfirmOffer(row);
 													}}
 													className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 												>
@@ -1215,6 +1222,19 @@ const OffersList = () => {
 					avgRating={ratingModalDriver.avgRating}
 				/>
 			)}
+
+			<ConfirmModal
+				isOpen={deactivateConfirmOffer != null}
+				onClose={() => setDeactivateConfirmOffer(null)}
+				onConfirm={handleConfirmDeactivateOffer}
+				title="Deactivate offer"
+				message="Are you sure you want to delete this offer?"
+				confirmText="Confirm"
+				cancelText="Cancel"
+				isLoading={deactivatingOfferId === deactivateConfirmOffer?.id}
+				icon={<DeactivateOfferIcon className="h-6 w-6" aria-hidden />}
+				variant="danger"
+			/>
 
 			<Modal
 				isOpen={showDriverAcceptedModal}
