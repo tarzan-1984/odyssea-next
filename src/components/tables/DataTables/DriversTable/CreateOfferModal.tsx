@@ -10,9 +10,10 @@ import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import DateTimePicker from "@/components/form/DateTimePicker";
 import TextArea from "@/components/form/input/TextArea";
+import Checkbox from "@/components/form/input/Checkbox";
 import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
-import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon } from "@/icons";
+import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { getRouteChronologyError } from "@/utils/offerDateTimeRange";
 import {
@@ -438,6 +439,11 @@ export default function CreateOfferModal({
 	const [submitError, setSubmitError] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [editFallbackLoadedMiles, setEditFallbackLoadedMiles] = useState<number | null>(null);
+	const [manualLoadedMiles, setManualLoadedMiles] = useState<number | null>(null);
+	const [isEditMilesModalOpen, setIsEditMilesModalOpen] = useState(false);
+	const [editMilesInput, setEditMilesInput] = useState("");
+	const [editMilesError, setEditMilesError] = useState<string | null>(null);
+	const [editMilesConfirmed, setEditMilesConfirmed] = useState(false);
 	const [initialEditSnapshot, setInitialEditSnapshot] = useState<EditComparableSnapshot | null>(
 		null
 	);
@@ -468,6 +474,7 @@ export default function CreateOfferModal({
 					: [initialRouteRow("pickup"), initialRouteRow("delivery")];
 			setRouteRows(rows);
 			setEditFallbackLoadedMiles(editData.loadedMiles ?? null);
+			setManualLoadedMiles(null);
 			const locs = rows
 				.map(r => r.location.trim())
 				.filter(l => l !== "" && isValidLocationFormat(l));
@@ -479,6 +486,7 @@ export default function CreateOfferModal({
 			setFormValues({ ...initialFormState });
 			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
 			setEditFallbackLoadedMiles(null);
+			setManualLoadedMiles(null);
 			setCommittedLocations([]);
 		}
 
@@ -486,6 +494,10 @@ export default function CreateOfferModal({
 		setRouteError(null);
 		setRouteRowLocationErrors({});
 		setSubmitError("");
+		setIsEditMilesModalOpen(false);
+		setEditMilesInput("");
+		setEditMilesError(null);
+		setEditMilesConfirmed(false);
 	}, [isOpen, editData?.offerId]);
 
 	const hasEditChanges = useMemo(() => {
@@ -521,15 +533,27 @@ export default function CreateOfferModal({
 		retry: 1,
 	});
 
-	const loadedMiles = routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
-	const routeDistanceError = routeDistanceQueryError
-		? routeDistanceQueryError instanceof Error
-			? routeDistanceQueryError.message
-			: "Could not calculate route distance"
-		: null;
+	const loadedMiles =
+		manualLoadedMiles ?? routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
+	const routeDistanceError =
+		manualLoadedMiles != null
+			? null
+			: routeDistanceQueryError
+				? routeDistanceQueryError instanceof Error
+					? routeDistanceQueryError.message
+					: "Could not calculate route distance"
+				: null;
+	const showLoadedMilesEditIcon =
+		!isCalculatingRoute &&
+		allLocationsFilledAndValid(committedLocations) &&
+		(routeDistanceData?.loadedMiles != null ||
+			routeDistanceQueryError != null ||
+			manualLoadedMiles != null ||
+			editFallbackLoadedMiles != null);
 
 	const addPickUpRow = (afterIndex: number) => {
 		setCommittedLocations([]);
+		setManualLoadedMiles(null);
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("pickup"));
@@ -539,6 +563,7 @@ export default function CreateOfferModal({
 
 	const addDeliveryRow = (afterIndex: number) => {
 		setCommittedLocations([]);
+		setManualLoadedMiles(null);
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("delivery"));
@@ -571,10 +596,12 @@ export default function CreateOfferModal({
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
 		if (!allFilled || !allValid) {
 			setCommittedLocations([]);
+			setManualLoadedMiles(null);
 			return;
 		}
 		const locs = rows.map(r => r.location.trim());
 		setCommittedLocations(locs);
+		setManualLoadedMiles(null);
 	}, []);
 
 	const removeExtraRow = useCallback(
@@ -805,6 +832,38 @@ export default function CreateOfferModal({
 		return Number.isNaN(n) ? undefined : n;
 	};
 
+	const openEditMilesModal = () => {
+		setEditMilesInput(
+			loadedMiles != null && Number.isFinite(loadedMiles)
+				? String(Math.round(loadedMiles))
+				: ""
+		);
+		setEditMilesError(null);
+		setEditMilesConfirmed(false);
+		setIsEditMilesModalOpen(true);
+	};
+
+	const handleChangeMiles = () => {
+		const trimmed = editMilesInput.replace(/,/g, "").trim();
+		if (!trimmed) {
+			setEditMilesError("Enter a value");
+			return;
+		}
+		const parsed = Number.parseFloat(trimmed);
+		if (Number.isNaN(parsed)) {
+			setEditMilesError("Enter a valid number");
+			return;
+		}
+		if (parsed <= 0) {
+			setEditMilesError("Must be greater than zero");
+			return;
+		}
+		setManualLoadedMiles(Math.round(parsed));
+		setIsEditMilesModalOpen(false);
+		setEditMilesError(null);
+		setSubmitError("");
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
@@ -903,10 +962,12 @@ export default function CreateOfferModal({
 	};
 
 	return (
+		<>
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
 			containScroll
+			closeOnEscape={!isEditMilesModalOpen}
 			className="relative m-5 flex w-full max-w-3xl max-h-[95vh] flex-col overflow-hidden rounded-3xl bg-white p-0 shadow-sm dark:bg-gray-900 sm:m-0"
 		>
 			<form
@@ -980,8 +1041,18 @@ export default function CreateOfferModal({
 											: ""
 									}
 									placeholder="Fill all addresses and blur to calculate"
-									className="cursor-not-allowed"
+									className={`cursor-not-allowed ${showLoadedMilesEditIcon ? "pr-11" : ""}`}
 								/>
+								{showLoadedMilesEditIcon && (
+									<button
+										type="button"
+										onClick={openEditMilesModal}
+										className="absolute right-2 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+										aria-label="Edit loaded miles"
+									>
+										<EditLoadedMilesIcon className="h-5 w-5" />
+									</button>
+								)}
 								{isCalculatingRoute && (
 									<div
 										className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-gray-900/80"
@@ -1174,5 +1245,67 @@ export default function CreateOfferModal({
 				</div>
 			</form>
 		</Modal>
+
+		<Modal
+			isOpen={isEditMilesModalOpen}
+			onClose={() => {
+				setIsEditMilesModalOpen(false);
+				setEditMilesError(null);
+				setEditMilesConfirmed(false);
+			}}
+			className="relative m-5 w-full max-w-md rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900 sm:m-0 sm:p-8"
+		>
+			<h4 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90">
+				Change loaded miles
+			</h4>
+			<div className="space-y-4">
+				<div>
+					<Label htmlFor="edit-loaded-miles-input">Loaded miles</Label>
+					<Input
+						id="edit-loaded-miles-input"
+						type="text"
+						inputMode="numeric"
+						value={editMilesInput}
+						onChange={e => {
+							setEditMilesInput(e.target.value);
+							if (editMilesError) setEditMilesError(null);
+						}}
+						placeholder="Enter miles"
+						className="dark:bg-gray-900"
+						error={Boolean(editMilesError)}
+						hint={editMilesError ?? undefined}
+					/>
+				</div>
+				<Checkbox
+					id="edit-loaded-miles-confirm"
+					checked={editMilesConfirmed}
+					onChange={setEditMilesConfirmed}
+					label="I am sure I am entering the correct value"
+				/>
+				<div className="flex justify-end gap-3 pt-2">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => {
+							setIsEditMilesModalOpen(false);
+							setEditMilesError(null);
+							setEditMilesConfirmed(false);
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						onClick={handleChangeMiles}
+						disabled={!editMilesConfirmed}
+					>
+						Change miles
+					</Button>
+				</div>
+			</div>
+		</Modal>
+		</>
 	);
 }

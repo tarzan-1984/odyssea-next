@@ -76,6 +76,7 @@ import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
 import DeactivateOfferIcon from "./deactivate-offer.svg";
 import EditOfferIcon from "./edit-offer.svg";
+import EditLoadedMilesIcon from "./edit-loaded-miles.svg";
 import AddPlusCircleIcon from "./AddPlusCircleIcon";
 import RemoveMinusIcon from "./RemoveMinusIcon";
 import TwicIcon from "./additional/twic.svg";
@@ -162,6 +163,7 @@ export {
 	ExtendBidTimeIcon,
 	DeactivateOfferIcon,
 	EditOfferIcon,
+	EditLoadedMilesIcon,
 	AddPlusCircleIcon,
 	RemoveMinusIcon,
 	BoxTapped,
