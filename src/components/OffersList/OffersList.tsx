@@ -748,7 +748,8 @@ const OffersList = () => {
 														<col style={{ width: "100px" }} />
 														<col style={{ width: "100px" }} />
 														<col style={{ width: "160px" }} />
-														<col style={{ width: "276px" }} />
+														<col style={{ width: "90px" }} />
+														<col style={{ width: "186px" }} />
 													</colgroup>
 													<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
 														<TableRow className="border-gray-200 dark:border-white/[0.08]">
@@ -766,6 +767,9 @@ const OffersList = () => {
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Special Requirements
+															</TableCell>
+															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																Total miles
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Notes
@@ -790,6 +794,11 @@ const OffersList = () => {
 															</TableCell>
 															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<SpecialRequirementsList value={row.special_requirements} />
+															</TableCell>
+															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																{row.loaded_miles != null
+																	? Math.round(row.loaded_miles)
+																	: ""}
 															</TableCell>
 															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																{row.notes && String(row.notes).trim()
