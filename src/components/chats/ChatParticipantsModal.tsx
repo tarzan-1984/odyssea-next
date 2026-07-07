@@ -42,8 +42,8 @@ export default function ChatParticipantsModal({
 	const [isSaving, setIsSaving] = useState(false);
 	const [addingUserIds, setAddingUserIds] = useState<string[]>([]); // Track users being added to prevent double clicks
 	const [localParticipants, setLocalParticipants] = useState(chatRoom?.participants ?? []);
-	const [addedUserIds, setAddedUserIds] = useState<string[]>([]);
-	const [removedUserIds, setRemovedUserIds] = useState<string[]>([]);
+	const [addedParticipants, setAddedParticipants] = useState<Array<{ id: string; role: string }>>([]);
+	const [removedParticipants, setRemovedParticipants] = useState<Array<{ id: string; role: string }>>([]);
 	const [chatNameDraft, setChatNameDraft] = useState("");
 	const currentUser = useCurrentUser();
 	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms({});
@@ -114,7 +114,7 @@ export default function ChatParticipantsModal({
 		(isGroupChat && isCurrentUserAdmin) ||
 		((isLoadChat || isOfferChat) && isAdminOrModerator);
 
-	const hasParticipantChanges = addedUserIds.length > 0 || removedUserIds.length > 0;
+	const hasParticipantChanges = addedParticipants.length > 0 || removedParticipants.length > 0;
 	const trimmedChatName = chatNameDraft.trim();
 	const originalChatName = String(chatRoom?.name ?? "").trim();
 	const hasChatNameChange =
@@ -139,8 +139,8 @@ export default function ChatParticipantsModal({
 	useEffect(() => {
 		if (!isOpen) return;
 		setLocalParticipants(chatRoom?.participants ?? []);
-		setAddedUserIds([]);
-		setRemovedUserIds([]);
+		setAddedParticipants([]);
+		setRemovedParticipants([]);
 		setAddingUserIds([]);
 		setChatNameDraft(String(chatRoom?.name ?? ""));
 	}, [isOpen, chatRoom?.participants]);
@@ -245,14 +245,15 @@ export default function ChatParticipantsModal({
 		},
 	};
 	setLocalParticipants(prev => [...prev, tempParticipant as any]);
-	setAddedUserIds(prev => {
-		if (prev.includes(userId)) {
+	setAddedParticipants(prev => {
+		const role = String(user.role || "USER");
+		if (prev.some((entry) => entry.id === userId)) {
 			return prev;
 		}
-		return [...prev, userId];
+		return [...prev, { id: userId, role }];
 	});
 	// if this user was scheduled for removal, cancel that
-	setRemovedUserIds(prev => prev.filter(id => id === userId ? false : true));
+	setRemovedParticipants(prev => prev.filter(entry => entry.id !== userId));
 	// remove from add-list immediately
 	setUsers(prev => prev.filter(u => u.id !== userId));
 
@@ -262,15 +263,18 @@ export default function ChatParticipantsModal({
 	}, 100);
 };
 
-	const handleRemoveParticipant = (userId: string) => {
+	const handleRemoveParticipant = (userId: string, userRole?: string) => {
 		// admin can remove any non-admin; UI already restricts rendering of the button
 		// userId is user.id from users table, so compare with p.user?.id
 		setLocalParticipants(prev => prev.filter(p => (p.user?.id || p.userId) !== userId));
-		if (addedUserIds.includes(userId)) {
+		const role = String(userRole || "USER");
+		if (addedParticipants.some(entry => entry.id === userId)) {
 			// was newly added in this session; just undo the add
-			setAddedUserIds(prev => prev.filter(id => id !== userId));
+			setAddedParticipants(prev => prev.filter(entry => entry.id !== userId));
 		} else {
-			setRemovedUserIds(prev => (prev.includes(userId) ? prev : [...prev, userId]));
+			setRemovedParticipants(prev =>
+				prev.some(entry => entry.id === userId) ? prev : [...prev, { id: userId, role }],
+			);
 		}
 		// refresh current user list so the removed user becomes eligible to appear
 		// eslint-disable-next-line no-void
@@ -328,14 +332,24 @@ export default function ChatParticipantsModal({
 			}
 
 			// 3) Persist participants add/remove
-			if (addedUserIds.length > 0) {
-				const uniqueIds = Array.from(new Set(addedUserIds));
-				addParticipants({ chatRoomId: chatRoom.id, participantIds: uniqueIds });
+			if (addedParticipants.length > 0) {
+				const uniqueParticipants = Array.from(
+					new Map(addedParticipants.map((entry) => [entry.id, entry])).values(),
+				);
+				addParticipants({
+					chatRoomId: chatRoom.id,
+					participantIds: uniqueParticipants.map((entry) => entry.id),
+					participants: uniqueParticipants,
+				});
 			}
 
-			if (removedUserIds.length > 0) {
-				for (const removedId of removedUserIds) {
-					removeParticipant({ chatRoomId: chatRoom.id, participantId: removedId });
+			if (removedParticipants.length > 0) {
+				for (const removed of removedParticipants) {
+					removeParticipant({
+						chatRoomId: chatRoom.id,
+						participantId: removed.id,
+						participantRole: removed.role,
+					});
 				}
 			}
 
@@ -562,7 +576,7 @@ export default function ChatParticipantsModal({
 												const userIdToRemove = participantUserId;
 												console.log("Removing participant:", { userId: userIdToRemove, participant });
 												if (userIdToRemove) {
-													handleRemoveParticipant(userIdToRemove);
+													handleRemoveParticipant(userIdToRemove, safeUser.role);
 												}
 											}}
 											className="flex-shrink-0 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"

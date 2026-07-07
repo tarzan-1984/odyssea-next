@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { tokenEncoder } from "@/utils/tokenEncoder";
 import {
 	canAccessAppSettings,
+	canAccessBidRates,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessUserListAndCheckList,
@@ -141,6 +142,15 @@ export function middleware(request: NextRequest) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 		if (isCheckListPage && !canAccessCheckList(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+	}
+
+	const isBidRatesPage =
+		pathname === "/bid-rates" || pathname.startsWith("/bid-rates/");
+	if (isBidRatesPage && hasToken) {
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessBidRates(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}

@@ -187,7 +187,11 @@ export const useWebSocketChatRooms = ({
 
 	// Add participants
 	const addParticipants = useCallback(
-		(data: { chatRoomId: string; participantIds: string[] }) => {
+		(data: {
+			chatRoomId: string;
+			participantIds?: string[];
+			participants?: Array<{ id: string; role: string }>;
+		}) => {
 			if (socket && isConnected) {
 				setIsLoading(true);
 				socket.emit("addParticipants", data);
@@ -198,7 +202,11 @@ export const useWebSocketChatRooms = ({
 
 	// Remove participant
 	const removeParticipant = useCallback(
-		(data: { chatRoomId: string; participantId: string }) => {
+		(data: {
+			chatRoomId: string;
+			participantId: string;
+			participantRole?: string;
+		}) => {
 			if (socket && isConnected) {
 				setIsLoading(true);
 				socket.emit("removeParticipant", data);

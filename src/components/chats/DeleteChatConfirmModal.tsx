@@ -53,6 +53,7 @@ export default function DeleteChatConfirmModal({
 				removeParticipant({
 					chatRoomId: chatRoom.id,
 					participantId: currentUser.id,
+					participantRole: currentUser.role,
 				});
 				state.removeChatRoom(chatRoom.id);
 			} else {

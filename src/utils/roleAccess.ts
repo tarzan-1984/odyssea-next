@@ -83,6 +83,20 @@ export function canAccessCheckList(role: string | undefined | null): boolean {
 	return (CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
+/** Bid rates page: dispatchers and expedite managers. */
+export const BID_RATES_ALLOWED_ROLES = [
+	"DISPATCHER",
+	"DISPATCHER_TL",
+	"EXPEDITE_MANAGER",
+	"ADMINISTRATOR",
+] as const;
+
+export function canAccessBidRates(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (BID_RATES_ALLOWED_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Load tracking page: edit/delete history points on the map. */
 export const LOAD_TRACKING_HISTORY_EDIT_ROLES = [
 	"EXPEDITE_MANAGER",

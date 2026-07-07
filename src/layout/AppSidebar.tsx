@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import {
 	canAccessAppSettings,
+	canAccessBidRates,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessUserListAndCheckList,
@@ -20,6 +21,7 @@ import {
 	OffersIcon,
 	WorkstationIcon,
 	CheckListIcon,
+	BidRatesIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Users, MessageCircle } from "lucide-react";
@@ -72,6 +74,11 @@ const navItems: NavItem[] = [
 		icon: <CheckListIcon className="h-5 w-5" />,
 		name: "Check list",
 		path: "/check-list",
+	},
+	{
+		icon: <BidRatesIcon className="h-7 w-7" />,
+		name: "Bid rates",
+		path: "/bid-rates",
 	},
 	// {
 	//   name: "AI Assistant",
@@ -163,6 +170,7 @@ const navItems: NavItem[] = [
 const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
 const USER_LIST_PATHS = ["/user-list"];
 const CHECK_LIST_PATHS = ["/check-list"];
+const BID_RATES_PATHS = ["/bid-rates"];
 
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -173,6 +181,7 @@ const AppSidebar: React.FC = () => {
 	const canAccessDriversOffers = canAccessDriversAndOffers(currentUser?.role);
 	const canSeeUserList = canAccessUserListAndCheckList(currentUser?.role);
 	const canSeeCheckList = canAccessCheckList(currentUser?.role);
+	const canSeeBidRates = canAccessBidRates(currentUser?.role);
 	const appHomePath = getAppHomePath(currentUser?.role);
 	const menuNavItems = useMemo(
 		() =>
@@ -183,9 +192,17 @@ const AppSidebar: React.FC = () => {
 						!DRIVERS_OFFERS_PATHS.includes(item.path) ||
 						canAccessDriversOffers) &&
 					(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
-					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList),
+					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList) &&
+					(!item.path || !BID_RATES_PATHS.includes(item.path) || canSeeBidRates),
 			),
-		[isAdmin, canAccessAdminPages, canAccessDriversOffers, canSeeUserList, canSeeCheckList],
+		[
+			isAdmin,
+			canAccessAdminPages,
+			canAccessDriversOffers,
+			canSeeUserList,
+			canSeeCheckList,
+			canSeeBidRates,
+		],
 	);
 
 	const renderMenuItems = (navItems: NavItem[], menuType: "main") => (
