@@ -21,16 +21,23 @@ export interface DriversListQueryParams {
 
 const STALE_TIME_MS = 10 * 60 * 1000;
 
-/** for_offers is auto-applied only during address search; omit it once address is cleared */
+/**
+ * Resolve status_filter for TMS.
+ * Uses the selected TMS status key (available, available_on, for_offers, …).
+ * "all" / empty is omitted; address search defaults to for_offers when that was auto-applied.
+ */
 export function resolveStatusFilterForQuery(
 	addressFilter: string,
 	statusFilter: string,
 	statusAutoAppliedByAddress = false
 ): string {
+	const trimmed = statusFilter?.trim() ?? "";
+	if (trimmed && trimmed !== "all") {
+		return trimmed;
+	}
 	const hasAddress = Boolean(addressFilter.trim());
-	if (hasAddress) return "for_offers";
-	if (statusFilter === "for_offers" && statusAutoAppliedByAddress) return "";
-	return statusFilter;
+	if (hasAddress && statusAutoAppliedByAddress) return "for_offers";
+	return "";
 }
 
 export async function fetchDriversPage(
@@ -72,7 +79,7 @@ export async function fetchDriversPage(
 		params.statusAutoAppliedByAddress
 	);
 	if (effectiveStatusFilter) {
-		searchParams.set("extended_search", effectiveStatusFilter);
+		searchParams.set("status_filter", effectiveStatusFilter);
 	}
 
 	const activeDimensions = getActiveDimensionsQueryParams(dimensionsFilter);

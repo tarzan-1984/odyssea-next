@@ -64,7 +64,7 @@ export function DriversMapPageClient() {
 	// Reset status filter if it targets statuses this user is not allowed to see
 	useEffect(() => {
 		if (canViewRestrictedStatuses) return;
-		if (driverStatusFilter === "Blocked" || driverStatusFilter === "Out of service") {
+		if (driverStatusFilter === "blocked" || driverStatusFilter === "banned") {
 			setDriverStatusFilter("all");
 		}
 	}, [canViewRestrictedStatuses, driverStatusFilter]);
@@ -73,7 +73,7 @@ export function DriversMapPageClient() {
 	const driverStatusOptions = useMemo(() => {
 		const base = [...DRIVER_STATUS_FILTER_OPTIONS];
 		if (canViewRestrictedStatuses) return base;
-		return base.filter(opt => opt !== "Blocked" && opt !== "Out of service");
+		return base.filter(opt => opt !== "blocked" && opt !== "banned");
 	}, [canViewRestrictedStatuses]);
 
 	const handleFilterApply = useCallback(

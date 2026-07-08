@@ -19,16 +19,16 @@ export const DRIVER_STATUS_LABELS: Record<string, string> = {
 	unknown: "Unknown",
 };
 
-/** Fixed status options for filter dropdown - same as drivers-list. */
+/** Fixed status options for filter dropdown - TMS status_filter keys (same as drivers-list). */
 export const DRIVER_STATUS_FILTER_OPTIONS = [
-	"Available",
-	"Available on",
-	"Not available",
-	"Loaded & Enroute",
-	"Out of service",
-	"On vacation",
-	"No updates",
-	"Blocked",
+	"available",
+	"available_on",
+	"available_off",
+	"loaded_enroute",
+	"banned",
+	"on_vocation",
+	"no_updates",
+	"blocked",
 ] as const;
 
 /** Maps raw driver_status (e.g. available_off) to filter label - same logic as drivers-list. */

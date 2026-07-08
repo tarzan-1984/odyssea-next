@@ -6,7 +6,10 @@ import {
 	type Dispatch,
 	type SetStateAction,
 } from "react";
-import { DRIVER_STATUS_LABELS } from "@/components/logistics/driversMapConstants";
+import {
+	DRIVER_STATUS_LABELS,
+	getStatusLabelForFilter,
+} from "@/components/logistics/driversMapConstants";
 import MultiSelect from "@/components/form/MultiSelect";
 import { CAPABILITIES_OPTIONS } from "@/components/tables/DataTables/DriversTable/capabilitiesFilterOptions";
 
@@ -191,7 +194,7 @@ export function DriversMapFilters({
 					<option value="all">{DRIVER_STATUS_LABELS.all}</option>
 					{driverStatusOptions.map((status) => (
 						<option key={status} value={status}>
-							{status}
+							{getStatusLabelForFilter(status)}
 						</option>
 					))}
 				</select>

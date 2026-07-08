@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchDriversPage } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
 import type { DriversListQueryParams } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
-import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
+import { driverMapStatusMatchesFilter } from "@/components/logistics/driversMapConstants";
 
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes
 const PAGE_SIZE = 60;
@@ -120,14 +120,14 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
 		.filter((d): d is DriverForMap => d !== null);
 
-	// Client-side status filter fallback when API does not apply extended_search
+	// Client-side status filter fallback when API does not apply status_filter
 	const allDrivers = useMemo(() => {
 		const statusFilter = baseParams.statusFilter;
 		if (!statusFilter) return rawDrivers;
 		const hasAddressFilter = Boolean(baseParams.addressFilter?.trim());
-		if (!hasAddressFilter) return rawDrivers; // API already filtered via extended_search
-		return rawDrivers.filter(
-			(d) => getStatusLabelForFilter(d.driverStatus) === statusFilter
+		if (!hasAddressFilter) return rawDrivers; // API already filtered via status_filter
+		return rawDrivers.filter(d =>
+			driverMapStatusMatchesFilter(d.driverStatus, statusFilter)
 		);
 	}, [rawDrivers, baseParams.statusFilter, baseParams.addressFilter]);
 

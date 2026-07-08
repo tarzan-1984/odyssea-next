@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import {
 	Mc,
@@ -48,7 +48,10 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
-import { canCreateOffers as canCreateOffersByRole } from "@/utils/roleAccess";
+import {
+	canCreateOffers as canCreateOffersByRole,
+	canViewRestrictedDriverStatusesOnMap,
+} from "@/utils/roleAccess";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
@@ -216,14 +219,14 @@ export default function DriversListTable({
 		} else {
 			setStatusAutoAppliedByAddress(wasAuto => {
 				if (wasAuto) {
-					setStatusFilter(prev => (prev === "for_offers" ? "" : prev));
+					setStatusFilter(prev => (prev === "for_offers" ? "all" : prev));
 				}
 				return false;
 			});
 		}
 	}, [addressFilter]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
-	const [statusFilter, setStatusFilter] = useState<string>("");
+	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
 	const [dimensionsFilter, setDimensionsFilter] = useState<DimensionsFilterValues>(
@@ -252,10 +255,43 @@ export default function DriversListTable({
 	});
 
 	const isAdmin = currentUser?.role?.toLowerCase() === "administrator";
+	const canViewRestrictedStatuses = canViewRestrictedDriverStatusesOnMap(currentUser?.role);
 	const requiresAddressToSearch = !isAdmin;
 	const queryEnabled = isAdmin || Boolean(debouncedAddressFilter?.trim());
 	const showTablePlaceholder = requiresAddressToSearch && !debouncedAddressFilter?.trim();
 	const canSelectDrivers = Boolean(debouncedAddressFilter?.trim());
+
+	const statusFilterOptions = useMemo(() => {
+		const options: { value: string; label: string }[] = [
+			{ value: "all", label: "All statuses" },
+			{ value: "for_offers", label: "Default" },
+			{ value: "available", label: "Available" },
+			{ value: "available_on", label: "Available on" },
+			{ value: "available_off", label: "Not available" },
+			{ value: "loaded_enroute", label: "Loaded & Enroute" },
+		];
+		if (canViewRestrictedStatuses) {
+			options.push(
+				{ value: "banned", label: "Out of service" },
+				{ value: "on_vocation", label: "On vacation" },
+				{ value: "blocked", label: "Blocked" },
+				{ value: "expired_documents", label: "Expired documents" }
+			);
+		} else {
+			options.push(
+				{ value: "on_vocation", label: "On vacation" },
+				{ value: "expired_documents", label: "Expired documents" }
+			);
+		}
+		return options;
+	}, [canViewRestrictedStatuses]);
+
+	useEffect(() => {
+		if (canViewRestrictedStatuses) return;
+		if (statusFilter === "blocked" || statusFilter === "banned") {
+			setStatusFilter("all");
+		}
+	}, [canViewRestrictedStatuses, statusFilter]);
 
 	const queryParams: DriversListQueryParams = {
 		currentPage,
@@ -286,10 +322,13 @@ export default function DriversListTable({
 
 	const filteredResults =
 		(driverList?.data?.results as any[] | undefined)?.filter((item: any) => {
-			if (!statusFilter || statusFilter === "for_offers") return true;
-			const status = item?.meta_data?.driver_status as string | null | undefined;
-			const statusLabel = getStatusLabel(status);
-			return statusLabel === statusFilter;
+			if (!statusFilter || statusFilter === "all" || statusFilter === "for_offers") {
+				return true;
+			}
+			const status = String(item?.meta_data?.driver_status ?? "")
+				.trim()
+				.toLowerCase();
+			return status === statusFilter.toLowerCase();
 		}) ?? [];
 
 	const visibleDriverIds: string[] = filteredResults.map((d: any) => String(d.id));
@@ -634,16 +673,11 @@ export default function DriversListTable({
 							}}
 							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[160px] md:w-auto"
 						>
-							<option value="">All statuses</option>
-							<option value="for_offers">Default</option>
-							<option value="Available">Available</option>
-							<option value="Available on">Available on</option>
-							<option value="Not available">Not available</option>
-							<option value="Loaded & Enroute">Loaded & Enroute</option>
-							<option value="Out of service">Out of service</option>
-							<option value="On vacation">On vacation</option>
-							<option value="No updates">No updates</option>
-							<option value="Blocked">Blocked</option>
+							{statusFilterOptions.map(opt => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
 						</select>
 					</div>
 
@@ -659,7 +693,7 @@ export default function DriversListTable({
 								setDebouncedAddressFilter("");
 								setLocationFilter("USA");
 								setRadiusFilter("500");
-								setStatusFilter("");
+								setStatusFilter("all");
 								setStatusAutoAppliedByAddress(false);
 								setCapabilitiesFilter([]);
 								setDimensionsFilter(createEmptyDimensionsFilter());
