@@ -126,6 +126,14 @@ function formatDateMmDdYy(date: Date | null): string {
 	return `${m}/${d}/${y}`;
 }
 
+/** Driver statuses excluded from row selection (Select all and manual click). */
+const EXCLUDED_FROM_SELECTION_STATUSES = new Set(["loaded_enroute", "available_on"]);
+
+function isDriverStatusSelectable(status: string | null | undefined): boolean {
+	if (!status) return true;
+	return !EXCLUDED_FROM_SELECTION_STATUSES.has(status.toLowerCase());
+}
+
 /** Test driver on drivers-list — selectable and offerable without Address filter. */
 const TEST_DRIVER_EXTERNAL_ID = "3343";
 
@@ -286,8 +294,11 @@ export default function DriversListTable({
 		driverUsesMobileApp(item?.meta_data?.activate_application);
 	const canSelectDriverRow = (item: {
 		id?: string | number;
-		meta_data?: { activate_application?: string };
-	}) => isDriverRowSelectable(item) && (canSelectDrivers || isTestDriver(item));
+		meta_data?: { activate_application?: string; driver_status?: string };
+	}) =>
+		isDriverRowSelectable(item) &&
+		(canSelectDrivers || isTestDriver(item)) &&
+		isDriverStatusSelectable(item?.meta_data?.driver_status);
 	const selectableVisibleDriverIds = visibleDriverIds.filter(id => {
 		const item = filteredResults.find((d: any) => String(d.id) === id);
 		return item != null && canSelectDriverRow(item);
@@ -317,16 +328,16 @@ export default function DriversListTable({
 		}
 	}, [canSelectDrivers]);
 
-	// Drop selection for drivers without the mobile app or already in the offer
+	// Drop selection for drivers without the mobile app, already in the offer, or excluded status
 	useEffect(() => {
 		setSelectedDriverIds(prev => {
 			const next = prev.filter(id => {
 				const item = filteredResults.find((d: any) => String(d.id) === id);
-				return item != null && isDriverRowSelectable(item);
+				return item != null && canSelectDriverRow(item);
 			});
 			return next.length === prev.length ? prev : next;
 		});
-	}, [filteredResults, existingDriverIdsSet]);
+	}, [filteredResults, existingDriverIdsSet, canSelectDrivers]);
 
 	useEffect(() => {
 		const handleMouseUp = () => {
