@@ -141,17 +141,17 @@ function usesDateAvailableForDisplay(status: string | null | undefined): boolean
 	return DATE_AVAILABLE_STATUSES.has(status.trim().toLowerCase());
 }
 
-/** Driver statuses excluded from row selection (Select all and manual click). */
-const EXCLUDED_FROM_SELECTION_STATUSES = new Set(["loaded_enroute", "available_on"]);
+/** Statuses skipped by Select all; still selectable by manual click / drag. */
+const EXCLUDED_FROM_BULK_SELECTION_STATUSES = new Set(["loaded_enroute", "available_on"]);
 
-function isDriverStatusSelectable(status: string | null | undefined): boolean {
-	if (!status) return true;
-	return !EXCLUDED_FROM_SELECTION_STATUSES.has(status.toLowerCase());
+function isExcludedFromBulkSelection(status: string | null | undefined): boolean {
+	if (!status) return false;
+	return EXCLUDED_FROM_BULK_SELECTION_STATUSES.has(status.trim().toLowerCase());
 }
 
 function isDriverStatusWithHighlightedDate(status: string | null | undefined): boolean {
 	if (!status) return false;
-	if (EXCLUDED_FROM_SELECTION_STATUSES.has(status.trim().toLowerCase())) return true;
+	if (EXCLUDED_FROM_BULK_SELECTION_STATUSES.has(status.trim().toLowerCase())) return true;
 	const normalizedLabel = getStatusLabel(status).trim().toLowerCase();
 	return normalizedLabel === "loaded & enroute" || normalizedLabel === "available on";
 }
@@ -354,12 +354,16 @@ export default function DriversListTable({
 		id?: string | number;
 		meta_data?: { activate_application?: string; driver_status?: string };
 	}) =>
-		isDriverRowSelectable(item) &&
-		(canSelectDrivers || isTestDriver(item)) &&
-		isDriverStatusSelectable(item?.meta_data?.driver_status);
+		isDriverRowSelectable(item) && (canSelectDrivers || isTestDriver(item));
+	const canBulkSelectDriverRow = (item: {
+		id?: string | number;
+		meta_data?: { activate_application?: string; driver_status?: string };
+	}) =>
+		canSelectDriverRow(item) &&
+		!isExcludedFromBulkSelection(item?.meta_data?.driver_status);
 	const selectableVisibleDriverIds = visibleDriverIds.filter(id => {
 		const item = filteredResults.find((d: any) => String(d.id) === id);
-		return item != null && canSelectDriverRow(item);
+		return item != null && canBulkSelectDriverRow(item);
 	});
 	const allVisibleSelected =
 		selectableVisibleDriverIds.length > 0 &&
@@ -386,7 +390,7 @@ export default function DriversListTable({
 		}
 	}, [canSelectDrivers]);
 
-	// Drop selection for drivers without the mobile app, already in the offer, or excluded status
+	// Drop selection for drivers without the mobile app or already in the offer
 	useEffect(() => {
 		setSelectedDriverIds(prev => {
 			const next = prev.filter(id => {
