@@ -134,6 +134,13 @@ function isDriverStatusSelectable(status: string | null | undefined): boolean {
 	return !EXCLUDED_FROM_SELECTION_STATUSES.has(status.toLowerCase());
 }
 
+function isDriverStatusWithHighlightedDate(status: string | null | undefined): boolean {
+	if (!status) return false;
+	if (EXCLUDED_FROM_SELECTION_STATUSES.has(status.trim().toLowerCase())) return true;
+	const normalizedLabel = getStatusLabel(status).trim().toLowerCase();
+	return normalizedLabel === "loaded & enroute" || normalizedLabel === "available on";
+}
+
 /** Test driver on drivers-list — selectable and offerable without Address filter. */
 const TEST_DRIVER_EXTERNAL_ID = "3343";
 
@@ -1042,6 +1049,10 @@ export default function DriversListTable({
 														const dateDisplay = locationDate
 															? formatDateMmDdYy(locationDate)
 															: dateStr || "";
+														const highlightStatusDate =
+															isDriverStatusWithHighlightedDate(
+																item?.meta_data?.driver_status
+															);
 														return (
 															<TableCell
 																className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
@@ -1067,7 +1078,13 @@ export default function DriversListTable({
 																		</Link>
 																	)}
 																</p>
-																<p className="text-[10px] text-gray-400 dark:text-gray-500">
+																<p
+																	className={
+																		highlightStatusDate
+																			? "text-xs font-semibold text-blue-600 dark:text-blue-400"
+																			: "text-[10px] text-gray-400 dark:text-gray-500"
+																	}
+																>
 																	{dateDisplay}
 																</p>
 															</TableCell>
