@@ -24,20 +24,17 @@ const STALE_TIME_MS = 10 * 60 * 1000;
 /**
  * Resolve status_filter for TMS.
  * Uses the selected TMS status key (available, available_on, for_offers, …).
- * "all" / empty is omitted; address search defaults to for_offers when that was auto-applied.
+ * "all" / empty → omit status_filter entirely (show every status).
+ * Address auto-selects Default (for_offers) in UI; if user then picks All statuses, nothing is sent.
  */
 export function resolveStatusFilterForQuery(
-	addressFilter: string,
+	_addressFilter: string,
 	statusFilter: string,
-	statusAutoAppliedByAddress = false
+	_statusAutoAppliedByAddress = false
 ): string {
 	const trimmed = statusFilter?.trim() ?? "";
-	if (trimmed && trimmed !== "all") {
-		return trimmed;
-	}
-	const hasAddress = Boolean(addressFilter.trim());
-	if (hasAddress && statusAutoAppliedByAddress) return "for_offers";
-	return "";
+	if (!trimmed || trimmed === "all") return "";
+	return trimmed;
 }
 
 export async function fetchDriversPage(
