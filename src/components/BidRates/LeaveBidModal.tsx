@@ -142,7 +142,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 								id="leave-bid-rate"
 								name="rate"
 								type="number"
-								step="0.01"
+								step={0.01}
 								min="0"
 								inputMode="decimal"
 								value={form.rate}
