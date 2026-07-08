@@ -129,6 +129,18 @@ function formatDateMmDdYy(date: Date | null): string {
 	return `${m}/${d}/${y}`;
 }
 
+/** Statuses that show `date_available` in Location & Date (not zip/location update time). */
+const DATE_AVAILABLE_STATUSES = new Set([
+	"available_on",
+	"loaded_enroute",
+	"on_vocation",
+]);
+
+function usesDateAvailableForDisplay(status: string | null | undefined): boolean {
+	if (!status) return false;
+	return DATE_AVAILABLE_STATUSES.has(status.trim().toLowerCase());
+}
+
 /** Driver statuses excluded from row selection (Select all and manual click). */
 const EXCLUDED_FROM_SELECTION_STATUSES = new Set(["loaded_enroute", "available_on"]);
 
@@ -1067,15 +1079,21 @@ export default function DriversListTable({
 
 													{/*location & date — light red background if datetime on second line is older than 12 hours */}
 													{(() => {
-														const dateStr =
-															item?.updated_zipcode ||
-															(item as any)?.date_updated ||
-															item?.meta_data?.status_date ||
-															"";
+														const driverStatus = item?.meta_data
+															?.driver_status as string | null | undefined;
+														const dateStr = usesDateAvailableForDisplay(
+															driverStatus
+														)
+															? item?.date_available || ""
+															: item?.updated_zipcode ||
+																(item as any)?.date_updated ||
+																item?.meta_data?.status_date ||
+																"";
 														const locationDate = dateStr
 															? new Date(dateStr.replace(/\s+/, "T"))
 															: null;
 														const isOlderThan12h =
+															!usesDateAvailableForDisplay(driverStatus) &&
 															locationDate &&
 															!Number.isNaN(locationDate.getTime()) &&
 															Date.now() - locationDate.getTime() >
@@ -1084,9 +1102,7 @@ export default function DriversListTable({
 															? formatDateMmDdYy(locationDate)
 															: dateStr || "";
 														const highlightStatusDate =
-															isDriverStatusWithHighlightedDate(
-																item?.meta_data?.driver_status
-															);
+															isDriverStatusWithHighlightedDate(driverStatus);
 														return (
 															<TableCell
 																className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
