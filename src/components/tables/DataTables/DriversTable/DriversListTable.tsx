@@ -115,18 +115,24 @@ function getStatusLabel(status: string | null | undefined): string {
 	return STATUS_LABELS[key] ?? STATUS_LABELS[key.toLowerCase()] ?? status;
 }
 
-/** Format date as mm/dd/YY for Location & Date column */
+/** Format vehicle_type for display */
 function formatVehicleType(value: string | null | undefined): string {
 	if (!value) return "";
 	return value.replace(/-/g, " ").replace(/^\w/, c => c.toUpperCase());
 }
 
+/** Format date/time as mm/dd/YY h:mma (e.g. 07/09/26 9:00am) for Location & Date */
 function formatDateMmDdYy(date: Date | null): string {
 	if (!date || Number.isNaN(date.getTime())) return "";
 	const m = (date.getMonth() + 1).toString().padStart(2, "0");
 	const d = date.getDate().toString().padStart(2, "0");
 	const y = date.getFullYear().toString().slice(-2);
-	return `${m}/${d}/${y}`;
+	let hours = date.getHours();
+	const minutes = date.getMinutes().toString().padStart(2, "0");
+	const ampm = hours >= 12 ? "pm" : "am";
+	hours = hours % 12;
+	if (hours === 0) hours = 12;
+	return `${m}/${d}/${y} ${hours}:${minutes}${ampm}`;
 }
 
 /** Statuses that show `date_available` in Location & Date (not zip/location update time). */
@@ -753,12 +759,12 @@ export default function DriversListTable({
 											maxWidth: "120px",
 										}}
 									/>
-									{/* Location & Date: fixed 160px (room for address + date + map icon) */}
+									{/* Location & Date: fixed 190px (room for address + date/time + map icon) */}
 									<col
 										style={{
-											width: "160px",
-											minWidth: "160px",
-											maxWidth: "160px",
+											width: "190px",
+											minWidth: "190px",
+											maxWidth: "190px",
 										}}
 									/>
 									{showDistanceColumn && (
@@ -774,16 +780,16 @@ export default function DriversListTable({
 									<col
 										style={{
 											width: showDistanceColumn
-												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
-												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 190px) * 30 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 190px) * 30 / 100)",
 										}}
 									/>
 									{/* Vehicle: ~13% */}
 									<col
 										style={{
 											width: showDistanceColumn
-												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 13 / 100)"
-												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 13 / 100)",
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 190px) * 13 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 190px) * 13 / 100)",
 										}}
 									/>
 									{/* Dimensions & Payload: fixed 120px */}
@@ -798,16 +804,16 @@ export default function DriversListTable({
 									<col
 										style={{
 											width: showDistanceColumn
-												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 30 / 100)"
-												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 30 / 100)",
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 190px) * 30 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 190px) * 30 / 100)",
 										}}
 									/>
 									{/* Comments: ~27% */}
 									<col
 										style={{
 											width: showDistanceColumn
-												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 160px) * 27 / 100)"
-												: "calc((100% - 120px - 72px - 72px - 120px - 160px) * 27 / 100)",
+												? "calc((100% - 120px - 68px - 72px - 72px - 120px - 190px) * 27 / 100)"
+												: "calc((100% - 120px - 72px - 72px - 120px - 190px) * 27 / 100)",
 										}}
 									/>
 									<col
@@ -1081,10 +1087,14 @@ export default function DriversListTable({
 														);
 													})()}
 
-													{/*location & date — light red background if datetime on second line is older than 12 hours */}
+													{/*location & date — pink cell + updated_zipcode line when zip update present */}
 													{(() => {
 														const driverStatus = item?.meta_data
 															?.driver_status as string | null | undefined;
+														const updatedZipcodeRaw = String(
+															item?.updated_zipcode ?? ""
+														).trim();
+														const hasUpdatedZipcode = Boolean(updatedZipcodeRaw);
 														const dateStr = usesDateAvailableForDisplay(
 															driverStatus
 														)
@@ -1096,27 +1106,54 @@ export default function DriversListTable({
 														const locationDate = dateStr
 															? new Date(dateStr.replace(/\s+/, "T"))
 															: null;
+														const dateDisplay = locationDate
+															? formatDateMmDdYy(locationDate)
+															: dateStr || "";
+														const updatedZipcodeDate = hasUpdatedZipcode
+															? new Date(updatedZipcodeRaw.replace(/\s+/, "T"))
+															: null;
+														const updatedZipcodeDisplay =
+															updatedZipcodeDate &&
+															!Number.isNaN(updatedZipcodeDate.getTime())
+																? formatDateMmDdYy(updatedZipcodeDate)
+																: updatedZipcodeRaw;
+														// Highlight only when updated_zipcode is a distinct second line
+														const showUpdatedZipcodeLine =
+															hasUpdatedZipcode &&
+															updatedZipcodeDisplay !== dateDisplay;
 														const isOlderThan12h =
+															!showUpdatedZipcodeLine &&
 															!usesDateAvailableForDisplay(driverStatus) &&
 															locationDate &&
 															!Number.isNaN(locationDate.getTime()) &&
 															Date.now() - locationDate.getTime() >
 																12 * 60 * 60 * 1000;
-														const dateDisplay = locationDate
-															? formatDateMmDdYy(locationDate)
-															: dateStr || "";
 														const highlightStatusDate =
 															isDriverStatusWithHighlightedDate(driverStatus);
+														const dateTextClass = highlightStatusDate
+															? "text-xs font-semibold text-blue-600 dark:text-blue-400"
+															: "text-[10px] text-gray-400 dark:text-gray-500";
 														return (
 															<TableCell
-																className={`p-2 font-normal dark:text-gray-400/90 text-gray-800 border ${cellBorder} text-theme-sm whitespace-nowrap ${isOlderThan12h ? "bg-red-50 dark:bg-red-950/30" : ""}`}
+																className={`p-2 font-normal border text-theme-sm ${
+																	showUpdatedZipcodeLine
+																		? "border-gray-400 text-black dark:border-gray-500 dark:text-black"
+																		: `dark:text-gray-400/90 text-gray-800 ${cellBorder}${isOlderThan12h ? " bg-red-50 dark:bg-red-950/30" : ""}`
+																}`}
+																style={
+																	showUpdatedZipcodeLine
+																		? { backgroundColor: "#f1cfcf" }
+																		: undefined
+																}
 															>
-																<p className="inline-flex items-center gap-1">
-																	{item?.meta_data?.current_city}{" "}
-																	{
-																		item?.meta_data
-																			?.current_location
-																	}
+																<p className="flex flex-wrap items-start gap-1">
+																	<span className="min-w-0 break-words whitespace-normal">
+																		{item?.meta_data?.current_city}{" "}
+																		{
+																			item?.meta_data
+																				?.current_location
+																		}
+																	</span>
 																	{(item?.meta_data?.driver_id ??
 																		item?.id) && (
 																		<Link
@@ -1125,22 +1162,25 @@ export default function DriversListTable({
 																					?.driver_id ??
 																					item?.id
 																			)}`}
-																			className="inline-flex shrink-0 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+																			className={
+																				showUpdatedZipcodeLine
+																					? "inline-flex shrink-0 text-black hover:text-black"
+																					: "inline-flex shrink-0 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+																			}
 																			title="Show on map"
 																		>
 																			<MapSearchIcon className="h-4 w-4" />
 																		</Link>
 																	)}
 																</p>
-																<p
-																	className={
-																		highlightStatusDate
-																			? "text-xs font-semibold text-blue-600 dark:text-blue-400"
-																			: "text-[10px] text-gray-400 dark:text-gray-500"
-																	}
-																>
+																<p className={`${dateTextClass} whitespace-nowrap`}>
 																	{dateDisplay}
 																</p>
+																{showUpdatedZipcodeLine && (
+																	<p className={`${dateTextClass} whitespace-nowrap`}>
+																		{updatedZipcodeDisplay}
+																	</p>
+																)}
 															</TableCell>
 														);
 													})()}
