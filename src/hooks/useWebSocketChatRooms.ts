@@ -162,7 +162,7 @@ export const useWebSocketChatRooms = ({
 	const createChatRoom = useCallback(
 		(data: {
 			name?: string;
-			type: "DIRECT" | "GROUP" | "LOAD";
+			type: "DIRECT" | "GROUP" | "LOAD" | "BID";
 			loadId?: string;
 			participantIds: string[];
 		}) => {

@@ -1,10 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { createBidRate } from "@/app-api/bidRates";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
+import BidRateRouteBuilder, {
+	bidRouteRowsToPayload,
+	initialBidRouteRows,
+	validateBidRouteRows,
+	type BidRouteRow,
+} from "./BidRateRouteBuilder";
 
 type LeaveBidModalProps = {
 	isOpen: boolean;
@@ -12,27 +19,27 @@ type LeaveBidModalProps = {
 };
 
 type LeaveBidForm = {
-	origin: string;
-	destination: string;
 	broker: string;
 	rate: string;
 };
 
 const EMPTY_FORM: LeaveBidForm = {
-	origin: "",
-	destination: "",
 	broker: "",
 	rate: "",
 };
 
 export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	const [form, setForm] = useState<LeaveBidForm>(EMPTY_FORM);
+	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
+	const [routeError, setRouteError] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
 	useEffect(() => {
 		if (isOpen) {
 			setForm(EMPTY_FORM);
+			setRouteRows(initialBidRouteRows());
+			setRouteError(null);
 			setError(null);
 			setSubmitting(false);
 		}
@@ -45,20 +52,17 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
 		setError(null);
+		setRouteError(null);
 
-		const origin = form.origin.trim();
-		const destination = form.destination.trim();
 		const broker = form.broker.trim();
 		const rateRaw = form.rate.trim();
+		const nextRouteError = validateBidRouteRows(routeRows);
 
-		if (!origin) {
-			setError("Please enter origin.");
+		if (nextRouteError) {
+			setRouteError(nextRouteError);
 			return;
 		}
-		if (!destination) {
-			setError("Please enter destination.");
-			return;
-		}
+
 		if (!broker) {
 			setError("Please enter broker.");
 			return;
@@ -76,7 +80,18 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 
 		setSubmitting(true);
 		try {
+			await createBidRate({
+				route: bidRouteRowsToPayload(routeRows),
+				broker,
+				rate,
+			});
 			onClose();
+		} catch (err) {
+			const message =
+				(err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+				(err as Error)?.message ||
+				"Failed to create bid rate.";
+			setError(message);
 		} finally {
 			setSubmitting(false);
 		}
@@ -86,40 +101,18 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
-			className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-900"
+			className="w-full max-w-2xl rounded-xl bg-white shadow-xl dark:bg-gray-900"
 			closeOnBackdropClick
 		>
 			<form onSubmit={onSubmit} className="p-6">
 				<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Leave bid</h2>
 
 				<div className="mt-5 space-y-4">
-					<div>
-						<Label htmlFor="leave-bid-origin">Origin</Label>
-						<div className="mt-1.5">
-							<Input
-								id="leave-bid-origin"
-								name="origin"
-								type="text"
-								value={form.origin}
-								onChange={e => updateField("origin", e.target.value)}
-								placeholder="Enter origin"
-							/>
-						</div>
-					</div>
+					<BidRateRouteBuilder rows={routeRows} onChange={setRouteRows} />
 
-					<div>
-						<Label htmlFor="leave-bid-destination">Destination</Label>
-						<div className="mt-1.5">
-							<Input
-								id="leave-bid-destination"
-								name="destination"
-								type="text"
-								value={form.destination}
-								onChange={e => updateField("destination", e.target.value)}
-								placeholder="Enter destination"
-							/>
-						</div>
-					</div>
+					{routeError && (
+						<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
+					)}
 
 					<div>
 						<Label htmlFor="leave-bid-broker">Broker</Label>

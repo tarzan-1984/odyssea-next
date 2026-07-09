@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Validate type
-		if (!["DIRECT", "GROUP"].includes(type)) {
+		if (!["DIRECT", "GROUP", "BID"].includes(type)) {
 			return NextResponse.json(
-				{ error: "Invalid type. Must be 'DIRECT' or 'GROUP'" },
+				{ error: "Invalid type. Must be 'DIRECT', 'GROUP', or 'BID'" },
 				{ status: 400 }
 			);
 		}
@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		if (type === "GROUP" && participantIds.length < 1) {
+		if ((type === "GROUP" || type === "BID") && participantIds.length < 1) {
 			return NextResponse.json(
-				{ error: "Group chats must have at least 1 participant" },
+				{ error: "Group and bid chats must have at least 1 participant" },
 				{ status: 400 }
 			);
 		}

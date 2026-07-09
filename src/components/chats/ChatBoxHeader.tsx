@@ -17,6 +17,7 @@ import {
 	getOtherChatParticipant,
 	participantUserToAvatarData,
 } from "@/utils/chatOtherParticipant";
+import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -66,7 +67,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			return chatRoom.name;
 		}
 
-		if (chatRoom.type === "GROUP") {
+		if (isMultiUserChatType(chatRoom.type)) {
 			const participantNames = chatRoom.participants
 				.slice(0, 2)
 				.map(p => p.user.firstName)
@@ -141,7 +142,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								return renderLoadChatAvatar(chatRoom, "w-12 h-12");
 							}
 
-							if (chatRoom.type === "GROUP" && chatRoom.avatar) {
+							if (isMultiUserChatType(chatRoom.type) && chatRoom.avatar) {
 								return (
 									// eslint-disable-next-line @next/next/no-img-element
 									<img
@@ -152,7 +153,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								);
 							}
 
-							if (chatRoom.type === "GROUP") {
+							if (isMultiUserChatType(chatRoom.type)) {
 								const name = getChatDisplayName();
 								const parts = name.trim().split(/\s+/).filter(Boolean);
 								const initials =
@@ -229,7 +230,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							anchorAlign="right"
 						>
 							{chatRoom?.adminId === currentUser?.id &&
-								chatRoom?.type === "GROUP" && (
+								isMultiUserChatType(chatRoom?.type) && (
 									<DropdownItem
 										onItemClick={() => {
 											closeDropdown();
@@ -278,7 +279,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 										className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
 									>
 										<TrashDeleteIcon className="w-4 h-4" />
-										{chatRoom?.type === "GROUP" &&
+										{isMultiUserChatType(chatRoom?.type) &&
 										chatRoom?.adminId !== currentUser?.id
 											? "Leave"
 											: "Delete"}

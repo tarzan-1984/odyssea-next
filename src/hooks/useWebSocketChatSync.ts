@@ -195,7 +195,7 @@ export const useWebSocketChatSync = () => {
 			if (isConnected) {
 				wsCreateChatRoom({
 					name: chatRoomData.name,
-					type: chatRoomData.type as "DIRECT" | "GROUP" | "LOAD",
+					type: chatRoomData.type as "DIRECT" | "GROUP" | "LOAD" | "BID",
 					loadId: chatRoomData.loadId,
 					participantIds: chatRoomData.participantIds,
 				});
@@ -203,7 +203,7 @@ export const useWebSocketChatSync = () => {
 				await createChatRoomApi({
 					...chatRoomData,
 					name: chatRoomData.name || `Chat ${Date.now()}`,
-					type: chatRoomData.type as "DIRECT" | "GROUP",
+					type: chatRoomData.type as "DIRECT" | "GROUP" | "BID",
 				});
 			}
 		},

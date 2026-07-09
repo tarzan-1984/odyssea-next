@@ -15,6 +15,7 @@ import LoadChatsArchiveSection from "./LoadChatsArchiveSection";
 import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 // WebSocket functionality is now passed via props
@@ -182,8 +183,8 @@ export default function ChatList({
 			return chatRoom.name;
 		}
 
-		// For group chats, show participant names
-		if (chatRoom.type === "GROUP") {
+		// For group / bid chats, show participant names
+		if (isMultiUserChatType(chatRoom.type)) {
 			const participantNames = chatRoom.participants
 				.slice(0, 2)
 				.map(p => p.user.firstName)
@@ -241,7 +242,7 @@ export default function ChatList({
 	// Unread counts per tab (for badge on tab buttons)
 	const tabUnreadCounts = useMemo(() => {
 		const chats = chatRooms
-			.filter(r => r.type !== "LOAD" && r.type !== "OFFER")
+			.filter(r => r.type !== "LOAD" && r.type !== "OFFER" && r.type !== "BID")
 			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
 		const shipments = chatRooms
 			.filter(r => r.type === "LOAD" && r.isLoadArchived !== true)
@@ -253,11 +254,12 @@ export default function ChatList({
 	}, [chatRooms]);
 
 	// Tab filtering:
-	// - Chats tab: show DIRECT and GROUP (exclude LOAD and OFFER)
+	// - Chats tab: show DIRECT and GROUP (exclude LOAD, OFFER, BID)
 	// - Shipments tab: show only LOAD chats
 	// - Offers tab: show only OFFER chats
 	const tabScopedChatRooms = chatRooms.filter(room => {
-		if (activeTab === "chats") return room.type !== "LOAD" && room.type !== "OFFER";
+		if (activeTab === "chats")
+			return room.type !== "LOAD" && room.type !== "OFFER" && room.type !== "BID";
 		if (activeTab === "shipments")
 			return room.type === "LOAD" && !(room.isLoadArchived === true);
 		if (activeTab === "offers") return room.type === "OFFER";

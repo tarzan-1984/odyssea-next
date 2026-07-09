@@ -398,7 +398,7 @@ export const useChatSync = () => {
 	const createChatRoom = useCallback(
 		async (chatRoomData: {
 			name: string;
-			type: "DIRECT" | "GROUP";
+			type: "DIRECT" | "GROUP" | "BID";
 			loadId?: string;
 			participantIds: string[];
 			avatar?: string;

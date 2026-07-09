@@ -14,6 +14,7 @@ import { S3Uploader } from "@/app-api/S3Uploader";
 import { useChatStore } from "@/stores/chatStore";
 import Image from "next/image";
 import { userMatchesSearchQuery } from "@/utils/chatSearch";
+import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 
 interface ChatParticipantsModalProps {
 	isOpen: boolean;
@@ -52,7 +53,7 @@ export default function ChatParticipantsModal({
 
 	// Check if current user is admin of this chat
 	const isCurrentUserAdmin = chatRoom?.adminId === currentUser?.id;
-	const isGroupChat = chatRoom?.type === "GROUP";
+	const isGroupChat = isMultiUserChatType(chatRoom?.type);
 	const isLoadChat = chatRoom?.type === "LOAD";
 	const isOfferChat = chatRoom?.type === "OFFER";
 

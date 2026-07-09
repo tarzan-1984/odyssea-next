@@ -12,6 +12,7 @@ import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { stripMarkdown } from "@/utils/chatMarkdown";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import {
 	getOtherChatParticipant,
 	OFFER_CHAT_LIST_AVATAR_CLASS,
@@ -60,8 +61,8 @@ export default function ChatListItem({
 			return chatRoom.name;
 		}
 
-		// For group chats, show participant names
-		if (chatRoom.type === "GROUP") {
+		// For group / bid chats, show participant names
+		if (isMultiUserChatType(chatRoom.type)) {
 			const participantNames = chatRoom.participants
 				.slice(0, 2)
 				.map(p => p.user.firstName)
@@ -250,7 +251,7 @@ export default function ChatListItem({
 			<div className="relative flex-shrink-0">
 				{chatRoom.type === "LOAD" ? (
 					renderLoadChatAvatar(chatRoom, "w-12 h-12")
-				) : chatRoom.type === "GROUP" && (!chatRoom.avatar || chatRoom.avatar === "") ? (
+				) : isMultiUserChatType(chatRoom.type) && (!chatRoom.avatar || chatRoom.avatar === "") ? (
 					<div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-800 dark:text-gray-100">
 						{(() => {
 							const name = getChatDisplayName(chatRoom);

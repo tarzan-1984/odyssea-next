@@ -449,7 +449,7 @@ export interface ChangeUserStatusInput {
 // Chat Room API types
 export interface CreateChatRoomData {
     name: string;
-    type: "DIRECT" | "GROUP";
+    type: "DIRECT" | "GROUP" | "BID";
     loadId: string;
     participantIds: string[];
     avatar?: string;
