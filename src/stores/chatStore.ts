@@ -15,7 +15,7 @@ import { trimChatMessagesWindow } from "@/utils/trimChatMessagesWindow";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { useUserStore } from "./userStore";
 
-// Helper function to sort chat rooms by pin, unread, mute status, and last message date
+// Helper function to sort chat rooms by pin, mute status, and last message date (read/unread does not affect order)
 const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
 	const compareByDate = (a: ChatRoom, b: ChatRoom) => {
 		const aDate = a.lastMessage?.createdAt || a.createdAt;
@@ -23,26 +23,18 @@ const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
 		return new Date(bDate).getTime() - new Date(aDate).getTime();
 	};
 
-	const hasUnread = (room: ChatRoom) => (room.unreadCount ?? 0) > 0;
-
 	return [...chatRooms].sort((a, b) => {
 		// 1. Pinned chats first
 		if (a.isPinned && !b.isPinned) return -1;
 		if (!a.isPinned && b.isPinned) return 1;
 
-		// 2. Unread chats before read (within the same pin group)
-		const aUnread = hasUnread(a);
-		const bUnread = hasUnread(b);
-		if (aUnread && !bUnread) return -1;
-		if (!aUnread && bUnread) return 1;
-
-		// 3. Among non-pinned: muted chats go to the bottom
+		// 2. Among non-pinned: muted chats go to the bottom
 		if (!a.isPinned && !b.isPinned) {
 			if (a.isMuted && !b.isMuted) return 1;
 			if (!a.isMuted && b.isMuted) return -1;
 		}
 
-		// 4. Sort by last message date
+		// 3. Sort by last message date
 		return compareByDate(a, b);
 	});
 };
