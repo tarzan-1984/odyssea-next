@@ -581,6 +581,7 @@ export default function DriversListTable({
 							externalId={currentUser?.externalId ?? ""}
 							selectedDriverIds={selectedDriverIds}
 							driverEmptyMiles={driverEmptyMiles}
+							initialPickupLocation={addressFilter.trim() || undefined}
 							onSubmit={() => {
 								setSelectedDriverIds([]);
 							}}

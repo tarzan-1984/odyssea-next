@@ -52,6 +52,8 @@ export interface CreateOfferModalProps {
 	selectedDriverIds: string[];
 	/** Map driverId -> empty_miles (rounded). Passed to backend for rate_offers. */
 	driverEmptyMiles?: Record<string, number>;
+	/** Pre-fill first pick up location (e.g. drivers-list address search). */
+	initialPickupLocation?: string;
 	onSubmit?: (values: CreateOfferFormValues) => void;
 	/** When set, modal opens in edit mode with pre-filled values. */
 	editData?: EditOfferData | null;
@@ -418,6 +420,7 @@ export default function CreateOfferModal({
 	externalId,
 	selectedDriverIds,
 	driverEmptyMiles = {},
+	initialPickupLocation,
 	onSubmit,
 	editData = null,
 }: CreateOfferModalProps) {
@@ -454,10 +457,14 @@ export default function CreateOfferModal({
 	 * only when locations actually changed, not on every focus/blur.
 	 */
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
+	const initialPickupAppliedRef = useRef(false);
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			initialPickupAppliedRef.current = false;
+			return;
+		}
 
 		if (editData) {
 			setInitialEditSnapshot(snapshotFromEditData(editData));
@@ -484,7 +491,12 @@ export default function CreateOfferModal({
 		} else {
 			setInitialEditSnapshot(null);
 			setFormValues({ ...initialFormState });
-			setRouteRows([initialRouteRow("pickup"), initialRouteRow("delivery")]);
+			const trimmedPickup = initialPickupLocation?.trim() ?? "";
+			const pickupRow = initialRouteRow("pickup");
+			if (trimmedPickup) {
+				pickupRow.location = trimmedPickup;
+			}
+			setRouteRows([pickupRow, initialRouteRow("delivery")]);
 			setEditFallbackLoadedMiles(null);
 			setManualLoadedMiles(null);
 			setCommittedLocations([]);
@@ -726,6 +738,23 @@ export default function CreateOfferModal({
 		},
 		[commitLocations]
 	);
+
+	// Run geocode/zip resolution for pre-filled pick up (same as manual blur).
+	useEffect(() => {
+		if (!isOpen || editData || initialPickupAppliedRef.current) return;
+
+		const trimmed = initialPickupLocation?.trim();
+		if (!trimmed) return;
+
+		const pickupIndex = routeRows.findIndex(row => row.type === "pickup");
+		if (pickupIndex < 0) return;
+
+		const row = routeRows[pickupIndex];
+		if (row.location.trim() !== trimmed) return;
+
+		initialPickupAppliedRef.current = true;
+		handleAddressBlur(pickupIndex, trimmed, row.id).catch(() => {});
+	}, [isOpen, editData, initialPickupLocation, routeRows, handleAddressBlur]);
 
 	const moveExtraRow = useCallback(
 		(dragIndex: number, hoverIndex: number) => {
