@@ -14,10 +14,11 @@ import { chatApi } from "@/app-api/chatApi";
 import LoadChatsArchiveSection from "./LoadChatsArchiveSection";
 import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
-import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import { formatChatPeerDisplayName, formatOfferChatDriverDisplayName } from "@/utils/chatPeerDisplayName";
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
+import { canShowOfferId } from "@/utils/offerDisplay";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -169,12 +170,16 @@ export default function ChatList({
 		}
 	}, [showOffersTab, activeTab]);
 
+	const showOfferId = canShowOfferId(currentUser);
+
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT and OFFER chats, show the other participant's name
 		if ((chatRoom.type === "DIRECT" || chatRoom.type === "OFFER") && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
-				return formatChatPeerDisplayName(otherParticipant.user);
+				return chatRoom.type === "OFFER"
+					? formatOfferChatDriverDisplayName(otherParticipant.user)
+					: formatChatPeerDisplayName(otherParticipant.user);
 			}
 		}
 
@@ -758,9 +763,11 @@ export default function ChatList({
 												<div className="font-medium text-gray-800 dark:text-gray-200 break-words leading-snug">
 													{route}
 												</div>
-												<div className="text-xs text-gray-500 dark:text-gray-400">
-													(id: {id})
-												</div>
+												{showOfferId ? (
+													<div className="text-xs text-gray-500 dark:text-gray-400">
+														(id: {id})
+													</div>
+												) : null}
 											</div>
 											<div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
 												{groupUnreadCount > 0 && (

@@ -18,6 +18,8 @@ import {
 	participantUserToAvatarData,
 } from "@/utils/chatOtherParticipant";
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
+import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
+import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -53,12 +55,15 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const getChatDisplayName = (): string => {
 		if (!chatRoom) return "Select a chat";
 
+		if (chatRoom.type === "OFFER" && chatRoom.participants.length === 2) {
+			return getOfferChatStaffHeaderTitle(chatRoom, currentUser?.id);
+		}
+
 		// For direct chats, ALWAYS show the other participant's name (ignore chatRoom.name)
-		// For OFFER chats, use chat name (offer card title)
 		if (chatRoom.type === "DIRECT" && chatRoom.participants.length === 2) {
 			const otherParticipant = chatRoom.participants.find(p => p.user.id !== currentUser?.id);
 			if (otherParticipant) {
-				return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
+				return formatChatPeerDisplayName(otherParticipant.user);
 			}
 		}
 
