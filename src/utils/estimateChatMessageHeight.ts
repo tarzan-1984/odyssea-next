@@ -1,22 +1,22 @@
 import { Message, getMessageMultiAttachments } from "@/app-api/chatApi";
-import {
-	CHAT_DOCUMENT_PREVIEW_HEIGHT_PX,
-	CHAT_IMAGE_PREVIEW_MAX_HEIGHT_PX,
-} from "@/config/chatImagePreview";
 
-const BASE_HEIGHT_PX = 88;
+const BASE_HEIGHT_PX = 20;
 const LINE_HEIGHT_PX = 20;
-const CHARS_PER_LINE = 52;
+const CHARS_PER_LINE = 42;
 const MAX_TEXT_HEIGHT_PX = 480;
 const REPLY_BLOCK_PX = 68;
 const REACTIONS_PX = 40;
-const IMAGE_ATTACHMENT_PX = CHAT_IMAGE_PREVIEW_MAX_HEIGHT_PX + 56;
-const PDF_ATTACHMENT_PX = CHAT_DOCUMENT_PREVIEW_HEIGHT_PX;
+const SINGLE_ATTACHMENT_CARD_PX = 160;
+const IMAGE_ATTACHMENT_PX = SINGLE_ATTACHMENT_CARD_PX;
+const PDF_ATTACHMENT_PX = SINGLE_ATTACHMENT_CARD_PX;
 const GENERIC_FILE_PX = 76;
-const INCOMING_NAME_PX = 28;
+const MULTI_ATTACHMENT_CELL_PX = 148;
+const TWO_ATTACHMENT_CELL_PX = 168;
+const MULTI_ATTACHMENT_GRID_GAP_PX = 8;
+const INCOMING_NAME_PX = 24;
 const INCOMING_FOOTER_PX = 24;
-const INCOMING_PHONE_PX = 22;
-const OUTGOING_META_PX = 28;
+const INCOMING_PHONE_PX = 26;
+const OUTGOING_META_PX = 24;
 const PENDING_FAILED_PX = 32;
 
 export interface EstimateChatMessageHeightOptions {
@@ -36,6 +36,13 @@ function attachmentHeight(fileName: string): number {
 	if (isImageFileName(fileName)) return IMAGE_ATTACHMENT_PX;
 	if (isPdfFileName(fileName)) return PDF_ATTACHMENT_PX;
 	return GENERIC_FILE_PX;
+}
+
+function multiAttachmentGridHeight(count: number): number {
+	const columns = count > 3 ? 3 : 2;
+	const rows = Math.max(1, Math.ceil(count / columns));
+	const cellHeight = count === 2 ? TWO_ATTACHMENT_CELL_PX : MULTI_ATTACHMENT_CELL_PX;
+	return rows * cellHeight + Math.max(0, rows - 1) * MULTI_ATTACHMENT_GRID_GAP_PX;
 }
 
 function shouldEstimateIncomingPhone(message: Message, chatRoomType?: string): boolean {
@@ -78,9 +85,7 @@ export function estimateChatMessageHeight(
 
 	const multi = getMessageMultiAttachments(message);
 	if (multi && multi.length >= 2) {
-		for (const file of multi) {
-			height += attachmentHeight(file.fileName ?? "");
-		}
+		height += multiAttachmentGridHeight(multi.length);
 	} else if (message.fileName) {
 		height += attachmentHeight(message.fileName);
 	}
@@ -106,5 +111,5 @@ export function estimateChatMessageHeight(
 		}
 	}
 
-	return Math.max(height, 96);
+	return Math.max(height, isSender ? 64 : 72);
 }

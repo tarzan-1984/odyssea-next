@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Message, ChatRoomParticipant, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
 import { renderAvatar, getRoleDisplayLabel, resolveAvatarBackground } from "@/helpers";
@@ -9,8 +9,10 @@ import MessageReadStatus from "./MessageReadStatus";
 import MessageDropdown, { getMessageDropdownActionCount } from "./MessageDropdown";
 import MessageReply from "./MessageReply";
 import ChatMessageContent from "./ChatMessageContent";
-import FilePreview from "./FilePreview";
-import MessageAttachmentsGrid from "./MessageAttachmentsGrid";
+import MessageAttachmentsGrid, {
+	MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS,
+	MessageAttachmentCard,
+} from "./MessageAttachmentsGrid";
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
@@ -43,6 +45,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onMarkUnread,
 	onRetry,
 }) => {
+	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
+		string | null
+	>(null);
 	const { isUserOnline } = useOnlineStatus();
 	const isSender = message.senderId === currentUser?.id;
 	const isOnline = isUserOnline(message.senderId);
@@ -116,6 +121,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const multiAttachments = getMessageMultiAttachments(message);
 	const legacyFileUrl = !multiAttachments ? message.fileUrl : undefined;
 	const showLegacySingleFile = Boolean(legacyFileUrl);
+	const legacyAttachment =
+		legacyFileUrl && message.fileName
+			? {
+					fileUrl: legacyFileUrl,
+					fileName: message.fileName,
+					fileSize: message.fileSize,
+				}
+			: null;
+	const legacyAttachmentKey = legacyAttachment ? `${legacyAttachment.fileUrl}-single` : "";
 	const showMessageMenu = !isPending && getMessageDropdownActionCount(message, currentUser) > 0;
 
 	const renderMessageMenu = () =>
@@ -220,25 +234,30 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					))}
 
 				{/* Image preview */}
-				{showLegacySingleFile && legacyFileUrl && isImageFile(message.fileName) && (
-					<div className={isSender ? "mb-2 ml-auto max-w-[400px]" : "mb-2"}>
+				{showLegacySingleFile && legacyAttachment && isImageFile(message.fileName) && (
+					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
 							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
-								<FilePreview
-									fileUrl={legacyFileUrl}
-									fileName={message.fileName || "Unknown file"}
-									fileSize={message.fileSize}
-									messageId={message.id}
-								/>
+								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<MessageAttachmentCard
+										item={legacyAttachment}
+										itemKey={legacyAttachmentKey}
+										downloadingKey={singleAttachmentDownloadingKey}
+										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+								</div>
 							</IncomingMessageBubble>
 						) : (
 							<div className="flex items-start justify-end gap-2">
-								<FilePreview
-									fileUrl={legacyFileUrl}
-									fileName={message.fileName || "Unknown file"}
-									fileSize={message.fileSize}
-									messageId={message.id}
-								/>
+								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<MessageAttachmentCard
+										item={legacyAttachment}
+										itemKey={legacyAttachmentKey}
+										isOutgoing
+										downloadingKey={singleAttachmentDownloadingKey}
+										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+								</div>
 								<MessageDropdown
 									message={message}
 									currentUser={currentUser}
@@ -253,25 +272,30 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				)}
 
 				{/* File preview for PDF, DOCX, TXT */}
-				{showLegacySingleFile && legacyFileUrl && isPreviewableFile(message.fileName) && (
-					<div className={isSender ? "mb-2 ml-auto max-w-[400px]" : "mb-2"}>
+				{showLegacySingleFile && legacyAttachment && isPreviewableFile(message.fileName) && (
+					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
 							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
-								<FilePreview
-									fileUrl={legacyFileUrl}
-									fileName={message.fileName || "Unknown file"}
-									fileSize={message.fileSize}
-									messageId={message.id}
-								/>
+								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<MessageAttachmentCard
+										item={legacyAttachment}
+										itemKey={legacyAttachmentKey}
+										downloadingKey={singleAttachmentDownloadingKey}
+										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+								</div>
 							</IncomingMessageBubble>
 						) : (
 							<div className="flex items-start justify-end gap-2">
-								<FilePreview
-									fileUrl={legacyFileUrl}
-									fileName={message.fileName || "Unknown file"}
-									fileSize={message.fileSize}
-									messageId={message.id}
-								/>
+								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<MessageAttachmentCard
+										item={legacyAttachment}
+										itemKey={legacyAttachmentKey}
+										isOutgoing
+										downloadingKey={singleAttachmentDownloadingKey}
+										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+								</div>
 								<MessageDropdown
 									message={message}
 									currentUser={currentUser}

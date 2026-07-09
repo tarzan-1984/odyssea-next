@@ -25,18 +25,31 @@ interface MessageAttachmentsGridProps {
 	isOutgoing?: boolean;
 }
 
-/**
- * Desktop (md+): 3 columns when 4+ files. Mobile: always at most 2 columns per row.
- */
-export default function MessageAttachmentsGrid({
-	items,
+interface MessageAttachmentCardProps {
+	item: ChatMessageAttachment;
+	itemKey: string;
+	isOutgoing?: boolean;
+	downloadingKey: string | null;
+	setDownloadingKey: React.Dispatch<React.SetStateAction<string | null>>;
+}
+
+export const MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS = "w-[149px]";
+export const MESSAGE_ATTACHMENT_GRID_CLASS =
+	"grid w-full items-stretch gap-2 grid-cols-[repeat(2,minmax(0,149px))]";
+export const MESSAGE_ATTACHMENT_GRID_THREE_CLASS =
+	"md:grid-cols-[repeat(3,minmax(0,149px))]";
+
+export function MessageAttachmentCard({
+	item,
+	itemKey,
 	isOutgoing = false,
-}: MessageAttachmentsGridProps) {
-	const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
-
-	if (!items?.length) return null;
-
-	const useThreeColumns = items.length > 3;
+	downloadingKey,
+	setDownloadingKey,
+}: MessageAttachmentCardProps) {
+	const kb = formatKb(item.fileSize);
+	const safeName = item.fileName || "File";
+	const isHeic = isHeicFileName(safeName, item.fileUrl);
+	const isDownloadingThis = downloadingKey === itemKey;
 
 	const cellFrame = isOutgoing
 		? "rounded-lg border border-white/20 bg-white/10"
@@ -53,76 +66,90 @@ export default function MessageAttachmentsGrid({
 	const downloadBtnCls =
 		"flex w-full shrink-0 items-center justify-center gap-0.5 px-1 py-1 text-[10px] font-medium bg-brand-500 text-white hover:bg-brand-600 transition-colors";
 
+	return (
+		<div className={`${cellFrame} relative flex h-full min-h-0 flex-col overflow-hidden`}>
+			{isDownloadingThis && isHeic && (
+				<HeicConvertingOverlay className="z-30 rounded-lg" message="Converting HEIC..." />
+			)}
+			<div className="shrink-0">
+				<FilePreview
+					compact
+					fileUrl={item.fileUrl}
+					fileName={safeName}
+					fileSize={item.fileSize}
+				/>
+			</div>
+			<div className="flex min-h-0 flex-1 flex-col px-1.5 pb-1 pt-1">
+				<div className="min-h-0">
+					<p className={nameCls} title={item.fileName}>
+						{safeName}
+					</p>
+					{kb ? <p className={metaCls}>{kb}</p> : null}
+				</div>
+				<button
+					type="button"
+					disabled={isDownloadingThis}
+					onClick={e => {
+						e.preventDefault();
+						e.stopPropagation();
+						downloadFile(item.fileUrl, safeName, {
+							onConvertingStart: () => setDownloadingKey(itemKey),
+							onConvertingEnd: () => setDownloadingKey(null),
+						}).catch(() => setDownloadingKey(null));
+					}}
+					className={`${downloadBtnCls} mt-auto disabled:cursor-not-allowed disabled:opacity-60`}
+				>
+					<svg
+						className="h-3 w-3"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+						/>
+					</svg>
+					Download
+				</button>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Desktop (md+): 3 columns when 4+ files. Mobile: always at most 2 columns per row.
+ */
+export default function MessageAttachmentsGrid({
+	items,
+	isOutgoing = false,
+}: MessageAttachmentsGridProps) {
+	const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+
+	if (!items?.length) return null;
+
+	const useThreeColumns = items.length > 3;
+
 	const gridClass = [
-		"grid w-full items-stretch gap-2",
-		useThreeColumns
-			? "grid-cols-2 max-w-[32rem] md:grid-cols-3 md:max-w-[48rem]"
-			: "grid-cols-2 max-w-[32rem]",
+		MESSAGE_ATTACHMENT_GRID_CLASS,
+		useThreeColumns ? MESSAGE_ATTACHMENT_GRID_THREE_CLASS : "",
 	].join(" ");
 
 	return (
 		<div className={gridClass}>
 			{items.map((a, idx) => {
 				const key = `${a.fileUrl}-${idx}`;
-				const kb = formatKb(a.fileSize);
-				const safeName = a.fileName || "File";
-
-				const isHeic = isHeicFileName(safeName, a.fileUrl);
-				const isDownloadingThis = downloadingKey === key;
-
 				return (
-					<div
+					<MessageAttachmentCard
 						key={key}
-						className={`${cellFrame} relative flex h-full min-h-0 flex-col overflow-hidden`}
-					>
-						{isDownloadingThis && isHeic && (
-							<HeicConvertingOverlay className="z-30 rounded-lg" message="Converting HEIC..." />
-						)}
-						<div className="shrink-0">
-							<FilePreview
-								compact
-								fileUrl={a.fileUrl}
-								fileName={safeName}
-								fileSize={a.fileSize}
-							/>
-						</div>
-						<div className="flex min-h-0 flex-1 flex-col px-1.5 pb-1 pt-1">
-							<div className="min-h-0">
-								<p className={nameCls} title={a.fileName}>
-									{safeName}
-								</p>
-								{kb ? <p className={metaCls}>{kb}</p> : null}
-							</div>
-							<button
-								type="button"
-								disabled={isDownloadingThis}
-								onClick={e => {
-									e.preventDefault();
-									e.stopPropagation();
-									downloadFile(a.fileUrl, safeName, {
-										onConvertingStart: () => setDownloadingKey(key),
-										onConvertingEnd: () => setDownloadingKey(null),
-									}).catch(() => setDownloadingKey(null));
-								}}
-								className={`${downloadBtnCls} mt-auto disabled:cursor-not-allowed disabled:opacity-60`}
-							>
-								<svg
-									className="h-3 w-3"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-									/>
-								</svg>
-								Download
-							</button>
-						</div>
-					</div>
+						item={a}
+						itemKey={key}
+						isOutgoing={isOutgoing}
+						downloadingKey={downloadingKey}
+						setDownloadingKey={setDownloadingKey}
+					/>
 				);
 			})}
 		</div>

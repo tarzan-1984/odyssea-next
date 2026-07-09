@@ -18,7 +18,7 @@ function placeholderHeightClass(compact: boolean, fileExtension?: string): strin
 		return "h-64";
 	}
 
-	return "min-h-[180px]";
+	return "h-64";
 }
 
 /** Skeleton shown until messages are loaded and preview enters the chat viewport. */

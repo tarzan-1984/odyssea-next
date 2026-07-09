@@ -20,6 +20,14 @@ const SCROLL_IDLE_MEASURE_DELAY_MS = 1200;
 
 export interface ChatBoxVirtualMessageListHandle {
 	scrollToBottom: () => void;
+	measure: () => void;
+	getScrollAnchor: () => ChatBoxVirtualScrollAnchor | null;
+	restoreScrollAnchor: (anchor: ChatBoxVirtualScrollAnchor) => boolean;
+}
+
+export interface ChatBoxVirtualScrollAnchor {
+	messageId: string;
+	offset: number;
 }
 
 interface ChatBoxVirtualMessageListProps {
@@ -88,17 +96,17 @@ function VirtualMessageRow({
 		}
 
 		const syncMeasuredHeight = () => {
+			if (isScrollingRef.current) {
+				pendingMeasureRef.current = true;
+				return;
+			}
+
 			const measured = node.getBoundingClientRect().height;
 			if (measured <= 0) return;
 
 			const prev = measuredHeightsRef.current.get(message.id);
 			measuredHeightsRef.current.set(message.id, measured);
 			if (prev != null && Math.abs(prev - measured) <= 2) {
-				return;
-			}
-
-			if (isScrollingRef.current) {
-				pendingMeasureRef.current = true;
 				return;
 			}
 
@@ -217,6 +225,71 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onContentMeasuredRef.current = onContentMeasured;
 	}, [onContentMeasured]);
 
+	useLayoutEffect(() => {
+		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
+			if (suppressScrollAdjustment || isScrollingRef.current || !isUserScrolledUp) {
+				return false;
+			}
+			const offset = instance.scrollOffset ?? 0;
+			return item.start < offset;
+		};
+	}, [isUserScrolledUp, suppressScrollAdjustment, virtualizer]);
+
+	const scrollToBottom = useCallback(() => {
+		if (messages.length === 0) return;
+		virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
+	}, [messages.length, virtualizer]);
+
+	const measure = useCallback(() => {
+		virtualizerRef.current?.measure();
+	}, []);
+
+	const getScrollAnchor = useCallback((): ChatBoxVirtualScrollAnchor | null => {
+		if (!scrollElement) return null;
+
+		const offset = scrollElement.scrollTop;
+		const virtualItems = virtualizer.getVirtualItems();
+		const item =
+			virtualItems.find(virtualItem => virtualItem.end > offset + 1) ?? virtualItems[0];
+		if (!item) return null;
+
+		const message = messages[item.index];
+		if (!message) return null;
+
+		return {
+			messageId: message.id,
+			offset: Math.max(0, offset - item.start),
+		};
+	}, [messages, scrollElement, virtualizer]);
+
+	const restoreScrollAnchor = useCallback(
+		(anchor: ChatBoxVirtualScrollAnchor): boolean => {
+			const index = messages.findIndex(message => message.id === anchor.messageId);
+			if (index === -1) return false;
+
+			const item = virtualizer.getVirtualItems().find(virtualItem => virtualItem.index === index);
+			if (!item) {
+				virtualizer.scrollToIndex(index, { align: "start" });
+				requestAnimationFrame(() => {
+					if (scrollElement && anchor.offset > 0) {
+						scrollElement.scrollTop += anchor.offset;
+					}
+				});
+				return true;
+			}
+
+			virtualizer.scrollToOffset(Math.max(0, item.start + anchor.offset));
+			return true;
+		},
+		[messages, scrollElement, virtualizer]
+	);
+
+	useImperativeHandle(
+		ref,
+		() => ({ scrollToBottom, measure, getScrollAnchor, restoreScrollAnchor }),
+		[getScrollAnchor, measure, restoreScrollAnchor, scrollToBottom]
+	);
+
 	useEffect(() => {
 		if (!scrollElement) return;
 
@@ -230,7 +303,14 @@ const ChatBoxVirtualMessageList = forwardRef<
 				scrollIdleTimerRef.current = null;
 				if (pendingMeasureRef.current) {
 					pendingMeasureRef.current = false;
+					const anchor = getScrollAnchor();
 					virtualizerRef.current?.measure();
+					if (anchor) {
+						requestAnimationFrame(() => {
+							virtualizerRef.current?.measure();
+							restoreScrollAnchor(anchor);
+						});
+					}
 					onContentMeasuredRef.current?.();
 				}
 			}, SCROLL_IDLE_MEASURE_DELAY_MS);
@@ -253,24 +333,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 			isScrollingRef.current = false;
 			pendingMeasureRef.current = false;
 		};
-	}, [scrollElement]);
-
-	useLayoutEffect(() => {
-		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
-			if (suppressScrollAdjustment || isScrollingRef.current || !isUserScrolledUp) {
-				return false;
-			}
-			const offset = instance.scrollOffset ?? 0;
-			return item.start < offset;
-		};
-	}, [isUserScrolledUp, suppressScrollAdjustment, virtualizer]);
-
-	const scrollToBottom = useCallback(() => {
-		if (messages.length === 0) return;
-		virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
-	}, [messages.length, virtualizer]);
-
-	useImperativeHandle(ref, () => ({ scrollToBottom }), [scrollToBottom]);
+	}, [getScrollAnchor, restoreScrollAnchor, scrollElement]);
 
 	useEffect(() => {
 		measuredHeightsRef.current.clear();

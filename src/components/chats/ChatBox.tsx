@@ -53,6 +53,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const isInitialScrollCompleteRef = useRef(false);
 	const pendingInitialScrollRef = useRef(false);
 	const isRestoringOlderScrollRef = useRef(false);
+	const olderLoadStartTimerRef = useRef<number | null>(null);
+	const olderScrollRestoreTimerRef = useRef<number | null>(null);
 	const [suppressVirtualScrollAdjustment, setSuppressVirtualScrollAdjustment] = useState(false);
 	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
@@ -419,6 +421,17 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		}
 	}, [isUserScrolledUp, scrollToBottom]);
 
+	const handleMessagesWheelCapture = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+		if (!isLoadingMoreRef.current && !isRestoringOlderScrollRef.current) {
+			return;
+		}
+
+		if (isRestoringOlderScrollRef.current || event.deltaY < 0) {
+			event.preventDefault();
+			event.stopPropagation();
+		}
+	}, []);
+
 	const handleScroll = useCallback(() => {
 		if (!messagesContainerRef.current) return;
 
@@ -444,39 +457,79 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			isLoadingMoreRef.current = true;
 			setIsLoadingOlder(true);
 
-			const container = messagesContainerRef.current;
-			const prevScrollHeight = container.scrollHeight;
-			const prevScrollTop = container.scrollTop;
-
-			const finalize = () => {
-				isRestoringOlderScrollRef.current = true;
-				setSuppressVirtualScrollAdjustment(true);
-				isProgrammaticScrollRef.current = true;
-				requestAnimationFrame(() => {
-					requestAnimationFrame(() => {
-						const newScrollHeight = container.scrollHeight;
-						const delta = newScrollHeight - prevScrollHeight;
-						container.scrollTop = prevScrollTop + delta;
-						setTimeout(() => {
-							isRestoringOlderScrollRef.current = false;
-							setSuppressVirtualScrollAdjustment(false);
-							isProgrammaticScrollRef.current = false;
-							isLoadingMoreRef.current = false;
-							setIsLoadingOlder(false);
-						}, 80);
-					});
-				});
-			};
-
-			if (hasMoreMessages) {
-				Promise.resolve(loadMoreMessages()).finally(finalize);
-			} else if (isLoadingAvailableArchives) {
-				setPendingArchiveLoad(true);
-				isLoadingMoreRef.current = false;
-				setIsLoadingOlder(false);
-			} else {
-				Promise.resolve(tryLoadNextArchivePage()).finally(finalize);
+			if (olderLoadStartTimerRef.current != null) {
+				window.clearTimeout(olderLoadStartTimerRef.current);
 			}
+
+			olderLoadStartTimerRef.current = window.setTimeout(() => {
+				olderLoadStartTimerRef.current = null;
+
+				const container = messagesContainerRef.current;
+				if (!container || container.scrollTop >= 300) {
+					isLoadingMoreRef.current = false;
+					setIsLoadingOlder(false);
+					return;
+				}
+
+				const prevScrollHeight = container.scrollHeight;
+				const prevScrollTop = container.scrollTop;
+				const prevAnchor = virtualListRef.current?.getScrollAnchor() ?? null;
+
+				const finalize = () => {
+					isRestoringOlderScrollRef.current = true;
+					setSuppressVirtualScrollAdjustment(true);
+					isProgrammaticScrollRef.current = true;
+
+					if (olderScrollRestoreTimerRef.current != null) {
+						window.clearTimeout(olderScrollRestoreTimerRef.current);
+						olderScrollRestoreTimerRef.current = null;
+					}
+
+					let restoreFrames = 0;
+					const restoreScrollAnchor = () => {
+						virtualListRef.current?.measure();
+						requestAnimationFrame(() => {
+							const newScrollHeight = container.scrollHeight;
+							const delta = newScrollHeight - prevScrollHeight;
+							const restoredByAnchor = prevAnchor
+								? virtualListRef.current?.restoreScrollAnchor(prevAnchor) ?? false
+								: false;
+
+							if (!restoredByAnchor) {
+								container.scrollTop = prevScrollTop + delta;
+							}
+
+							restoreFrames += 1;
+							if (restoreFrames < 4) {
+								requestAnimationFrame(restoreScrollAnchor);
+								return;
+							}
+
+							olderScrollRestoreTimerRef.current = window.setTimeout(() => {
+								isRestoringOlderScrollRef.current = false;
+								setSuppressVirtualScrollAdjustment(false);
+								isProgrammaticScrollRef.current = false;
+								isLoadingMoreRef.current = false;
+								setIsLoadingOlder(false);
+								virtualListRef.current?.measure();
+								olderScrollRestoreTimerRef.current = null;
+							}, 240);
+						});
+					};
+
+					requestAnimationFrame(restoreScrollAnchor);
+				};
+
+				if (hasMoreMessages) {
+					Promise.resolve(loadMoreMessages()).finally(finalize);
+				} else if (isLoadingAvailableArchives) {
+					setPendingArchiveLoad(true);
+					isLoadingMoreRef.current = false;
+					setIsLoadingOlder(false);
+				} else {
+					Promise.resolve(tryLoadNextArchivePage()).finally(finalize);
+				}
+			}, 160);
 		}
 	}, [
 		hasMoreMessages,
@@ -517,6 +570,14 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 			isProgrammaticScrollRef.current = false;
 			isInitialScrollCompleteRef.current = false;
 			isRestoringOlderScrollRef.current = false;
+			if (olderLoadStartTimerRef.current != null) {
+				window.clearTimeout(olderLoadStartTimerRef.current);
+				olderLoadStartTimerRef.current = null;
+			}
+			if (olderScrollRestoreTimerRef.current != null) {
+				window.clearTimeout(olderScrollRestoreTimerRef.current);
+				olderScrollRestoreTimerRef.current = null;
+			}
 			pendingInitialScrollRef.current = true;
 			setSuppressVirtualScrollAdjustment(false);
 			setIsLoadingOlder(false);
@@ -525,6 +586,17 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 		setReplyingTo(null);
 		setEditingMessage(null);
 	}, [selectedChatRoomId]);
+
+	useEffect(() => {
+		return () => {
+			if (olderLoadStartTimerRef.current != null) {
+				window.clearTimeout(olderLoadStartTimerRef.current);
+			}
+			if (olderScrollRestoreTimerRef.current != null) {
+				window.clearTimeout(olderScrollRestoreTimerRef.current);
+			}
+		};
+	}, []);
 
 	useLayoutEffect(() => {
 		if (!messagesReady || !selectedChatRoomId || uniqueMessages.length === 0) return;
@@ -822,6 +894,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				<div
 					ref={attachMessagesContainer}
 					onScroll={handleScroll}
+					onWheelCapture={handleMessagesWheelCapture}
 					className="relative flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
 					style={{ overflowAnchor: "none" }}
 				>
