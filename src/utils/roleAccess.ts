@@ -74,6 +74,7 @@ export const CHECK_LIST_VERSION_ONLY_ROLES = [
 	"DISPATCHER",
 	"DISPATCHER_TL",
 	"TRACKING",
+	"EXPEDITE_MANAGER",
 ] as const;
 
 /** @deprecated Use CHECK_LIST_FULL_ACCESS_ROLES */
