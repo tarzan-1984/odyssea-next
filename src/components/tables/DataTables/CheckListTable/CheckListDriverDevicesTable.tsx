@@ -24,6 +24,8 @@ import type {
 	CheckListVersionResponse,
 } from "./checkListTypes";
 import { formatDriverUnitLine } from "./checkListTypes";
+import { useCurrentUser } from "@/stores/userStore";
+import { canManageCheckListDevices } from "@/utils/roleAccess";
 
 export type CheckListAppVersionSort = "asc" | "desc";
 
@@ -131,6 +133,8 @@ export default function CheckListDriverDevicesTable({
 	showMinimumAppVersion = false,
 	showLastOpenAppColumn = false,
 }: CheckListDriverDevicesTableProps) {
+	const currentUser = useCurrentUser();
+	const canManageDevices = canManageCheckListDevices(currentUser?.role);
 	const queryClient = useQueryClient();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -615,42 +619,46 @@ export default function CheckListDriverDevicesTable({
 										)}
 										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
 											<div className="flex flex-wrap items-center justify-end gap-2">
-												<Button
-													size="sm"
-													variant="outline"
-													type="button"
-													className={`!px-2 !py-1 !text-xs h-auto rounded-md ${
-														device.blocked
-															? "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-															: ""
-													}`}
-													onClick={() => handleBlockDevice(device)}
-													disabled={
-														deviceActionLoadingId === device.id || query.isPending
-													}
-												>
-													{deviceActionLoadingId === device.id
-														? device.blocked
-															? "Unblocking…"
-															: "Blocking…"
-														: device.blocked
-															? "Blocked"
-															: "Block"}
-												</Button>
-												<Button
-													size="sm"
-													variant="outline"
-													type="button"
-													className="!px-2 !py-1 !text-xs h-auto rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-													onClick={() => handleDeleteDevice(device)}
-													disabled={
-														deviceActionLoadingId === device.id || query.isPending
-													}
-												>
-													{deviceActionLoadingId === device.id
-														? "Deleting…"
-														: "Delete"}
-												</Button>
+												{canManageDevices && (
+													<Button
+														size="sm"
+														variant="outline"
+														type="button"
+														className={`!px-2 !py-1 !text-xs h-auto rounded-md ${
+															device.blocked
+																? "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+																: ""
+														}`}
+														onClick={() => handleBlockDevice(device)}
+														disabled={
+															deviceActionLoadingId === device.id || query.isPending
+														}
+													>
+														{deviceActionLoadingId === device.id
+															? device.blocked
+																? "Unblocking…"
+																: "Blocking…"
+															: device.blocked
+																? "Blocked"
+																: "Block"}
+													</Button>
+												)}
+												{canManageDevices && (
+													<Button
+														size="sm"
+														variant="outline"
+														type="button"
+														className="!px-2 !py-1 !text-xs h-auto rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+														onClick={() => handleDeleteDevice(device)}
+														disabled={
+															deviceActionLoadingId === device.id || query.isPending
+														}
+													>
+														{deviceActionLoadingId === device.id
+															? "Deleting…"
+															: "Delete"}
+													</Button>
+												)}
 												<Button
 													size="sm"
 													variant="primary"

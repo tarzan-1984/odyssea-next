@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
-import { canAccessCheckList } from "@/utils/roleAccess";
+import { canManageCheckListDevices } from "@/utils/roleAccess";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 		}
 
 		const userData = serverAuth.getUserData(request);
-		if (!canAccessCheckList(userData?.role)) {
+		if (!canManageCheckListDevices(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 

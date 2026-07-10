@@ -62,12 +62,22 @@ export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 	"TRACKING_TL",
 ] as const;
 
-/** Check list: user-list roles plus tracking shifts. */
-export const CHECK_LIST_ALLOWED_ROLES = [
+/** Check list: all tabs (location, version, several devices) and device admin actions. */
+export const CHECK_LIST_FULL_ACCESS_ROLES = [
 	...USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES,
 	"MORNING_TRACKING",
 	"NIGHTSHIFT_TRACKING",
 ] as const;
+
+/** Check list: version tab only (no block/delete, no other tabs). */
+export const CHECK_LIST_VERSION_ONLY_ROLES = [
+	"DISPATCHER",
+	"DISPATCHER_TL",
+	"TRACKING",
+] as const;
+
+/** @deprecated Use CHECK_LIST_FULL_ACCESS_ROLES */
+export const CHECK_LIST_ALLOWED_ROLES = CHECK_LIST_FULL_ACCESS_ROLES;
 
 export function canAccessUserListAndCheckList(role: string | undefined | null): boolean {
 	if (isGastRole(role)) return true;
@@ -76,11 +86,26 @@ export function canAccessUserListAndCheckList(role: string | undefined | null): 
 	return (USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
-export function canAccessCheckList(role: string | undefined | null): boolean {
+export function canAccessCheckListFull(role: string | undefined | null): boolean {
 	if (isGastRole(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
-	return (CHECK_LIST_ALLOWED_ROLES as readonly string[]).includes(normalized);
+	return (CHECK_LIST_FULL_ACCESS_ROLES as readonly string[]).includes(normalized);
+}
+
+export function canAccessCheckListVersionOnly(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (CHECK_LIST_VERSION_ONLY_ROLES as readonly string[]).includes(normalized);
+}
+
+export function canAccessCheckList(role: string | undefined | null): boolean {
+	return canAccessCheckListFull(role) || canAccessCheckListVersionOnly(role);
+}
+
+export function canManageCheckListDevices(role: string | undefined | null): boolean {
+	if (isGastRole(role)) return false;
+	return canAccessCheckListFull(role);
 }
 
 /** Bid rates page: dispatchers and expedite managers. */
