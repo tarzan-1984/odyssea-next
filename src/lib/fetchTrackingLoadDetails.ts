@@ -121,6 +121,11 @@ export async function fetchTrackingLoadDetails(
 		publicView
 	);
 
+	console.group(`[TrackingLoadPage] fetch load ${loadId} (${publicView ? "public" : "auth"})`);
+	console.log("TMS response", tmsJson);
+	console.log("Enrichment response", enrichment);
+	console.groupEnd();
+
 	return {
 		data: {
 			...tmsJson,

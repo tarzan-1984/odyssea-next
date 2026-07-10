@@ -26,8 +26,8 @@ const STALE_TIME_MS = 10 * 60 * 1000;
 /**
  * Resolve status_filter for TMS.
  * Uses the selected TMS status key (available, available_on, for_offers, …).
- * "all" / empty → omit status_filter entirely (show every status).
- * Address auto-selects Default (for_offers) in UI; if user then picks All statuses, nothing is sent.
+ * "all" / empty → send status_filter=all (TMS without the param only returns "available").
+ * Address auto-selects Default (for_offers) in UI; if user then picks All statuses, "all" is sent.
  */
 export function resolveStatusFilterForQuery(
 	_addressFilter: string,
@@ -35,7 +35,7 @@ export function resolveStatusFilterForQuery(
 	_statusAutoAppliedByAddress = false
 ): string {
 	const trimmed = statusFilter?.trim() ?? "";
-	if (!trimmed || trimmed === "all") return "";
+	if (!trimmed || trimmed === "all") return "all";
 	return trimmed;
 }
 

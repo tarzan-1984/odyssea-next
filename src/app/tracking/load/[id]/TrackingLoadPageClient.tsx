@@ -712,6 +712,66 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return loadDrivers[0] ?? null;
 	}, [loadDrivers, sortedTrackingPoints]);
 
+	useEffect(() => {
+		if (!loadDetails) return;
+
+		let driverResolution: {
+			source: "tracking_history" | "attached_driver_fallback" | "none";
+			externalDriverId: string | null;
+			trackingPointIndex: number | null;
+		} = { source: "none", externalDriverId: null, trackingPointIndex: null };
+
+		if (sortedTrackingPoints.length > 0) {
+			for (let i = sortedTrackingPoints.length - 1; i >= 0; i--) {
+				const externalId = normalizeDriverExternalId(
+					sortedTrackingPoints[i]?.externalDriverId
+				);
+				if (!externalId) continue;
+				const fromHistory = loadDrivers.find(
+					driver => normalizeDriverExternalId(driver.externalId) === externalId
+				);
+				if (fromHistory) {
+					driverResolution = {
+						source: "tracking_history",
+						externalDriverId: externalId,
+						trackingPointIndex: i,
+					};
+					break;
+				}
+			}
+		}
+		if (driverResolution.source === "none" && loadDrivers[0]) {
+			driverResolution = {
+				source: "attached_driver_fallback",
+				externalDriverId: normalizeDriverExternalId(loadDrivers[0].externalId),
+				trackingPointIndex: null,
+			};
+		}
+
+		console.group(`[TrackingLoadPage] page data load ${loadId}`);
+		console.log("loadDetails (merged)", loadDetails);
+		console.log("meta_data", loadMetaData);
+		console.log("attached drivers from TMS", {
+			attached_driver: loadMetaData?.attached_driver ?? null,
+			attached_second_driver: loadMetaData?.attached_second_driver ?? null,
+			attached_third_driver: loadMetaData?.attached_third_driver ?? null,
+		});
+		console.log("drivers (from DB, TMS order)", loadDrivers);
+		console.log("trackingPoints", sortedTrackingPoints);
+		console.log("currentTrackingDriver", currentTrackingDriver);
+		console.log("driverResolution (why this driver was picked)", driverResolution);
+		console.log("routeGeocode", routeGeocodeFromApi);
+		console.groupEnd();
+	}, [
+		currentTrackingDriver,
+		loadDetails,
+		loadDrivers,
+		loadId,
+		loadMetaData,
+		routeGeocodeFromApi,
+		sortedTrackingPoints,
+	]);
+
 	const currentDriverLatitude = Number(currentTrackingDriver?.latitude);
 	const currentDriverLongitude = Number(currentTrackingDriver?.longitude);
 	const hasCurrentDriverCoordinates =
