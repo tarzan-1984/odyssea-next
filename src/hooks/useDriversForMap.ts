@@ -4,7 +4,8 @@ import { useEffect, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchDriversPage } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
 import type { DriversListQueryParams } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
-import { driverMapStatusMatchesFilter } from "@/components/logistics/driversMapConstants";
+import type { DimensionsFilterValues } from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
+import { getActiveDimensionsQueryParams } from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
 
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes
 const PAGE_SIZE = 60;
@@ -23,9 +24,13 @@ export interface DriverForMap {
 export interface DriversMapFilterParams {
 	capabilitiesFilter: string[];
 	addressFilter: string;
+	extendedSearchEnabled?: boolean;
+	extendedSearchFilter?: string;
 	radiusFilter: string;
 	locationFilter: "USA" | "Canada";
 	statusFilter: string;
+	statusAutoAppliedByAddress?: boolean;
+	dimensionsFilter?: DimensionsFilterValues;
 	role: string;
 	/** When false, query is disabled (same as drivers-list: only fetch when address set for non-admin). */
 	enabled?: boolean;
@@ -73,9 +78,15 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		itemsPerPage: PAGE_SIZE,
 		capabilitiesFilter: filters?.capabilitiesFilter ?? [],
 		addressFilter: filters?.addressFilter ?? "",
+		extendedSearchEnabled: filters?.extendedSearchEnabled ?? false,
+		extendedSearchFilter: filters?.extendedSearchFilter ?? "",
 		radiusFilter: filters?.radiusFilter ?? "500",
 		locationFilter: filters?.locationFilter ?? "USA",
-		statusFilter: filters?.statusFilter ?? "",
+		statusFilter: filters?.statusFilter ?? "all",
+		statusAutoAppliedByAddress: filters?.statusAutoAppliedByAddress ?? false,
+		...(Object.keys(getActiveDimensionsQueryParams(filters?.dimensionsFilter)).length > 0
+			? { dimensionsFilter: filters?.dimensionsFilter }
+			: {}),
 		role: filters?.role ?? "",
 	};
 
@@ -87,9 +98,14 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 			{
 				capabilitiesFilter: baseParams.capabilitiesFilter,
 				addressFilter: baseParams.addressFilter,
+				extendedSearchEnabled: baseParams.extendedSearchEnabled ?? false,
+				extendedSearchFilter: baseParams.extendedSearchFilter?.trim() ?? "",
 				radiusFilter: baseParams.radiusFilter,
 				locationFilter: baseParams.locationFilter,
 				statusFilter: baseParams.statusFilter,
+				statusAutoAppliedByAddress: baseParams.statusAutoAppliedByAddress ?? false,
+				dimensionsFilter: getActiveDimensionsQueryParams(baseParams.dimensionsFilter),
+				role: baseParams.role,
 			},
 		],
 		queryFn: ({ pageParam }) =>
@@ -120,16 +136,16 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
 		.filter((d): d is DriverForMap => d !== null);
 
-	// Client-side status filter fallback when API does not apply status_filter
+	// Same client-side status filter as drivers-list
 	const allDrivers = useMemo(() => {
 		const statusFilter = baseParams.statusFilter;
-		if (!statusFilter) return rawDrivers;
-		const hasAddressFilter = Boolean(baseParams.addressFilter?.trim());
-		if (!hasAddressFilter) return rawDrivers; // API already filtered via status_filter
-		return rawDrivers.filter(d =>
-			driverMapStatusMatchesFilter(d.driverStatus, statusFilter)
+		if (!statusFilter || statusFilter === "all" || statusFilter === "for_offers") {
+			return rawDrivers;
+		}
+		return rawDrivers.filter(
+			d => (d.driverStatus ?? "").trim().toLowerCase() === statusFilter.toLowerCase()
 		);
-	}, [rawDrivers, baseParams.statusFilter, baseParams.addressFilter]);
+	}, [rawDrivers, baseParams.statusFilter]);
 
 	return {
 		drivers: allDrivers,

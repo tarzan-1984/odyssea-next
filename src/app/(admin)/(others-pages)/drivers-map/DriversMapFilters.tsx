@@ -1,32 +1,40 @@
 import {
-	useState,
 	useEffect,
 	useRef,
 	useCallback,
 	type Dispatch,
 	type SetStateAction,
 } from "react";
-import {
-	DRIVER_STATUS_LABELS,
-	getStatusLabelForFilter,
-} from "@/components/logistics/driversMapConstants";
 import MultiSelect from "@/components/form/MultiSelect";
+import Label from "@/components/form/Label";
+import Switch from "@/components/form/switch/Switch";
 import { CAPABILITIES_OPTIONS } from "@/components/tables/DataTables/DriversTable/capabilitiesFilterOptions";
+import MinDimensionsModal from "@/components/tables/DataTables/DriversTable/MinDimensionsModal";
+import DimensionsFilterDisplay from "@/components/tables/DataTables/DriversTable/DimensionsFilterDisplay";
+import type { DimensionsFilterValues } from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
 
 const ADDRESS_DEBOUNCE_MS = 400;
 
 interface DriversMapFiltersProps {
-	driverStatusFilter: string;
-	setDriverStatusFilter: Dispatch<SetStateAction<string>>;
-	driverStatusOptions: string[];
+	extendedSearchEnabled: boolean;
+	onExtendedSearchToggle: (enabled: boolean) => void;
+	addressFilter: string;
+	setAddressFilter: Dispatch<SetStateAction<string>>;
+	extendedSearchFilter: string;
+	setExtendedSearchFilter: Dispatch<SetStateAction<string>>;
 	capabilitiesFilter: string[];
 	setCapabilitiesFilter: Dispatch<SetStateAction<string[]>>;
-	zipFilter: string;
-	setZipFilter: Dispatch<SetStateAction<string>>;
+	dimensionsFilter: DimensionsFilterValues;
+	setDimensionsFilter: Dispatch<SetStateAction<DimensionsFilterValues>>;
+	dimensionsModalOpen: boolean;
+	setDimensionsModalOpen: Dispatch<SetStateAction<boolean>>;
 	locationFilter: "USA" | "Canada";
 	setLocationFilter: Dispatch<SetStateAction<"USA" | "Canada">>;
 	radiusFilter: string;
 	setRadiusFilter: Dispatch<SetStateAction<string>>;
+	statusFilter: string;
+	onStatusFilterChange: (value: string) => void;
+	statusFilterOptions: { value: string; label: string }[];
 	onFilterApply?: (params: {
 		latitude: number;
 		longitude: number;
@@ -38,17 +46,25 @@ interface DriversMapFiltersProps {
 }
 
 export function DriversMapFilters({
-	driverStatusFilter,
-	setDriverStatusFilter,
-	driverStatusOptions,
+	extendedSearchEnabled,
+	onExtendedSearchToggle,
+	addressFilter,
+	setAddressFilter,
+	extendedSearchFilter,
+	setExtendedSearchFilter,
 	capabilitiesFilter,
 	setCapabilitiesFilter,
-	zipFilter,
-	setZipFilter,
+	dimensionsFilter,
+	setDimensionsFilter,
+	dimensionsModalOpen,
+	setDimensionsModalOpen,
 	locationFilter,
 	setLocationFilter,
 	radiusFilter,
 	setRadiusFilter,
+	statusFilter,
+	onStatusFilterChange,
+	statusFilterOptions,
 	onFilterApply,
 	onRadiusChange,
 	onClearFilter,
@@ -57,8 +73,6 @@ export function DriversMapFilters({
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lastGeocodeRef = useRef<string>("");
 
-	// Simple geocoding using OpenStreetMap Nominatim API.
-	// Appending country to the query helps resolve short inputs (e.g. state codes OH, CA, TX).
 	async function geocodeAddress(address: string, country: "USA" | "Canada") {
 		const countryLabel = country === "USA" ? "USA" : "Canada";
 		const query = address.includes(countryLabel) ? address : `${address}, ${countryLabel}`;
@@ -123,9 +137,14 @@ export function DriversMapFilters({
 		[onFilterApply, onClearFilter]
 	);
 
-	// Auto-filter when address or location changes (debounced for address)
 	useEffect(() => {
-		const trimmed = zipFilter.trim();
+		if (extendedSearchEnabled) {
+			lastGeocodeRef.current = "";
+			onClearFilter?.();
+			return;
+		}
+
+		const trimmed = addressFilter.trim();
 		if (!trimmed) {
 			lastGeocodeRef.current = "";
 			onClearFilter?.();
@@ -142,149 +161,172 @@ export function DriversMapFilters({
 		return () => {
 			if (debounceRef.current) clearTimeout(debounceRef.current);
 		};
-	}, [zipFilter, locationFilter, radiusFilter, runGeocodeAndApply, onClearFilter]);
+	}, [
+		addressFilter,
+		locationFilter,
+		radiusFilter,
+		extendedSearchEnabled,
+		runGeocodeAndApply,
+		onClearFilter,
+	]);
 
-	// When only radius changes (address not empty), update radius in parent
 	useEffect(() => {
-		if (!zipFilter.trim()) return;
+		if (extendedSearchEnabled || !addressFilter.trim()) return;
 		const miles = Number.parseInt(radiusFilter, 10);
 		if (Number.isNaN(miles)) return;
 		onRadiusChange?.(miles);
-	}, [radiusFilter, zipFilter, onRadiusChange]);
+	}, [radiusFilter, addressFilter, extendedSearchEnabled, onRadiusChange]);
 
 	const handleResetClick = () => {
-		setDriverStatusFilter("all");
-		setCapabilitiesFilter([]);
-		setZipFilter("");
-		setLocationFilter("USA");
-		setRadiusFilter("500");
-		lastGeocodeRef.current = "";
 		onReset?.();
 	};
 
 	return (
-		<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
-			{/* Capabilities (multiselect) */}
-			<div className="flex min-w-0 flex-col gap-1 md:min-w-[220px]">
-				<MultiSelect
-					label="Capabilities"
-					options={CAPABILITIES_OPTIONS}
-					defaultSelected={capabilitiesFilter}
-					onChange={(values) => setCapabilitiesFilter(values)}
-					size="sm"
-					dropdownInPortal
+		<div>
+			<div className="mb-3">
+				<Switch
+					label="Extended search"
+					checked={extendedSearchEnabled}
+					onChange={onExtendedSearchToggle}
 				/>
 			</div>
 
-			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+			<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
+				<div className="flex min-w-0 flex-col">
+					{extendedSearchEnabled ? (
+						<>
+							<Label htmlFor="drivers-map-extended-search">Search</Label>
+							<input
+								id="drivers-map-extended-search"
+								name="extended_search"
+								type="text"
+								value={extendedSearchFilter}
+								onChange={e => setExtendedSearchFilter(e.target.value)}
+								placeholder="Unit/name/phone/vehicle"
+								className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
+							/>
+						</>
+					) : (
+						<>
+							<Label htmlFor="drivers-map-address-filter">Address</Label>
+							<input
+								id="drivers-map-address-filter"
+								type="text"
+								value={addressFilter}
+								onChange={e => setAddressFilter(e.target.value)}
+								placeholder="Enter address"
+								className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
+							/>
+						</>
+					)}
+				</div>
 
-			<div className="flex min-w-0 flex-col gap-1">
-				<label
-					htmlFor="driver-status-filter"
-					className="text-xs font-medium text-gray-700 dark:text-gray-300"
-				>
-					Status
-				</label>
-				<select
-					id="driver-status-filter"
-					value={driverStatusFilter}
-					onChange={(e) => setDriverStatusFilter(e.target.value)}
-					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[160px] md:w-auto"
-				>
-					<option value="all">{DRIVER_STATUS_LABELS.all}</option>
-					{driverStatusOptions.map((status) => (
-						<option key={status} value={status}>
-							{getStatusLabelForFilter(status)}
-						</option>
-					))}
-				</select>
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="flex min-w-0 flex-col md:min-w-[220px]">
+					<MultiSelect
+						label="Capabilities"
+						options={CAPABILITIES_OPTIONS}
+						defaultSelected={capabilitiesFilter}
+						onChange={values => setCapabilitiesFilter(values)}
+						triggerClassName="h-11"
+						dropdownInPortal
+					/>
+				</div>
+
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="flex min-w-0 flex-col">
+					<Label htmlFor="drivers-map-dimensions-filter">Dimensions</Label>
+					<button
+						id="drivers-map-dimensions-filter"
+						type="button"
+						onClick={() => setDimensionsModalOpen(true)}
+						className="h-11 w-full min-w-0 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-left text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 md:w-40"
+					>
+						<DimensionsFilterDisplay values={dimensionsFilter} />
+					</button>
+				</div>
+
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="flex min-w-0 flex-col">
+					<Label htmlFor="drivers-map-location-filter">Location</Label>
+					<select
+						id="drivers-map-location-filter"
+						value={locationFilter}
+						onChange={e =>
+							setLocationFilter(e.target.value === "Canada" ? "Canada" : "USA")
+						}
+						className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[140px] md:w-auto"
+					>
+						<option value="USA">USA</option>
+						<option value="Canada">Canada</option>
+					</select>
+				</div>
+
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="flex min-w-0 flex-col">
+					<Label htmlFor="drivers-map-radius-filter">Radius</Label>
+					<select
+						id="drivers-map-radius-filter"
+						value={radiusFilter}
+						onChange={e => setRadiusFilter(e.target.value)}
+						className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[140px] md:w-auto"
+					>
+						<option value="50">50 miles</option>
+						<option value="100">100 miles</option>
+						<option value="150">150 miles</option>
+						<option value="200">200 miles</option>
+						<option value="250">250 miles</option>
+						<option value="300">300 miles</option>
+						<option value="400">400 miles</option>
+						<option value="500">500 miles</option>
+						<option value="600">600 miles</option>
+						<option value="800">800 miles</option>
+						<option value="1000">1000 miles</option>
+					</select>
+				</div>
+
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="flex min-w-0 flex-col">
+					<Label htmlFor="drivers-map-status-filter">Status</Label>
+					<select
+						id="drivers-map-status-filter"
+						value={statusFilter}
+						onChange={e => onStatusFilterChange(e.target.value)}
+						className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-brand-800 md:min-w-[160px] md:w-auto"
+					>
+						{statusFilterOptions.map(opt => (
+							<option key={opt.value} value={opt.value}>
+								{opt.label}
+							</option>
+						))}
+					</select>
+				</div>
+
+				<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
+				<div className="col-span-2 flex min-w-0 flex-col md:col-span-1">
+					<Label className="select-none text-transparent">{""}</Label>
+					<button
+						type="button"
+						onClick={handleResetClick}
+						className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800 dark:focus:border-brand-800 md:w-auto"
+					>
+						Reset
+					</button>
+				</div>
 			</div>
 
-			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
-
-			<div className="flex min-w-0 flex-col gap-1">
-				<label
-					htmlFor="address-filter"
-					className="text-xs font-medium text-gray-700 dark:text-gray-300"
-				>
-					Address
-				</label>
-				<input
-					id="address-filter"
-					type="text"
-					value={zipFilter}
-					onChange={(e) => setZipFilter(e.target.value)}
-					placeholder="Enter address"
-					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400 md:w-40"
-				/>
-			</div>
-
-			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
-
-			<div className="flex min-w-0 flex-col gap-1">
-				<label
-					htmlFor="location-filter"
-					className="text-xs font-medium text-gray-700 dark:text-gray-300"
-				>
-					Location
-				</label>
-				<select
-					id="location-filter"
-					value={locationFilter}
-					onChange={(e) =>
-						setLocationFilter(e.target.value === "Canada" ? "Canada" : "USA")
-					}
-					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
-				>
-					<option value="USA">USA</option>
-					<option value="Canada">Canada</option>
-				</select>
-			</div>
-
-			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
-
-			<div className="flex min-w-0 flex-col gap-1">
-				<label
-					htmlFor="radius-filter"
-					className="text-xs font-medium text-gray-700 dark:text-gray-300"
-				>
-					Radius
-				</label>
-				<select
-					id="radius-filter"
-					value={radiusFilter}
-					onChange={(e) => setRadiusFilter(e.target.value)}
-					className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 md:min-w-[140px] md:w-auto"
-				>
-					<option value="50">50 miles</option>
-					<option value="100">100 miles</option>
-					<option value="150">150 miles</option>
-					<option value="200">200 miles</option>
-					<option value="250">250 miles</option>
-					<option value="300">300 miles</option>
-					<option value="400">400 miles</option>
-					<option value="500">500 miles</option>
-					<option value="600">600 miles</option>
-					<option value="800">800 miles</option>
-					<option value="1000">1000 miles</option>
-				</select>
-			</div>
-
-			<div className="hidden h-8 w-px bg-gray-300 dark:bg-gray-600 md:block" />
-
-			<div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
-				{/* Invisible label to align button with other fields */}
-				<label className="text-xs font-medium text-transparent select-none">
-					Reset
-				</label>
-				<button
-					type="button"
-					onClick={handleResetClick}
-					className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 md:w-auto"
-				>
-					Reset
-				</button>
-			</div>
+			<MinDimensionsModal
+				isOpen={dimensionsModalOpen}
+				onClose={() => setDimensionsModalOpen(false)}
+				initialValues={dimensionsFilter}
+				onApply={setDimensionsFilter}
+			/>
 		</div>
 	);
 }

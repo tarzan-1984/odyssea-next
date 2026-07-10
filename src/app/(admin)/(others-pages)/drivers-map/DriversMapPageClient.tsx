@@ -6,11 +6,12 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useDriversForMap } from "@/hooks/useDriversForMap";
 import { DriversMapFilters } from "./DriversMapFilters";
 import { useCurrentUser } from "@/stores/userStore";
-import {
-	DRIVER_STATUS_FILTER_OPTIONS,
-	isRestrictedDriverStatusForMap,
-} from "@/components/logistics/driversMapConstants";
+import { isRestrictedDriverStatusForMap } from "@/components/logistics/driversMapConstants";
 import { canViewRestrictedDriverStatusesOnMap } from "@/utils/roleAccess";
+import {
+	createEmptyDimensionsFilter,
+	type DimensionsFilterValues,
+} from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
 
 const DriversMapWithMarkers = dynamic(
 	() => import("@/components/logistics/DriversMapWithMarkers"),
@@ -20,34 +21,77 @@ const DriversMapWithMarkers = dynamic(
 export function DriversMapPageClient() {
 	const currentUser = useCurrentUser();
 
-	// Filter state — same as drivers-list
-	const [driverStatusFilter, setDriverStatusFilter] = useState<string>("all");
-	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
-	const [zipFilter, setZipFilter] = useState<string>("");
-	const [debouncedZipFilter, setDebouncedZipFilter] = useState<string>("");
+	const [extendedSearchEnabled, setExtendedSearchEnabled] = useState(false);
+	const [addressFilter, setAddressFilter] = useState<string>("");
+	const [debouncedAddressFilter, setDebouncedAddressFilter] = useState<string>("");
+	const [extendedSearchFilter, setExtendedSearchFilter] = useState<string>("");
+	const [debouncedExtendedSearchFilter, setDebouncedExtendedSearchFilter] =
+		useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
+	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
+	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
+	const [dimensionsFilter, setDimensionsFilter] = useState<DimensionsFilterValues>(
+		createEmptyDimensionsFilter
+	);
+	const [dimensionsModalOpen, setDimensionsModalOpen] = useState(false);
 	const [centerCoordinates, setCenterCoordinates] = useState<{
 		lat: number;
 		lng: number;
 	} | null>(null);
 	const [radiusMiles, setRadiusMiles] = useState<number | null>(null);
 
-	// Debounce address filter (1.5 second delay) — same as drivers-list
+	const handleExtendedSearchToggle = useCallback((enabled: boolean) => {
+		setExtendedSearchEnabled(enabled);
+		setAddressFilter("");
+		setDebouncedAddressFilter("");
+		setExtendedSearchFilter("");
+		setDebouncedExtendedSearchFilter("");
+		setStatusAutoAppliedByAddress(false);
+		setCenterCoordinates(null);
+		setRadiusMiles(null);
+	}, []);
+
 	useEffect(() => {
 		const timer = setTimeout(() => {
-			setDebouncedZipFilter(zipFilter);
+			setDebouncedAddressFilter(addressFilter);
 		}, 1500);
 		return () => clearTimeout(timer);
-	}, [zipFilter]);
+	}, [addressFilter]);
 
-	// Query always enabled — initially show all drivers on map, then filter via filters
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedExtendedSearchFilter(extendedSearchFilter);
+		}, 1500);
+		return () => clearTimeout(timer);
+	}, [extendedSearchFilter]);
+
+	useEffect(() => {
+		if (extendedSearchEnabled) return;
+		if (addressFilter.trim()) {
+			setStatusFilter("for_offers");
+			setStatusAutoAppliedByAddress(true);
+		} else {
+			setStatusAutoAppliedByAddress(wasAuto => {
+				if (wasAuto) {
+					setStatusFilter(prev => (prev === "for_offers" ? "all" : prev));
+				}
+				return false;
+			});
+		}
+	}, [addressFilter, extendedSearchEnabled]);
+
 	const { drivers, isLoading, isFetching, error, refetch } = useDriversForMap({
-		statusFilter: driverStatusFilter === "all" ? "" : driverStatusFilter,
 		capabilitiesFilter,
-		addressFilter: debouncedZipFilter,
+		addressFilter: extendedSearchEnabled ? "" : debouncedAddressFilter,
+		extendedSearchEnabled,
+		extendedSearchFilter: extendedSearchEnabled ? debouncedExtendedSearchFilter : "",
 		radiusFilter,
 		locationFilter,
+		statusFilter,
+		statusAutoAppliedByAddress,
+		dimensionsFilter,
 		role: currentUser?.role?.toLowerCase() ?? "",
 	});
 
@@ -56,25 +100,42 @@ export function DriversMapPageClient() {
 		[currentUser?.role]
 	);
 
+	const statusFilterOptions = useMemo(() => {
+		const options: { value: string; label: string }[] = [
+			{ value: "all", label: "All statuses" },
+			{ value: "for_offers", label: "Default" },
+			{ value: "available", label: "Available" },
+			{ value: "available_on", label: "Available on" },
+			{ value: "available_off", label: "Not available" },
+			{ value: "loaded_enroute", label: "Loaded & Enroute" },
+		];
+		if (canViewRestrictedStatuses) {
+			options.push(
+				{ value: "banned", label: "Out of service" },
+				{ value: "on_vocation", label: "On vacation" },
+				{ value: "blocked", label: "Blocked" },
+				{ value: "expired_documents", label: "Expired documents" }
+			);
+		} else {
+			options.push(
+				{ value: "on_vocation", label: "On vacation" },
+				{ value: "expired_documents", label: "Expired documents" }
+			);
+		}
+		return options;
+	}, [canViewRestrictedStatuses]);
+
 	const driversForMap = useMemo(() => {
 		if (canViewRestrictedStatuses) return drivers;
 		return drivers.filter(d => !isRestrictedDriverStatusForMap(d.driverStatus));
 	}, [drivers, canViewRestrictedStatuses]);
 
-	// Reset status filter if it targets statuses this user is not allowed to see
 	useEffect(() => {
 		if (canViewRestrictedStatuses) return;
-		if (driverStatusFilter === "blocked" || driverStatusFilter === "banned") {
-			setDriverStatusFilter("all");
+		if (statusFilter === "blocked" || statusFilter === "banned") {
+			setStatusFilter("all");
 		}
-	}, [canViewRestrictedStatuses, driverStatusFilter]);
-
-	// Fixed status options — hide blocked / out-of-service filters for restricted viewers
-	const driverStatusOptions = useMemo(() => {
-		const base = [...DRIVER_STATUS_FILTER_OPTIONS];
-		if (canViewRestrictedStatuses) return base;
-		return base.filter(opt => opt !== "blocked" && opt !== "banned");
-	}, [canViewRestrictedStatuses]);
+	}, [canViewRestrictedStatuses, statusFilter]);
 
 	const handleFilterApply = useCallback(
 		({
@@ -102,10 +163,21 @@ export function DriversMapPageClient() {
 	}, []);
 
 	const handleReset = useCallback(() => {
+		handleExtendedSearchToggle(false);
+		setAddressFilter("");
+		setDebouncedAddressFilter("");
+		setExtendedSearchFilter("");
+		setDebouncedExtendedSearchFilter("");
+		setLocationFilter("USA");
+		setRadiusFilter("500");
+		setStatusFilter("all");
+		setStatusAutoAppliedByAddress(false);
 		setCapabilitiesFilter([]);
+		setDimensionsFilter(createEmptyDimensionsFilter());
+		setDimensionsModalOpen(false);
 		setCenterCoordinates(null);
 		setRadiusMiles(null);
-	}, []);
+	}, [handleExtendedSearchToggle]);
 
 	return (
 		<div className="flex flex-col gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 md:gap-3 md:px-0 md:py-0">
@@ -113,17 +185,28 @@ export function DriversMapPageClient() {
 
 			<div className="relative z-[1000]">
 				<DriversMapFilters
-					driverStatusFilter={driverStatusFilter}
-					setDriverStatusFilter={setDriverStatusFilter}
-					driverStatusOptions={driverStatusOptions}
+					extendedSearchEnabled={extendedSearchEnabled}
+					onExtendedSearchToggle={handleExtendedSearchToggle}
+					addressFilter={addressFilter}
+					setAddressFilter={setAddressFilter}
+					extendedSearchFilter={extendedSearchFilter}
+					setExtendedSearchFilter={setExtendedSearchFilter}
 					capabilitiesFilter={capabilitiesFilter}
 					setCapabilitiesFilter={setCapabilitiesFilter}
-					zipFilter={zipFilter}
-					setZipFilter={setZipFilter}
+					dimensionsFilter={dimensionsFilter}
+					setDimensionsFilter={setDimensionsFilter}
+					dimensionsModalOpen={dimensionsModalOpen}
+					setDimensionsModalOpen={setDimensionsModalOpen}
 					locationFilter={locationFilter}
 					setLocationFilter={setLocationFilter}
 					radiusFilter={radiusFilter}
 					setRadiusFilter={setRadiusFilter}
+					statusFilter={statusFilter}
+					onStatusFilterChange={value => {
+						setStatusFilter(value);
+						setStatusAutoAppliedByAddress(false);
+					}}
+					statusFilterOptions={statusFilterOptions}
 					onFilterApply={handleFilterApply}
 					onRadiusChange={handleRadiusChange}
 					onClearFilter={handleClearFilter}
@@ -139,10 +222,6 @@ export function DriversMapPageClient() {
 						isFetching={isFetching}
 						error={error}
 						refetch={refetch}
-						driverStatusFilter={driverStatusFilter}
-						onDriverStatusFilterChange={setDriverStatusFilter}
-						zipFilter={zipFilter}
-						onZipFilterChange={setZipFilter}
 						centerCoordinates={centerCoordinates}
 						radiusMiles={radiusMiles}
 						hideFilterBar

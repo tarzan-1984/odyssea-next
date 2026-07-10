@@ -360,8 +360,8 @@ export default function DriversMapWithMarkers({
 			? drivers
 			: drivers.filter(d => driverMapStatusMatchesFilter(d.driverStatus, driverStatusFilter));
 
-	// Same as drivers-list: API already filters by address + radius. No client-side filtering.
-	const filteredDrivers = filteredByStatus;
+	// When filter bar is in page header, drivers are already filtered via API + hook.
+	const filteredDrivers = hideFilterBar ? drivers : filteredByStatus;
 
 	if (error) {
 		return (
