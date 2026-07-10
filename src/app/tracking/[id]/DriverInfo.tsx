@@ -295,9 +295,11 @@ export default function DriverInfo({
 						<div className="flex max-w-[20rem] shrink-0 flex-col gap-3">
 							<div className="min-w-0">
 								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">Route</p>
-								<p className="min-w-0 whitespace-pre-line text-sm font-medium leading-relaxed text-slate-900 dark:text-white">
-									{routeDetails}
-								</p>
+								<div className="max-h-[150px] overflow-y-auto">
+									<p className="min-w-0 whitespace-pre-line text-sm font-medium leading-relaxed text-slate-900 dark:text-white">
+										{routeDetails}
+									</p>
+								</div>
 							</div>
 						</div>
 					)}
