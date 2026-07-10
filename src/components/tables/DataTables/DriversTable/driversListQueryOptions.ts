@@ -10,6 +10,8 @@ export interface DriversListQueryParams {
 	itemsPerPage: number;
 	capabilitiesFilter: string[];
 	addressFilter: string;
+	extendedSearchEnabled?: boolean;
+	extendedSearchFilter?: string;
 	radiusFilter: string;
 	locationFilter: "USA" | "Canada";
 	statusFilter: string;
@@ -45,6 +47,8 @@ export async function fetchDriversPage(
 		itemsPerPage,
 		capabilitiesFilter,
 		addressFilter,
+		extendedSearchEnabled = false,
+		extendedSearchFilter = "",
 		radiusFilter,
 		locationFilter,
 		statusFilter,
@@ -64,7 +68,16 @@ export async function fetchDriversPage(
 		searchParams.set("role", "administrator");
 	}
 
-	if (addressFilter && radiusFilter && locationFilter) {
+	const trimmedExtendedSearch = extendedSearchFilter?.trim() ?? "";
+	if (extendedSearchEnabled && trimmedExtendedSearch) {
+		searchParams.set("extended_search", trimmedExtendedSearch);
+		if (radiusFilter) {
+			searchParams.set("radius", radiusFilter);
+		}
+		if (locationFilter) {
+			searchParams.set("country", locationFilter);
+		}
+	} else if (addressFilter && radiusFilter && locationFilter) {
 		searchParams.set("my_search", addressFilter);
 		searchParams.set("radius", radiusFilter);
 		searchParams.set("country", locationFilter);
@@ -119,6 +132,8 @@ export function driversListQueryKey(params: DriversListQueryParams) {
 			itemsPerPage: params.itemsPerPage,
 			capabilitiesFilter: params.capabilitiesFilter,
 			addressFilter: params.addressFilter,
+			extendedSearchEnabled: params.extendedSearchEnabled ?? false,
+			extendedSearchFilter: params.extendedSearchFilter?.trim() ?? "",
 			radiusFilter: params.radiusFilter,
 			locationFilter: params.locationFilter,
 			statusFilter: effectiveStatusFilter,

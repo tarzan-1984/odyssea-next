@@ -8,6 +8,7 @@ const TMS_API_KEY = process.env.TMS_API_KEY || "tms_api_key_2024_driver_access";
 /** Optional query params for TMS driver search (all optional) */
 const SEARCH_PARAMS = [
 	"my_search",
+	"extended_search",
 	"status_filter",
 	"radius",
 	"country",
@@ -24,6 +25,7 @@ const SEARCH_PARAMS = [
  * GET /api/users/drivers/search
  * Proxies to TMS driver search API with optional query params:
  * - my_search: Address or place to search drivers near (geocoding + distance filter)
+ * - extended_search: Unit, name, phone, or vehicle text search (mutually exclusive with my_search)
  * - status_filter: Driver status filter (e.g. for_offers, Available)
  * - radius: Radius in miles when using my_search
  * - country: Country filter

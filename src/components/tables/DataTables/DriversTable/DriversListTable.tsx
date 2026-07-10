@@ -45,6 +45,7 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
 import Label from "@/components/form/Label";
+import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
@@ -218,9 +219,22 @@ export default function DriversListTable({
 	} | null>(null);
 
 	// Local filters
+	const [extendedSearchEnabled, setExtendedSearchEnabled] = useState(false);
 	const [addressFilter, setAddressFilter] = useState<string>("");
 	const [debouncedAddressFilter, setDebouncedAddressFilter] = useState<string>("");
+	const [extendedSearchFilter, setExtendedSearchFilter] = useState<string>("");
+	const [debouncedExtendedSearchFilter, setDebouncedExtendedSearchFilter] =
+		useState<string>("");
 	const [locationFilter, setLocationFilter] = useState<"USA" | "Canada">("USA");
+
+	const handleExtendedSearchToggle = (enabled: boolean) => {
+		setExtendedSearchEnabled(enabled);
+		setAddressFilter("");
+		setDebouncedAddressFilter("");
+		setExtendedSearchFilter("");
+		setDebouncedExtendedSearchFilter("");
+		setStatusAutoAppliedByAddress(false);
+	};
 
 	// Debounce address filter (1.5 second delay)
 	useEffect(() => {
@@ -230,7 +244,16 @@ export default function DriversListTable({
 		return () => clearTimeout(timer);
 	}, [addressFilter]);
 
+	// Debounce extended search filter (1.5 second delay)
 	useEffect(() => {
+		const timer = setTimeout(() => {
+			setDebouncedExtendedSearchFilter(extendedSearchFilter);
+		}, 1500);
+		return () => clearTimeout(timer);
+	}, [extendedSearchFilter]);
+
+	useEffect(() => {
+		if (extendedSearchEnabled) return;
 		if (addressFilter.trim()) {
 			setStatusFilter("for_offers");
 			setStatusAutoAppliedByAddress(true);
@@ -242,7 +265,7 @@ export default function DriversListTable({
 				return false;
 			});
 		}
-	}, [addressFilter]);
+	}, [addressFilter, extendedSearchEnabled]);
 	const [radiusFilter, setRadiusFilter] = useState<string>("500");
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
@@ -257,6 +280,8 @@ export default function DriversListTable({
 		setCurrentPage(1);
 	}, [
 		debouncedAddressFilter,
+		debouncedExtendedSearchFilter,
+		extendedSearchEnabled,
 		locationFilter,
 		radiusFilter,
 		statusFilter,
@@ -274,10 +299,14 @@ export default function DriversListTable({
 
 	const isAdmin = currentUser?.role?.toLowerCase() === "administrator";
 	const canViewRestrictedStatuses = canViewRestrictedDriverStatusesOnMap(currentUser?.role);
+	const hasActiveAddressSearch = Boolean(debouncedAddressFilter?.trim());
+	const hasActiveExtendedSearch =
+		extendedSearchEnabled && Boolean(debouncedExtendedSearchFilter?.trim());
+	const hasActiveSearch = hasActiveAddressSearch || hasActiveExtendedSearch;
 	const requiresAddressToSearch = !isAdmin;
-	const queryEnabled = isAdmin || Boolean(debouncedAddressFilter?.trim());
-	const showTablePlaceholder = requiresAddressToSearch && !debouncedAddressFilter?.trim();
-	const canSelectDrivers = Boolean(debouncedAddressFilter?.trim());
+	const queryEnabled = isAdmin || hasActiveSearch;
+	const showTablePlaceholder = requiresAddressToSearch && !hasActiveSearch;
+	const canSelectDrivers = hasActiveSearch;
 
 	const statusFilterOptions = useMemo(() => {
 		const options: { value: string; label: string }[] = [
@@ -315,7 +344,9 @@ export default function DriversListTable({
 		currentPage,
 		itemsPerPage,
 		capabilitiesFilter,
-		addressFilter: debouncedAddressFilter,
+		addressFilter: extendedSearchEnabled ? "" : debouncedAddressFilter,
+		extendedSearchEnabled,
+		extendedSearchFilter: extendedSearchEnabled ? debouncedExtendedSearchFilter : "",
 		radiusFilter,
 		locationFilter,
 		statusFilter,
@@ -458,7 +489,9 @@ export default function DriversListTable({
 	);
 
 	const showDistanceColumn =
-		Boolean(debouncedAddressFilter) && Boolean(driverList?.data?.has_distance_data);
+		hasActiveAddressSearch &&
+		!extendedSearchEnabled &&
+		Boolean(driverList?.data?.has_distance_data);
 	const idPosts = driverList?.data?.id_posts ?? {};
 	const colCount = showDistanceColumn ? 10 : 9;
 	const canCreateOffersWithoutAddress =
@@ -597,7 +630,46 @@ export default function DriversListTable({
 						: "pb-4"
 				}`}
 			>
+				<div className="mb-3">
+					<Switch
+						label="Extended search"
+						checked={extendedSearchEnabled}
+						onChange={handleExtendedSearchToggle}
+					/>
+				</div>
 				<div className="grid grid-cols-2 gap-2 sm:gap-3 md:flex md:flex-wrap md:items-end md:gap-3">
+					{/* Address / Extended search */}
+					<div className="flex min-w-0 flex-col">
+						{extendedSearchEnabled ? (
+							<>
+								<Label htmlFor="extended_search">Search</Label>
+								<input
+									id="extended_search"
+									name="extended_search"
+									type="text"
+									value={extendedSearchFilter}
+									onChange={e => setExtendedSearchFilter(e.target.value)}
+									placeholder="Unit/name/phone/vehicle"
+									className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
+								/>
+							</>
+						) : (
+							<>
+								<Label htmlFor="drivers-list-address-filter">Address</Label>
+								<input
+									id="drivers-list-address-filter"
+									type="text"
+									value={addressFilter}
+									onChange={e => setAddressFilter(e.target.value)}
+									placeholder="Enter address"
+									className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
+								/>
+							</>
+						)}
+					</div>
+
+					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
+
 					{/* Capabilities (multiselect) */}
 					<div className="flex min-w-0 flex-col md:min-w-[220px]">
 						<MultiSelect
@@ -606,21 +678,6 @@ export default function DriversListTable({
 							defaultSelected={capabilitiesFilter}
 							onChange={values => setCapabilitiesFilter(values)}
 							triggerClassName="h-11"
-						/>
-					</div>
-
-					<div className="hidden self-end h-11 w-px bg-gray-300 dark:bg-gray-600 md:block" />
-
-					{/* Address */}
-					<div className="flex min-w-0 flex-col">
-						<Label htmlFor="drivers-list-address-filter">Address</Label>
-						<input
-							id="drivers-list-address-filter"
-							type="text"
-							value={addressFilter}
-							onChange={e => setAddressFilter(e.target.value)}
-							placeholder="Enter address"
-							className="h-11 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-white/30 md:w-40"
 						/>
 					</div>
 
@@ -712,8 +769,11 @@ export default function DriversListTable({
 						<button
 							type="button"
 							onClick={() => {
+								handleExtendedSearchToggle(false);
 								setAddressFilter("");
 								setDebouncedAddressFilter("");
+								setExtendedSearchFilter("");
+								setDebouncedExtendedSearchFilter("");
 								setLocationFilter("USA");
 								setRadiusFilter("500");
 								setStatusFilter("all");
@@ -734,7 +794,9 @@ export default function DriversListTable({
 			{showTablePlaceholder ? (
 				<div className="flex min-h-[200px] items-center justify-center border border-t-0 rounded-b-xl border-gray-100 px-4 py-12 dark:border-white/[0.05]">
 					<p className="text-center text-gray-500 dark:text-gray-400">
-						Enter address to search for drivers
+						{extendedSearchEnabled
+							? "Enter unit, name, phone or vehicle to search for drivers"
+							: "Enter address to search for drivers"}
 					</p>
 				</div>
 			) : (
