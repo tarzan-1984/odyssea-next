@@ -47,6 +47,14 @@ export function buildOfferChatUrl(offerId: string, unitId?: string | null): stri
 	return `/chat?${params.toString()}`;
 }
 
+export function buildLoadChatUrl(loadId: string, roomId?: string | null): string {
+	const params = new URLSearchParams();
+	params.set("load", loadId.trim());
+	const room = roomId?.trim();
+	if (room) params.set("room", room);
+	return `/chat?${params.toString()}`;
+}
+
 export function buildChatUrlForRoom(
 	chatRoom: ChatRoom,
 	currentUserId?: string | null
@@ -54,7 +62,7 @@ export function buildChatUrlForRoom(
 	const type = (chatRoom.type || "").toUpperCase().trim();
 	if (type === "LOAD") {
 		const loadId = String(chatRoom.loadId ?? "").trim();
-		if (loadId) return `/chat?load=${encodeURIComponent(loadId)}`;
+		if (loadId) return buildLoadChatUrl(loadId, chatRoom.id);
 	}
 	if (type === "OFFER") {
 		const offerId = getOfferIdFromChatRoom(chatRoom);

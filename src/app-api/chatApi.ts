@@ -499,10 +499,16 @@ class ChatApiClient {
 		});
 	}
 
-	deleteLoadChat(loadId: string): Promise<{ started: boolean; chatRoomId: string; jobId: string }> {
+	deleteLoadChat(
+		loadId: string,
+		chatRoomId?: string,
+	): Promise<{ started: boolean; chatRoomId: string; jobId: string }> {
 		return this.request<{ started: boolean; chatRoomId: string; jobId: string }>(`/delete_load_chat`, {
 			method: "POST",
-			body: JSON.stringify({ load_id: loadId }),
+			body: JSON.stringify({
+				load_id: loadId,
+				...(chatRoomId ? { chat_room_id: chatRoomId } : {}),
+			}),
 		});
 	}
 

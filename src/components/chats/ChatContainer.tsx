@@ -14,6 +14,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { findActiveLoadChatInList, resolveLoadChatRoom } from "@/utils/findLoadChatRoom";
 import {
 	buildChatUrlForRoom,
+	buildLoadChatUrl,
 	findOfferChatRoom,
 } from "@/utils/offerChatUrl";
 import { useCurrentUser } from "@/stores/userStore";
@@ -58,7 +59,7 @@ export default function ChatContainer() {
 	);
 
 	useEffect(() => {
-		if (!roomFromUrl || loadFromUrl || offerFromUrl) {
+		if (!roomFromUrl || offerFromUrl) {
 			if (!roomFromUrl) roomResolvedRef.current = null;
 			return;
 		}
@@ -69,12 +70,14 @@ export default function ChatContainer() {
 			const fromList = chatRooms.find(r => r.id === roomFromUrl);
 			if (fromList) {
 				roomResolvedRef.current = roomFromUrl;
+				if (loadFromUrl) loadResolvedRef.current = loadFromUrl;
 				applySelectedRoom(fromList);
 				return;
 			}
 			const curr = useChatStore.getState().currentChatRoom;
 			if (curr?.id === roomFromUrl) {
 				roomResolvedRef.current = roomFromUrl;
+				if (loadFromUrl) loadResolvedRef.current = loadFromUrl;
 				setSelectedChatRoomId(roomFromUrl);
 				return;
 			}
@@ -90,14 +93,21 @@ export default function ChatContainer() {
 					),
 				};
 				roomResolvedRef.current = roomFromUrl;
+				if (loadFromUrl) loadResolvedRef.current = loadFromUrl;
 				applySelectedRoom(room);
 			} catch {
-				// ignore — room inaccessible
+				// Room gone / no access — clear stale deep-link from URL
+				roomResolvedRef.current = roomFromUrl;
+				window.dispatchEvent(
+					new CustomEvent("odyssea:clearSelectedChat", {
+						detail: { chatRoomId: roomFromUrl },
+					})
+				);
 			}
 		};
 
 		trySelect().catch(() => {});
-	}, [roomFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom]);
+	}, [roomFromUrl, loadFromUrl, chatRooms, isLoadingChatRooms, applySelectedRoom, offerFromUrl]);
 
 	useEffect(() => {
 		if (!loadFromUrl) {
@@ -107,35 +117,16 @@ export default function ChatContainer() {
 			setDeepLinkedArchivedRoom(null);
 			return;
 		}
+		// Specific room already selected via ?load=&room=
+		if (roomFromUrl) return;
 		if (isLoadingChatRooms) return;
 		if (loadResolvedRef.current === loadFromUrl) return;
 
 		const resolveGeneration = ++loadResolveGenerationRef.current;
 
-		const trySelectLoadChat = async () => {
-			const active = findActiveLoadChatInList(chatRooms, loadFromUrl);
-			if (active) {
-				if (resolveGeneration !== loadResolveGenerationRef.current) return;
-				loadResolvedRef.current = loadFromUrl;
-				setExpandArchiveSection(false);
-				setNoAccessLoadId(null);
-				setDeepLinkedArchivedRoom(null);
-				applySelectedRoom(active);
-				return;
-			}
-
-			const resolved = await resolveLoadChatRoom(chatRooms, loadFromUrl);
-			if (resolveGeneration !== loadResolveGenerationRef.current) return;
-
+		const openResolvedLoadChat = (room: ChatRoom, isArchived: boolean) => {
 			loadResolvedRef.current = loadFromUrl;
-			if (!resolved) {
-				setExpandArchiveSection(false);
-				setNoAccessLoadId(loadFromUrl);
-				setDeepLinkedArchivedRoom(null);
-				return;
-			}
-
-			const { room, isArchived } = resolved;
+			roomResolvedRef.current = room.id;
 			setExpandArchiveSection(isArchived);
 			setNoAccessLoadId(null);
 			applySelectedRoom(room);
@@ -146,15 +137,45 @@ export default function ChatContainer() {
 			} else {
 				setDeepLinkedArchivedRoom(null);
 			}
+			// Canonical URL for duplicated loadId: newest chat + its room id
+			try {
+				router.replace(buildLoadChatUrl(loadFromUrl, room.id), { scroll: false });
+			} catch {
+				// ignore url sync errors
+			}
+		};
+
+		const trySelectLoadChat = async () => {
+			const active = findActiveLoadChatInList(chatRooms, loadFromUrl);
+			if (active) {
+				if (resolveGeneration !== loadResolveGenerationRef.current) return;
+				openResolvedLoadChat(active, false);
+				return;
+			}
+
+			const resolved = await resolveLoadChatRoom(chatRooms, loadFromUrl);
+			if (resolveGeneration !== loadResolveGenerationRef.current) return;
+
+			if (!resolved) {
+				loadResolvedRef.current = loadFromUrl;
+				setExpandArchiveSection(false);
+				setNoAccessLoadId(loadFromUrl);
+				setDeepLinkedArchivedRoom(null);
+				return;
+			}
+
+			openResolvedLoadChat(resolved.room, resolved.isArchived);
 		};
 
 		trySelectLoadChat().catch(() => {});
 	}, [
 		loadFromUrl,
+		roomFromUrl,
 		chatRooms,
 		isLoadingChatRooms,
 		applySelectedRoom,
 		queryClient,
+		router,
 	]);
 
 	useEffect(() => {
@@ -218,6 +239,59 @@ export default function ChatContainer() {
 			// ignore url sync errors
 		}
 	};
+
+	// Allow Chat Settings (and similar) to open a newly forked LOAD chat immediately.
+	useEffect(() => {
+		const onSelectChatRoom = (event: Event) => {
+			const room = (event as CustomEvent<{ chatRoom?: ChatRoom }>).detail?.chatRoom;
+			if (!room?.id) return;
+			applySelectedRoom(room);
+			try {
+				router.replace(buildChatUrlForRoom(room, currentUser?.id), { scroll: false });
+			} catch {
+				// ignore url sync errors
+			}
+		};
+		window.addEventListener("odyssea:selectChatRoom", onSelectChatRoom);
+		return () => window.removeEventListener("odyssea:selectChatRoom", onSelectChatRoom);
+	}, [applySelectedRoom, router, currentUser?.id]);
+
+	// After delete/leave: clear selection + URL so we do not refetch the removed room.
+	useEffect(() => {
+		const onClearSelectedChat = (event: Event) => {
+			const chatRoomId = (event as CustomEvent<{ chatRoomId?: string }>).detail
+				?.chatRoomId;
+			const selectedId =
+				selectedChatRoomId || useChatStore.getState().currentChatRoom?.id || null;
+			if (chatRoomId && selectedId && chatRoomId !== selectedId) {
+				return;
+			}
+
+			loadResolveGenerationRef.current += 1;
+			// Keep resolved refs pointed at the removed ids until URL params are cleared,
+			// so deep-link effects do not refetch a deleted room mid-navigation.
+			if (chatRoomId) {
+				roomResolvedRef.current = chatRoomId;
+			}
+			if (loadFromUrl) {
+				loadResolvedRef.current = loadFromUrl;
+			}
+			offerResolvedRef.current = null;
+			setSelectedChatRoomId(null);
+			setCurrentChatRoom(null);
+			setNoAccessLoadId(null);
+			setDeepLinkedArchivedRoom(null);
+			setExpandArchiveSection(false);
+			try {
+				router.replace("/chat", { scroll: false });
+			} catch {
+				// ignore url sync errors
+			}
+		};
+		window.addEventListener("odyssea:clearSelectedChat", onClearSelectedChat);
+		return () =>
+			window.removeEventListener("odyssea:clearSelectedChat", onClearSelectedChat);
+	}, [selectedChatRoomId, setCurrentChatRoom, router, loadFromUrl]);
 
 	return (
 		<>

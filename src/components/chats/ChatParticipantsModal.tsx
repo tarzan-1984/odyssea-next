@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
-import { ChatRoom, chatApi } from "@/app-api/chatApi";
+import { ChatRoom } from "@/app-api/chatApi";
 import { UserListItem } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
 import { renderAvatar, getRoleDisplayLabel, chatRoomPlaceholderBg } from "@/helpers";
@@ -50,6 +50,8 @@ export default function ChatParticipantsModal({
 	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms({});
 	const { socket, isConnected } = useWebSocket();
 	const updateChatRoomInStore = useChatStore(state => state.updateChatRoom);
+	const addChatRoomToStore = useChatStore(state => state.addChatRoom);
+	const setCurrentChatRoom = useChatStore(state => state.setCurrentChatRoom);
 
 	// Check if current user is admin of this chat
 	const isCurrentUserAdmin = chatRoom?.adminId === currentUser?.id;
@@ -306,6 +308,35 @@ export default function ChatParticipantsModal({
 		if (isSaving) return;
 		setIsSaving(true);
 
+		const normalizeForkedRoom = (raw: any): ChatRoom | null => {
+			if (!raw?.id) return null;
+			return {
+				...raw,
+				participants: Array.isArray(raw.participants)
+					? raw.participants.map((p: any) => ({
+							...p,
+							user: {
+								...p.user,
+								avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+								userColor: p.user?.userColor ?? null,
+							},
+						}))
+					: [],
+			} as ChatRoom;
+		};
+
+		const openForkedLoadChat = (room: ChatRoom) => {
+			addChatRoomToStore(room);
+			setCurrentChatRoom(room);
+			window.dispatchEvent(
+				new CustomEvent("odyssea:selectChatRoom", { detail: { chatRoom: room } }),
+			);
+			if (socket?.connected) {
+				socket.emit("joinChatRoom", { chatRoomId: room.id });
+			}
+			onClose();
+		};
+
 		try {
 
 			// 1) Avatar upload if changed
@@ -337,11 +368,49 @@ export default function ChatParticipantsModal({
 				const uniqueParticipants = Array.from(
 					new Map(addedParticipants.map((entry) => [entry.id, entry])).values(),
 				);
-				addParticipants({
-					chatRoomId: chatRoom.id,
-					participantIds: uniqueParticipants.map((entry) => entry.id),
-					participants: uniqueParticipants,
-				});
+				const addingDriverToLoad = isLoadChat && uniqueParticipants.some(
+					(entry) => String(entry.role || "").toUpperCase() === "DRIVER",
+				);
+
+				if (addingDriverToLoad) {
+					await new Promise<void>((resolve, reject) => {
+						const timeout = setTimeout(() => {
+							socket.off("loadChatForked", onForked);
+							reject(new Error("Timed out waiting for forked load chat"));
+						}, 15000);
+
+						const onForked = (data: {
+							sourceChatRoomId?: string;
+							chatRooms?: any[];
+						}) => {
+							if (data?.sourceChatRoomId && data.sourceChatRoomId !== chatRoom.id) {
+								return;
+							}
+							clearTimeout(timeout);
+							socket.off("loadChatForked", onForked);
+							const forked = normalizeForkedRoom(data?.chatRooms?.[0]);
+							if (forked) {
+								openForkedLoadChat(forked);
+							} else {
+								onClose();
+							}
+							resolve();
+						};
+
+						socket.on("loadChatForked", onForked);
+						addParticipants({
+							chatRoomId: chatRoom.id,
+							participantIds: uniqueParticipants.map((entry) => entry.id),
+							participants: uniqueParticipants,
+						});
+					});
+				} else {
+					addParticipants({
+						chatRoomId: chatRoom.id,
+						participantIds: uniqueParticipants.map((entry) => entry.id),
+						participants: uniqueParticipants,
+					});
+				}
 			}
 
 			if (removedParticipants.length > 0) {
@@ -358,8 +427,13 @@ export default function ChatParticipantsModal({
 				updateChatRoomInStore(chatRoom.id, { avatar: newAvatarPath });
 			}
 
-			// Close modal
-			onClose();
+			// Close modal (fork path closes earlier after navigation)
+			const addedDrivers = addedParticipants.some(
+				(entry) => String(entry.role || "").toUpperCase() === "DRIVER",
+			);
+			if (!(isLoadChat && addedDrivers && addedParticipants.length > 0)) {
+				onClose();
+			}
 		} catch (e) {
 			console.error("Failed to save chat participant changes:", e);
 		} finally {

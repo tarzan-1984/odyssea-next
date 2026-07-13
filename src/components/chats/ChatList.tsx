@@ -111,12 +111,13 @@ export default function ChatList({
 			setActiveTab("offers");
 			return;
 		}
-		if (roomFromUrl) {
-			setActiveTab("chats");
-			return;
-		}
+		// LOAD deep-links use ?load= (and may also include ?room= for a specific fork)
 		if (loadFromUrl) {
 			setActiveTab("shipments");
+			return;
+		}
+		if (roomFromUrl) {
+			setActiveTab("chats");
 			return;
 		}
 		setActiveTab(readStoredChatTab());

@@ -8,14 +8,20 @@ export function findLoadChatInList(rooms: ChatRoom[], loadId: string): ChatRoom 
 	return rooms.find(room => matchesLoadChatId(room, loadId));
 }
 
-/** Active LOAD chats only (excludes archived in main shipments list). */
+/** Active LOAD chats only (excludes archived in main shipments list). Prefer newest. */
 export function findActiveLoadChatInList(
 	rooms: ChatRoom[],
 	loadId: string
 ): ChatRoom | undefined {
-	return rooms.find(
+	const matches = rooms.filter(
 		room => matchesLoadChatId(room, loadId) && room.isLoadArchived !== true
 	);
+	if (matches.length === 0) return undefined;
+	return matches.reduce((newest, room) => {
+		const newestTs = Date.parse(String(newest.createdAt ?? newest.updatedAt ?? 0));
+		const roomTs = Date.parse(String(room.createdAt ?? room.updatedAt ?? 0));
+		return roomTs >= newestTs ? room : newest;
+	});
 }
 
 /** Lookup LOAD chat by TMS load id via API (active or archived). */

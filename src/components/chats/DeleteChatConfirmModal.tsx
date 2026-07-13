@@ -46,9 +46,10 @@ export default function DeleteChatConfirmModal({
 					return;
 				}
 
-				// Call the LOAD chat deletion endpoint
+				// Call the LOAD chat deletion endpoint for this specific room
 				const { chatApi } = await import("@/app-api/chatApi");
-				await chatApi.deleteLoadChat(chatRoom.loadId || "");
+				await chatApi.deleteLoadChat(chatRoom.loadId || "", chatRoom.id);
+				state.removeChatRoom(chatRoom.id);
 			} else if (isMultiUserChatType(chatRoom.type) && !isCurrentUserAdmin) {
 				// For group/bid chats, non-admin users should leave the chat (remove themselves)
 				removeParticipant({
@@ -75,6 +76,12 @@ export default function DeleteChatConfirmModal({
 					)
 					.catch(() => {});
 			}
+
+			window.dispatchEvent(
+				new CustomEvent("odyssea:clearSelectedChat", {
+					detail: { chatRoomId: chatRoom.id },
+				}),
+			);
 
 			onDeleteSuccess?.();
 			onClose();

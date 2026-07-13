@@ -613,6 +613,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			const roomBefore =
 				state.chatRooms.find(r => r.id === data.chatRoomId) ??
 				(state.currentChatRoom?.id === data.chatRoomId ? state.currentChatRoom : undefined);
+			const wasCurrent = state.currentChatRoom?.id === data.chatRoomId;
 
 			if (roomBefore?.type === "LOAD") {
 				queryClient
@@ -622,9 +623,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 			state.removeChatRoom(data.chatRoomId);
 
-			// Clear currentChatRoom if it was the deleted chat
-			if (state.currentChatRoom?.id === data.chatRoomId) {
-				state.setCurrentChatRoom(null);
+			if (wasCurrent) {
+				window.dispatchEvent(
+					new CustomEvent("odyssea:clearSelectedChat", {
+						detail: { chatRoomId: data.chatRoomId },
+					})
+				);
 			}
 		});
 
@@ -1141,11 +1145,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Check if the removed user is the current user
 				if (currentUser?.id === removedUserId) {
 					// Remove the entire chat room from the list and cache
+					const wasCurrent = state.currentChatRoom?.id === chatRoomId;
 					state.removeChatRoom(chatRoomId);
 
-					// If this was the current chat room, clear it
-					if (state.currentChatRoom?.id === chatRoomId) {
-						state.setCurrentChatRoom(null);
+					if (wasCurrent) {
+						window.dispatchEvent(
+							new CustomEvent("odyssea:clearSelectedChat", {
+								detail: { chatRoomId },
+							})
+						);
 					}
 					return;
 				}
@@ -1167,13 +1175,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			try {
 				const { chatRoomId } = data;
 				const state = useChatStore.getState();
+				const wasCurrent = state.currentChatRoom?.id === chatRoomId;
 
 				// Remove the entire chat room from the list and cache
 				state.removeChatRoom(chatRoomId);
 
-				// If this was the current chat room, clear it
-				if (state.currentChatRoom?.id === chatRoomId) {
-					state.setCurrentChatRoom(null);
+				if (wasCurrent) {
+					window.dispatchEvent(
+						new CustomEvent("odyssea:clearSelectedChat", {
+							detail: { chatRoomId },
+						})
+					);
 				}
 			} catch (e) {
 				console.error("Failed to handle removedFromChatRoom:", e);
