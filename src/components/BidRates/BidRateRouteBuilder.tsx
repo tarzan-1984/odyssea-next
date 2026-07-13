@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import { AddPlusCircleIcon, DragHandleIcon, RemoveMinusIcon } from "@/icons";
-import type { CreateOfferRoutePoint } from "@/app-api/offers";
+import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
+import {
+	isValidLocationFormat,
+	LOCATION_FORMAT_ERROR,
+	needsLocationGeocode,
+	normalizeLocationForGeocode,
+} from "@/utils/offerLocationFormat";
 
 const DND_BID_ROUTE_ROW_TYPE = "BID_ROUTE_ROW";
 
@@ -53,6 +59,9 @@ export function validateBidRouteRows(rows: BidRouteRow[]): string | null {
 	if (rows.some(row => !row.location.trim())) {
 		return "Each stop must have a location";
 	}
+	if (rows.some(row => !isValidLocationFormat(row.location.trim()))) {
+		return LOCATION_FORMAT_ERROR;
+	}
 
 	return null;
 }
@@ -71,10 +80,13 @@ type DraggableBidRouteRowProps = {
 	index: number;
 	rowCount: number;
 	canRemove: boolean;
+	locationError?: string;
 	updateRow: (index: number, location: string) => void;
 	removeRow: (index: number) => void;
 	moveRow: (dragIndex: number, hoverIndex: number) => void;
 	onAddRow: (afterIndex: number) => void;
+	onAddressBlur: (index: number, location: string, rowId: string) => void;
+	onLocationChange: (rowId: string) => void;
 	pendingDropRef: React.MutableRefObject<number | null>;
 };
 
@@ -83,10 +95,13 @@ function DraggableBidRouteRow({
 	index,
 	rowCount,
 	canRemove,
+	locationError,
 	updateRow,
 	removeRow,
 	moveRow,
 	onAddRow,
+	onAddressBlur,
+	onLocationChange,
 	pendingDropRef,
 }: DraggableBidRouteRowProps) {
 	const rowRef = useRef<HTMLDivElement>(null);
@@ -186,15 +201,25 @@ function DraggableBidRouteRow({
 				<AddPlusCircleIcon className="h-11 w-11" />
 			</button>
 
-			<div className="min-w-0 flex-1">
+			<div className="relative min-w-0 flex-1">
 				<Label>{label}</Label>
 				<Input
 					type="text"
 					value={row.location}
-					onChange={e => updateRow(index, e.target.value)}
+					onChange={e => {
+						updateRow(index, e.target.value);
+						onLocationChange(row.id);
+					}}
+					onBlur={() => onAddressBlur(index, row.location, row.id)}
 					placeholder={placeholder}
 					className="dark:bg-gray-900"
+					error={Boolean(locationError)}
 				/>
+				{locationError ? (
+					<p className="absolute left-0 top-full mt-1 whitespace-nowrap text-xs text-red-500 dark:text-red-400">
+						{locationError}
+					</p>
+				) : null}
 			</div>
 
 			{canRemove && (
@@ -213,45 +238,129 @@ function DraggableBidRouteRow({
 
 type BidRateRouteBuilderProps = {
 	rows: BidRouteRow[];
-	onChange: (rows: BidRouteRow[]) => void;
+	onChange: React.Dispatch<React.SetStateAction<BidRouteRow[]>>;
 };
 
 export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuilderProps) {
 	const pendingDropRef = useRef<number | null>(null);
+	const [locationErrors, setLocationErrors] = useState<Record<string, string>>({});
 
 	const updateRow = useCallback(
 		(index: number, location: string) => {
-			onChange(
-				rows.map((row, rowIndex) => (rowIndex === index ? { ...row, location } : row)),
+			onChange(prev =>
+				prev.map((row, rowIndex) => (rowIndex === index ? { ...row, location } : row)),
 			);
 		},
-		[onChange, rows],
+		[onChange],
 	);
 
 	const addRow = useCallback(
 		(afterIndex: number, type: "pickup" | "delivery") => {
-			const next = [...rows];
-			next.splice(afterIndex + 1, 0, createBidRouteRow(type));
-			onChange(next);
+			onChange(prev => {
+				const next = [...prev];
+				next.splice(afterIndex + 1, 0, createBidRouteRow(type));
+				return next;
+			});
 		},
-		[onChange, rows],
+		[onChange],
 	);
 
 	const removeRow = useCallback(
 		(index: number) => {
-			onChange(rows.filter((_, rowIndex) => rowIndex !== index));
+			onChange(prev => {
+				const removed = prev[index];
+				if (removed) {
+					setLocationErrors(errors => {
+						const next = { ...errors };
+						delete next[removed.id];
+						return next;
+					});
+				}
+				return prev.filter((_, rowIndex) => rowIndex !== index);
+			});
 		},
-		[onChange, rows],
+		[onChange],
 	);
 
 	const moveRow = useCallback(
 		(dragIndex: number, hoverIndex: number) => {
-			const next = [...rows];
-			const [removed] = next.splice(dragIndex, 1);
-			next.splice(hoverIndex, 0, removed);
-			onChange(next);
+			onChange(prev => {
+				const next = [...prev];
+				const [removed] = next.splice(dragIndex, 1);
+				next.splice(hoverIndex, 0, removed);
+				return next;
+			});
 		},
-		[onChange, rows],
+		[onChange],
+	);
+
+	const onLocationChange = useCallback((rowId: string) => {
+		setLocationErrors(prev => {
+			if (!prev[rowId]) return prev;
+			const next = { ...prev };
+			delete next[rowId];
+			return next;
+		});
+	}, []);
+
+	const onAddressBlur = useCallback(
+		async (index: number, location: string, rowId: string) => {
+			const trimmed = location.trim();
+			if (!trimmed) {
+				setLocationErrors(prev => {
+					const next = { ...prev };
+					delete next[rowId];
+					return next;
+				});
+				return;
+			}
+
+			if (!isValidLocationFormat(trimmed)) {
+				setLocationErrors(prev => ({ ...prev, [rowId]: LOCATION_FORMAT_ERROR }));
+				return;
+			}
+
+			setLocationErrors(prev => {
+				const next = { ...prev };
+				delete next[rowId];
+				return next;
+			});
+
+			const geocodeAddress = normalizeLocationForGeocode(trimmed);
+			let finalAddress = trimmed;
+
+			if (needsLocationGeocode(trimmed)) {
+				try {
+					const formatted = await offers.geocodeToFormattedAddress(geocodeAddress);
+					if (formatted) {
+						finalAddress = formatted;
+					}
+				} catch {
+					// Keep original value on error
+				}
+			} else if (geocodeAddress !== trimmed) {
+				finalAddress = geocodeAddress;
+			}
+
+			if (finalAddress !== trimmed) {
+				onChange(prev => {
+					const next = [...prev];
+					if (next[index]?.id === rowId) {
+						next[index] = { ...next[index], location: finalAddress };
+					} else {
+						const foundIndex = next.findIndex(row => row.id === rowId);
+						if (foundIndex >= 0) {
+							next[foundIndex] = {
+								...next[foundIndex],
+								location: finalAddress,
+							};
+						}
+					}
+					return next;
+				});
+			}
+		},
+		[onChange],
 	);
 
 	const pickupCount = rows.filter(row => row.type === "pickup").length;
@@ -270,6 +379,9 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 					moveRow={moveRow}
 					pendingDropRef={pendingDropRef}
 					onAddRow={afterIndex => addRow(afterIndex, row.type)}
+					onAddressBlur={onAddressBlur}
+					onLocationChange={onLocationChange}
+					locationError={locationErrors[row.id]}
 					canRemove={
 						(row.type === "pickup" && pickupCount > 1) ||
 						(row.type === "delivery" && deliveryCount > 1)

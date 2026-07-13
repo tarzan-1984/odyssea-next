@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
+import BidRatesList from "./BidRatesList";
 import LeaveBidModal from "./LeaveBidModal";
 import LeaveBidPlusIcon from "./LeaveBidPlusIcon";
 
 export default function BidRatesPageClient() {
+	const queryClient = useQueryClient();
 	const [isLeaveBidModalOpen, setIsLeaveBidModalOpen] = useState(false);
 
 	return (
@@ -27,13 +30,16 @@ export default function BidRatesPageClient() {
 				</Button>
 			</div>
 			<ComponentCard title="Bid rates">
-				<p className="text-sm text-gray-500 dark:text-gray-400">
-					Bid rates content will be added here.
-				</p>
+				<BidRatesList />
 			</ComponentCard>
 			<LeaveBidModal
 				isOpen={isLeaveBidModalOpen}
-				onClose={() => setIsLeaveBidModalOpen(false)}
+				onClose={() => {
+					setIsLeaveBidModalOpen(false);
+					queryClient
+						.invalidateQueries({ queryKey: ["bid-rates-list"] })
+						.catch(() => undefined);
+				}}
 			/>
 		</>
 	);

@@ -14,6 +14,9 @@ import {
 const COMPOSE_FIELD_CLASS =
 	"w-full min-h-9 max-h-[50cqh] overflow-y-auto py-2 pl-[4.85rem] pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90 sm:pl-[5rem]";
 
+const COMPOSE_FIELD_COMPACT_CLASS =
+	"w-full min-h-9 max-h-[50cqh] overflow-y-auto py-2 pl-10 pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90 sm:pl-11";
+
 export type ChatRichComposeInputProps = {
 	editorRef: React.RefObject<HTMLDivElement | null>;
 	onContentChange: (markdown: string, plainText: string) => void;
@@ -26,6 +29,8 @@ export type ChatRichComposeInputProps = {
 	/** Increment to replace editor content with draftContent. */
 	draftKey?: number;
 	draftContent?: string;
+	/** Single leading icon (e.g. BID chat) — tighter left padding. */
+	compactLeadingIcons?: boolean;
 };
 
 export default function ChatRichComposeInput({
@@ -38,6 +43,7 @@ export default function ChatRichComposeInput({
 	resetKey = 0,
 	draftKey = 0,
 	draftContent = "",
+	compactLeadingIcons = false,
 }: ChatRichComposeInputProps) {
 	const [showPlaceholder, setShowPlaceholder] = useState(true);
 
@@ -128,7 +134,7 @@ export default function ChatRichComposeInput({
 		<div className="relative min-h-9">
 			{showPlaceholder ? (
 				<span
-					className={`pointer-events-none absolute inset-0 z-0 flex items-start text-sm leading-snug text-gray-400 dark:text-gray-500 ${COMPOSE_FIELD_CLASS}`}
+					className={`pointer-events-none absolute inset-0 z-0 flex items-start text-sm leading-snug text-gray-400 dark:text-gray-500 ${compactLeadingIcons ? COMPOSE_FIELD_COMPACT_CLASS : COMPOSE_FIELD_CLASS}`}
 					aria-hidden
 				>
 					{placeholder}
@@ -144,7 +150,7 @@ export default function ChatRichComposeInput({
 				onInput={handleInput}
 				onKeyDown={onKeyDown}
 				onPaste={onPaste}
-				className={`relative z-0 ${COMPOSE_FIELD_CLASS} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
+				className={`relative z-0 ${compactLeadingIcons ? COMPOSE_FIELD_COMPACT_CLASS : COMPOSE_FIELD_CLASS} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
 			/>
 		</div>
 	);

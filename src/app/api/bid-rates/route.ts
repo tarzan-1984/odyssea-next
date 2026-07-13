@@ -3,6 +3,54 @@ import { serverAuth } from "@/utils/auth";
 import { canAccessBidRates } from "@/utils/roleAccess";
 
 /**
+ * GET /api/bid-rates
+ * Lists bid rates with owner and route (paginated).
+ */
+export async function GET(request: NextRequest) {
+	try {
+		const accessToken = serverAuth.getAccessToken(request);
+		if (!accessToken) {
+			return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+		}
+
+		const userData = serverAuth.getUserData(request);
+		if (!canAccessBidRates(userData?.role)) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+
+		const { searchParams } = new URL(request.url);
+		const page = searchParams.get("page") || "1";
+		const limit = searchParams.get("limit") || "10";
+		const qs = new URLSearchParams({ page, limit });
+
+		const response = await fetch(
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/bid-rates?${qs.toString()}`,
+			{
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+				},
+				cache: "no-store",
+			},
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return NextResponse.json(
+				{ error: data.message || data.error || "Failed to load bid rates" },
+				{ status: response.status },
+			);
+		}
+
+		return NextResponse.json(data);
+	} catch (error) {
+		console.error("Error loading bid rates:", error);
+		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+	}
+}
+
+/**
  * POST /api/bid-rates
  * Creates bid_rates row and linked BID chat on backend.
  */

@@ -147,6 +147,19 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								return renderLoadChatAvatar(chatRoom, "w-12 h-12");
 							}
 
+							if (chatRoom.type === "BID") {
+								const creator =
+									chatRoom.participants.find(
+										p => p.user.id === chatRoom.adminId || p.userId === chatRoom.adminId,
+									) ?? null;
+								if (creator) {
+									return renderAvatar(
+										participantUserToAvatarData(creator.user),
+										CHAT_HEADER_AVATAR_CLASS,
+									);
+								}
+							}
+
 							if (isMultiUserChatType(chatRoom.type) && chatRoom.avatar) {
 								return (
 									// eslint-disable-next-line @next/next/no-img-element

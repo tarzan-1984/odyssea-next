@@ -254,7 +254,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 
 	const isLoadArchivedReadOnlyChat =
 		selectedChatRoom?.type === "LOAD" && selectedChatRoom.isLoadArchived === true;
-	const canAttachFiles = !isLoadArchivedReadOnlyChat;
+	const isBidChat = selectedChatRoom?.type === "BID";
+	const canAttachFiles = !isLoadArchivedReadOnlyChat && !isBidChat;
 
 	const hasFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
@@ -1062,6 +1063,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						editingMessage={editingMessage}
 						editDraftKey={editDraftKey}
 						onCancelEdit={handleCancelEdit}
+						isBidChat={isBidChat}
 					/>
 				)}
 			</div>

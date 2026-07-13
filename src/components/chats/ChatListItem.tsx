@@ -19,6 +19,7 @@ import {
 	participantUserToAvatarData,
 } from "@/utils/chatOtherParticipant";
 import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
+import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -83,6 +84,9 @@ export default function ChatListItem({
 			}
 			if (chatRoom.lastMessage.fileUrl) {
 				return `📎 ${chatRoom.lastMessage.fileName || "File"}`;
+			}
+			if (isBidPlusOneMessage(chatRoom.lastMessage.content)) {
+				return "+1";
 			}
 			return stripMarkdown(chatRoom.lastMessage.content);
 		}

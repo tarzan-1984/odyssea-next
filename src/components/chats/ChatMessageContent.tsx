@@ -7,8 +7,10 @@ import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Schema } from "hast-util-sanitize";
+import { BidChatActionIcon } from "@/icons";
 import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
 import { escapeChatListSyntax } from "@/utils/chatMarkdown";
+import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
 
 const chatMarkdownSanitizeSchema: Schema = {
 	...defaultSchema,
@@ -38,6 +40,17 @@ export default function ChatMessageContent({
 }: ChatMessageContentProps) {
 	if (!content.trim()) {
 		return null;
+	}
+
+	if (isBidPlusOneMessage(content)) {
+		return (
+			<div
+				className={`flex items-center justify-center py-1 ${className}`}
+				aria-label="+1"
+			>
+				<BidChatActionIcon className="h-24 w-24 text-green-400 dark:text-green-300" />
+			</div>
+		);
 	}
 
 	const renderContent = escapeChatListSyntax(preprocessChatMessageLinks(content));
