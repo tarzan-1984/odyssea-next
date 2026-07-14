@@ -94,3 +94,110 @@ export async function extendBidRateTime(id: number): Promise<BidRate> {
 	}
 	return body as BidRate;
 }
+
+export type BidParticipation = {
+	bidRateId: number;
+	hasJoined: boolean;
+	createdAt?: string | null;
+	updatedAt?: string | null;
+};
+
+export type BidJoinResult = BidParticipation & {
+	alreadyJoined: boolean;
+};
+
+export type BidAuctionParticipant = {
+	userId: string;
+	firstName?: string | null;
+	lastName?: string | null;
+	profilePhoto?: string | null;
+	userColor?: string | null;
+	role?: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type BidAuctionParticipantsResponse = {
+	bidRateId: number;
+	ownerId: string;
+	participants: BidAuctionParticipant[];
+};
+
+export async function getBidParticipationByChat(
+	chatRoomId: string,
+): Promise<BidParticipation> {
+	const res = await axios.get<BidParticipation | { data: BidParticipation }>(
+		`/api/bid-rates/by-chat/${encodeURIComponent(chatRoomId)}/participation`,
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidParticipation;
+}
+
+export async function joinBidByChat(chatRoomId: string): Promise<BidJoinResult> {
+	const res = await axios.post<BidJoinResult | { data: BidJoinResult }>(
+		`/api/bid-rates/by-chat/${encodeURIComponent(chatRoomId)}/join`,
+		{},
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidJoinResult;
+}
+
+export async function getBidParticipantsByChat(
+	chatRoomId: string,
+): Promise<BidAuctionParticipantsResponse> {
+	const res = await axios.get<
+		BidAuctionParticipantsResponse | { data: BidAuctionParticipantsResponse }
+	>(`/api/bid-rates/by-chat/${encodeURIComponent(chatRoomId)}/participants`, {
+		withCredentials: true,
+	});
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidAuctionParticipantsResponse;
+}
+
+export async function getBidParticipants(
+	bidRateId: number,
+): Promise<BidAuctionParticipantsResponse> {
+	const res = await axios.get<
+		BidAuctionParticipantsResponse | { data: BidAuctionParticipantsResponse }
+	>(`/api/bid-rates/${bidRateId}/participants`, {
+		withCredentials: true,
+	});
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidAuctionParticipantsResponse;
+}
+
+export async function extendBidParticipantTimeByChat(
+	chatRoomId: string,
+	userId?: string,
+): Promise<{
+	bidRateId: number;
+	participant: BidAuctionParticipant;
+}> {
+	const res = await axios.post<
+		| { bidRateId: number; participant: BidAuctionParticipant }
+		| { data: { bidRateId: number; participant: BidAuctionParticipant } }
+	>(
+		`/api/bid-rates/by-chat/${encodeURIComponent(chatRoomId)}/extend-participant-time`,
+		userId ? { userId } : {},
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as { bidRateId: number; participant: BidAuctionParticipant };
+}

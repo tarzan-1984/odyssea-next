@@ -16,6 +16,7 @@ import MessageAttachmentsGrid, {
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
+import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
 	message: Message;
@@ -49,7 +50,17 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		string | null
 	>(null);
 	const { isUserOnline } = useOnlineStatus();
+	const bidAuction = useBidChatAuctionOptional();
 	const isSender = message.senderId === currentUser?.id;
+	const canManageBidTimer = Boolean(
+		currentUser?.id &&
+			(currentUser.id === message.senderId ||
+				(bidAuction?.ownerId != null && currentUser.id === bidAuction.ownerId)),
+	);
+	const plusOneContentProps = {
+		senderUserId: message.senderId,
+		canManageBidTimer,
+	};
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
@@ -199,7 +210,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && <MessageReply replyData={message.replyData} />}
 								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
 								{message.content?.trim() ? (
-									<ChatMessageContent content={message.content} isOutgoing />
+									<ChatMessageContent
+										content={message.content}
+										isOutgoing
+										{...plusOneContentProps}
+									/>
 								) : null}
 							</div>
 							{renderMessageMenu()}
@@ -216,7 +231,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										{message.replyData && <MessageReply replyData={message.replyData} />}
 										<MessageAttachmentsGrid items={multiAttachments} />
 										{message.content?.trim() ? (
-											<ChatMessageContent content={message.content} />
+											<ChatMessageContent
+												content={message.content}
+												{...plusOneContentProps}
+											/>
 										) : null}
 									</div>
 								</IncomingMessageBubble>
@@ -484,7 +502,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								{message.replyData && (
 									<MessageReply replyData={message.replyData} />
 								)}
-								<ChatMessageContent content={message.content} isOutgoing />
+								<ChatMessageContent
+									content={message.content}
+									isOutgoing
+									{...plusOneContentProps}
+								/>
 							</div>
 							{renderMessageMenu()}
 						</div>
@@ -496,7 +518,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										{message.replyData && (
 											<MessageReply replyData={message.replyData} />
 										)}
-										<ChatMessageContent content={message.content} />
+										<ChatMessageContent
+											content={message.content}
+											{...plusOneContentProps}
+										/>
 									</div>
 								</IncomingMessageBubble>
 								<MessageDropdown

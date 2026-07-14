@@ -11,6 +11,7 @@ import { BidChatActionIcon } from "@/icons";
 import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
 import { escapeChatListSyntax } from "@/utils/chatMarkdown";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
+import BidPlusOneTimer from "./BidPlusOneTimer";
 
 const chatMarkdownSanitizeSchema: Schema = {
 	...defaultSchema,
@@ -31,12 +32,18 @@ type ChatMessageContentProps = {
 	className?: string;
 	/** Outgoing bubble (blue bg) — links are white. */
 	isOutgoing?: boolean;
+	/** Sender of this message (needed for BID +1 timer). */
+	senderUserId?: string;
+	/** Whether current user can extend this +1 timer. */
+	canManageBidTimer?: boolean;
 };
 
 export default function ChatMessageContent({
 	content,
 	className = "",
 	isOutgoing = false,
+	senderUserId,
+	canManageBidTimer = false,
 }: ChatMessageContentProps) {
 	if (!content.trim()) {
 		return null;
@@ -45,10 +52,17 @@ export default function ChatMessageContent({
 	if (isBidPlusOneMessage(content)) {
 		return (
 			<div
-				className={`flex items-center justify-center py-1 ${className}`}
+				className={`flex flex-col items-center justify-center py-1 ${className}`}
 				aria-label="+1"
 			>
 				<BidChatActionIcon className="h-24 w-24 text-green-400 dark:text-green-300" />
+				{senderUserId ? (
+					<BidPlusOneTimer
+						senderUserId={senderUserId}
+						canManage={canManageBidTimer}
+						isOutgoing={isOutgoing}
+					/>
+				) : null}
 			</div>
 		);
 	}

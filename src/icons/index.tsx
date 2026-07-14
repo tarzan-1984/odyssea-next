@@ -81,6 +81,7 @@ import EditLoadedMilesIcon from "./edit-loaded-miles.svg";
 import AddPlusCircleIcon from "./AddPlusCircleIcon";
 import RemoveMinusIcon from "./RemoveMinusIcon";
 import BidChatActionIcon from "./BidChatActionIcon";
+import AddedValueIcon from "./AddedValueIcon";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
 import Hazmat2Icon from "./additional/hazmat2.svg";
@@ -170,6 +171,7 @@ export {
 	AddPlusCircleIcon,
 	RemoveMinusIcon,
 	BidChatActionIcon,
+	AddedValueIcon,
 	BoxTapped,
 	TruckDelivery,
 	BoxMoving,

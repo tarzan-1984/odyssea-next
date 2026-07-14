@@ -20,6 +20,7 @@ import ChatBoxVirtualMessageList, {
 } from "./ChatBoxVirtualMessageList";
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
+import { BidChatAuctionProvider } from "./BidChatAuctionContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 import { removeChatMessageLocally, restoreChatMessageLocally, isDeletableChatMessage } from "@/lib/chatMessageDelete";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
@@ -863,6 +864,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	}
 
 	return (
+		<BidChatAuctionProvider chatRoomId={selectedChatRoomId} enabled={isBidChat}>
 		<ChatImageGalleryProvider messages={uniqueMessages}>
 			<div
 				data-chat-box
@@ -1068,5 +1070,6 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 				)}
 			</div>
 		</ChatImageGalleryProvider>
+		</BidChatAuctionProvider>
 	);
 }

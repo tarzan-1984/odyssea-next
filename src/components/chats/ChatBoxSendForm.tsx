@@ -23,6 +23,12 @@ import ChatRichComposeInput from "./ChatRichComposeInput";
 import { useEditorFormatState } from "@/hooks/useEditorFormatState";
 import { BID_PLUS_ONE_MESSAGE_CONTENT } from "@/utils/bidPlusOneMessage";
 import {
+	getBidParticipationByChat,
+	joinBidByChat,
+} from "@/app-api/bidRates";
+import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
+import { useCurrentUser } from "@/stores/userStore";
+import {
 	applyEditorFormat,
 	formatActionToCommand,
 	getEditorPlainText,
@@ -100,6 +106,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const [message, setMessage] = useState<string>("");
 		const [composeResetKey, setComposeResetKey] = useState(0);
 		const [isSending, setIsSending] = useState(false);
+		const [plusOneLocked, setPlusOneLocked] = useState(false);
+		const [plusOneStatusLoaded, setPlusOneStatusLoaded] = useState(!isBidChat);
 
 		const [attachedFiles, setAttachedFiles] = useState<
 			(ChatAttachmentPayload & { localId: string })[]
@@ -121,6 +129,37 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		);
 		const isEditing = Boolean(editingMessage);
 		const chatImageGallery = useChatImageGalleryOptional();
+		const bidAuction = useBidChatAuctionOptional();
+		const currentUser = useCurrentUser();
+
+		useEffect(() => {
+			if (!isBidChat || !chatRoomId) {
+				setPlusOneLocked(false);
+				setPlusOneStatusLoaded(!isBidChat);
+				return;
+			}
+
+			let cancelled = false;
+			setPlusOneStatusLoaded(false);
+
+			getBidParticipationByChat(chatRoomId)
+				.then(result => {
+					if (!cancelled) {
+						setPlusOneLocked(Boolean(result.hasJoined));
+						setPlusOneStatusLoaded(true);
+					}
+				})
+				.catch(error => {
+					console.error("Failed to load bid +1 status:", error);
+					if (!cancelled) {
+						setPlusOneStatusLoaded(true);
+					}
+				});
+
+			return () => {
+				cancelled = true;
+			};
+		}, [isBidChat, chatRoomId]);
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -712,14 +751,43 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								{isBidChat ? (
 									<button
 										type="button"
-										disabled={disabled || isSending}
+										disabled={
+											disabled ||
+											isSending ||
+											plusOneLocked ||
+											!plusOneStatusLoaded ||
+											!chatRoomId
+										}
 										onClick={async () => {
-											if (!onSendMessage || disabled || isSending) return;
+											if (
+												!onSendMessage ||
+												!chatRoomId ||
+												disabled ||
+												isSending ||
+												plusOneLocked
+											) {
+												return;
+											}
 											try {
 												setIsSending(true);
-												await onSendMessage({
-													content: BID_PLUS_ONE_MESSAGE_CONTENT,
-												});
+												const joinResult = await joinBidByChat(chatRoomId);
+												setPlusOneLocked(true);
+												if (
+													currentUser?.id &&
+													joinResult.createdAt &&
+													joinResult.updatedAt
+												) {
+													bidAuction?.upsertParticipant({
+														userId: currentUser.id,
+														createdAt: String(joinResult.createdAt),
+														updatedAt: String(joinResult.updatedAt),
+													});
+												}
+												if (!joinResult.alreadyJoined) {
+													await onSendMessage({
+														content: BID_PLUS_ONE_MESSAGE_CONTENT,
+													});
+												}
 												if (onTyping) {
 													onTyping(false);
 												}
@@ -729,9 +797,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 												setIsSending(false);
 											}
 										}}
-										className="text-green-500 hover:text-green-600 disabled:opacity-50 dark:text-green-400 dark:hover:text-green-300"
-										aria-label="Send +1"
-										title="Send +1"
+										className="text-green-500 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-green-400 dark:hover:text-green-300"
+										aria-label={plusOneLocked ? "+1 already sent" : "Send +1"}
+										title={plusOneLocked ? "+1 already sent" : "Send +1"}
 									>
 										<BidChatActionIcon className="h-6 w-6" />
 									</button>

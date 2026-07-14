@@ -6,8 +6,6 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import {
-	ChevronDownIcon,
-	ChevronUpIcon,
 	DeactivateOfferIcon,
 	ExtendBidTimeIcon,
 } from "@/icons";
@@ -19,18 +17,21 @@ import {
 	type BidRateRoutePoint,
 } from "@/app-api/bidRates";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
+import { parseNaiveNyDateTime } from "@/utils/nyWallClock";
 import {
-	formatNyWallClockSqlString,
-	parseNaiveNyDateTime,
-} from "@/utils/nyWallClock";
+	BID_WARNING_SECONDS,
+	canExtendBidTime,
+	formatBidCountdown,
+	getBidRemainingSeconds,
+	getBidTimerBackgroundColor,
+	getNowNyNaiveMs,
+} from "@/utils/bidTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import BidRateChatEmbed from "./BidRateChatEmbed";
+import BidPlusOneParticipantsPopup from "./BidPlusOneParticipantsPopup";
 
 const ITEMS_PER_PAGE = 10;
-const BID_TIMER_SECONDS = 15 * 60;
-const BID_WARNING_SECONDS = 3 * 60;
-const BID_MAX_EXTEND_MS = 3 * BID_TIMER_SECONDS * 1000;
 
 function formatBidCreatorName(owner: BidRate["owner"]): string {
 	if (!owner) return "Unknown";
@@ -72,55 +73,6 @@ function formatBidRate(rate: number): string {
 		minimumFractionDigits: 0,
 		maximumFractionDigits: 2,
 	})}`;
-}
-
-function formatCountdown(totalSeconds: number): string {
-	const hours = Math.floor(totalSeconds / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
-
-	return [hours, minutes, seconds]
-		.map(value => String(value).padStart(2, "0"))
-		.join(":");
-}
-
-/** Green (full time) → red (near expiry). Hue 120 → 0. */
-function getBidTimerBackgroundColor(remainingSeconds: number): string {
-	const ratio = Math.min(1, Math.max(0, remainingSeconds / BID_TIMER_SECONDS));
-	const hue = Math.round(ratio * 120);
-	return `hsl(${hue}, 72%, 42%)`;
-}
-
-function getNowNyNaiveMs(now: Date = new Date()): number {
-	const parsed = parseNaiveNyDateTime(formatNyWallClockSqlString(now));
-	return parsed?.getTime() ?? now.getTime();
-}
-
-/** Deadline = updated_at (NY wall-clock) + 15 minutes */
-function getBidExpiryNyNaiveMs(updatedAt: string | null | undefined): number | null {
-	const updated = parseNaiveNyDateTime(updatedAt);
-	if (!updated) return null;
-	return updated.getTime() + BID_TIMER_SECONDS * 1000;
-}
-
-function getBidRemainingSeconds(
-	updatedAt: string | null | undefined,
-	nowNyNaiveMs: number,
-): number | null {
-	const expiryMs = getBidExpiryNyNaiveMs(updatedAt);
-	if (expiryMs == null) return null;
-	return Math.max(0, Math.floor((expiryMs - nowNyNaiveMs) / 1000));
-}
-
-/** Can extend while (updated_at - created_at) < 45 minutes (max 3 × 15 min). */
-function canExtendBidTime(
-	createdAt: string | null | undefined,
-	updatedAt: string | null | undefined,
-): boolean {
-	const created = parseNaiveNyDateTime(createdAt);
-	const updated = parseNaiveNyDateTime(updatedAt);
-	if (!created || !updated) return false;
-	return updated.getTime() - created.getTime() < BID_MAX_EXTEND_MS;
 }
 
 function showBidExpiringToast(bidName: string, bidId: number) {
@@ -292,7 +244,7 @@ export default function BidRatesList() {
 							return (
 								<div
 									key={row.id}
-									className="relative w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/[0.05] dark:bg-gray-900"
+									className="relative w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/50 dark:bg-gray-900"
 								>
 									<div
 										className="cursor-pointer select-none px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]"
@@ -302,59 +254,48 @@ export default function BidRatesList() {
 									>
 										<div className="flex items-start justify-between gap-3">
 											<div className="flex min-w-0 flex-1 flex-col gap-1">
-												<p className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+												<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
 													<span className="min-w-0 truncate">
 														{creatorName}
 														{createdAt ? ` ${createdAt}` : null}
+														{row.broker?.trim() ? (
+															<>
+																{" "}
+																<span className="text-gray-900 dark:text-white">|</span>
+																{" "}
+																<span className="text-base text-gray-900 dark:text-white">
+																	{row.broker.trim()}
+																</span>
+															</>
+														) : null}
 													</span>
-													<span className="shrink-0 text-xl font-semibold text-brand-600 dark:text-brand-400">
-														{formatBidRate(row.rate)}
-													</span>
-												</p>
+													<BidPlusOneParticipantsPopup bidRateId={row.id} />
+												</div>
 												<p className="text-base font-medium text-gray-900 dark:text-white">
 													{routeLabel || "—"}
 												</p>
-												<p className="truncate text-sm text-gray-700 dark:text-gray-300">
-													{row.broker || "—"}
+												<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
+													{formatBidRate(row.rate)}
 												</p>
 											</div>
 											<div className="flex flex-shrink-0 flex-col items-end gap-2">
-												<div className="flex items-center gap-2">
-													{isOwner ? (
-														<button
-															type="button"
-															disabled={deletingBidId === row.id}
-															onClick={e => {
-																e.stopPropagation();
-																setDeleteConfirmBid(row);
-															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-														>
-															Delete bid
-															<DeactivateOfferIcon
-																className="h-5 w-5 shrink-0"
-																aria-hidden
-															/>
-														</button>
-													) : null}
+												{isOwner ? (
 													<button
 														type="button"
+														disabled={deletingBidId === row.id}
 														onClick={e => {
 															e.stopPropagation();
-															setExpandedBidId(id =>
-																id === row.id ? null : row.id,
-															);
+															setDeleteConfirmBid(row);
 														}}
-														className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:text-brand-300 dark:hover:bg-gray-800 dark:hover:text-brand-200"
+														className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 													>
-														<span>{isExpanded ? "Show less" : "Show more"}</span>
-														{isExpanded ? (
-															<ChevronUpIcon className="h-4 w-4" />
-														) : (
-															<ChevronDownIcon className="h-4 w-4" />
-														)}
+														Delete bid
+														<DeactivateOfferIcon
+															className="h-5 w-5 shrink-0"
+															aria-hidden
+														/>
 													</button>
-												</div>
+												) : null}
 
 												{hasActiveTimer ? (
 													<div className="flex items-center gap-2">
@@ -366,7 +307,7 @@ export default function BidRatesList() {
 																),
 															}}
 														>
-															{formatCountdown(remainingSeconds)}
+															{formatBidCountdown(remainingSeconds)}
 														</span>
 														{showExtendButton ? (
 															<button
