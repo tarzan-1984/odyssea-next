@@ -23,6 +23,7 @@ import {
 	SOCKET_IO_CLIENT_OPTIONS,
 	SOCKET_OFFLINE_UI_DEBOUNCE_MS,
 	SOCKET_PERIODIC_RETRY_MS,
+	SOCKET_STUCK_OFFLINE_FORCE_RECREATE_MS,
 } from "@/lib/socketIoClientOptions";
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
@@ -34,7 +35,7 @@ interface WebSocketContextType {
 	isConnected: boolean;
 	/** Debounced offline flag for UI — avoids flicker during brief reconnects. */
 	isDisplayOffline: boolean;
-	connect: () => void;
+	connect: (options?: { force?: boolean }) => void;
 	disconnect: () => void;
 	joinChatRoom: (chatRoomId: string) => void;
 	leaveChatRoom: (chatRoomId: string) => void;
@@ -157,12 +158,34 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const queryClient = useQueryClient();
 	const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const periodicRetryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const stuckOfflineWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const reconnectAttempts = useRef(0);
 	const isConnectingRef = useRef(false);
 	const maxReconnectAttempts = 20;
 	/** After first successful connect, further connects are reconnects → trigger chat catch-up sync. */
 	const hadSuccessfulSocketConnectionRef = useRef(false);
 	const recentChatToastMessageIdsRef = useRef(new Set<string>());
+	const connectRef = useRef<(options?: { force?: boolean }) => Promise<void>>(async () => {});
+
+	const clearStuckOfflineWatchdog = () => {
+		if (stuckOfflineWatchdogRef.current) {
+			clearTimeout(stuckOfflineWatchdogRef.current);
+			stuckOfflineWatchdogRef.current = null;
+		}
+	};
+
+	/** Recreate the Socket.IO client if reconnect stays stuck (incl. socket.active). */
+	const scheduleStuckOfflineWatchdog = () => {
+		clearStuckOfflineWatchdog();
+		stuckOfflineWatchdogRef.current = setTimeout(() => {
+			stuckOfflineWatchdogRef.current = null;
+			const activeSocket = socketRef.current;
+			if (activeSocket?.connected || isConnectingRef.current) {
+				return;
+			}
+			void connectRef.current({ force: true });
+		}, SOCKET_STUCK_OFFLINE_FORCE_RECREATE_MS);
+	};
 
 	const shouldShowChatToast = (messageId: string): boolean => {
 		if (!messageId || recentChatToastMessageIdsRef.current.has(messageId)) {
@@ -216,17 +239,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 	}, [urlLogged]);
 
-	const connect = async () => {
+	const connect = async (options?: { force?: boolean }) => {
 		if (!currentUser || isConnectingRef.current) {
 			return;
 		}
 
-		if (socket?.connected) {
+		const existingSocket = socketRef.current;
+
+		if (existingSocket?.connected && !options?.force) {
 			return;
 		}
 
-		// Let Socket.IO finish its own reconnection cycle before creating a new socket
-		if (socket && !socket.connected && socket.active) {
+		// Let Socket.IO finish its own reconnection cycle before creating a new socket,
+		// unless we are force-recreating after a stuck offline period.
+		if (existingSocket && !existingSocket.connected && existingSocket.active && !options?.force) {
 			return;
 		}
 
@@ -245,10 +271,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				return;
 			}
 
-			if (socket) {
-				socket.removeAllListeners();
-				socket.disconnect();
+			if (existingSocket) {
+				clearStuckOfflineWatchdog();
+				existingSocket.removeAllListeners();
+				existingSocket.io.removeAllListeners();
+				existingSocket.disconnect();
 				setSocket(null);
+				socketRef.current = null;
 			}
 
 			const newSocket = io(wsUrl, {
@@ -315,6 +344,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Connection event handlers
 		newSocket.on("connect", () => {
+			clearStuckOfflineWatchdog();
 			if (offlineUiTimerRef.current) {
 				clearTimeout(offlineUiTimerRef.current);
 				offlineUiTimerRef.current = null;
@@ -362,6 +392,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		newSocket.io.on("reconnect_failed", () => {
 			isConnectingRef.current = false;
+			scheduleStuckOfflineWatchdog();
 			if (periodicRetryIntervalRef.current) {
 				return;
 			}
@@ -370,10 +401,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					return;
 				}
 				const activeSocket = socketRef.current;
-				if (activeSocket?.connected || activeSocket?.active) {
+				if (activeSocket?.connected) {
 					return;
 				}
-				connect().catch(() => {});
+				// Force a fresh client — Infinity reconnect can leave socket.active stuck.
+				void connectRef.current({ force: true });
 			}, SOCKET_PERIODIC_RETRY_MS);
 		});
 
@@ -959,6 +991,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				offlineUiTimerRef.current = null;
 			}, SOCKET_OFFLINE_UI_DEBOUNCE_MS);
 			isConnectingRef.current = false;
+			scheduleStuckOfflineWatchdog();
 			// Socket.IO handles automatic reconnection unless the client disconnected intentionally
 		});
 
@@ -984,6 +1017,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				offlineUiTimerRef.current = null;
 			}, SOCKET_OFFLINE_UI_DEBOUNCE_MS);
 			isConnectingRef.current = false;
+			scheduleStuckOfflineWatchdog();
 
 			if (
 				message.toLowerCase().includes("unauthorized") ||
@@ -1210,14 +1244,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					const freshToken = getAuthToken();
 					if (socket && freshToken) {
 						socket.auth = { token: freshToken };
-						if (socket.connected) {
-							socket.disconnect().connect();
-							return;
+						// Server accepts expired JWTs on WS; only reconnect when offline.
+						if (!socket.connected) {
+							if (socket.active) {
+								void connectRef.current({ force: true });
+							} else {
+								socket.connect();
+							}
 						}
-						socket.connect();
 						return;
 					}
-					connect().catch(() => {});
+					void connectRef.current({ force: true });
 					return;
 				}
 				disconnect();
@@ -1230,12 +1267,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	const disconnect = () => {
 		isConnectingRef.current = false;
 		hadSuccessfulSocketConnectionRef.current = false;
+		clearStuckOfflineWatchdog();
 		if (offlineUiTimerRef.current) {
 			clearTimeout(offlineUiTimerRef.current);
 			offlineUiTimerRef.current = null;
 		}
 		setIsDisplayOffline(false);
 		if (socket) {
+			socket.removeAllListeners();
+			socket.io.removeAllListeners();
 			socket.disconnect();
 			setSocket(null);
 			socketRef.current = null;
@@ -1348,19 +1388,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		}
 	}, [currentUser, socket, isConnected]);
 
-	// Reconnect when tab becomes visible or browser regains network
-	const connectRef = useRef(connect);
+	// Keep connectRef current for timers / visibility handlers (avoids stale closures).
 	connectRef.current = connect;
+
+	// Reconnect when tab becomes visible or browser regains network
 	const nudgeReconnect = useCallback(() => {
 		if (!currentUser) return;
 		const activeSocket = socketRef.current;
 		if (activeSocket?.connected) return;
-		if (activeSocket?.active || isConnectingRef.current) return;
+		if (isConnectingRef.current) return;
+		// Stuck in Manager reconnect loop — force a fresh client on tab/network focus.
+		if (activeSocket?.active) {
+			void connectRef.current({ force: true });
+			return;
+		}
 		if (activeSocket && !activeSocket.connected) {
 			activeSocket.connect();
 			return;
 		}
-		connectRef.current();
+		void connectRef.current();
 	}, [currentUser]);
 
 	useEffect(() => {
@@ -1379,16 +1425,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		};
 	}, [nudgeReconnect]);
 
-	// JWT in the Socket.IO handshake is fixed at connect time — reconnect after proactive refresh.
+	// Keep handshake auth fresh for the next reconnect; do not tear down a live socket
+	// (server verifies WS JWT with ignoreExpiration).
 	useEffect(() => {
 		const onAccessTokenRefreshed = () => {
 			if (!socket) return;
 			const freshToken = getAuthToken();
 			if (!freshToken) return;
 			socket.auth = { token: freshToken };
-			if (socket.connected) {
-				socket.disconnect().connect();
-			} else if (!socket.active) {
+			if (!socket.connected && !socket.active) {
 				socket.connect();
 			}
 		};
@@ -1403,6 +1448,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
+			clearStuckOfflineWatchdog();
 			if (offlineUiTimerRef.current) {
 				clearTimeout(offlineUiTimerRef.current);
 			}
