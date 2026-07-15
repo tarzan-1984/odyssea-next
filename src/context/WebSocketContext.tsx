@@ -183,7 +183,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			if (activeSocket?.connected || isConnectingRef.current) {
 				return;
 			}
-			void connectRef.current({ force: true });
+			connectRef.current({ force: true }).catch(() => undefined);
 		}, SOCKET_STUCK_OFFLINE_FORCE_RECREATE_MS);
 	};
 
@@ -405,7 +405,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					return;
 				}
 				// Force a fresh client — Infinity reconnect can leave socket.active stuck.
-				void connectRef.current({ force: true });
+				connectRef.current({ force: true }).catch(() => undefined);
 			}, SOCKET_PERIODIC_RETRY_MS);
 		});
 
@@ -1247,14 +1247,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						// Server accepts expired JWTs on WS; only reconnect when offline.
 						if (!socket.connected) {
 							if (socket.active) {
-								void connectRef.current({ force: true });
+								connectRef.current({ force: true }).catch(() => undefined);
 							} else {
 								socket.connect();
 							}
 						}
 						return;
 					}
-					void connectRef.current({ force: true });
+					connectRef.current({ force: true }).catch(() => undefined);
 					return;
 				}
 				disconnect();
@@ -1399,14 +1399,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		if (isConnectingRef.current) return;
 		// Stuck in Manager reconnect loop — force a fresh client on tab/network focus.
 		if (activeSocket?.active) {
-			void connectRef.current({ force: true });
+			connectRef.current({ force: true }).catch(() => undefined);
 			return;
 		}
 		if (activeSocket && !activeSocket.connected) {
 			activeSocket.connect();
 			return;
 		}
-		void connectRef.current();
+		connectRef.current().catch(() => undefined);
 	}, [currentUser]);
 
 	useEffect(() => {
