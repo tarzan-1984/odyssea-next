@@ -233,12 +233,14 @@ export default function BidRatesList() {
 								remainingSeconds != null && remainingSeconds > 0;
 							const isExpired =
 								remainingSeconds != null && remainingSeconds <= 0;
-							const showExtendButton =
-								isOwner &&
+							const canExtend = canExtendBidTime(row.createdAt, row.updatedAt);
+							const inWarningWindow =
 								hasActiveTimer &&
 								remainingSeconds != null &&
-								remainingSeconds <= BID_WARNING_SECONDS &&
-								canExtendBidTime(row.createdAt, row.updatedAt);
+								remainingSeconds <= BID_WARNING_SECONDS;
+							const showExtendButton = isOwner && inWarningWindow && canExtend;
+							const showMaxExtendMessage =
+								isOwner && inWarningWindow && !canExtend;
 							const isExpanded = expandedBidId === row.id;
 
 							return (
@@ -298,31 +300,39 @@ export default function BidRatesList() {
 												) : null}
 
 												{hasActiveTimer ? (
-													<div className="flex items-center gap-2">
-														<span
-															className="inline-flex min-w-[78px] items-center justify-center rounded-full px-2 py-1 text-xs font-semibold tabular-nums text-white transition-[background-color] duration-1000"
-															style={{
-																backgroundColor: getBidTimerBackgroundColor(
-																	remainingSeconds,
-																),
-															}}
-														>
-															{formatBidCountdown(remainingSeconds)}
-														</span>
-														{showExtendButton ? (
-															<button
-																type="button"
-																title="Extend bid time"
-																disabled={extendingBidId === row.id}
-																onClick={e => {
-																	e.stopPropagation();
-																	handleExtendTime(row).catch(() => undefined);
+													<div className="flex max-w-[280px] flex-col items-end gap-1.5 sm:max-w-xs">
+														<div className="flex items-center gap-2">
+															<span
+																className="inline-flex min-w-[78px] items-center justify-center rounded-full px-2 py-1 text-xs font-semibold tabular-nums text-white transition-[background-color] duration-1000"
+																style={{
+																	backgroundColor: getBidTimerBackgroundColor(
+																		remainingSeconds,
+																	),
 																}}
-																className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-brand-300 bg-brand-50 px-2 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
 															>
-																<ExtendBidTimeIcon className="h-4 w-4" aria-hidden />
-																{extendingBidId === row.id ? "…" : "Extend"}
-															</button>
+																{formatBidCountdown(remainingSeconds)}
+															</span>
+															{showExtendButton ? (
+																<button
+																	type="button"
+																	title="Extend bid time"
+																	disabled={extendingBidId === row.id}
+																	onClick={e => {
+																		e.stopPropagation();
+																		handleExtendTime(row).catch(() => undefined);
+																	}}
+																	className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-brand-300 bg-brand-50 px-2 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
+																>
+																	<ExtendBidTimeIcon className="h-4 w-4" aria-hidden />
+																	{extendingBidId === row.id ? "…" : "Extend"}
+																</button>
+															) : null}
+														</div>
+														{showMaxExtendMessage ? (
+															<p className="text-right text-xs leading-snug text-gray-800 dark:text-gray-200">
+																You've reached the maximum bid extension time. No
+																further extensions are available.
+															</p>
 														) : null}
 													</div>
 												) : isExpired ? (
