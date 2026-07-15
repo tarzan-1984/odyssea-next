@@ -239,9 +239,29 @@ function DraggableBidRouteRow({
 type BidRateRouteBuilderProps = {
 	rows: BidRouteRow[];
 	onChange: React.Dispatch<React.SetStateAction<BidRouteRow[]>>;
+	/** Fired when all stops are filled/valid (after blur, add/remove/move). Empty array when incomplete. */
+	onLocationsCommit?: (locations: string[]) => void;
 };
 
-export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuilderProps) {
+function commitLocationsFromRows(
+	rows: BidRouteRow[],
+	onLocationsCommit?: (locations: string[]) => void,
+) {
+	if (!onLocationsCommit) return;
+	const allFilled = rows.every(row => row.location.trim() !== "");
+	const allValid = rows.every(row => isValidLocationFormat(row.location.trim()));
+	if (!allFilled || !allValid || rows.length < 2) {
+		onLocationsCommit([]);
+		return;
+	}
+	onLocationsCommit(rows.map(row => row.location.trim()));
+}
+
+export default function BidRateRouteBuilder({
+	rows,
+	onChange,
+	onLocationsCommit,
+}: BidRateRouteBuilderProps) {
 	const pendingDropRef = useRef<number | null>(null);
 	const [locationErrors, setLocationErrors] = useState<Record<string, string>>({});
 
@@ -259,10 +279,11 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 			onChange(prev => {
 				const next = [...prev];
 				next.splice(afterIndex + 1, 0, createBidRouteRow(type));
+				commitLocationsFromRows(next, onLocationsCommit);
 				return next;
 			});
 		},
-		[onChange],
+		[onChange, onLocationsCommit],
 	);
 
 	const removeRow = useCallback(
@@ -276,10 +297,12 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 						return next;
 					});
 				}
-				return prev.filter((_, rowIndex) => rowIndex !== index);
+				const next = prev.filter((_, rowIndex) => rowIndex !== index);
+				commitLocationsFromRows(next, onLocationsCommit);
+				return next;
 			});
 		},
-		[onChange],
+		[onChange, onLocationsCommit],
 	);
 
 	const moveRow = useCallback(
@@ -288,10 +311,11 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 				const next = [...prev];
 				const [removed] = next.splice(dragIndex, 1);
 				next.splice(hoverIndex, 0, removed);
+				commitLocationsFromRows(next, onLocationsCommit);
 				return next;
 			});
 		},
-		[onChange],
+		[onChange, onLocationsCommit],
 	);
 
 	const onLocationChange = useCallback((rowId: string) => {
@@ -312,11 +336,16 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 					delete next[rowId];
 					return next;
 				});
+				onChange(current => {
+					commitLocationsFromRows(current, onLocationsCommit);
+					return current;
+				});
 				return;
 			}
 
 			if (!isValidLocationFormat(trimmed)) {
 				setLocationErrors(prev => ({ ...prev, [rowId]: LOCATION_FORMAT_ERROR }));
+				onLocationsCommit?.([]);
 				return;
 			}
 
@@ -359,8 +388,16 @@ export default function BidRateRouteBuilder({ rows, onChange }: BidRateRouteBuil
 					return next;
 				});
 			}
+
+			// Commit after geocode so distance calc uses the final address
+			setTimeout(() => {
+				onChange(current => {
+					commitLocationsFromRows(current, onLocationsCommit);
+					return current;
+				});
+			}, 0);
 		},
-		[onChange],
+		[onChange, onLocationsCommit],
 	);
 
 	const pickupCount = rows.filter(row => row.type === "pickup").length;

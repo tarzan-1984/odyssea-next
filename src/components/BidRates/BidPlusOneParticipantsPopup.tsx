@@ -136,8 +136,8 @@ export default function BidPlusOneParticipantsPopup({
 			<button
 				ref={buttonRef}
 				type="button"
-				title="+1 participants"
-				aria-label="Show +1 participants"
+				title="Participants"
+				aria-label="Show participants"
 				aria-expanded={isOpen}
 				onClick={handleToggle}
 				className="dropdown-toggle inline-flex items-center justify-center rounded-md p-0.5 text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-white/[0.06]"
@@ -153,7 +153,7 @@ export default function BidPlusOneParticipantsPopup({
 				className="max-h-80 w-80 overflow-y-auto p-3 dark:border-white/20"
 			>
 				<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					+1 participants
+					Participants
 				</p>
 
 				{loading && participants.length === 0 ? (

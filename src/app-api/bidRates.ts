@@ -17,6 +17,7 @@ export interface BidRate {
 	route: BidRateRoutePoint[] | null;
 	broker: string;
 	rate: number;
+	distance: number | null;
 	status: BidRateStatus;
 	ownerId: string;
 	owner: BidRateOwner | null;
@@ -50,6 +51,7 @@ export interface CreateBidRatePayload {
 	route: BidRateRoutePoint[];
 	broker: string;
 	rate: number;
+	distance: number;
 }
 
 export async function getBidRates(
