@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import {
 	getBidParticipants,
@@ -24,13 +24,13 @@ function formatParticipantName(row: BidAuctionParticipant): string {
 const participantsCache = new Map<number, BidAuctionParticipant[]>();
 const participantsInflight = new Map<number, Promise<BidAuctionParticipant[]>>();
 
-async function fetchParticipantsCached(
+function fetchParticipantsCached(
 	bidRateId: number,
 	options?: { force?: boolean },
 ): Promise<BidAuctionParticipant[]> {
 	if (!options?.force) {
 		const cached = participantsCache.get(bidRateId);
-		if (cached) return cached;
+		if (cached) return Promise.resolve(cached);
 		const inflight = participantsInflight.get(bidRateId);
 		if (inflight) return inflight;
 	}
@@ -110,7 +110,7 @@ export default function BidPlusOneParticipantsPopup({
 		fetchParticipantsCached(bidRateId).catch(() => undefined);
 	}
 
-	function handleToggle(e: React.MouseEvent) {
+	function handleToggle(e: MouseEvent) {
 		e.stopPropagation();
 		e.preventDefault();
 		const next = !isOpen;

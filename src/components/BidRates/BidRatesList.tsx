@@ -330,8 +330,9 @@ export default function BidRatesList() {
 														</div>
 														{showMaxExtendMessage ? (
 															<p className="text-right text-xs leading-snug text-gray-800 dark:text-gray-200">
-																You've reached the maximum bid extension time. No
-																further extensions are available.
+																{
+																	"You've reached the maximum bid extension time. No further extensions are available."
+																}
 															</p>
 														) : null}
 													</div>
