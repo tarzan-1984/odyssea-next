@@ -131,11 +131,23 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const chatImageGallery = useChatImageGalleryOptional();
 		const bidAuction = useBidChatAuctionOptional();
 		const currentUser = useCurrentUser();
+		const isBidPlusOneAdminException =
+			String(currentUser?.externalId ?? "").trim() === "83";
+		const isBidOwner = Boolean(
+			isBidChat &&
+				currentUser?.id &&
+				bidAuction?.ownerId != null &&
+				bidAuction.ownerId === currentUser.id,
+		);
+		const showBidPlusOne =
+			isBidChat &&
+			bidAuction?.ownerId != null &&
+			(!isBidOwner || isBidPlusOneAdminException);
 
 		useEffect(() => {
-			if (!isBidChat || !chatRoomId) {
+			if (!showBidPlusOne || !chatRoomId) {
 				setPlusOneLocked(false);
-				setPlusOneStatusLoaded(!isBidChat);
+				setPlusOneStatusLoaded(!showBidPlusOne);
 				return;
 			}
 
@@ -159,7 +171,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			return () => {
 				cancelled = true;
 			};
-		}, [isBidChat, chatRoomId]);
+		}, [showBidPlusOne, chatRoomId]);
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -748,7 +760,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						/>
 						<div className="relative">
 							<div className="absolute bottom-1.5 left-1 z-20 flex items-center gap-2 sm:left-2">
-								{isBidChat ? (
+								{showBidPlusOne ? (
 									<button
 										type="button"
 										disabled={
@@ -803,7 +815,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 									>
 										<BidChatActionIcon className="h-6 w-6" />
 									</button>
-								) : (
+								) : !isBidChat ? (
 									<>
 										<button
 											ref={emojiButtonRef}
@@ -864,7 +876,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											</svg>
 										</button>
 									</>
-								)}
+								) : null}
 							</div>
 
 							<ChatRichComposeInput
@@ -876,7 +888,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								onKeyDown={handleKeyDown}
 								onPaste={handlePaste}
 								disabled={disabled || isSending || isUploadingAttachments}
-								compactLeadingIcons={isBidChat}
+								compactLeadingIcons={showBidPlusOne}
 							/>
 						</div>
 					</div>
