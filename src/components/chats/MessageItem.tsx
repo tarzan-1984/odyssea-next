@@ -16,6 +16,11 @@ import MessageAttachmentsGrid, {
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
+import {
+	isBidNewOfferMessage,
+	isBidPriceUpdateMessage,
+	isBidRateChangedMessage,
+} from "@/utils/bidPriceUpdateMessage";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
@@ -27,6 +32,8 @@ interface MessageItemProps {
 	chatParticipants?: ChatRoomParticipant[];
 	/** Pre-built lookup from participants + loaded messages. */
 	chatUserNameLookup?: Map<string, string>;
+	/** Latest +1 message id per sender — live timer only on that message. */
+	latestBidPlusOneMessageIdBySender?: Map<string, string>;
 	onDelete: (messageId: string) => void;
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
@@ -40,6 +47,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	chatRoomType,
 	chatParticipants = [],
 	chatUserNameLookup,
+	latestBidPlusOneMessageIdBySender,
 	onDelete,
 	onEdit,
 	onReply,
@@ -57,10 +65,25 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			(currentUser.id === message.senderId ||
 				(bidAuction?.ownerId != null && currentUser.id === bidAuction.ownerId)),
 	);
+	const isLatestBidPlusOne =
+		latestBidPlusOneMessageIdBySender == null ||
+		latestBidPlusOneMessageIdBySender.get(message.senderId) === message.id;
 	const plusOneContentProps = {
 		senderUserId: message.senderId,
 		canManageBidTimer,
+		isLatestBidPlusOne,
 	};
+	const isBidPriceUpdate = isBidPriceUpdateMessage(message.content);
+	const isBidRateChanged = isBidRateChangedMessage(message.content);
+	const isBidNewOffer = isBidNewOfferMessage(message.content);
+	const bidPriceBubbleClass = isBidNewOffer
+		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
+		: isBidRateChanged
+			? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
+			: "";
+	const bidPriceTextClass =
+		"[&_.chat-msg-body]:![font-size:calc(var(--chat-font-body,14px)+2px)] [&_.chat-msg-body]:![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
+	const bidNewOfferTextClass = `${bidPriceTextClass} [&_.chat-msg-body]:!text-gray-900`;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
@@ -497,14 +520,25 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					(isSender ? (
 						<div className="flex items-center justify-end gap-2">
 							<div
-								className={`px-3 py-2 rounded-lg bg-brand-500 text-white dark:bg-brand-500 rounded-tr-sm`}
+								className={
+									isBidPriceUpdate
+										? `${bidPriceBubbleClass} rounded-tr-sm`
+										: "px-3 py-2 rounded-lg bg-brand-500 text-white dark:bg-brand-500 rounded-tr-sm"
+								}
 							>
 								{message.replyData && (
 									<MessageReply replyData={message.replyData} />
 								)}
 								<ChatMessageContent
 									content={message.content}
-									isOutgoing
+									isOutgoing={!isBidNewOffer}
+									className={
+										isBidNewOffer
+											? bidNewOfferTextClass
+											: isBidPriceUpdate
+												? bidPriceTextClass
+												: undefined
+									}
 									{...plusOneContentProps}
 								/>
 							</div>
@@ -514,12 +548,26 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						<>
 							<div className="flex items-center gap-2">
 								<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
-									<div className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90 rounded-tl-sm">
+									<div
+										className={
+											isBidPriceUpdate
+												? `${bidPriceBubbleClass} rounded-tl-sm`
+												: "px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90 rounded-tl-sm"
+										}
+									>
 										{message.replyData && (
 											<MessageReply replyData={message.replyData} />
 										)}
 										<ChatMessageContent
 											content={message.content}
+											isOutgoing={isBidRateChanged}
+											className={
+												isBidNewOffer
+													? bidNewOfferTextClass
+													: isBidRateChanged
+														? bidPriceTextClass
+														: undefined
+											}
 											{...plusOneContentProps}
 										/>
 									</div>

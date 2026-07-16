@@ -7,6 +7,7 @@ import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/Pagi
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import {
 	DeactivateOfferIcon,
+	EditOfferIcon,
 	ExtendBidTimeIcon,
 } from "@/icons";
 import {
@@ -17,19 +18,19 @@ import {
 	type BidRateRoutePoint,
 } from "@/app-api/bidRates";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
-import { parseNaiveNyDateTime } from "@/utils/nyWallClock";
 import {
 	BID_WARNING_SECONDS,
 	canExtendBidTime,
 	formatBidCountdown,
 	getBidRemainingSeconds,
 	getBidTimerBackgroundColor,
-	getNowNyNaiveMs,
+	getNowUnixSeconds,
 } from "@/utils/bidTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import BidRateChatEmbed from "./BidRateChatEmbed";
 import BidPlusOneParticipantsPopup from "./BidPlusOneParticipantsPopup";
+import EditBidPriceModal from "./EditBidPriceModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -48,22 +49,23 @@ function formatBidRoutePath(route: BidRateRoutePoint[] | null | undefined): stri
 		.join(" → ");
 }
 
-/** Creation time stored as NY wall-clock: MM/DD/YYYY H:MM:SS AM/PM EST */
-function formatBidCreatedAtEst(value: string | null | undefined): string {
-	const date = parseNaiveNyDateTime(value);
-	if (!date) return "";
+/** Creation time from unix seconds, shown in America/New_York. */
+function formatBidCreatedAtEst(value: number | string | null | undefined): string {
+	const sec = typeof value === "number" ? value : Number(value);
+	if (!Number.isFinite(sec)) return "";
+	const date = new Date(sec * 1000);
 	const datePart = date.toLocaleDateString("en-US", {
 		month: "2-digit",
 		day: "2-digit",
 		year: "numeric",
-		timeZone: "UTC",
+		timeZone: "America/New_York",
 	});
 	const timePart = date.toLocaleTimeString("en-US", {
 		hour: "numeric",
 		minute: "2-digit",
 		second: "2-digit",
 		hour12: true,
-		timeZone: "UTC",
+		timeZone: "America/New_York",
 	});
 	return `${datePart} ${timePart} EST`;
 }
@@ -104,7 +106,8 @@ export default function BidRatesList() {
 	const [deleteConfirmBid, setDeleteConfirmBid] = useState<BidRate | null>(null);
 	const [deletingBidId, setDeletingBidId] = useState<number | null>(null);
 	const [extendingBidId, setExtendingBidId] = useState<number | null>(null);
-	const [nowNyNaiveMs, setNowNyNaiveMs] = useState(() => getNowNyNaiveMs());
+	const [editPriceBid, setEditPriceBid] = useState<BidRate | null>(null);
+	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const warnedBidIdsRef = useRef<Set<number>>(new Set());
 
 	const queryParams = {
@@ -125,7 +128,7 @@ export default function BidRatesList() {
 
 	useEffect(() => {
 		const intervalId = window.setInterval(() => {
-			setNowNyNaiveMs(getNowNyNaiveMs());
+			setNowUnixSec(getNowUnixSeconds());
 		}, 1000);
 		return () => window.clearInterval(intervalId);
 	}, []);
@@ -137,7 +140,7 @@ export default function BidRatesList() {
 			const isOwner = row.ownerId === currentUser.id;
 			if (!isOwner) continue;
 
-			const remainingSeconds = getBidRemainingSeconds(row.updatedAt, nowNyNaiveMs);
+			const remainingSeconds = getBidRemainingSeconds(row.updatedAt, nowUnixSec);
 			const inWarningWindow =
 				remainingSeconds != null &&
 				remainingSeconds > 0 &&
@@ -154,7 +157,7 @@ export default function BidRatesList() {
 				warnedBidIdsRef.current.delete(row.id);
 			}
 		}
-	}, [rows, nowNyNaiveMs, currentUser?.id]);
+	}, [rows, nowUnixSec, currentUser?.id]);
 
 	async function handleConfirmDelete() {
 		if (!deleteConfirmBid) return;
@@ -227,7 +230,7 @@ export default function BidRatesList() {
 							);
 							const remainingSeconds = getBidRemainingSeconds(
 								row.updatedAt,
-								nowNyNaiveMs,
+								nowUnixSec,
 							);
 							const hasActiveTimer =
 								remainingSeconds != null && remainingSeconds > 0;
@@ -276,9 +279,23 @@ export default function BidRatesList() {
 												<p className="text-base font-medium text-gray-900 dark:text-white">
 													{routeLabel || "—"}
 												</p>
-												<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
-													{formatBidRate(row.rate)}
-												</p>
+												<div className="flex items-center gap-2">
+													<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
+														{formatBidRate(row.rate)}
+													</p>
+													<button
+														type="button"
+														title="Edit price"
+														aria-label="Edit price"
+														onClick={e => {
+															e.stopPropagation();
+															setEditPriceBid(row);
+														}}
+														className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-brand-600 hover:opacity-80 dark:text-brand-400"
+													>
+														<EditOfferIcon className="h-6 w-6" aria-hidden />
+													</button>
+												</div>
 											</div>
 											<div className="flex flex-shrink-0 flex-col items-end gap-2">
 												{isOwner ? (
@@ -399,6 +416,15 @@ export default function BidRatesList() {
 				isLoading={deletingBidId === deleteConfirmBid?.id}
 				icon={<DeactivateOfferIcon className="h-6 w-6" aria-hidden />}
 				variant="danger"
+			/>
+
+			<EditBidPriceModal
+				bid={editPriceBid}
+				isOpen={editPriceBid != null}
+				onClose={() => setEditPriceBid(null)}
+				onSaved={() => {
+					queryClient.invalidateQueries({ queryKey: ["bid-rates-list"] }).catch(() => undefined);
+				}}
 			/>
 		</>
 	);

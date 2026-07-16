@@ -13,19 +13,25 @@ import {
 	getBidParticipantsByChat,
 	type BidAuctionParticipant,
 } from "@/app-api/bidRates";
-import { getNowNyNaiveMs } from "@/utils/bidTimer";
+import { getNowUnixSeconds } from "@/utils/bidTimer";
+import {
+	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	type BidRateUpdatedEventDetail,
+} from "@/lib/bidRateRealtimeEvents";
 
 type ParticipantTimer = {
 	userId: string;
-	createdAt: string;
-	updatedAt: string;
+	/** Unix timestamp in seconds. */
+	createdAt: number;
+	/** Unix timestamp in seconds. */
+	updatedAt: number;
 };
 
 type BidChatAuctionContextValue = {
 	chatRoomId: string | null;
 	bidRateId: number | null;
 	ownerId: string | null;
-	nowNyNaiveMs: number;
+	nowUnixSec: number;
 	getParticipant: (userId: string) => ParticipantTimer | null;
 	upsertParticipant: (participant: BidAuctionParticipant) => void;
 	extendParticipant: (userId: string) => Promise<void>;
@@ -35,6 +41,10 @@ type BidChatAuctionContextValue = {
 const BidChatAuctionContext = createContext<BidChatAuctionContextValue | null>(
 	null,
 );
+
+function toUnixNumber(value: number | string): number {
+	return typeof value === "number" ? value : Number(value);
+}
 
 export function BidChatAuctionProvider({
 	chatRoomId,
@@ -50,13 +60,13 @@ export function BidChatAuctionProvider({
 	const [byUserId, setByUserId] = useState<Record<string, ParticipantTimer>>(
 		{},
 	);
-	const [nowNyNaiveMs, setNowNyNaiveMs] = useState(() => getNowNyNaiveMs());
+	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const [extendingUserId, setExtendingUserId] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!enabled) return;
 		const intervalId = window.setInterval(() => {
-			setNowNyNaiveMs(getNowNyNaiveMs());
+			setNowUnixSec(getNowUnixSeconds());
 		}, 1000);
 		return () => window.clearInterval(intervalId);
 	}, [enabled]);
@@ -71,27 +81,43 @@ export function BidChatAuctionProvider({
 
 		let cancelled = false;
 
-		getBidParticipantsByChat(chatRoomId)
-			.then(result => {
-				if (cancelled) return;
-				setBidRateId(result.bidRateId);
-				setOwnerId(result.ownerId ?? null);
-				const next: Record<string, ParticipantTimer> = {};
-				for (const row of result.participants ?? []) {
-					next[row.userId] = {
-						userId: row.userId,
-						createdAt: String(row.createdAt),
-						updatedAt: String(row.updatedAt),
-					};
-				}
-				setByUserId(next);
-			})
-			.catch(error => {
-				console.error("Failed to load bid auction participants:", error);
-			});
+		const loadParticipants = () => {
+			getBidParticipantsByChat(chatRoomId)
+				.then(result => {
+					if (cancelled) return;
+					setBidRateId(result.bidRateId);
+					setOwnerId(result.ownerId ?? null);
+					const next: Record<string, ParticipantTimer> = {};
+					for (const row of result.participants ?? []) {
+						next[row.userId] = {
+							userId: row.userId,
+							createdAt: toUnixNumber(row.createdAt),
+							updatedAt: toUnixNumber(row.updatedAt),
+						};
+					}
+					setByUserId(next);
+				})
+				.catch(error => {
+					console.error("Failed to load bid auction participants:", error);
+				});
+		};
+
+		loadParticipants();
+
+		const onBidRateUpdated = (event: Event) => {
+			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
+			if (detail?.chatRoomId && detail.chatRoomId !== chatRoomId) return;
+			loadParticipants();
+		};
+
+		window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
 
 		return () => {
 			cancelled = true;
+			window.removeEventListener(
+				ODYSSEA_BID_RATE_UPDATED_EVENT,
+				onBidRateUpdated,
+			);
 		};
 	}, [enabled, chatRoomId]);
 
@@ -105,8 +131,8 @@ export function BidChatAuctionProvider({
 			...prev,
 			[participant.userId]: {
 				userId: participant.userId,
-				createdAt: String(participant.createdAt),
-				updatedAt: String(participant.updatedAt),
+				createdAt: toUnixNumber(participant.createdAt),
+				updatedAt: toUnixNumber(participant.updatedAt),
 			},
 		}));
 	}, []);
@@ -130,7 +156,7 @@ export function BidChatAuctionProvider({
 			chatRoomId: chatRoomId ?? null,
 			bidRateId,
 			ownerId,
-			nowNyNaiveMs,
+			nowUnixSec,
 			getParticipant,
 			upsertParticipant,
 			extendParticipant,
@@ -140,7 +166,7 @@ export function BidChatAuctionProvider({
 			chatRoomId,
 			bidRateId,
 			ownerId,
-			nowNyNaiveMs,
+			nowUnixSec,
 			getParticipant,
 			upsertParticipant,
 			extendParticipant,

@@ -36,6 +36,7 @@ interface ChatBoxVirtualMessageListProps {
 	chatRoomType?: string;
 	chatParticipants: ChatRoomParticipant[];
 	chatUserNameLookup?: Map<string, string>;
+	latestBidPlusOneMessageIdBySender?: Map<string, string>;
 	scrollElement: HTMLDivElement | null;
 	onDelete: (messageId: string) => void;
 	onEdit: (message: Message) => void;
@@ -58,6 +59,7 @@ interface VirtualMessageRowProps {
 	chatRoomType?: string;
 	chatParticipants: ChatRoomParticipant[];
 	chatUserNameLookup?: Map<string, string>;
+	latestBidPlusOneMessageIdBySender?: Map<string, string>;
 	onDelete: (messageId: string) => void;
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
@@ -76,6 +78,7 @@ function VirtualMessageRow({
 	chatRoomType,
 	chatParticipants,
 	chatUserNameLookup,
+	latestBidPlusOneMessageIdBySender,
 	onDelete,
 	onEdit,
 	onReply,
@@ -149,6 +152,7 @@ function VirtualMessageRow({
 				chatRoomType={chatRoomType}
 				chatParticipants={chatParticipants}
 				chatUserNameLookup={chatUserNameLookup}
+				latestBidPlusOneMessageIdBySender={latestBidPlusOneMessageIdBySender}
 				onDelete={onDelete}
 				onEdit={onEdit}
 				onReply={onReply}
@@ -173,6 +177,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		chatRoomType,
 		chatParticipants,
 		chatUserNameLookup,
+		latestBidPlusOneMessageIdBySender,
 		scrollElement,
 		onDelete,
 		onEdit,
@@ -373,6 +378,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 						chatRoomType={chatRoomType}
 						chatParticipants={chatParticipants}
 						chatUserNameLookup={chatUserNameLookup}
+						latestBidPlusOneMessageIdBySender={latestBidPlusOneMessageIdBySender}
 						onDelete={onDelete}
 						onEdit={onEdit}
 						onReply={onReply}

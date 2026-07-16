@@ -22,8 +22,10 @@ export interface BidRate {
 	ownerId: string;
 	owner: BidRateOwner | null;
 	chatId: string | null;
-	createdAt: string;
-	updatedAt: string;
+	/** Unix timestamp in seconds. */
+	createdAt: number;
+	/** Unix timestamp in seconds. */
+	updatedAt: number;
 }
 
 export interface BidRatesPagination {
@@ -97,11 +99,29 @@ export async function extendBidRateTime(id: number): Promise<BidRate> {
 	return body as BidRate;
 }
 
+export async function updateBidRateNewPrice(
+	id: number,
+	newPrice: number,
+): Promise<BidRate> {
+	const res = await axios.patch<{ data: BidRate } | BidRate>(
+		`/api/bid-rates/${id}/new-price`,
+		{ newPrice },
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidRate;
+}
+
 export type BidParticipation = {
 	bidRateId: number;
 	hasJoined: boolean;
-	createdAt?: string | null;
-	updatedAt?: string | null;
+	/** True while the user's +1 timer is still running. */
+	timerActive?: boolean;
+	createdAt?: number | null;
+	updatedAt?: number | null;
 };
 
 export type BidJoinResult = BidParticipation & {
@@ -115,8 +135,10 @@ export type BidAuctionParticipant = {
 	profilePhoto?: string | null;
 	userColor?: string | null;
 	role?: string | null;
-	createdAt: string;
-	updatedAt: string;
+	/** Unix timestamp in seconds. */
+	createdAt: number;
+	/** Unix timestamp in seconds. */
+	updatedAt: number;
 };
 
 export type BidAuctionParticipantsResponse = {

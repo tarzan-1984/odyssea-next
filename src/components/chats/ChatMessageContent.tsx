@@ -11,6 +11,10 @@ import { BidChatActionIcon } from "@/icons";
 import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
 import { escapeChatListSyntax } from "@/utils/chatMarkdown";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
+import {
+	formatBidPriceUpdateMarkdown,
+	isBidPriceUpdateMessage,
+} from "@/utils/bidPriceUpdateMessage";
 import BidPlusOneTimer from "./BidPlusOneTimer";
 
 const chatMarkdownSanitizeSchema: Schema = {
@@ -36,6 +40,8 @@ type ChatMessageContentProps = {
 	senderUserId?: string;
 	/** Whether current user can extend this +1 timer. */
 	canManageBidTimer?: boolean;
+	/** Only the newest +1 from this sender shows a live timer. */
+	isLatestBidPlusOne?: boolean;
 };
 
 export default function ChatMessageContent({
@@ -44,6 +50,7 @@ export default function ChatMessageContent({
 	isOutgoing = false,
 	senderUserId,
 	canManageBidTimer = false,
+	isLatestBidPlusOne = true,
 }: ChatMessageContentProps) {
 	if (!content.trim()) {
 		return null;
@@ -61,13 +68,19 @@ export default function ChatMessageContent({
 						senderUserId={senderUserId}
 						canManage={canManageBidTimer}
 						isOutgoing={isOutgoing}
+						isLatestPlusOneMessage={isLatestBidPlusOne}
 					/>
 				) : null}
 			</div>
 		);
 	}
 
-	const renderContent = escapeChatListSyntax(preprocessChatMessageLinks(content));
+	const isBidPriceUpdate = isBidPriceUpdateMessage(content);
+	const renderContent = escapeChatListSyntax(
+		preprocessChatMessageLinks(
+			isBidPriceUpdate ? formatBidPriceUpdateMarkdown(content) : content,
+		),
+	);
 
 	const rootClass = [
 		"chat-markdown min-w-0 break-words",
@@ -106,7 +119,17 @@ export default function ChatMessageContent({
 						);
 					},
 					p: ({ children }) => <p className="chat-msg-body mb-0">{children}</p>,
-					strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+					strong: ({ children }) => (
+						<strong
+							className={
+								isBidPriceUpdate
+									? "font-bold text-blue-600 dark:text-blue-600"
+									: "font-bold"
+							}
+						>
+							{children}
+						</strong>
+					),
 					em: ({ children }) => <em className="italic">{children}</em>,
 					del: ({ children }) => (
 						<del className="line-through opacity-90">{children}</del>

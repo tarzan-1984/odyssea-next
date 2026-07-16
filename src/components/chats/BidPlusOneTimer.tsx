@@ -3,9 +3,9 @@
 import { ExtendBidTimeIcon } from "@/icons";
 import {
 	BID_WARNING_SECONDS,
-	canExtendBidTime,
+	canExtendBidParticipantTime,
 	formatBidCountdown,
-	getBidRemainingSeconds,
+	getBidParticipantRemainingSeconds,
 	getBidTimerBackgroundColor,
 } from "@/utils/bidTimer";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
@@ -15,12 +15,18 @@ type BidPlusOneTimerProps = {
 	/** Show Extend for own timer or when current user may extend this participant. */
 	canManage: boolean;
 	isOutgoing?: boolean;
+	/**
+	 * Only the newest +1 message for this sender shows a live countdown.
+	 * Older +1 messages always show "Bid time Expired".
+	 */
+	isLatestPlusOneMessage?: boolean;
 };
 
 export default function BidPlusOneTimer({
 	senderUserId,
 	canManage,
 	isOutgoing = false,
+	isLatestPlusOneMessage = true,
 }: BidPlusOneTimerProps) {
 	const auction = useBidChatAuctionOptional();
 	if (!auction) return null;
@@ -28,9 +34,25 @@ export default function BidPlusOneTimer({
 	const participant = auction.getParticipant(senderUserId);
 	if (!participant) return null;
 
-	const remainingSeconds = getBidRemainingSeconds(
+	const expiredLabel = (
+		<p
+			className={
+				isOutgoing
+					? "mt-2 text-center text-xs font-medium text-white/90"
+					: "mt-2 text-center text-xs font-medium text-gray-800 dark:text-gray-200"
+			}
+		>
+			Bid time Expired
+		</p>
+	);
+
+	if (!isLatestPlusOneMessage) {
+		return expiredLabel;
+	}
+
+	const remainingSeconds = getBidParticipantRemainingSeconds(
 		participant.updatedAt,
-		auction.nowNyNaiveMs,
+		auction.nowUnixSec,
 	);
 	if (remainingSeconds == null) return null;
 
@@ -40,7 +62,7 @@ export default function BidPlusOneTimer({
 		canManage &&
 		hasActiveTimer &&
 		remainingSeconds <= BID_WARNING_SECONDS &&
-		canExtendBidTime(participant.createdAt, participant.updatedAt);
+		canExtendBidParticipantTime(participant.createdAt, participant.updatedAt);
 	const isExtending = auction.extendingUserId === senderUserId;
 
 	if (hasActiveTimer) {
@@ -79,17 +101,7 @@ export default function BidPlusOneTimer({
 	}
 
 	if (isExpired) {
-		return (
-			<p
-				className={
-					isOutgoing
-						? "mt-2 text-center text-xs font-medium text-white/90"
-						: "mt-2 text-center text-xs font-medium text-gray-800 dark:text-gray-200"
-				}
-			>
-				Bid time Expired
-			</p>
-		);
+		return expiredLabel;
 	}
 
 	return null;

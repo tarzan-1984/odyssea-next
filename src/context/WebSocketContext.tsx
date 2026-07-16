@@ -28,6 +28,8 @@ import {
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
+import { clearBidParticipantsCache } from "@/components/BidRates/BidPlusOneParticipantsPopup";
+import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
 
 // WebSocket context interface
 interface WebSocketContextType {
@@ -131,6 +133,13 @@ interface RoleBroadcastData {
 
 interface OfferUpdatedData {
 	offerId?: number;
+	reason?: string;
+	refreshedAt?: string;
+}
+
+interface BidRateUpdatedData {
+	bidRateId?: number;
+	chatRoomId?: string | null;
 	reason?: string;
 	refreshedAt?: string;
 }
@@ -420,6 +429,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
 			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
 			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
+		});
+
+		newSocket.on("bidRateUpdated", (data: BidRateUpdatedData) => {
+			if (data?.bidRateId != null) {
+				clearBidParticipantsCache(data.bidRateId);
+			} else {
+				clearBidParticipantsCache();
+			}
+
+			window.dispatchEvent(
+				new CustomEvent(ODYSSEA_BID_RATE_UPDATED_EVENT, {
+					detail: data ?? {},
+				}),
+			);
+
+			queryClient.invalidateQueries({ queryKey: ["bid-rates-list"] });
+			queryClient.refetchQueries({ queryKey: ["bid-rates-list"], type: "active" });
 		});
 
 		newSocket.on("appLocationSettingsUpdated", () => {

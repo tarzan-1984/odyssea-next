@@ -10,10 +10,14 @@ import { AddedValueIcon } from "@/icons";
 import { renderAvatar } from "@/helpers";
 import {
 	formatBidCountdown,
-	getBidRemainingSeconds,
+	getBidParticipantRemainingSeconds,
 	getBidTimerBackgroundColor,
-	getNowNyNaiveMs,
+	getNowUnixSeconds,
 } from "@/utils/bidTimer";
+import {
+	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	type BidRateUpdatedEventDetail,
+} from "@/lib/bidRateRealtimeEvents";
 
 function formatParticipantName(row: BidAuctionParticipant): string {
 	const name = [row.firstName, row.lastName].filter(Boolean).join(" ").trim();
@@ -23,6 +27,16 @@ function formatParticipantName(row: BidAuctionParticipant): string {
 /** In-memory cache so reopen / hover prefetch skips the loading wait. */
 const participantsCache = new Map<number, BidAuctionParticipant[]>();
 const participantsInflight = new Map<number, Promise<BidAuctionParticipant[]>>();
+
+export function clearBidParticipantsCache(bidRateId?: number) {
+	if (bidRateId != null) {
+		participantsCache.delete(bidRateId);
+		participantsInflight.delete(bidRateId);
+		return;
+	}
+	participantsCache.clear();
+	participantsInflight.clear();
+}
 
 function fetchParticipantsCached(
 	bidRateId: number,
@@ -62,7 +76,7 @@ export default function BidPlusOneParticipantsPopup({
 	const [participants, setParticipants] = useState<BidAuctionParticipant[]>(
 		() => participantsCache.get(bidRateId) ?? [],
 	);
-	const [nowNyNaiveMs, setNowNyNaiveMs] = useState(() => getNowNyNaiveMs());
+	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const buttonRef = useRef<HTMLButtonElement>(null);
 
 	useEffect(() => {
@@ -73,7 +87,7 @@ export default function BidPlusOneParticipantsPopup({
 	useEffect(() => {
 		if (!isOpen) return;
 		const intervalId = window.setInterval(() => {
-			setNowNyNaiveMs(getNowNyNaiveMs());
+			setNowUnixSec(getNowUnixSeconds());
 		}, 1000);
 		return () => window.clearInterval(intervalId);
 	}, [isOpen]);
@@ -102,6 +116,24 @@ export default function BidPlusOneParticipantsPopup({
 		},
 		[bidRateId],
 	);
+
+	useEffect(() => {
+		const onBidRateUpdated = (event: Event) => {
+			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
+			if (detail?.bidRateId != null && detail.bidRateId !== bidRateId) return;
+			if (isOpen) {
+				loadParticipants({ force: true, silent: true }).catch(() => undefined);
+			}
+		};
+
+		window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
+		return () => {
+			window.removeEventListener(
+				ODYSSEA_BID_RATE_UPDATED_EVENT,
+				onBidRateUpdated,
+			);
+		};
+	}, [bidRateId, isOpen, loadParticipants]);
 
 	function handlePrefetch() {
 		if (participantsCache.has(bidRateId) || participantsInflight.has(bidRateId)) {
@@ -171,9 +203,9 @@ export default function BidPlusOneParticipantsPopup({
 				) : (
 					<ul className="space-y-2">
 						{participants.map(row => {
-							const remainingSeconds = getBidRemainingSeconds(
+							const remainingSeconds = getBidParticipantRemainingSeconds(
 								row.updatedAt,
-								nowNyNaiveMs,
+								nowUnixSec,
 							);
 							const hasActiveTimer =
 								remainingSeconds != null && remainingSeconds > 0;

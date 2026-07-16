@@ -26,6 +26,8 @@ import {
 	getBidParticipationByChat,
 	joinBidByChat,
 } from "@/app-api/bidRates";
+import { getBidRemainingSeconds, getNowUnixSeconds } from "@/utils/bidTimer";
+import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import { useCurrentUser } from "@/stores/userStore";
 import {
@@ -108,6 +110,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const [isSending, setIsSending] = useState(false);
 		const [plusOneLocked, setPlusOneLocked] = useState(false);
 		const [plusOneStatusLoaded, setPlusOneStatusLoaded] = useState(!isBidChat);
+		const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
+		const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 
 		const [attachedFiles, setAttachedFiles] = useState<
 			(ChatAttachmentPayload & { localId: string })[]
@@ -144,9 +148,20 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			bidAuction?.ownerId != null &&
 			(!isBidOwner || isBidPlusOneAdminException);
 
+		const tickUnixSec = bidAuction?.nowUnixSec ?? nowUnixSec;
+
+		useEffect(() => {
+			if (!showBidPlusOne || bidAuction?.nowUnixSec != null) return;
+			const intervalId = window.setInterval(() => {
+				setNowUnixSec(getNowUnixSeconds());
+			}, 1000);
+			return () => window.clearInterval(intervalId);
+		}, [showBidPlusOne, bidAuction?.nowUnixSec]);
+
 		useEffect(() => {
 			if (!showBidPlusOne || !chatRoomId) {
 				setPlusOneLocked(false);
+				setPlusOneUpdatedAt(null);
 				setPlusOneStatusLoaded(!showBidPlusOne);
 				return;
 			}
@@ -154,24 +169,64 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			let cancelled = false;
 			setPlusOneStatusLoaded(false);
 
-			getBidParticipationByChat(chatRoomId)
-				.then(result => {
-					if (!cancelled) {
-						setPlusOneLocked(Boolean(result.hasJoined));
-						setPlusOneStatusLoaded(true);
-					}
-				})
-				.catch(error => {
-					console.error("Failed to load bid +1 status:", error);
-					if (!cancelled) {
-						setPlusOneStatusLoaded(true);
-					}
-				});
+			const applyParticipation = (result: {
+				hasJoined: boolean;
+				timerActive?: boolean;
+				updatedAt?: number | null;
+			}) => {
+				const updatedAt =
+					result.updatedAt != null ? Number(result.updatedAt) : null;
+				setPlusOneUpdatedAt(
+					result.hasJoined && Number.isFinite(updatedAt) ? updatedAt : null,
+				);
+				const remaining =
+					updatedAt != null
+						? getBidRemainingSeconds(updatedAt, getNowUnixSeconds())
+						: null;
+				const locked =
+					result.timerActive === true ||
+					(remaining != null && remaining > 0);
+				setPlusOneLocked(Boolean(result.hasJoined && locked));
+			};
+
+			const loadParticipation = () => {
+				getBidParticipationByChat(chatRoomId)
+					.then(result => {
+						if (!cancelled) {
+							applyParticipation(result);
+							setPlusOneStatusLoaded(true);
+						}
+					})
+					.catch(error => {
+						console.error("Failed to load bid +1 status:", error);
+						if (!cancelled) {
+							setPlusOneStatusLoaded(true);
+						}
+					});
+			};
+
+			loadParticipation();
+
+			const onBidRateUpdated = () => {
+				loadParticipation();
+			};
+			window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
 
 			return () => {
 				cancelled = true;
+				window.removeEventListener(
+					ODYSSEA_BID_RATE_UPDATED_EVENT,
+					onBidRateUpdated,
+				);
 			};
 		}, [showBidPlusOne, chatRoomId]);
+
+		// Unlock + when the participant timer expires; keep locked while active.
+		useEffect(() => {
+			if (!showBidPlusOne || plusOneUpdatedAt == null) return;
+			const remaining = getBidRemainingSeconds(plusOneUpdatedAt, tickUnixSec);
+			setPlusOneLocked(remaining != null && remaining > 0);
+		}, [showBidPlusOne, plusOneUpdatedAt, tickUnixSec]);
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -783,16 +838,33 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											try {
 												setIsSending(true);
 												const joinResult = await joinBidByChat(chatRoomId);
-												setPlusOneLocked(true);
+												const nextUpdatedAt =
+													joinResult.updatedAt != null
+														? Number(joinResult.updatedAt)
+														: null;
+												setPlusOneUpdatedAt(
+													Number.isFinite(nextUpdatedAt) ? nextUpdatedAt : null,
+												);
+												setPlusOneLocked(
+													joinResult.timerActive === true ||
+														joinResult.alreadyJoined === true ||
+														Boolean(
+															nextUpdatedAt != null &&
+																(getBidRemainingSeconds(
+																	nextUpdatedAt,
+																	getNowUnixSeconds(),
+																) ?? 0) > 0,
+														),
+												);
 												if (
 													currentUser?.id &&
-													joinResult.createdAt &&
-													joinResult.updatedAt
+													joinResult.createdAt != null &&
+													joinResult.updatedAt != null
 												) {
 													bidAuction?.upsertParticipant({
 														userId: currentUser.id,
-														createdAt: String(joinResult.createdAt),
-														updatedAt: String(joinResult.updatedAt),
+														createdAt: Number(joinResult.createdAt),
+														updatedAt: Number(joinResult.updatedAt),
 													});
 												}
 												if (!joinResult.alreadyJoined) {
@@ -810,8 +882,16 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											}
 										}}
 										className="text-green-500 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-green-400 dark:hover:text-green-300"
-										aria-label={plusOneLocked ? "+1 already sent" : "Send +1"}
-										title={plusOneLocked ? "+1 already sent" : "Send +1"}
+										aria-label={
+											plusOneLocked
+												? "+1 timer still active"
+												: "Send +1"
+										}
+										title={
+											plusOneLocked
+												? "Available again after the timer expires"
+												: "Send +1"
+										}
 									>
 										<BidChatActionIcon className="h-6 w-6" />
 									</button>

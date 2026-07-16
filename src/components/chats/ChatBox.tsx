@@ -26,6 +26,7 @@ import { removeChatMessageLocally, restoreChatMessageLocally, isDeletableChatMes
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
+import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -386,6 +387,11 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 	const chatUserNameLookup = React.useMemo(
 		() => buildChatUserNameLookup(chatParticipants, uniqueMessages),
 		[chatParticipants, uniqueMessages]
+	);
+
+	const latestBidPlusOneMessageIdBySender = React.useMemo(
+		() => getLatestBidPlusOneMessageIdBySender(uniqueMessages),
+		[uniqueMessages]
 	);
 
 	// WebSocket message handling is already provided by useWebSocketChatSync
@@ -957,6 +963,7 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 								chatRoomType={selectedChatRoom?.type}
 								chatParticipants={chatParticipants}
 								chatUserNameLookup={chatUserNameLookup}
+								latestBidPlusOneMessageIdBySender={latestBidPlusOneMessageIdBySender}
 								scrollElement={messagesScrollRoot}
 								onContentMeasured={handleVirtualContentMeasured}
 								isUserScrolledUp={isUserScrolledUp}
@@ -981,6 +988,9 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 										chatRoomType={selectedChatRoom?.type}
 										chatParticipants={chatParticipants}
 										chatUserNameLookup={chatUserNameLookup}
+										latestBidPlusOneMessageIdBySender={
+											latestBidPlusOneMessageIdBySender
+										}
 										onDelete={handleDeleteMessage}
 										onEdit={handleEditMessage}
 										onReply={handleReplyToMessage}

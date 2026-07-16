@@ -96,7 +96,8 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 		gcTime: 0,
 		refetchOnWindowFocus: false,
 		retry: false,
-		throwOnError: (error) => !isAbortError(error),
+		// Do not throw into the Next.js error boundary — show in-chat error state instead.
+		throwOnError: false,
 	});
 
 	const isLoading =
@@ -122,7 +123,7 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 	const isReady =
 		Boolean(chatRoomId) &&
 		hydration.ready &&
-		(!hydration.needsApi || query.isSuccess || (query.isError && isAbortError(query.error)));
+		(!hydration.needsApi || query.isSuccess || query.isError);
 
 	return {
 		isLoading,
