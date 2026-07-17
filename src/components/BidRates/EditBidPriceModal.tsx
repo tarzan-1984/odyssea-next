@@ -77,6 +77,14 @@ export default function EditBidPriceModal({
 			return;
 		}
 
+		const initialRate = bid.rate;
+		if (Number.isFinite(initialRate) && newPrice >= initialRate) {
+			setError(
+				`Your bid must be less than ${formatMinBidUsd(initialRate)}`,
+			);
+			return;
+		}
+
 		setSubmitting(true);
 		setError(null);
 		try {

@@ -26,6 +26,14 @@ function formatVoterName(row: BidRateVoter): string {
 	return name || "Unknown";
 }
 
+function formatVoterRate(rate: number | null | undefined): string {
+	if (rate == null || !Number.isFinite(rate)) return "—";
+	return `$${Number(rate).toLocaleString("en-US", {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2,
+	})}`;
+}
+
 const votersCache = new Map<number, BidRateVoter[]>();
 const votersInflight = new Map<number, Promise<BidRateVoter[]>>();
 
@@ -224,6 +232,9 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 										<th className="px-3 py-2.5 font-semibold text-gray-600 dark:text-gray-300">
 											Timer
 										</th>
+										<th className="px-3 py-2.5 font-semibold text-gray-600 dark:text-gray-300">
+											Rate
+										</th>
 										<th className="px-3 py-2.5 text-center font-semibold text-gray-600 dark:text-gray-300">
 											Actions
 										</th>
@@ -284,6 +295,11 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 													) : (
 														<span className="text-xs text-gray-400">—</span>
 													)}
+												</td>
+												<td className="px-3 py-2.5">
+													<span className="font-semibold tabular-nums text-brand-600 dark:text-brand-400">
+														{formatVoterRate(row.rate)}
+													</span>
 												</td>
 												<td className="px-3 py-2.5">
 													<div className="flex items-center justify-center gap-2">
