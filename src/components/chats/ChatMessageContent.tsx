@@ -62,7 +62,7 @@ export default function ChatMessageContent({
 				className={`flex flex-col items-center justify-center py-1 ${className}`}
 				aria-label="+1"
 			>
-				<BidChatActionIcon className="h-24 w-24 text-green-400 dark:text-green-300" />
+				<BidChatActionIcon className="h-10 w-10 text-green-400 dark:text-green-300" />
 				{senderUserId ? (
 					<BidPlusOneTimer
 						senderUserId={senderUserId}

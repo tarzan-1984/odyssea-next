@@ -1,7 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { updateBidRateNewPrice, type BidRate } from "@/app-api/bidRates";
+import {
+	getBidRateVoters,
+	updateBidRateNewPrice,
+	type BidRate,
+} from "@/app-api/bidRates";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -19,6 +23,23 @@ function initialPriceValue(bid: BidRate | null): string {
 	const value = bid.rate;
 	if (!Number.isFinite(value)) return "";
 	return String(value);
+}
+
+function formatMinBidUsd(price: number): string {
+	return `$${Number(price).toLocaleString("en-US", {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2,
+	})}`;
+}
+
+function minActiveOfferRate(
+	voters: Array<{ rate: number | null }>,
+): number | null {
+	const rates = voters
+		.map(row => row.rate)
+		.filter((rate): rate is number => rate != null && Number.isFinite(rate));
+	if (rates.length === 0) return null;
+	return Math.min(...rates);
 }
 
 export default function EditBidPriceModal({
@@ -59,17 +80,28 @@ export default function EditBidPriceModal({
 		setSubmitting(true);
 		setError(null);
 		try {
+			const voters = await getBidRateVoters(bid.id);
+			const minRate = minActiveOfferRate(voters.participants ?? []);
+			if (minRate != null && newPrice >= minRate) {
+				setError(
+					`Your bid must be less than ${formatMinBidUsd(minRate)}`,
+				);
+				return;
+			}
+
 			await updateBidRateNewPrice(bid.id, newPrice);
 			onSaved();
 			onClose();
 			setAcceptedOpen(true);
 		} catch (err) {
 			const message =
-				(err as { response?: { data?: { error?: string } } })?.response?.data
-					?.error ||
+				(err as { response?: { data?: { error?: string; message?: string } } })
+					?.response?.data?.error ||
+				(err as { response?: { data?: { message?: string } } })?.response?.data
+					?.message ||
 				(err as Error)?.message ||
 				"Failed to update price.";
-			setError(message);
+			setError(Array.isArray(message) ? message.join(", ") : String(message));
 		} finally {
 			setSubmitting(false);
 		}
