@@ -8,6 +8,8 @@ interface IncomingMessageBubbleProps {
 	message: Message;
 	currentUserId?: string | null;
 	className?: string;
+	/** When false, hide reaction button (e.g. BID chats). */
+	allowReactions?: boolean;
 	children: React.ReactNode;
 }
 
@@ -16,6 +18,7 @@ export default function IncomingMessageBubble({
 	message,
 	currentUserId,
 	className = "",
+	allowReactions = true,
 	children,
 }: IncomingMessageBubbleProps) {
 	return (
@@ -23,7 +26,9 @@ export default function IncomingMessageBubble({
 			className={`group/bubble relative w-fit max-w-full ${className}`.trim()}
 		>
 			{children}
-			<MessageReactionTrigger message={message} currentUserId={currentUserId} />
+			{allowReactions ? (
+				<MessageReactionTrigger message={message} currentUserId={currentUserId} />
+			) : null}
 		</div>
 	);
 }

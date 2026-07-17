@@ -76,6 +76,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isBidPriceUpdate = isBidPriceUpdateMessage(message.content);
 	const isBidRateChanged = isBidRateChangedMessage(message.content);
 	const isBidNewOffer = isBidNewOfferMessage(message.content);
+	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
 		: isBidRateChanged
@@ -248,6 +249,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								<IncomingMessageBubble
 									message={message}
 									currentUserId={currentUser?.id}
+									allowReactions={allowReactions}
 									className="max-w-[32rem]"
 								>
 									<div className="space-y-2 rounded-lg rounded-tl-sm bg-gray-100 px-3 py-2 text-gray-800 dark:bg-white/5 dark:text-white/90">
@@ -278,7 +280,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{showLegacySingleFile && legacyAttachment && isImageFile(message.fileName) && (
 					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
-							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
+							<IncomingMessageBubble
+								message={message}
+								currentUserId={currentUser?.id}
+								allowReactions={allowReactions}
+							>
 								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
 									<MessageAttachmentCard
 										item={legacyAttachment}
@@ -316,7 +322,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{showLegacySingleFile && legacyAttachment && isPreviewableFile(message.fileName) && (
 					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
-							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
+							<IncomingMessageBubble
+								message={message}
+								currentUserId={currentUser?.id}
+								allowReactions={allowReactions}
+							>
 								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
 									<MessageAttachmentCard
 										item={legacyAttachment}
@@ -361,7 +371,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						}
 					>
 						{!isSender ? (
-							<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
+							<IncomingMessageBubble
+								message={message}
+								currentUserId={currentUser?.id}
+								allowReactions={allowReactions}
+							>
 								<a
 									href={legacyFileUrl}
 									download={message.fileName}
@@ -547,7 +561,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					) : (
 						<>
 							<div className="flex items-center gap-2">
-								<IncomingMessageBubble message={message} currentUserId={currentUser?.id}>
+								<IncomingMessageBubble
+									message={message}
+									currentUserId={currentUser?.id}
+									allowReactions={allowReactions}
+								>
 									<div
 										className={
 											isBidPriceUpdate
@@ -588,12 +606,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{/* Incoming: role + time under legacy file-only messages (multi-attachment footer is inside block above) */}
 				{!isSender && !message.content?.trim() && showLegacySingleFile ? incomingMessageFooter : null}
 
-				<MessageReactions
-					message={message}
-					currentUserId={currentUser?.id}
-					canReact={!isSender && !isPending}
-					align={isSender ? "right" : "left"}
-				/>
+				{allowReactions ? (
+					<MessageReactions
+						message={message}
+						currentUserId={currentUser?.id}
+						canReact={!isSender && !isPending}
+						align={isSender ? "right" : "left"}
+					/>
+				) : null}
 
 				{/* Timestamp and read status (outgoing only) */}
 				{isSender && (

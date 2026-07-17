@@ -275,10 +275,15 @@ const AppSidebar: React.FC = () => {
 								{(isExpanded || isHovered || isMobileOpen) && (
 									<span className={`menu-item-text`}>{nav.name}</span>
 								)}
-								{/* Show unread count badge for Chat link */}
+								{/* Chat: unread excluding BID chats */}
 								{nav.path === "/chat" &&
 									(isExpanded || isHovered || isMobileOpen) && (
-										<UnreadCountBadge className="ml-auto" />
+										<UnreadCountBadge className="ml-auto" filter="non-bid" />
+									)}
+								{/* Bid rates: unread from BID chats only */}
+								{nav.path === "/bid-rates" &&
+									(isExpanded || isHovered || isMobileOpen) && (
+										<UnreadCountBadge className="ml-auto" filter="bid" />
 									)}
 							</Link>
 						)

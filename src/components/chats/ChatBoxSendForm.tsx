@@ -30,6 +30,7 @@ import { getBidRemainingSeconds, getNowUnixSeconds } from "@/utils/bidTimer";
 import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import { useCurrentUser } from "@/stores/userStore";
+import { useChatStore } from "@/stores/chatStore";
 import {
 	applyEditorFormat,
 	formatActionToCommand,
@@ -61,8 +62,12 @@ interface ChatBoxSendFormProps {
 	editingMessage?: Message | null;
 	editDraftKey?: number;
 	onCancelEdit?: () => void;
-	/** BID chats: hide emoji / templates / attachments, show green action icon stub. */
+	/** BID chats: hide emoji / templates / attachments, show green +1 control. */
 	isBidChat?: boolean;
+	/** Bid creator user id (from bid card / API) — preferred over async auction lookup. */
+	bidOwnerId?: string | null;
+	/** Explicit lock from parent (e.g. bid card already knows current user is owner). */
+	disableBidPlusOne?: boolean;
 }
 
 export type ChatBoxSendFormHandle = {
@@ -102,6 +107,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			editDraftKey = 0,
 			onCancelEdit,
 			isBidChat = false,
+			bidOwnerId: bidOwnerIdProp = null,
+			disableBidPlusOne: disableBidPlusOneProp = false,
 		},
 		ref
 	) {
@@ -112,6 +119,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const [plusOneStatusLoaded, setPlusOneStatusLoaded] = useState(!isBidChat);
 		const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
 		const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
+		/** Once true for this chat, never re-enable +1 for the bid creator. */
+		const [ownerPlusOneDisabled, setOwnerPlusOneDisabled] = useState(
+			() => Boolean(isBidChat && disableBidPlusOneProp),
+		);
 
 		const [attachedFiles, setAttachedFiles] = useState<
 			(ChatAttachmentPayload & { localId: string })[]
@@ -135,18 +146,44 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const chatImageGallery = useChatImageGalleryOptional();
 		const bidAuction = useBidChatAuctionOptional();
 		const currentUser = useCurrentUser();
-		const isBidPlusOneAdminException =
-			String(currentUser?.externalId ?? "").trim() === "83";
+		const chatRoomAdminId = useChatStore(state => {
+			if (!chatRoomId) return null;
+			const room =
+				state.chatRooms.find(r => r.id === chatRoomId) ??
+				(state.currentChatRoom?.id === chatRoomId ? state.currentChatRoom : null);
+			return room?.adminId ?? null;
+		});
+		// Prefer explicit prop (bid card), then auction, then chat adminId
+		const bidOwnerId =
+			bidOwnerIdProp ?? bidAuction?.ownerId ?? chatRoomAdminId ?? null;
 		const isBidOwner = Boolean(
 			isBidChat &&
 				currentUser?.id &&
-				bidAuction?.ownerId != null &&
-				bidAuction.ownerId === currentUser.id,
+				bidOwnerId != null &&
+				String(bidOwnerId) === String(currentUser.id),
 		);
-		const showBidPlusOne =
+		// Always render +1 in bid chats (keeps compose layout stable).
+		const showBidPlusOne = isBidChat;
+		const isPlusOneBlockedForOwner =
 			isBidChat &&
-			bidAuction?.ownerId != null &&
-			(!isBidOwner || isBidPlusOneAdminException);
+			(ownerPlusOneDisabled ||
+				disableBidPlusOneProp ||
+				currentUser?.id == null ||
+				bidOwnerId == null ||
+				isBidOwner);
+
+		// Reset latch only when switching chats; never unlock after creator was detected
+		useEffect(() => {
+			setOwnerPlusOneDisabled(Boolean(isBidChat && disableBidPlusOneProp));
+			// eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on chat switch
+		}, [chatRoomId]);
+
+		useEffect(() => {
+			if (!isBidChat) return;
+			if (disableBidPlusOneProp || isBidOwner) {
+				setOwnerPlusOneDisabled(true);
+			}
+		}, [isBidChat, disableBidPlusOneProp, isBidOwner]);
 
 		const tickUnixSec = bidAuction?.nowUnixSec ?? nowUnixSec;
 
@@ -159,10 +196,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		}, [showBidPlusOne, bidAuction?.nowUnixSec]);
 
 		useEffect(() => {
-			if (!showBidPlusOne || !chatRoomId) {
+			if (!showBidPlusOne || !chatRoomId || isPlusOneBlockedForOwner) {
 				setPlusOneLocked(false);
 				setPlusOneUpdatedAt(null);
-				setPlusOneStatusLoaded(!showBidPlusOne);
+				setPlusOneStatusLoaded(true);
 				return;
 			}
 
@@ -219,14 +256,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					onBidRateUpdated,
 				);
 			};
-		}, [showBidPlusOne, chatRoomId]);
+		}, [showBidPlusOne, chatRoomId, isPlusOneBlockedForOwner]);
 
 		// Unlock + when the participant timer expires; keep locked while active.
 		useEffect(() => {
-			if (!showBidPlusOne || plusOneUpdatedAt == null) return;
+			if (!showBidPlusOne || isPlusOneBlockedForOwner || plusOneUpdatedAt == null) return;
 			const remaining = getBidRemainingSeconds(plusOneUpdatedAt, tickUnixSec);
 			setPlusOneLocked(remaining != null && remaining > 0);
-		}, [showBidPlusOne, plusOneUpdatedAt, tickUnixSec]);
+		}, [showBidPlusOne, isPlusOneBlockedForOwner, plusOneUpdatedAt, tickUnixSec]);
 
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
@@ -821,6 +858,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 										disabled={
 											disabled ||
 											isSending ||
+											isPlusOneBlockedForOwner ||
 											plusOneLocked ||
 											!plusOneStatusLoaded ||
 											!chatRoomId
@@ -831,6 +869,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 												!chatRoomId ||
 												disabled ||
 												isSending ||
+												isPlusOneBlockedForOwner ||
 												plusOneLocked
 											) {
 												return;
@@ -883,14 +922,18 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 										}}
 										className="text-green-500 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-green-400 dark:hover:text-green-300"
 										aria-label={
-											plusOneLocked
-												? "+1 timer still active"
-												: "Send +1"
+											isPlusOneBlockedForOwner
+												? "Bid creator cannot use +1"
+												: plusOneLocked
+													? "+1 timer still active"
+													: "Send +1"
 										}
 										title={
-											plusOneLocked
-												? "Available again after the timer expires"
-												: "Send +1"
+											isPlusOneBlockedForOwner
+												? "Bid creator cannot use +1"
+												: plusOneLocked
+													? "Available again after the timer expires"
+													: "Send +1"
 										}
 									>
 										<BidChatActionIcon className="h-6 w-6" />
@@ -968,7 +1011,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								onKeyDown={handleKeyDown}
 								onPaste={handlePaste}
 								disabled={disabled || isSending || isUploadingAttachments}
-								compactLeadingIcons={showBidPlusOne}
+								leadingIcons={showBidPlusOne ? "compact" : "default"}
 							/>
 						</div>
 					</div>

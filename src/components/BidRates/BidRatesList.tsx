@@ -27,9 +27,11 @@ import {
 	getNowUnixSeconds,
 } from "@/utils/bidTimer";
 import { useCurrentUser } from "@/stores/userStore";
+import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import BidRateChatEmbed from "./BidRateChatEmbed";
 import BidPlusOneParticipantsPopup from "./BidPlusOneParticipantsPopup";
+import BidCardUnreadCount from "./BidCardUnreadCount";
 import EditBidPriceModal from "./EditBidPriceModal";
 
 const ITEMS_PER_PAGE = 10;
@@ -75,6 +77,12 @@ function formatBidRate(rate: number): string {
 		minimumFractionDigits: 0,
 		maximumFractionDigits: 2,
 	})}`;
+}
+
+function formatBidDistanceMiles(distance: number | null | undefined): string {
+	if (distance == null || !Number.isFinite(Number(distance))) return "";
+	const miles = Math.round(Number(distance));
+	return `${miles.toLocaleString("en-US")} ${miles === 1 ? "mile" : "miles"}`;
 }
 
 function showBidExpiringToast(bidName: string, bidId: number) {
@@ -168,6 +176,11 @@ export default function BidRatesList() {
 			setDeleteConfirmBid(null);
 			warnedBidIdsRef.current.delete(bid.id);
 
+			// Linked BID chat is hard-deleted on the server (no cloud archive) — drop it locally too
+			if (bid.chatId) {
+				useChatStore.getState().removeChatRoom(bid.chatId);
+			}
+
 			const remainingOnPage = rows.length - 1;
 			if (remainingOnPage <= 0 && currentPage > 1) {
 				setCurrentPage(page => Math.max(1, page - 1));
@@ -225,6 +238,7 @@ export default function BidRatesList() {
 							const creatorName = formatBidCreatorName(row.owner);
 							const createdAt = formatBidCreatedAtEst(row.createdAt);
 							const routeLabel = formatBidRoutePath(row.route);
+							const distanceLabel = formatBidDistanceMiles(row.distance);
 							const isOwner = Boolean(
 								currentUser?.id && row.ownerId && currentUser.id === row.ownerId,
 							);
@@ -277,7 +291,23 @@ export default function BidRatesList() {
 													<BidPlusOneParticipantsPopup bidRateId={row.id} />
 												</div>
 												<p className="text-base font-medium text-gray-900 dark:text-white">
-													{routeLabel || "—"}
+													{routeLabel ? (
+														<>
+															{routeLabel}
+															{distanceLabel ? (
+																<>
+																	{" "}
+																	<span className="font-bold text-gray-900 dark:text-white">
+																		|
+																	</span>{" "}
+
+																	{distanceLabel}
+																</>
+															) : null}
+														</>
+													) : (
+														"—"
+													)}
 												</p>
 												<div className="flex items-center gap-2">
 													<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
@@ -358,6 +388,8 @@ export default function BidRatesList() {
 														Bid time Expired
 													</span>
 												) : null}
+
+												<BidCardUnreadCount chatId={row.chatId} />
 											</div>
 										</div>
 									</div>
@@ -367,6 +399,8 @@ export default function BidRatesList() {
 											{row.chatId ? (
 												<BidRateChatEmbed
 													chatRoomId={row.chatId}
+													bidOwnerId={row.ownerId}
+													disableBidPlusOne={isOwner}
 													webSocketChatSync={webSocketChatSync}
 												/>
 											) : (

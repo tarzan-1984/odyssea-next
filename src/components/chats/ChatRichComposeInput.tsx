@@ -17,6 +17,15 @@ const COMPOSE_FIELD_CLASS =
 const COMPOSE_FIELD_COMPACT_CLASS =
 	"w-full min-h-9 max-h-[50cqh] overflow-y-auto py-2 pl-10 pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90 sm:pl-11";
 
+const COMPOSE_FIELD_NO_LEADING_ICONS_CLASS =
+	"w-full min-h-9 max-h-[50cqh] overflow-y-auto py-2 pl-3 pr-3 text-sm leading-snug text-gray-800 outline-none dark:text-white/90";
+
+function composeFieldClass(leadingIcons: "default" | "compact" | "none"): string {
+	if (leadingIcons === "compact") return COMPOSE_FIELD_COMPACT_CLASS;
+	if (leadingIcons === "none") return COMPOSE_FIELD_NO_LEADING_ICONS_CLASS;
+	return COMPOSE_FIELD_CLASS;
+}
+
 export type ChatRichComposeInputProps = {
 	editorRef: React.RefObject<HTMLDivElement | null>;
 	onContentChange: (markdown: string, plainText: string) => void;
@@ -29,7 +38,9 @@ export type ChatRichComposeInputProps = {
 	/** Increment to replace editor content with draftContent. */
 	draftKey?: number;
 	draftContent?: string;
-	/** Single leading icon (e.g. BID chat) — tighter left padding. */
+	/** Left padding for leading action icons in the compose field. */
+	leadingIcons?: "default" | "compact" | "none";
+	/** @deprecated Prefer leadingIcons="compact" */
 	compactLeadingIcons?: boolean;
 };
 
@@ -43,8 +54,12 @@ export default function ChatRichComposeInput({
 	resetKey = 0,
 	draftKey = 0,
 	draftContent = "",
+	leadingIcons,
 	compactLeadingIcons = false,
 }: ChatRichComposeInputProps) {
+	const resolvedLeadingIcons =
+		leadingIcons ?? (compactLeadingIcons ? "compact" : "default");
+	const fieldClass = composeFieldClass(resolvedLeadingIcons);
 	const [showPlaceholder, setShowPlaceholder] = useState(true);
 
 	const syncFromEditor = useCallback(() => {
@@ -134,7 +149,7 @@ export default function ChatRichComposeInput({
 		<div className="relative min-h-9">
 			{showPlaceholder ? (
 				<span
-					className={`pointer-events-none absolute inset-0 z-0 flex items-start text-sm leading-snug text-gray-400 dark:text-gray-500 ${compactLeadingIcons ? COMPOSE_FIELD_COMPACT_CLASS : COMPOSE_FIELD_CLASS}`}
+					className={`pointer-events-none absolute inset-0 z-0 flex items-start text-sm leading-snug text-gray-400 dark:text-gray-500 ${fieldClass}`}
 					aria-hidden
 				>
 					{placeholder}
@@ -150,7 +165,7 @@ export default function ChatRichComposeInput({
 				onInput={handleInput}
 				onKeyDown={onKeyDown}
 				onPaste={onPaste}
-				className={`relative z-0 ${compactLeadingIcons ? COMPOSE_FIELD_COMPACT_CLASS : COMPOSE_FIELD_CLASS} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
+				className={`relative z-0 ${fieldClass} chat-compose-editor empty:min-h-9 disabled:opacity-50`}
 			/>
 		</div>
 	);

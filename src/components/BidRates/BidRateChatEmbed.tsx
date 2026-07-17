@@ -10,6 +10,10 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
 type BidRateChatEmbedProps = {
 	chatRoomId: string;
+	/** Bid creator user id — used to disable +1 immediately for the owner. */
+	bidOwnerId?: string | null;
+	/** True when the current user created this bid. */
+	disableBidPlusOne?: boolean;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 };
 
@@ -18,6 +22,8 @@ type BidRateChatEmbedProps = {
  */
 export default function BidRateChatEmbed({
 	chatRoomId,
+	bidOwnerId = null,
+	disableBidPlusOne = false,
 	webSocketChatSync,
 }: BidRateChatEmbedProps) {
 	const [ready, setReady] = useState(false);
@@ -93,6 +99,8 @@ export default function BidRateChatEmbed({
 		<div className="h-[560px] w-full overflow-hidden rounded-xl [&_>div]:!w-full [&_>div]:!max-w-none [&_>div]:xl:!w-full">
 			<ChatBox
 				selectedChatRoomId={chatRoomId}
+				bidOwnerId={bidOwnerId}
+				disableBidPlusOne={disableBidPlusOne}
 				webSocketChatSync={webSocketChatSync}
 			/>
 		</div>

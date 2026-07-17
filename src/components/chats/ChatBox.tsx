@@ -30,10 +30,19 @@ import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage"
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
+	/** When known (e.g. bid card), used to disable +1 for the bid creator immediately. */
+	bidOwnerId?: string | null;
+	/** Explicit: current user is the bid creator — +1 stays locked. */
+	disableBidPlusOne?: boolean;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 }
 
-export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatBoxProps) {
+export default function ChatBox({
+	selectedChatRoomId,
+	bidOwnerId = null,
+	disableBidPlusOne = false,
+	webSocketChatSync,
+}: ChatBoxProps) {
 	const [useVirtualMessageList, setUseVirtualMessageList] = useState(true);
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 	const [isDragOver, setIsDragOver] = useState(false);
@@ -1076,6 +1085,8 @@ export default function ChatBox({ selectedChatRoomId, webSocketChatSync }: ChatB
 						editDraftKey={editDraftKey}
 						onCancelEdit={handleCancelEdit}
 						isBidChat={isBidChat}
+						bidOwnerId={bidOwnerId}
+						disableBidPlusOne={disableBidPlusOne}
 					/>
 				)}
 			</div>
