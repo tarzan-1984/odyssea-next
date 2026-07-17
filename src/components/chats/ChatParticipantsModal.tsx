@@ -374,9 +374,14 @@ export default function ChatParticipantsModal({
 
 				if (addingDriverToLoad) {
 					await new Promise<void>((resolve, reject) => {
-						const timeout = setTimeout(() => {
+						const cleanup = () => {
 							socket.off("loadChatForked", onForked);
-							reject(new Error("Timed out waiting for forked load chat"));
+							socket.off("participantsAdded", onAddedInPlace);
+						};
+
+						const timeout = setTimeout(() => {
+							cleanup();
+							reject(new Error("Timed out waiting for driver to be added to load chat"));
 						}, 15000);
 
 						const onForked = (data: {
@@ -387,7 +392,7 @@ export default function ChatParticipantsModal({
 								return;
 							}
 							clearTimeout(timeout);
-							socket.off("loadChatForked", onForked);
+							cleanup();
 							const forked = normalizeForkedRoom(data?.chatRooms?.[0]);
 							if (forked) {
 								openForkedLoadChat(forked);
@@ -397,7 +402,30 @@ export default function ChatParticipantsModal({
 							resolve();
 						};
 
+						// Source had no driver — backend attached in place
+						const onAddedInPlace = (data: {
+							chatRoomId?: string;
+							newParticipants?: Array<{ user?: { role?: string }; role?: string }>;
+						}) => {
+							if (data?.chatRoomId !== chatRoom.id) {
+								return;
+							}
+							// Ignore staff-only adds that may accompany a fork
+							const addedDriver = (data.newParticipants || []).some(
+								(p) =>
+									String(p?.user?.role || p?.role || "").toUpperCase() === "DRIVER",
+							);
+							if (!addedDriver) {
+								return;
+							}
+							clearTimeout(timeout);
+							cleanup();
+							onClose();
+							resolve();
+						};
+
 						socket.on("loadChatForked", onForked);
+						socket.on("participantsAdded", onAddedInPlace);
 						addParticipants({
 							chatRoomId: chatRoom.id,
 							participantIds: uniqueParticipants.map((entry) => entry.id),

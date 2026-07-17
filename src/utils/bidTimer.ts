@@ -3,6 +3,8 @@ import { parseNaiveNyDateTime } from "@/utils/nyWallClock";
 export const BID_TIMER_SECONDS = 15 * 60;
 export const BID_WARNING_SECONDS = 3 * 60;
 export const BID_MAX_EXTEND_SECONDS = 3 * BID_TIMER_SECONDS;
+/** Freshness window for rate-offer votes on the bid card (matches backend). */
+export const BID_RATE_VOTE_FRESH_SECONDS = 4 * 60;
 /** @deprecated use BID_MAX_EXTEND_SECONDS */
 export const BID_MAX_EXTEND_MS = BID_MAX_EXTEND_SECONDS * 1000;
 
@@ -17,8 +19,12 @@ export function formatBidCountdown(totalSeconds: number): string {
 }
 
 /** Green (full time) → red (near expiry). Hue 120 → 0. */
-export function getBidTimerBackgroundColor(remainingSeconds: number): string {
-	const ratio = Math.min(1, Math.max(0, remainingSeconds / BID_TIMER_SECONDS));
+export function getBidTimerBackgroundColor(
+	remainingSeconds: number,
+	totalSeconds: number = BID_TIMER_SECONDS,
+): string {
+	const safeTotal = totalSeconds > 0 ? totalSeconds : BID_TIMER_SECONDS;
+	const ratio = Math.min(1, Math.max(0, remainingSeconds / safeTotal));
 	const hue = Math.round(ratio * 120);
 	return `hsl(${hue}, 72%, 42%)`;
 }
@@ -59,6 +65,19 @@ export function getBidRemainingSeconds(
 	const updatedAtSec = toUnixSeconds(updatedAtUnix);
 	if (updatedAtSec == null) return null;
 	return Math.max(0, updatedAtSec + BID_TIMER_SECONDS - nowUnixSec);
+}
+
+/** Remaining seconds for a rate offer vote (4 min from created_rate_at). */
+export function getBidRateVoteRemainingSeconds(
+	createdRateAtUnix: number | string | Date | null | undefined,
+	nowUnixSec: number = getNowUnixSeconds(),
+): number | null {
+	const createdRateAtSec = toUnixSeconds(createdRateAtUnix);
+	if (createdRateAtSec == null) return null;
+	return Math.max(
+		0,
+		createdRateAtSec + BID_RATE_VOTE_FRESH_SECONDS - nowUnixSec,
+	);
 }
 
 /** Can extend while (updated_at - created_at) < 45 minutes (max 3 × 15 min). */

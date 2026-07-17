@@ -31,6 +31,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import BidRateChatEmbed from "./BidRateChatEmbed";
 import BidPlusOneParticipantsPopup from "./BidPlusOneParticipantsPopup";
+import BidRateVotersPopup from "./BidRateVotersPopup";
 import BidCardUnreadCount from "./BidCardUnreadCount";
 import EditBidPriceModal from "./EditBidPriceModal";
 
@@ -325,6 +326,7 @@ export default function BidRatesList() {
 													>
 														<EditOfferIcon className="h-6 w-6" aria-hidden />
 													</button>
+													<BidRateVotersPopup bidRateId={row.id} />
 												</div>
 											</div>
 											<div className="flex flex-shrink-0 flex-col items-end gap-2">

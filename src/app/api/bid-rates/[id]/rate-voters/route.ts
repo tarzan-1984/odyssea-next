@@ -3,11 +3,10 @@ import { serverAuth } from "@/utils/auth";
 import { canAccessBidRates } from "@/utils/roleAccess";
 
 /**
- * PATCH /api/bid-rates/:id/new-price
- * Updates bid price: non-owner → bid_rate_participants.rate for that user;
- * owner → bid_rates.rate when no active +1 timers, otherwise owner participant rate.
+ * GET /api/bid-rates/:id/rate-voters
+ * Participants with non-null rate and created_rate_at within the last 4 minutes.
  */
-export async function PATCH(
+export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> },
 ) {
@@ -28,20 +27,14 @@ export async function PATCH(
 			return NextResponse.json({ error: "Invalid bid rate id" }, { status: 400 });
 		}
 
-		const body = await request.json().catch(() => null);
-		if (!body || typeof body !== "object") {
-			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-		}
-
 		const response = await fetch(
-			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/bid-rates/${bidId}/new-price`,
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/bid-rates/${bidId}/rate-voters`,
 			{
-				method: "PATCH",
+				method: "GET",
 				headers: {
 					Authorization: `Bearer ${accessToken}`,
-					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(body),
+				cache: "no-store",
 			},
 		);
 
@@ -53,8 +46,7 @@ export async function PATCH(
 					error:
 						data.message ||
 						data.error ||
-						(Array.isArray(data.message) ? data.message.join(", ") : null) ||
-						"Failed to update bid price",
+						"Failed to load rate voters",
 				},
 				{ status: response.status },
 			);
@@ -62,7 +54,7 @@ export async function PATCH(
 
 		return NextResponse.json(data?.data ?? data);
 	} catch (error) {
-		console.error("Error updating bid price:", error);
+		console.error("Error loading bid rate voters:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }

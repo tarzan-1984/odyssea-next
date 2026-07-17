@@ -141,10 +141,28 @@ export type BidAuctionParticipant = {
 	updatedAt: number;
 };
 
+export type BidRateVoter = {
+	userId: string;
+	firstName?: string | null;
+	lastName?: string | null;
+	profilePhoto?: string | null;
+	userColor?: string | null;
+	role?: string | null;
+	rate: number | null;
+	/** Unix timestamp in seconds when rate was last written. */
+	createdRateAt: number | null;
+};
+
 export type BidAuctionParticipantsResponse = {
 	bidRateId: number;
 	ownerId: string;
 	participants: BidAuctionParticipant[];
+};
+
+export type BidRateVotersResponse = {
+	bidRateId: number;
+	ownerId: string;
+	participants: BidRateVoter[];
 };
 
 export async function getBidParticipationByChat(
@@ -202,6 +220,21 @@ export async function getBidParticipants(
 		return body.data;
 	}
 	return body as BidAuctionParticipantsResponse;
+}
+
+export async function getBidRateVoters(
+	bidRateId: number,
+): Promise<BidRateVotersResponse> {
+	const res = await axios.get<
+		BidRateVotersResponse | { data: BidRateVotersResponse }
+	>(`/api/bid-rates/${bidRateId}/rate-voters`, {
+		withCredentials: true,
+	});
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as BidRateVotersResponse;
 }
 
 export async function extendBidParticipantTimeByChat(

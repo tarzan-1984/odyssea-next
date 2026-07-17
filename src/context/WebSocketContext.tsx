@@ -29,6 +29,7 @@ import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
 import { clearBidParticipantsCache } from "@/components/BidRates/BidPlusOneParticipantsPopup";
+import { clearBidRateVotersCache } from "@/components/BidRates/BidRateVotersPopup";
 import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
 
 // WebSocket context interface
@@ -434,8 +435,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		newSocket.on("bidRateUpdated", (data: BidRateUpdatedData) => {
 			if (data?.bidRateId != null) {
 				clearBidParticipantsCache(data.bidRateId);
+				clearBidRateVotersCache(data.bidRateId);
 			} else {
 				clearBidParticipantsCache();
+				clearBidRateVotersCache();
 			}
 
 			window.dispatchEvent(

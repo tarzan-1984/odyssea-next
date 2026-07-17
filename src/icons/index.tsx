@@ -82,6 +82,9 @@ import AddPlusCircleIcon from "./AddPlusCircleIcon";
 import RemoveMinusIcon from "./RemoveMinusIcon";
 import BidChatActionIcon from "./BidChatActionIcon";
 import BidUnreadMessagesIcon from "./BidUnreadMessagesIcon";
+import BidParticipantRateIcon from "./BidParticipantRateIcon";
+import BidOfferAcceptIcon from "./BidOfferAcceptIcon";
+import BidOfferRejectIcon from "./BidOfferRejectIcon";
 import AddedValueIcon from "./AddedValueIcon";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
@@ -173,6 +176,9 @@ export {
 	RemoveMinusIcon,
 	BidChatActionIcon,
 	BidUnreadMessagesIcon,
+	BidParticipantRateIcon,
+	BidOfferAcceptIcon,
+	BidOfferRejectIcon,
 	AddedValueIcon,
 	BoxTapped,
 	TruckDelivery,
