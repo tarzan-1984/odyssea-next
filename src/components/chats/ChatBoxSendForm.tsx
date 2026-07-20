@@ -29,6 +29,7 @@ import {
 import { getBidRemainingSeconds, getNowUnixSeconds } from "@/utils/bidTimer";
 import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
+import BidComposePlusOneTimer from "./BidComposePlusOneTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import {
@@ -847,9 +848,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					<div className="relative w-full min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40">
 							<ChatFormatToolbar
 								disabled={disabled || isSending || isUploadingAttachments}
-							activeFormats={formatState}
-							onAction={applyFormatAction}
-						/>
+								activeFormats={formatState}
+								onAction={applyFormatAction}
+								trailing={showBidPlusOne ? <BidComposePlusOneTimer /> : null}
+							/>
 						<div className="relative">
 							<div className="absolute bottom-1.5 left-1 z-20 flex items-center gap-2 sm:left-2">
 								{showBidPlusOne ? (
@@ -1016,14 +1018,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						</div>
 					</div>
 
-					<div className="flex flex-shrink-0 items-center pb-0.5">
+					<div className="flex flex-shrink-0 items-center gap-2 pb-0.5">
 						{/* File attachment button */}
 						{!isBidChat ? (
 							<button
 								type="button"
 								onClick={handleFileButtonClick}
 								disabled={disabled || isSending || isUploadingAttachments || isEditing}
-								className="mr-2 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
+								className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90 disabled:opacity-50"
 							>
 								<svg
 									className="fill-current"
@@ -1052,7 +1054,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								isUploadingAttachments ||
 								(!message.trim() && attachedFiles.length === 0)
 							}
-							className="flex items-center justify-center ml-3 text-white rounded-lg h-9 w-9 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-400 disabled:cursor-not-allowed xl:ml-5"
+							className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500 text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-400"
 						>
 							{isLoading ? (
 								// Loading spinner

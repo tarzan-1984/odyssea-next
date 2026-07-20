@@ -18,6 +18,8 @@ import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
 import {
 	isBidNewOfferMessage,
+	isBidOfferConfirmedMessage,
+	isBidOfferRejectedMessage,
 	isBidPriceUpdateMessage,
 	isBidRateChangedMessage,
 } from "@/utils/bidPriceUpdateMessage";
@@ -76,15 +78,21 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isBidPriceUpdate = isBidPriceUpdateMessage(message.content);
 	const isBidRateChanged = isBidRateChangedMessage(message.content);
 	const isBidNewOffer = isBidNewOfferMessage(message.content);
+	const isBidOfferConfirmed = isBidOfferConfirmedMessage(message.content);
+	const isBidOfferRejected = isBidOfferRejectedMessage(message.content);
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
-		: isBidRateChanged
-			? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
-			: "";
+		: isBidOfferRejected
+			? "px-3 py-2 rounded-lg bg-red-500 text-white dark:bg-red-500"
+			: isBidRateChanged || isBidOfferConfirmed
+				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
+				: "";
 	const bidPriceTextClass =
 		"[&_.chat-msg-body]:![font-size:calc(var(--chat-font-body,14px)+2px)] [&_.chat-msg-body]:![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
 	const bidNewOfferTextClass = `${bidPriceTextClass} [&_.chat-msg-body]:!text-gray-900`;
+	const usesWhiteBidText =
+		isBidRateChanged || isBidOfferConfirmed || isBidOfferRejected;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
@@ -578,11 +586,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										)}
 										<ChatMessageContent
 											content={message.content}
-											isOutgoing={isBidRateChanged}
+											isOutgoing={usesWhiteBidText}
 											className={
 												isBidNewOffer
 													? bidNewOfferTextClass
-													: isBidRateChanged
+													: usesWhiteBidText
 														? bidPriceTextClass
 														: undefined
 											}

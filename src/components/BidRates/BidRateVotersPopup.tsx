@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { Modal } from "@/components/ui/modal";
-import { getBidRateVoters, type BidRateVoter } from "@/app-api/bidRates";
+import { getBidRateVoters, voteBidOffer, type BidRateVoter } from "@/app-api/bidRates";
 import {
 	BidOfferAcceptIcon,
 	BidOfferRejectIcon,
@@ -18,6 +18,7 @@ import {
 } from "@/utils/bidTimer";
 import {
 	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	isBidRateRemovedReason,
 	type BidRateUpdatedEventDetail,
 } from "@/lib/bidRateRealtimeEvents";
 
@@ -45,6 +46,70 @@ export function clearBidRateVotersCache(bidRateId?: number) {
 	}
 	votersCache.clear();
 	votersInflight.clear();
+}
+
+export function userHasActiveBidRateOffer(
+	voters: BidRateVoter[],
+	userId: string | null | undefined,
+	nowUnixSec: number = getNowUnixSeconds(),
+): boolean {
+	if (!userId) return false;
+	const own = voters.find(row => row.userId === userId);
+	if (!own) return false;
+	const remaining = getBidRateVoteRemainingSeconds(own.createdRateAt, nowUnixSec);
+	return remaining != null && remaining > 0;
+}
+
+/** True while the current user still has a live 4-min rate offer on this bid. */
+export function useHasActiveBidRateOffer(
+	bidRateId: number,
+	userId: string | null | undefined,
+): boolean {
+	const [voters, setVoters] = useState<BidRateVoter[]>(
+		() => votersCache.get(bidRateId) ?? [],
+	);
+	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
+
+	useEffect(() => {
+		setVoters(votersCache.get(bidRateId) ?? []);
+		fetchVotersCached(bidRateId)
+			.then(setVoters)
+			.catch(() => undefined);
+	}, [bidRateId]);
+
+	useEffect(() => {
+		const onBidRateUpdated = (event: Event) => {
+			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
+			if (detail?.bidRateId != null && detail.bidRateId !== bidRateId) return;
+			votersCache.delete(bidRateId);
+			if (isBidRateRemovedReason(detail?.reason)) {
+				setVoters([]);
+				return;
+			}
+			fetchVotersCached(bidRateId, { force: true })
+				.then(setVoters)
+				.catch(() => undefined);
+		};
+		window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
+		return () => {
+			window.removeEventListener(
+				ODYSSEA_BID_RATE_UPDATED_EVENT,
+				onBidRateUpdated,
+			);
+		};
+	}, [bidRateId]);
+
+	const hasActive = userHasActiveBidRateOffer(voters, userId, nowUnixSec);
+
+	useEffect(() => {
+		if (!hasActive) return;
+		const intervalId = window.setInterval(() => {
+			setNowUnixSec(getNowUnixSeconds());
+		}, 1000);
+		return () => window.clearInterval(intervalId);
+	}, [hasActive]);
+
+	return hasActive;
 }
 
 function fetchVotersCached(
@@ -84,6 +149,7 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 		() => votersCache.get(bidRateId) ?? [],
 	);
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
+	const [votingUserId, setVotingUserId] = useState<string | null>(null);
 
 	const loadVoters = useCallback(
 		async (options?: { force?: boolean; silent?: boolean }) => {
@@ -98,8 +164,13 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 				});
 				setVoters(rows);
 			} catch (err) {
-				console.error("Failed to load rate voters:", err);
-				setError("Failed to load voters");
+				const status = (err as { response?: { status?: number } })?.response
+					?.status;
+				// Bid may have been deleted while a voters request was in flight.
+				if (status !== 404) {
+					console.error("Failed to load rate voters:", err);
+				}
+				setError(status === 404 ? null : "Failed to load voters");
 				if (!hasCache) {
 					setVoters([]);
 				}
@@ -121,6 +192,11 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
 			if (detail?.bidRateId != null && detail.bidRateId !== bidRateId) return;
 			votersCache.delete(bidRateId);
+			if (isBidRateRemovedReason(detail?.reason)) {
+				setVoters([]);
+				setError(null);
+				return;
+			}
 			loadVoters({ force: true, silent: true }).catch(() => undefined);
 		};
 
@@ -161,6 +237,30 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 
 	function handleClose() {
 		setIsOpen(false);
+	}
+
+	async function handleVote(offererUserId: string, accept: boolean) {
+		setVotingUserId(offererUserId);
+		try {
+			await voteBidOffer(bidRateId, offererUserId, accept);
+			votersCache.delete(bidRateId);
+			const rows = await fetchVotersCached(bidRateId, { force: true });
+			setVoters(rows);
+			// No offers left — close instead of showing empty state.
+			if (rows.length === 0) {
+				setIsOpen(false);
+			}
+		} catch (err) {
+			console.error("Failed to vote on offer:", err);
+			setError(
+				(err as { response?: { data?: { error?: string } } })?.response?.data
+					?.error ||
+					(err as Error)?.message ||
+					"Failed to vote on offer",
+			);
+		} finally {
+			setVotingUserId(null);
+		}
 	}
 
 	const votersCount = voters.length;
@@ -302,30 +402,44 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 													</span>
 												</td>
 												<td className="px-3 py-2.5">
-													<div className="flex items-center justify-center gap-2">
-														<button
-															type="button"
-															title="Accept offer"
-															aria-label={`Accept offer from ${formatVoterName(row)}`}
-															onClick={e => {
-																e.stopPropagation();
-															}}
-															className="inline-flex h-8 w-8 items-center justify-center rounded-md text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/30"
-														>
-															<BidOfferAcceptIcon className="h-5 w-5" />
-														</button>
-														<button
-															type="button"
-															title="Reject offer"
-															aria-label={`Reject offer from ${formatVoterName(row)}`}
-															onClick={e => {
-																e.stopPropagation();
-															}}
-															className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-														>
-															<BidOfferRejectIcon className="h-5 w-5" />
-														</button>
-													</div>
+													{row.canVote ? (
+														<div className="flex items-center justify-center gap-2">
+															<button
+																type="button"
+																title="Accept offer"
+																aria-label={`Accept offer from ${formatVoterName(row)}`}
+																disabled={votingUserId === row.userId}
+																onClick={e => {
+																	e.stopPropagation();
+																	handleVote(row.userId, true).catch(
+																		() => undefined,
+																	);
+																}}
+																className="inline-flex h-8 w-8 items-center justify-center rounded-md text-green-600 hover:bg-green-50 disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-900/30"
+															>
+																<BidOfferAcceptIcon className="h-5 w-5" />
+															</button>
+															<button
+																type="button"
+																title="Reject offer"
+																aria-label={`Reject offer from ${formatVoterName(row)}`}
+																disabled={votingUserId === row.userId}
+																onClick={e => {
+																	e.stopPropagation();
+																	handleVote(row.userId, false).catch(
+																		() => undefined,
+																	);
+																}}
+																className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+															>
+																<BidOfferRejectIcon className="h-5 w-5" />
+															</button>
+														</div>
+													) : (
+														<span className="block text-center text-xs text-gray-400">
+															—
+														</span>
+													)}
 												</td>
 											</tr>
 										);

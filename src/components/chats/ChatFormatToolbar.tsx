@@ -11,6 +11,8 @@ type ChatFormatToolbarProps = {
 	disabled?: boolean;
 	activeFormats: EditorFormatState;
 	onAction: (action: ChatFormatAction) => void;
+	/** Rendered after format buttons (e.g. bid +1 timer). */
+	trailing?: React.ReactNode;
 };
 
 function ToolbarButton({
@@ -49,6 +51,7 @@ export default function ChatFormatToolbar({
 	disabled,
 	activeFormats,
 	onAction,
+	trailing,
 }: ChatFormatToolbarProps) {
 	return (
 		<div
@@ -87,6 +90,7 @@ export default function ChatFormatToolbar({
 			>
 				<Strikethrough className="h-4 w-4" aria-hidden />
 			</ToolbarButton>
+			{trailing ? <div className="ml-1.5 flex items-center">{trailing}</div> : null}
 		</div>
 	);
 }

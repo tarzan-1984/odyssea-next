@@ -6,6 +6,7 @@ import React, {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import {
@@ -16,6 +17,7 @@ import {
 import { getNowUnixSeconds } from "@/utils/bidTimer";
 import {
 	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	isBidRateRemovedReason,
 	type BidRateUpdatedEventDetail,
 } from "@/lib/bidRateRealtimeEvents";
 
@@ -46,6 +48,17 @@ function toUnixNumber(value: number | string): number {
 	return typeof value === "number" ? value : Number(value);
 }
 
+function isParticipantPayload(
+	value: BidRateUpdatedEventDetail["participant"],
+): value is { userId: string; createdAt: number; updatedAt: number } {
+	if (!value || typeof value !== "object") return false;
+	return (
+		typeof value.userId === "string" &&
+		Number.isFinite(Number(value.createdAt)) &&
+		Number.isFinite(Number(value.updatedAt))
+	);
+}
+
 export function BidChatAuctionProvider({
 	chatRoomId,
 	enabled,
@@ -62,6 +75,12 @@ export function BidChatAuctionProvider({
 	);
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const [extendingUserId, setExtendingUserId] = useState<string | null>(null);
+	const bidRateIdRef = useRef<number | null>(null);
+	const loadSeqRef = useRef(0);
+
+	useEffect(() => {
+		bidRateIdRef.current = bidRateId;
+	}, [bidRateId]);
 
 	useEffect(() => {
 		if (!enabled) return;
@@ -70,6 +89,28 @@ export function BidChatAuctionProvider({
 		}, 1000);
 		return () => window.clearInterval(intervalId);
 	}, [enabled]);
+
+	const upsertParticipant = useCallback((participant: BidAuctionParticipant) => {
+		const createdAt = toUnixNumber(participant.createdAt);
+		const updatedAt = toUnixNumber(participant.updatedAt);
+		if (!Number.isFinite(createdAt) || !Number.isFinite(updatedAt)) return;
+
+		setByUserId(prev => {
+			const existing = prev[participant.userId];
+			// Ignore stale WS/refetch payloads that would rewind the timer.
+			if (existing && existing.updatedAt > updatedAt) {
+				return prev;
+			}
+			return {
+				...prev,
+				[participant.userId]: {
+					userId: participant.userId,
+					createdAt,
+					updatedAt,
+				},
+			};
+		});
+	}, []);
 
 	useEffect(() => {
 		if (!enabled || !chatRoomId) {
@@ -82,20 +123,29 @@ export function BidChatAuctionProvider({
 		let cancelled = false;
 
 		const loadParticipants = () => {
+			const seq = ++loadSeqRef.current;
 			getBidParticipantsByChat(chatRoomId)
 				.then(result => {
-					if (cancelled) return;
+					if (cancelled || seq !== loadSeqRef.current) return;
 					setBidRateId(result.bidRateId);
 					setOwnerId(result.ownerId ?? null);
-					const next: Record<string, ParticipantTimer> = {};
-					for (const row of result.participants ?? []) {
-						next[row.userId] = {
-							userId: row.userId,
-							createdAt: toUnixNumber(row.createdAt),
-							updatedAt: toUnixNumber(row.updatedAt),
-						};
-					}
-					setByUserId(next);
+					setByUserId(prev => {
+						const next: Record<string, ParticipantTimer> = {};
+						for (const row of result.participants ?? []) {
+							const createdAt = toUnixNumber(row.createdAt);
+							const updatedAt = toUnixNumber(row.updatedAt);
+							const existing = prev[row.userId];
+							next[row.userId] = {
+								userId: row.userId,
+								createdAt,
+								updatedAt:
+									existing && existing.updatedAt > updatedAt
+										? existing.updatedAt
+										: updatedAt,
+							};
+						}
+						return next;
+					});
 				})
 				.catch(error => {
 					console.error("Failed to load bid auction participants:", error);
@@ -107,6 +157,21 @@ export function BidChatAuctionProvider({
 		const onBidRateUpdated = (event: Event) => {
 			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
 			if (detail?.chatRoomId && detail.chatRoomId !== chatRoomId) return;
+			if (
+				detail?.bidRateId != null &&
+				bidRateIdRef.current != null &&
+				detail.bidRateId !== bidRateIdRef.current
+			) {
+				return;
+			}
+			if (isBidRateRemovedReason(detail?.reason)) {
+				setByUserId({});
+				return;
+			}
+			// Apply timer immediately from WS payload (extend/join/rejoin).
+			if (isParticipantPayload(detail?.participant)) {
+				upsertParticipant(detail.participant);
+			}
 			loadParticipants();
 		};
 
@@ -119,23 +184,12 @@ export function BidChatAuctionProvider({
 				onBidRateUpdated,
 			);
 		};
-	}, [enabled, chatRoomId]);
+	}, [enabled, chatRoomId, upsertParticipant]);
 
 	const getParticipant = useCallback(
 		(userId: string) => byUserId[userId] ?? null,
 		[byUserId],
 	);
-
-	const upsertParticipant = useCallback((participant: BidAuctionParticipant) => {
-		setByUserId(prev => ({
-			...prev,
-			[participant.userId]: {
-				userId: participant.userId,
-				createdAt: toUnixNumber(participant.createdAt),
-				updatedAt: toUnixNumber(participant.updatedAt),
-			},
-		}));
-	}, []);
 
 	const extendParticipant = useCallback(
 		async (userId: string) => {

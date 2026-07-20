@@ -16,6 +16,7 @@ import {
 } from "@/utils/bidTimer";
 import {
 	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	isBidRateRemovedReason,
 	type BidRateUpdatedEventDetail,
 } from "@/lib/bidRateRealtimeEvents";
 
@@ -105,8 +106,12 @@ export default function BidPlusOneParticipantsPopup({
 				});
 				setParticipants(rows);
 			} catch (err) {
-				console.error("Failed to load +1 participants:", err);
-				setError("Failed to load participants");
+				const status = (err as { response?: { status?: number } })?.response
+					?.status;
+				if (status !== 404) {
+					console.error("Failed to load +1 participants:", err);
+				}
+				setError(status === 404 ? null : "Failed to load participants");
 				if (!hasCache) {
 					setParticipants([]);
 				}
@@ -121,6 +126,12 @@ export default function BidPlusOneParticipantsPopup({
 		const onBidRateUpdated = (event: Event) => {
 			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
 			if (detail?.bidRateId != null && detail.bidRateId !== bidRateId) return;
+			if (isBidRateRemovedReason(detail?.reason)) {
+				setParticipants([]);
+				setError(null);
+				setIsOpen(false);
+				return;
+			}
 			if (isOpen) {
 				loadParticipants({ force: true, silent: true }).catch(() => undefined);
 			}

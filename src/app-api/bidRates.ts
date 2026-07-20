@@ -141,6 +141,12 @@ export type BidAuctionParticipant = {
 	updatedAt: number;
 };
 
+export type BidOfferUserVote = {
+	userId: string;
+	user_vote: boolean | null;
+	plusOneCreatedAt: number;
+};
+
 export type BidRateVoter = {
 	userId: string;
 	firstName?: string | null;
@@ -151,6 +157,9 @@ export type BidRateVoter = {
 	rate: number | null;
 	/** Unix timestamp in seconds when rate was last written. */
 	createdRateAt: number | null;
+	userVotes?: BidOfferUserVote[];
+	myVote?: boolean | null;
+	canVote?: boolean;
 };
 
 export type BidAuctionParticipantsResponse = {
@@ -235,6 +244,26 @@ export async function getBidRateVoters(
 		return body.data;
 	}
 	return body as BidRateVotersResponse;
+}
+
+export async function voteBidOffer(
+	bidRateId: number,
+	offererUserId: string,
+	accept: boolean,
+): Promise<{ bidRateId: number; status: string; rate?: number }> {
+	const res = await axios.post<
+		| { bidRateId: number; status: string; rate?: number }
+		| { data: { bidRateId: number; status: string; rate?: number } }
+	>(
+		`/api/bid-rates/${bidRateId}/offers/${encodeURIComponent(offererUserId)}/vote`,
+		{ accept },
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as { bidRateId: number; status: string; rate?: number };
 }
 
 export async function extendBidParticipantTimeByChat(

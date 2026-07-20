@@ -7,7 +7,6 @@ import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/Pagi
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import {
 	DeactivateOfferIcon,
-	EditOfferIcon,
 	ExtendBidTimeIcon,
 } from "@/icons";
 import {
@@ -30,8 +29,13 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import BidRateChatEmbed from "./BidRateChatEmbed";
-import BidPlusOneParticipantsPopup from "./BidPlusOneParticipantsPopup";
-import BidRateVotersPopup from "./BidRateVotersPopup";
+import BidRateVotersPopup, {
+	clearBidRateVotersCache,
+} from "./BidRateVotersPopup";
+import BidPlusOneParticipantsPopup, {
+	clearBidParticipantsCache,
+} from "./BidPlusOneParticipantsPopup";
+import BidEditPriceButton from "./BidEditPriceButton";
 import BidCardUnreadCount from "./BidCardUnreadCount";
 import EditBidPriceModal from "./EditBidPriceModal";
 
@@ -176,6 +180,8 @@ export default function BidRatesList() {
 			await deleteBidRate(bid.id);
 			setDeleteConfirmBid(null);
 			warnedBidIdsRef.current.delete(bid.id);
+			clearBidRateVotersCache(bid.id);
+			clearBidParticipantsCache(bid.id);
 
 			// Linked BID chat is hard-deleted on the server (no cloud archive) — drop it locally too
 			if (bid.chatId) {
@@ -314,18 +320,11 @@ export default function BidRatesList() {
 													<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
 														{formatBidRate(row.rate)}
 													</p>
-													<button
-														type="button"
-														title="Edit price"
-														aria-label="Edit price"
-														onClick={e => {
-															e.stopPropagation();
-															setEditPriceBid(row);
-														}}
-														className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-brand-600 hover:opacity-80 dark:text-brand-400"
-													>
-														<EditOfferIcon className="h-6 w-6" aria-hidden />
-													</button>
+													<BidEditPriceButton
+														bid={row}
+														currentUserId={currentUser?.id}
+														onEdit={setEditPriceBid}
+													/>
 													<BidRateVotersPopup bidRateId={row.id} />
 												</div>
 											</div>

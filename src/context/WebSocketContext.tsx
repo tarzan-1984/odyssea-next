@@ -143,6 +143,11 @@ interface BidRateUpdatedData {
 	chatRoomId?: string | null;
 	reason?: string;
 	refreshedAt?: string;
+	participant?: {
+		userId: string;
+		createdAt: number;
+		updatedAt: number;
+	} | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
