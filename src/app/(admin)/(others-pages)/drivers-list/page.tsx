@@ -1,11 +1,13 @@
 import ComponentCard from "@/components/common/ComponentCard";
-import React from "react";
+import React, { Suspense } from "react";
 import DriversListTable from "@/components/tables/DataTables/DriversTable/DriversListTable";
 
 const driversList = () => {
 	return (
 		<ComponentCard title="Driver List">
-			<DriversListTable />
+			<Suspense fallback={null}>
+				<DriversListTable />
+			</Suspense>
 		</ComponentCard>
 	);
 };

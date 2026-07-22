@@ -96,8 +96,9 @@ export function parseOfferDateTimeField(value: string): {
 	const trimmed = value.trim();
 	if (!trimmed) return { start: null, end: null };
 
-	if (trimmed.includes(OFFER_DATETIME_RANGE_SEP)) {
-		const [startPart, endPart] = trimmed.split(OFFER_DATETIME_RANGE_SEP).map(p => p.trim());
+	const rangeParts = splitOfferDateTimeRange(trimmed);
+	if (rangeParts) {
+		const [startPart, endPart] = rangeParts;
 		const start = parseSingleOfferDateTime(startPart);
 		if (!start || !endPart) return { start, end: null };
 		const end =
@@ -106,6 +107,19 @@ export function parseOfferDateTimeField(value: string): {
 	}
 
 	return { start: parseSingleOfferDateTime(trimmed), end: null };
+}
+
+/**
+ * Splits "start — end" / "start - end" ranges.
+ * UI uses em dash; URL deep links often use a plain hyphen.
+ */
+function splitOfferDateTimeRange(trimmed: string): [string, string] | null {
+	for (const sep of [OFFER_DATETIME_RANGE_SEP, " – ", " - "]) {
+		if (!trimmed.includes(sep)) continue;
+		const [startPart, endPart] = trimmed.split(sep).map(p => p.trim());
+		if (startPart && endPart) return [startPart, endPart];
+	}
+	return null;
 }
 
 function formatTimePart(d: Date): string {

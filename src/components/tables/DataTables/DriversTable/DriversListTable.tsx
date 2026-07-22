@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../../../ui/table";
 import {
 	Mc,
@@ -54,7 +55,7 @@ import {
 	canViewRestrictedDriverStatusesOnMap,
 } from "@/utils/roleAccess";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import CreateOfferModal from "./CreateOfferModal";
+import CreateOfferModal, { type CreateOfferUrlPrefill } from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
 import DriverMobileAppIcon, { driverUsesMobileApp } from "./DriverMobileAppIcon";
 import DriverNotesModal from "./DriverNotesModal";
@@ -194,6 +195,10 @@ export default function DriversListTable({
 }: DriversListTableProps = {}) {
 	const existingDriverIdsSet = new Set(existingDriverIds.map(id => String(id)));
 	const currentUser = useCurrentUser();
+	const searchParams = useSearchParams();
+	const createOfferFromUrlAppliedRef = useRef(false);
+	const [createOfferUrlPrefill, setCreateOfferUrlPrefill] =
+		useState<CreateOfferUrlPrefill | null>(null);
 
 	// State for pagination
 	const [currentPage, setCurrentPage] = useState(1);
@@ -275,6 +280,80 @@ export default function DriversListTable({
 	);
 	const [dimensionsModalOpen, setDimensionsModalOpen] = useState(false);
 	const [hoveredStatusRowIndex, setHoveredStatusRowIndex] = useState<number | null>(null);
+
+	// Prefill filters from /drivers-list?create_offer=1&country=...&pu[0]=...
+	useEffect(() => {
+		if (createOfferFromUrlAppliedRef.current) return;
+		if (searchParams.get("create_offer") !== "1") return;
+
+		createOfferFromUrlAppliedRef.current = true;
+
+		const stripQuotes = (value: string | null): string => {
+			if (!value) return "";
+			let s = value.trim();
+			if (
+				(s.startsWith("'") && s.endsWith("'")) ||
+				(s.startsWith('"') && s.endsWith('"'))
+			) {
+				s = s.slice(1, -1).trim();
+			}
+			return s;
+		};
+
+		// Build route in URL appearance order: pu[0], del[0], pu[1], ...
+		const route: NonNullable<CreateOfferUrlPrefill["route"]> = [];
+		const stopsByKey = new Map<string, NonNullable<CreateOfferUrlPrefill["route"]>[number]>();
+
+		searchParams.forEach((value, key) => {
+			const locationMatch = key.match(/^(pu|del)\[(\d+)\]$/);
+			if (locationMatch) {
+				const prefix = locationMatch[1];
+				const index = locationMatch[2];
+				const location = stripQuotes(value);
+				if (!location) return;
+				const stop = {
+					type: (prefix === "pu" ? "pickup" : "delivery") as "pickup" | "delivery",
+					location,
+				};
+				route.push(stop);
+				stopsByKey.set(`${prefix}:${index}`, stop);
+				return;
+			}
+
+			const timeMatch = key.match(/^(pu|del)_at\[(\d+)\]$/);
+			if (timeMatch) {
+				const time = stripQuotes(value);
+				if (!time) return;
+				const stop = stopsByKey.get(`${timeMatch[1]}:${timeMatch[2]}`);
+				if (stop) {
+					stop.time = time;
+				}
+			}
+		});
+
+		const pickupAddress = route.find(s => s.type === "pickup")?.location ?? "";
+		const country = stripQuotes(searchParams.get("country"));
+
+		setCreateOfferUrlPrefill({
+			route: route.length > 0 ? route : undefined,
+			loadedMiles: stripQuotes(searchParams.get("loaded_miles")) || undefined,
+			weight: stripQuotes(searchParams.get("weight")) || undefined,
+			commodity: stripQuotes(searchParams.get("commodity")) || undefined,
+		});
+
+		if (country === "USA" || country === "Canada") {
+			setLocationFilter(country);
+		}
+
+		if (pickupAddress) {
+			setExtendedSearchEnabled(false);
+			setAddressFilter(pickupAddress);
+			// Skip debounce so search starts immediately
+			setDebouncedAddressFilter(pickupAddress);
+			setStatusFilter("for_offers");
+			setStatusAutoAppliedByAddress(true);
+		}
+	}, [searchParams]);
 
 	useEffect(() => {
 		setCurrentPage(1);
@@ -614,7 +693,13 @@ export default function DriversListTable({
 							externalId={currentUser?.externalId ?? ""}
 							selectedDriverIds={selectedDriverIds}
 							driverEmptyMiles={driverEmptyMiles}
-							initialPickupLocation={addressFilter.trim() || undefined}
+							initialPickupLocation={
+								createOfferUrlPrefill?.route?.find(s => s.type === "pickup")
+									?.location ||
+								addressFilter.trim() ||
+								undefined
+							}
+							initialCreateOfferFromUrl={createOfferUrlPrefill}
 							onSubmit={() => {
 								setSelectedDriverIds([]);
 							}}

@@ -17,7 +17,9 @@ import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
 	formatOfferDateTime,
+	formatOfferDateTimeRange,
 	getRouteChronologyError,
+	parseOfferDateTimeField,
 } from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
@@ -48,6 +50,21 @@ export interface EditOfferData {
 	loadedMiles?: number | null;
 }
 
+/** Prefill create-offer form from /drivers-list?create_offer=1&... URL params. */
+export interface CreateOfferUrlStop {
+	type: "pickup" | "delivery";
+	location: string;
+	time?: string;
+}
+
+export interface CreateOfferUrlPrefill {
+	/** Stops in URL appearance order (pu/del mixed). */
+	route?: CreateOfferUrlStop[];
+	loadedMiles?: string;
+	weight?: string;
+	commodity?: string;
+}
+
 export interface CreateOfferModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -57,9 +74,19 @@ export interface CreateOfferModalProps {
 	driverEmptyMiles?: Record<string, number>;
 	/** Pre-fill first pick up location (e.g. drivers-list address search). */
 	initialPickupLocation?: string;
+	/** Prefill from create_offer=1 deep link (route, weight, commodity, miles). */
+	initialCreateOfferFromUrl?: CreateOfferUrlPrefill | null;
 	onSubmit?: (values: CreateOfferFormValues) => void;
 	/** When set, modal opens in edit mode with pre-filled values. */
 	editData?: EditOfferData | null;
+}
+
+function normalizeOfferTimeFromUrl(raw: string): string {
+	const trimmed = raw.trim();
+	if (!trimmed) return "";
+	const { start, end } = parseOfferDateTimeField(trimmed);
+	if (!start) return trimmed;
+	return formatOfferDateTimeRange(start, end);
 }
 
 export interface CreateOfferFormValues {
@@ -99,6 +126,46 @@ const initialRouteRow = (type: "pickup" | "delivery"): RouteRow => ({
 	time: "",
 	coordinates: "",
 });
+
+function buildRouteRowsFromUrlPrefill(
+	urlPrefill: CreateOfferUrlPrefill | null | undefined,
+	fallbackPickupLocation?: string
+): RouteRow[] {
+	const stops = urlPrefill?.route?.filter(s => s.location.trim()) ?? [];
+
+	if (stops.length === 0) {
+		const pickupRow = initialRouteRow("pickup");
+		if (fallbackPickupLocation?.trim()) {
+			pickupRow.location = fallbackPickupLocation.trim();
+		}
+		pickupRow.time = formatOfferDateTime(new Date());
+		return [pickupRow, initialRouteRow("delivery")];
+	}
+
+	const firstPickupIndex = stops.findIndex(s => s.type === "pickup");
+	const rows = stops.map((stop, index) => {
+		const row = initialRouteRow(stop.type);
+		row.location = stop.location.trim();
+		const timeRaw = stop.time?.trim() ?? "";
+		if (timeRaw) {
+			row.time = normalizeOfferTimeFromUrl(timeRaw);
+		} else if (index === firstPickupIndex) {
+			row.time = formatOfferDateTime(new Date());
+		}
+		return row;
+	});
+
+	if (!rows.some(r => r.type === "pickup")) {
+		const pickupRow = initialRouteRow("pickup");
+		pickupRow.time = formatOfferDateTime(new Date());
+		rows.unshift(pickupRow);
+	}
+	if (!rows.some(r => r.type === "delivery")) {
+		rows.push(initialRouteRow("delivery"));
+	}
+
+	return rows;
+}
 
 function routePointToRow(
 	point: EditOfferData["route"][number],
@@ -424,6 +491,7 @@ export default function CreateOfferModal({
 	selectedDriverIds,
 	driverEmptyMiles = {},
 	initialPickupLocation,
+	initialCreateOfferFromUrl = null,
 	onSubmit,
 	editData = null,
 }: CreateOfferModalProps) {
@@ -460,16 +528,20 @@ export default function CreateOfferModal({
 	 * only when locations actually changed, not on every focus/blur.
 	 */
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
-	const initialPickupAppliedRef = useRef(false);
+	const initialLocationsAppliedRef = useRef(false);
+	/** When true, keep URL-provided loaded miles and skip route-distance API. */
+	const preserveUrlLoadedMilesRef = useRef(false);
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
 		if (!isOpen) {
-			initialPickupAppliedRef.current = false;
+			initialLocationsAppliedRef.current = false;
+			preserveUrlLoadedMilesRef.current = false;
 			return;
 		}
 
 		if (editData) {
+			preserveUrlLoadedMilesRef.current = false;
 			setInitialEditSnapshot(snapshotFromEditData(editData));
 			setFormValues({
 				offeredRate: editData.offeredRate,
@@ -493,17 +565,26 @@ export default function CreateOfferModal({
 			);
 		} else {
 			setInitialEditSnapshot(null);
-			setFormValues({ ...initialFormState });
-			const trimmedPickup = initialPickupLocation?.trim() ?? "";
-			const pickupRow = initialRouteRow("pickup");
-			// Manual web create: pre-fill pick up date & time with today (not Chrome Extension / edit)
-			pickupRow.time = formatOfferDateTime(new Date());
-			if (trimmedPickup) {
-				pickupRow.location = trimmedPickup;
-			}
-			setRouteRows([pickupRow, initialRouteRow("delivery")]);
+			const urlPrefill = initialCreateOfferFromUrl;
+			setFormValues({
+				...initialFormState,
+				weight: urlPrefill?.weight?.trim() ?? "",
+				commodity: urlPrefill?.commodity?.trim() ?? "",
+			});
+
+			const rows = buildRouteRowsFromUrlPrefill(urlPrefill, initialPickupLocation);
+			setRouteRows(rows);
 			setEditFallbackLoadedMiles(null);
-			setManualLoadedMiles(null);
+
+			const milesRaw = urlPrefill?.loadedMiles?.trim() ?? "";
+			const miles = milesRaw ? Number.parseFloat(milesRaw.replace(/,/g, "")) : NaN;
+			if (Number.isFinite(miles) && miles > 0) {
+				preserveUrlLoadedMilesRef.current = true;
+				setManualLoadedMiles(Math.round(miles));
+			} else {
+				preserveUrlLoadedMilesRef.current = false;
+				setManualLoadedMiles(null);
+			}
 			setCommittedLocations([]);
 		}
 
@@ -545,7 +626,8 @@ export default function CreateOfferModal({
 	} = useQuery({
 		queryKey: ["route-distance", committedLocations],
 		queryFn: () => offers.calculateRouteDistance(committedLocations),
-		enabled: allLocationsFilledAndValid(committedLocations),
+		enabled:
+			manualLoadedMiles == null && allLocationsFilledAndValid(committedLocations),
 		staleTime: 20 * 60 * 1000,
 		retry: 1,
 	});
@@ -562,13 +644,20 @@ export default function CreateOfferModal({
 				: null;
 	const showLoadedMilesEditIcon =
 		!isCalculatingRoute &&
-		allLocationsFilledAndValid(committedLocations) &&
-		(routeDistanceData?.loadedMiles != null ||
-			routeDistanceQueryError != null ||
-			manualLoadedMiles != null ||
-			editFallbackLoadedMiles != null);
+		(manualLoadedMiles != null ||
+			(allLocationsFilledAndValid(committedLocations) &&
+				(routeDistanceData?.loadedMiles != null ||
+					routeDistanceQueryError != null ||
+					editFallbackLoadedMiles != null)));
+
+	const clearUrlLoadedMilesLock = useCallback(() => {
+		if (!preserveUrlLoadedMilesRef.current) return;
+		preserveUrlLoadedMilesRef.current = false;
+		setManualLoadedMiles(null);
+	}, []);
 
 	const addPickUpRow = (afterIndex: number) => {
+		preserveUrlLoadedMilesRef.current = false;
 		setCommittedLocations([]);
 		setManualLoadedMiles(null);
 		setRouteRows(prev => {
@@ -579,6 +668,7 @@ export default function CreateOfferModal({
 	};
 
 	const addDeliveryRow = (afterIndex: number) => {
+		preserveUrlLoadedMilesRef.current = false;
 		setCommittedLocations([]);
 		setManualLoadedMiles(null);
 		setRouteRows(prev => {
@@ -613,12 +703,17 @@ export default function CreateOfferModal({
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
 		if (!allFilled || !allValid) {
 			setCommittedLocations([]);
-			setManualLoadedMiles(null);
+			if (!preserveUrlLoadedMilesRef.current) {
+				setManualLoadedMiles(null);
+			}
 			return;
 		}
 		const locs = rows.map(r => r.location.trim());
 		setCommittedLocations(locs);
-		setManualLoadedMiles(null);
+		// Keep URL-provided miles; otherwise clear so distance can be recalculated.
+		if (!preserveUrlLoadedMilesRef.current) {
+			setManualLoadedMiles(null);
+		}
 	}, []);
 
 	const removeExtraRow = useCallback(
@@ -744,22 +839,49 @@ export default function CreateOfferModal({
 		[commitLocations]
 	);
 
-	// Run geocode/zip resolution for pre-filled pick up (same as manual blur).
+	// Run geocode/zip resolution for pre-filled route locations (same as manual blur).
 	useEffect(() => {
-		if (!isOpen || editData || initialPickupAppliedRef.current) return;
+		if (!isOpen || editData || initialLocationsAppliedRef.current) return;
+		if (routeRows.length === 0) return;
 
-		const trimmed = initialPickupLocation?.trim();
-		if (!trimmed) return;
+		const expectedLocations = [
+			...(initialCreateOfferFromUrl?.route ?? [])
+				.map(s => s.location.trim())
+				.filter(Boolean),
+		];
+		if (
+			expectedLocations.length === 0 &&
+			initialPickupLocation?.trim()
+		) {
+			expectedLocations.push(initialPickupLocation.trim());
+		}
+		if (expectedLocations.length === 0) return;
 
-		const pickupIndex = routeRows.findIndex(row => row.type === "pickup");
-		if (pickupIndex < 0) return;
+		const filledRows = routeRows.filter(row => row.location.trim());
+		if (filledRows.length < expectedLocations.length) return;
+		const locationsReady = expectedLocations.every(
+			(loc, index) => filledRows[index]?.location.trim() === loc
+		);
+		if (!locationsReady) return;
 
-		const row = routeRows[pickupIndex];
-		if (row.location.trim() !== trimmed) return;
+		initialLocationsAppliedRef.current = true;
 
-		initialPickupAppliedRef.current = true;
-		handleAddressBlur(pickupIndex, trimmed, row.id).catch(() => {});
-	}, [isOpen, editData, initialPickupLocation, routeRows, handleAddressBlur]);
+		void (async () => {
+			for (let i = 0; i < routeRows.length; i++) {
+				const row = routeRows[i];
+				const loc = row.location.trim();
+				if (!loc) continue;
+				await handleAddressBlur(i, loc, row.id).catch(() => {});
+			}
+		})();
+	}, [
+		isOpen,
+		editData,
+		initialPickupLocation,
+		initialCreateOfferFromUrl,
+		routeRows,
+		handleAddressBlur,
+	]);
 
 	const moveExtraRow = useCallback(
 		(dragIndex: number, hoverIndex: number) => {
@@ -1032,6 +1154,7 @@ export default function CreateOfferModal({
 								pendingDropRef={pendingDropRef}
 								onAddressBlur={handleAddressBlur}
 								onLocationChange={rowId => {
+									clearUrlLoadedMilesLock();
 									setRouteRowLocationErrors(prev => {
 										const next = { ...prev };
 										delete next[rowId];
