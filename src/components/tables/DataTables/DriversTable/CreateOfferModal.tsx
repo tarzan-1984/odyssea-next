@@ -866,14 +866,15 @@ export default function CreateOfferModal({
 
 		initialLocationsAppliedRef.current = true;
 
-		void (async () => {
+		const applyPrefillGeocode = async () => {
 			for (let i = 0; i < routeRows.length; i++) {
 				const row = routeRows[i];
 				const loc = row.location.trim();
 				if (!loc) continue;
 				await handleAddressBlur(i, loc, row.id).catch(() => {});
 			}
-		})();
+		};
+		applyPrefillGeocode().catch(() => {});
 	}, [
 		isOpen,
 		editData,
