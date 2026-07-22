@@ -15,6 +15,7 @@ import { useChatStore } from "@/stores/chatStore";
 import Image from "next/image";
 import { userMatchesSearchQuery } from "@/utils/chatSearch";
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
+import { canShowOfferId } from "@/utils/offerDisplay";
 
 interface ChatParticipantsModalProps {
 	isOpen: boolean;
@@ -58,6 +59,8 @@ export default function ChatParticipantsModal({
 	const isGroupChat = isMultiUserChatType(chatRoom?.type);
 	const isLoadChat = chatRoom?.type === "LOAD";
 	const isOfferChat = chatRoom?.type === "OFFER";
+	/** LOAD only: show participant externalId next to role for admin externalId 83. */
+	const showParticipantExternalId = isLoadChat && canShowOfferId(currentUser);
 
 	// Roles that can manage LOAD chat participants (not chat picture — see below)
 	const loadChatManagerRoles = [
@@ -245,6 +248,7 @@ export default function ChatParticipantsModal({
 			lastName: user.lastName,
 			avatar: user.avatar || "",
 			role: user.role || "USER",
+			externalId: user.externalId || null,
 		},
 	};
 	setLocalParticipants(prev => [...prev, tempParticipant as any]);
@@ -623,7 +627,13 @@ export default function ChatParticipantsModal({
 							lastName: participant.user?.lastName || "",
 							avatar: participant.user?.avatar || (participant.user as any)?.profilePhoto || "",
 							role: participant.user?.role || "USER",
+							externalId: String(participant.user?.externalId ?? "").trim(),
 						};
+						const roleLabel = getRoleDisplayLabel(safeUser.role);
+						const roleWithExternalId =
+							showParticipantExternalId && safeUser.externalId
+								? `${roleLabel} (${safeUser.externalId})`
+								: roleLabel;
 
 						return (
 							<div
@@ -648,7 +658,7 @@ export default function ChatParticipantsModal({
 										)}
 									</div>
 									<p className="text-xs text-gray-500 dark:text-gray-400">
-									{getRoleDisplayLabel(safeUser.role)}
+									{roleWithExternalId}
 									</p>
 								</div>
 								{canManageChat && !isAdmin && (() => {
@@ -764,7 +774,13 @@ export default function ChatParticipantsModal({
 														{user.firstName} {user.lastName}
 													</h5>
 													<p className="text-xs text-gray-500 dark:text-gray-400">
-														{getRoleDisplayLabel(user.role)}
+														{(() => {
+															const label = getRoleDisplayLabel(user.role);
+															const extId = String(user.externalId ?? "").trim();
+															return showParticipantExternalId && extId
+																? `${label} (${extId})`
+																: label;
+														})()}
 													</p>
 												</div>
 											</div>
