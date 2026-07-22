@@ -14,6 +14,13 @@ export type BidRateUpdatedEventDetail = {
 	refreshedAt?: string;
 	/** Present for +1 join / rejoin / timer extend — apply immediately. */
 	participant?: BidRateUpdatedParticipant | null;
+	/** Updated bid row (e.g. after offer accept — includes restarted timer). */
+	bidRate?: {
+		id: number;
+		rate?: number;
+		createdAt?: number;
+		updatedAt?: number;
+	} | null;
 };
 
 /** Bid row is gone — refetching voters/participants would 404. */

@@ -54,11 +54,33 @@ export default function EditBidPriceModal({
 	const [acceptedOpen, setAcceptedOpen] = useState(false);
 
 	useEffect(() => {
-		if (isOpen) {
-			setPriceInput(initialPriceValue(bid));
-			setError(null);
-			setSubmitting(false);
+		if (!isOpen || !bid) {
+			return;
 		}
+
+		let cancelled = false;
+		setError(null);
+		setSubmitting(false);
+		setPriceInput(initialPriceValue(bid));
+
+		getBidRateVoters(bid.id)
+			.then(result => {
+				if (cancelled) return;
+				const minRate = minActiveOfferRate(result.participants ?? []);
+				if (minRate != null) {
+					setPriceInput(String(minRate));
+				} else {
+					setPriceInput(initialPriceValue(bid));
+				}
+			})
+			.catch(() => {
+				if (cancelled) return;
+				setPriceInput(initialPriceValue(bid));
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	}, [isOpen, bid]);
 
 	async function handleSubmit(e: FormEvent) {

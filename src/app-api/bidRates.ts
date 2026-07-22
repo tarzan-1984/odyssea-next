@@ -22,6 +22,9 @@ export interface BidRate {
 	ownerId: string;
 	owner: BidRateOwner | null;
 	chatId: string | null;
+	isArchive?: boolean;
+	/** True after bid_rates.rate was changed from the initial create value. */
+	isRateChange?: boolean;
 	/** Unix timestamp in seconds. */
 	createdAt: number;
 	/** Unix timestamp in seconds. */
@@ -257,6 +260,26 @@ export async function voteBidOffer(
 	>(
 		`/api/bid-rates/${bidRateId}/offers/${encodeURIComponent(offererUserId)}/vote`,
 		{ accept },
+		{ withCredentials: true },
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body) {
+		return body.data;
+	}
+	return body as { bidRateId: number; status: string; rate?: number };
+}
+
+/** Resolve offer after 4-min timer expiry (idempotent). */
+export async function autoAcceptExpiredBidOffer(
+	bidRateId: number,
+	offererUserId: string,
+): Promise<{ bidRateId: number; status: string; rate?: number }> {
+	const res = await axios.post<
+		| { bidRateId: number; status: string; rate?: number }
+		| { data: { bidRateId: number; status: string; rate?: number } }
+	>(
+		`/api/bid-rates/${bidRateId}/offers/${encodeURIComponent(offererUserId)}/auto-accept-expired`,
+		{},
 		{ withCredentials: true },
 	);
 	const body = res.data;

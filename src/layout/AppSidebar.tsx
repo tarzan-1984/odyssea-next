@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import {
+	canAccessAppLogs,
 	canAccessAppSettings,
 	canAccessBidRates,
 	canAccessCheckList,
@@ -24,7 +25,7 @@ import {
 	BidRatesIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
-import { Users, MessageCircle } from "lucide-react";
+import { Users, MessageCircle, ScrollText } from "lucide-react";
 import { UnreadCountBadge } from "@/components/common/UnreadCountBadge";
 
 type NavItem = {
@@ -79,6 +80,11 @@ const navItems: NavItem[] = [
 		icon: <BidRatesIcon className="h-7 w-7" />,
 		name: "Bid rates",
 		path: "/bid-rates",
+	},
+	{
+		icon: <ScrollText className="h-5 w-5" />,
+		name: "App Logs",
+		path: "/app-logs",
 	},
 	// {
 	//   name: "AI Assistant",
@@ -171,6 +177,7 @@ const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
 const USER_LIST_PATHS = ["/user-list"];
 const CHECK_LIST_PATHS = ["/check-list"];
 const BID_RATES_PATHS = ["/bid-rates"];
+const APP_LOGS_PATHS = ["/app-logs"];
 
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -182,6 +189,7 @@ const AppSidebar: React.FC = () => {
 	const canSeeUserList = canAccessUserListAndCheckList(currentUser?.role);
 	const canSeeCheckList = canAccessCheckList(currentUser?.role);
 	const canSeeBidRates = canAccessBidRates(currentUser?.role);
+	const canSeeAppLogs = canAccessAppLogs(currentUser?.role);
 	const appHomePath = getAppHomePath(currentUser?.role);
 	const menuNavItems = useMemo(
 		() =>
@@ -193,7 +201,8 @@ const AppSidebar: React.FC = () => {
 						canAccessDriversOffers) &&
 					(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
 					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList) &&
-					(!item.path || !BID_RATES_PATHS.includes(item.path) || canSeeBidRates),
+					(!item.path || !BID_RATES_PATHS.includes(item.path) || canSeeBidRates) &&
+					(!item.path || !APP_LOGS_PATHS.includes(item.path) || canSeeAppLogs),
 			),
 		[
 			isAdmin,
@@ -202,6 +211,7 @@ const AppSidebar: React.FC = () => {
 			canSeeUserList,
 			canSeeCheckList,
 			canSeeBidRates,
+			canSeeAppLogs,
 		],
 	);
 

@@ -232,80 +232,82 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							<LoadTrackingChatIcon className="h-[22px] w-[22px]" />
 						</Link>
 					) : null}
-					<div className="relative -mb-1.5">
-						<button
-							ref={dropdownAnchorRef}
-							onClick={toggleDropdown}
-							className="dropdown-toggle"
-						>
-							<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
-						</button>
-						<Dropdown
-							isOpen={isOpen}
-							onClose={closeDropdown}
-							className="w-40 p-2"
-							anchorRef={dropdownAnchorRef}
-							anchorAlign="right"
-						>
-							{chatRoom?.adminId === currentUser?.id &&
-								isMultiUserChatType(chatRoom?.type) && (
-									<DropdownItem
-										onItemClick={() => {
-											closeDropdown();
-											setIsParticipantsModalOpen(true);
-										}}
-										className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-									>
-										<EditIcon className="w-4 h-4" />
-										Edit
-									</DropdownItem>
-								)}
-							<DropdownItem
-								onItemClick={handleFilesClick}
-								className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+					{chatRoom?.type !== "BID" ? (
+						<div className="relative -mb-1.5">
+							<button
+								ref={dropdownAnchorRef}
+								onClick={toggleDropdown}
+								className="dropdown-toggle"
 							>
-								<AttachmentIcon className="w-4 h-4" />
-								Files
-							</DropdownItem>
-							{chatRoom?.type === "LOAD" && chatRoom.loadId?.trim() ? (
-								<a
-									href={`https://www.endurance-tms.com/add-load/?post_id=${encodeURIComponent(
-										chatRoom.loadId.trim()
-									)}`}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex w-full items-center gap-2 rounded-lg px-4 py-2 text-left text-sm font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-									onClick={closeDropdown}
+								<MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+							</button>
+							<Dropdown
+								isOpen={isOpen}
+								onClose={closeDropdown}
+								className="w-40 p-2"
+								anchorRef={dropdownAnchorRef}
+								anchorAlign="right"
+							>
+								{chatRoom?.adminId === currentUser?.id &&
+									isMultiUserChatType(chatRoom?.type) && (
+										<DropdownItem
+											onItemClick={() => {
+												closeDropdown();
+												setIsParticipantsModalOpen(true);
+											}}
+											className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+										>
+											<EditIcon className="w-4 h-4" />
+											Edit
+										</DropdownItem>
+									)}
+								<DropdownItem
+									onItemClick={handleFilesClick}
+									className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
 								>
-									<ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-									show in TMS
-								</a>
-							) : null}
-							{/* Show delete/leave button only if user is allowed to */}
-							{(() => {
-								// For LOAD chats: only administrators can delete
-								if (chatRoom?.type === "LOAD") {
-									if (currentUser?.role !== "ADMINISTRATOR") {
-										return null; // Hide the button
-									}
-								}
-
-								// For the rest of chat types show the action
-								return (
-									<DropdownItem
-										onItemClick={handleDeleteClick}
-										className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+									<AttachmentIcon className="w-4 h-4" />
+									Files
+								</DropdownItem>
+								{chatRoom?.type === "LOAD" && chatRoom.loadId?.trim() ? (
+									<a
+										href={`https://www.endurance-tms.com/add-load/?post_id=${encodeURIComponent(
+											chatRoom.loadId.trim()
+										)}`}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex w-full items-center gap-2 rounded-lg px-4 py-2 text-left text-sm font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+										onClick={closeDropdown}
 									>
-										<TrashDeleteIcon className="w-4 h-4" />
-										{isMultiUserChatType(chatRoom?.type) &&
-										chatRoom?.adminId !== currentUser?.id
-											? "Leave"
-											: "Delete"}
-									</DropdownItem>
-								);
-							})()}
-						</Dropdown>
-					</div>
+										<ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+										show in TMS
+									</a>
+								) : null}
+								{/* Show delete/leave button only if user is allowed to */}
+								{(() => {
+									// For LOAD chats: only administrators can delete
+									if (chatRoom?.type === "LOAD") {
+										if (currentUser?.role !== "ADMINISTRATOR") {
+											return null; // Hide the button
+										}
+									}
+
+									// For the rest of chat types show the action
+									return (
+										<DropdownItem
+											onItemClick={handleDeleteClick}
+											className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+										>
+											<TrashDeleteIcon className="w-4 h-4" />
+											{isMultiUserChatType(chatRoom?.type) &&
+											chatRoom?.adminId !== currentUser?.id
+												? "Leave"
+												: "Delete"}
+										</DropdownItem>
+									);
+								})()}
+							</Dropdown>
+						</div>
+					) : null}
 				</div>
 			</div>
 

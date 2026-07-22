@@ -1,15 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Modal } from "@/components/ui/modal";
-import { getBidRateVoters, voteBidOffer, type BidRateVoter } from "@/app-api/bidRates";
+import {
+	autoAcceptExpiredBidOffer,
+	getBidRateVoters,
+	voteBidOffer,
+	type BidRateVoter,
+} from "@/app-api/bidRates";
 import {
 	BidOfferAcceptIcon,
 	BidOfferRejectIcon,
 	BidParticipantRateIcon,
 } from "@/icons";
 import { renderAvatar } from "@/helpers";
+import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
+	BID_MAX_ACTIVE_OFFERS,
 	BID_RATE_VOTE_FRESH_SECONDS,
 	formatBidCountdown,
 	getBidRateVoteRemainingSeconds,
@@ -60,11 +67,23 @@ export function userHasActiveBidRateOffer(
 	return remaining != null && remaining > 0;
 }
 
-/** True while the current user still has a live 4-min rate offer on this bid. */
-export function useHasActiveBidRateOffer(
-	bidRateId: number,
-	userId: string | null | undefined,
-): boolean {
+export function countActiveBidRateOffers(
+	voters: BidRateVoter[],
+	nowUnixSec: number = getNowUnixSeconds(),
+): number {
+	return voters.filter(row => {
+		const remaining = getBidRateVoteRemainingSeconds(
+			row.createdRateAt,
+			nowUnixSec,
+		);
+		return remaining != null && remaining > 0;
+	}).length;
+}
+
+function useBidRateVotersState(bidRateId: number): {
+	voters: BidRateVoter[];
+	nowUnixSec: number;
+} {
 	const [voters, setVoters] = useState<BidRateVoter[]>(
 		() => votersCache.get(bidRateId) ?? [],
 	);
@@ -99,18 +118,49 @@ export function useHasActiveBidRateOffer(
 		};
 	}, [bidRateId]);
 
-	const hasActive = userHasActiveBidRateOffer(voters, userId, nowUnixSec);
+	const activeCount = countActiveBidRateOffers(voters, nowUnixSec);
 
 	useEffect(() => {
-		if (!hasActive) return;
+		if (activeCount === 0) return;
 		const intervalId = window.setInterval(() => {
 			setNowUnixSec(getNowUnixSeconds());
 		}, 1000);
 		return () => window.clearInterval(intervalId);
-	}, [hasActive]);
+	}, [activeCount]);
 
-	return hasActive;
+	return { voters, nowUnixSec };
 }
+
+/** True while the current user still has a live 4-min rate offer on this bid. */
+export function useHasActiveBidRateOffer(
+	bidRateId: number,
+	userId: string | null | undefined,
+): boolean {
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+	return userHasActiveBidRateOffer(voters, userId, nowUnixSec);
+}
+
+/** Live count of active rate offers on this bid (max BID_MAX_ACTIVE_OFFERS). */
+export function useActiveBidRateOffersCount(bidRateId: number): number {
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+	return countActiveBidRateOffers(voters, nowUnixSec);
+}
+
+/** Own active offer + total active offers count (single shared listeners). */
+export function useBidRateOffersGate(
+	bidRateId: number,
+	userId: string | null | undefined,
+): { offerLocked: boolean; activeOffersCount: number; offersAtLimit: boolean } {
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+	const activeOffersCount = countActiveBidRateOffers(voters, nowUnixSec);
+	return {
+		offerLocked: userHasActiveBidRateOffer(voters, userId, nowUnixSec),
+		activeOffersCount,
+		offersAtLimit: activeOffersCount >= BID_MAX_ACTIVE_OFFERS,
+	};
+}
+
+export { BID_MAX_ACTIVE_OFFERS };
 
 function fetchVotersCached(
 	bidRateId: number,
@@ -150,6 +200,8 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 	);
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const [votingUserId, setVotingUserId] = useState<string | null>(null);
+	/** Avoid duplicate auto-accept calls for the same offer cycle. */
+	const autoAcceptFiredRef = useRef(new Set<string>());
 
 	const loadVoters = useCallback(
 		async (options?: { force?: boolean; silent?: boolean }) => {
@@ -209,13 +261,47 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 		};
 	}, [bidRateId, loadVoters]);
 
+	const activeVoters = voters.filter(row => {
+		const remaining = getBidRateVoteRemainingSeconds(
+			row.createdRateAt,
+			nowUnixSec,
+		);
+		return remaining != null && remaining > 0;
+	});
+
+	// Keep 4-min offer clocks alive even when the popup is closed.
 	useEffect(() => {
-		if (!isOpen) return;
+		if (voters.length === 0) return;
 		const intervalId = window.setInterval(() => {
 			setNowUnixSec(getNowUnixSeconds());
 		}, 1000);
 		return () => window.clearInterval(intervalId);
-	}, [isOpen]);
+	}, [voters.length]);
+
+	// When an offer timer hits 0, ask backend to auto-accept (idempotent).
+	useEffect(() => {
+		for (const row of voters) {
+			const remaining = getBidRateVoteRemainingSeconds(
+				row.createdRateAt,
+				nowUnixSec,
+			);
+			if (remaining == null || remaining > 0) continue;
+			const key = `${bidRateId}:${row.userId}:${row.createdRateAt}`;
+			if (autoAcceptFiredRef.current.has(key)) continue;
+			autoAcceptFiredRef.current.add(key);
+			autoAcceptExpiredBidOffer(bidRateId, row.userId).catch(err => {
+				console.error("Failed to auto-accept expired offer:", err);
+				autoAcceptFiredRef.current.delete(key);
+			});
+		}
+	}, [voters, nowUnixSec, bidRateId]);
+
+	// Drop expired offers locally so badge / edit-price gate stay in sync.
+	useEffect(() => {
+		if (activeVoters.length === voters.length) return;
+		votersCache.set(bidRateId, activeVoters);
+		setVoters(activeVoters);
+	}, [activeVoters.length, voters.length, bidRateId, nowUnixSec]);
 
 	function handlePrefetch() {
 		if (votersCache.has(bidRateId) || votersInflight.has(bidRateId)) {
@@ -227,6 +313,7 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 	function handleOpen(e: MouseEvent) {
 		e.stopPropagation();
 		e.preventDefault();
+		setNowUnixSec(getNowUnixSeconds());
 		setIsOpen(true);
 		const cached = votersCache.get(bidRateId);
 		if (cached) {
@@ -246,6 +333,7 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 			votersCache.delete(bidRateId);
 			const rows = await fetchVotersCached(bidRateId, { force: true });
 			setVoters(rows);
+			setNowUnixSec(getNowUnixSeconds());
 			// No offers left — close instead of showing empty state.
 			if (rows.length === 0) {
 				setIsOpen(false);
@@ -263,7 +351,7 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 		}
 	}
 
-	const votersCount = voters.length;
+	const votersCount = activeVoters.length;
 	const countLabel = votersCount > 99 ? "99+" : String(votersCount);
 
 	return (
@@ -299,25 +387,42 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 
 			<Modal
 				isOpen={isOpen}
-				onClose={handleClose}
-				closeOnBackdropClick
+				onClose={() => {
+					if (votingUserId) return;
+					handleClose();
+				}}
+				closeOnBackdropClick={!votingUserId}
 				className="relative m-5 w-full max-w-2xl rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900 sm:m-0 sm:p-8"
 			>
+				{votingUserId ? (
+					<div
+						className="absolute inset-0 z-20 flex items-center justify-center rounded-3xl bg-white/75 dark:bg-gray-900/75"
+						aria-busy
+						aria-live="polite"
+					>
+						<div className="flex flex-col items-center gap-2">
+							<SpinnerOne />
+							<span className="text-sm text-gray-600 dark:text-gray-300">
+								Processing…
+							</span>
+						</div>
+					</div>
+				) : null}
 				<div onClick={e => e.stopPropagation()}>
 					<h4 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
 						Rate offers
 						{votersCount > 0 ? ` (${votersCount})` : ""}
 					</h4>
 
-					{loading && voters.length === 0 ? (
+					{loading && activeVoters.length === 0 ? (
 						<p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
 							Loading…
 						</p>
-					) : error && voters.length === 0 ? (
+					) : error && activeVoters.length === 0 ? (
 						<p className="py-8 text-center text-sm text-red-500 dark:text-red-400">
 							{error}
 						</p>
-					) : voters.length === 0 ? (
+					) : activeVoters.length === 0 ? (
 						<p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
 							No recent offers
 						</p>
@@ -341,15 +446,13 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 									</tr>
 								</thead>
 								<tbody>
-									{voters.map(row => {
+									{activeVoters.map(row => {
 										const remainingSeconds = getBidRateVoteRemainingSeconds(
 											row.createdRateAt,
 											nowUnixSec,
 										);
 										const hasTimer =
 											remainingSeconds != null && remainingSeconds > 0;
-										const isExpired =
-											remainingSeconds != null && remainingSeconds <= 0;
 
 										return (
 											<tr
@@ -387,10 +490,6 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 															}}
 														>
 															{formatBidCountdown(remainingSeconds)}
-														</span>
-													) : isExpired ? (
-														<span className="text-xs font-medium text-gray-800 dark:text-gray-200">
-															Expired
 														</span>
 													) : (
 														<span className="text-xs text-gray-400">—</span>

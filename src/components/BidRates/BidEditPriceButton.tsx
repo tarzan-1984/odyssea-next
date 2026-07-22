@@ -7,7 +7,7 @@ import {
 	getBidParticipantRemainingSeconds,
 	getNowUnixSeconds,
 } from "@/utils/bidTimer";
-import { useHasActiveBidRateOffer } from "./BidRateVotersPopup";
+import { useBidRateOffersGate, BID_MAX_ACTIVE_OFFERS } from "./BidRateVotersPopup";
 import {
 	ODYSSEA_BID_RATE_UPDATED_EVENT,
 	isBidRateRemovedReason,
@@ -28,7 +28,10 @@ export default function BidEditPriceButton({
 	const isOwner = Boolean(
 		currentUserId && bid.ownerId && currentUserId === bid.ownerId,
 	);
-	const offerLocked = useHasActiveBidRateOffer(bid.id, currentUserId);
+	const { offerLocked, offersAtLimit } = useBidRateOffersGate(
+		bid.id,
+		currentUserId,
+	);
 	const [plusOneActive, setPlusOneActive] = useState(isOwner);
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
@@ -102,11 +105,13 @@ export default function BidEditPriceButton({
 	}, [isOwner, plusOneUpdatedAt, nowUnixSec]);
 
 	const blockedByPlusOne = !isOwner && !plusOneActive;
-	const disabled = offerLocked || blockedByPlusOne;
+	const disabled = offerLocked || blockedByPlusOne || offersAtLimit;
 
 	let title = "Edit price";
 	if (offerLocked) {
 		title = "You already have an active offer. Wait until the timer expires.";
+	} else if (offersAtLimit) {
+		title = `Maximum of ${BID_MAX_ACTIVE_OFFERS} active offers. Wait until one expires or is resolved.`;
 	} else if (blockedByPlusOne) {
 		title = "Press +1 and keep an active timer before placing an offer.";
 	}

@@ -149,6 +149,12 @@ export function canModifyAppSettings(role: string | undefined | null): boolean {
 	return role.trim().toUpperCase() === "ADMINISTRATOR";
 }
 
+/** App Logs page: administrators only. */
+export function canAccessAppLogs(role: string | undefined | null): boolean {
+	if (!role) return false;
+	return role.trim().toUpperCase() === "ADMINISTRATOR";
+}
+
 export const CHAT_MESSAGE_DELETE_ROLES = [
 	"ADMINISTRATOR",
 	"TRACKING_TL",

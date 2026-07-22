@@ -5,6 +5,8 @@ export const BID_WARNING_SECONDS = 3 * 60;
 export const BID_MAX_EXTEND_SECONDS = 3 * BID_TIMER_SECONDS;
 /** Freshness window for rate-offer votes on the bid card (matches backend). */
 export const BID_RATE_VOTE_FRESH_SECONDS = 4 * 60;
+/** Max concurrent active rate offers per bid (matches backend). */
+export const BID_MAX_ACTIVE_OFFERS = 3;
 /** @deprecated use BID_MAX_EXTEND_SECONDS */
 export const BID_MAX_EXTEND_MS = BID_MAX_EXTEND_SECONDS * 1000;
 

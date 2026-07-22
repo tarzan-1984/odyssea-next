@@ -15,7 +15,10 @@ import MultiSelect from "@/components/form/MultiSelect";
 import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import { getRouteChronologyError } from "@/utils/offerDateTimeRange";
+import {
+	formatOfferDateTime,
+	getRouteChronologyError,
+} from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
 	LOCATION_FORMAT_ERROR,
@@ -493,6 +496,8 @@ export default function CreateOfferModal({
 			setFormValues({ ...initialFormState });
 			const trimmedPickup = initialPickupLocation?.trim() ?? "";
 			const pickupRow = initialRouteRow("pickup");
+			// Manual web create: pre-fill pick up date & time with today (not Chrome Extension / edit)
+			pickupRow.time = formatOfferDateTime(new Date());
 			if (trimmedPickup) {
 				pickupRow.location = trimmedPickup;
 			}

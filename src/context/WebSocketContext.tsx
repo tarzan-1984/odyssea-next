@@ -143,6 +143,13 @@ interface BidRateUpdatedData {
 	chatRoomId?: string | null;
 	reason?: string;
 	refreshedAt?: string;
+	bidRate?: {
+		id: number;
+		rate?: number;
+		createdAt?: number;
+		updatedAt?: number;
+		[key: string]: unknown;
+	} | null;
 	participant?: {
 		userId: string;
 		createdAt: number;
@@ -444,6 +451,61 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			} else {
 				clearBidParticipantsCache();
 				clearBidRateVotersCache();
+			}
+
+			// When main bid_rates.rate is written, payload includes rate + restarted
+			// createdAt/updatedAt — patch the list so the card timer resets immediately.
+			const patched = data?.bidRate;
+			if (
+				patched &&
+				typeof patched.id === "number" &&
+				patched.rate != null &&
+				patched.createdAt != null &&
+				patched.updatedAt != null
+			) {
+				queryClient.setQueriesData(
+					{ queryKey: ["bid-rates-list"] },
+					(old: unknown) => {
+						if (!old || typeof old !== "object") return old;
+						const body = old as {
+							data?: { results?: Array<Record<string, unknown>> };
+							results?: Array<Record<string, unknown>>;
+						};
+						const patchRow = (row: Record<string, unknown>) => {
+							if (Number(row.id) !== patched.id) return row;
+							return {
+								...row,
+								...patched,
+								createdAt:
+									patched.createdAt != null
+										? Number(patched.createdAt)
+										: row.createdAt,
+								updatedAt:
+									patched.updatedAt != null
+										? Number(patched.updatedAt)
+										: row.updatedAt,
+								rate:
+									patched.rate != null ? Number(patched.rate) : row.rate,
+							};
+						};
+						if (body.data?.results) {
+							return {
+								...body,
+								data: {
+									...body.data,
+									results: body.data.results.map(patchRow),
+								},
+							};
+						}
+						if (body.results) {
+							return {
+								...body,
+								results: body.results.map(patchRow),
+							};
+						}
+						return old;
+					},
+				);
 			}
 
 			window.dispatchEvent(

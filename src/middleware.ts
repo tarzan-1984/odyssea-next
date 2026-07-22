@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { tokenEncoder } from "@/utils/tokenEncoder";
 import {
+	canAccessAppLogs,
 	canAccessAppSettings,
 	canAccessBidRates,
 	canAccessCheckList,
@@ -151,6 +152,16 @@ export function middleware(request: NextRequest) {
 	if (isBidRatesPage && hasToken) {
 		const role = getUserRoleFromCookie(request);
 		if (!canAccessBidRates(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+	}
+
+	// App Logs: administrators only
+	const isAppLogsPage =
+		pathname === "/app-logs" || pathname.startsWith("/app-logs/");
+	if (isAppLogsPage && hasToken) {
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessAppLogs(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}
