@@ -172,6 +172,7 @@ export function canSendCheckListMessages(role: string | undefined | null): boole
 	return !isGastRole(role);
 }
 
+/** True if role may submit create/edit offer (GAST can open UI but not submit). */
 export function canCreateOffers(role: string | undefined | null): boolean {
 	return !isGastRole(role);
 }

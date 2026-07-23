@@ -15,6 +15,7 @@ import {
 	getAppLogOpenChatHref,
 	getAppLogTitle,
 	isAppLogFailed,
+	isAppLogWarning,
 	type AppLogsResponse,
 } from "./appLogsTypes";
 
@@ -186,13 +187,16 @@ export default function AppLogsTable() {
 								const openChatHref = getAppLogOpenChatHref(row);
 								const title = getAppLogTitle(row.data);
 								const failed = isAppLogFailed(row.data);
+								const warning = isAppLogWarning(row.data);
 								return (
 									<TableRow
 										key={row.id}
 										className={
 											failed
 												? "bg-red-50 hover:bg-red-100/80 dark:bg-red-500/10 dark:hover:bg-red-500/15"
-												: "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+												: warning
+													? "bg-orange-50 hover:bg-orange-100/80 dark:bg-orange-500/10 dark:hover:bg-orange-500/15"
+													: "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
 										}
 									>
 										<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 font-mono text-xs whitespace-nowrap align-top">

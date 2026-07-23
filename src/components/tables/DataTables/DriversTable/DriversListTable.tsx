@@ -50,10 +50,7 @@ import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
-import {
-	canCreateOffers as canCreateOffersByRole,
-	canViewRestrictedDriverStatusesOnMap,
-} from "@/utils/roleAccess";
+import { canViewRestrictedDriverStatusesOnMap } from "@/utils/roleAccess";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal, { type CreateOfferUrlPrefill } from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
@@ -579,8 +576,8 @@ export default function DriversListTable({
 			const item = filteredResults.find((d: any) => String(d.id) === id);
 			return item != null && isTestDriver(item);
 		});
-	const canCreateOffers =
-		canCreateOffersByRole(currentUser?.role) &&
+	// GAST may open the create-offer popup; submit stays blocked in the modal.
+	const canOpenCreateOfferModal =
 		selectedDriverIds.length > 0 &&
 		(showDistanceColumn || canCreateOffersWithoutAddress);
 
@@ -652,9 +649,8 @@ export default function DriversListTable({
 								<Button
 									size="sm"
 									variant="primary"
-									disabled={!canCreateOffers}
+									disabled={!canOpenCreateOfferModal}
 									onClick={() => {
-										if (!canCreateOffersByRole(currentUser?.role)) return;
 										setCreateOfferModalOpen(true);
 									}}
 									className="h-9"

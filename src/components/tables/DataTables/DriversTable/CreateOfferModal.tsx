@@ -27,6 +27,8 @@ import {
 	normalizeLocationForGeocode,
 	needsLocationGeocode,
 } from "@/utils/offerLocationFormat";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateOffers } from "@/utils/roleAccess";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -495,6 +497,8 @@ export default function CreateOfferModal({
 	onSubmit,
 	editData = null,
 }: CreateOfferModalProps) {
+	const currentUser = useCurrentUser();
+	const canSubmitOffer = canCreateOffers(currentUser?.role);
 	const isEditMode = Boolean(editData);
 	const effectiveExternalId = editData?.externalId ?? externalId;
 	const effectiveDriverIds = editData?.selectedDriverIds ?? selectedDriverIds;
@@ -1024,6 +1028,10 @@ export default function CreateOfferModal({
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
+		if (!canSubmitOffer) {
+			return;
+		}
+
 		if (isEditMode && !hasEditChanges) {
 			return;
 		}
@@ -1384,6 +1392,7 @@ export default function CreateOfferModal({
 						size="sm"
 						className="min-w-[6.5rem]"
 						disabled={
+							!canSubmitOffer ||
 							isSubmitting ||
 							isCalculatingRoute ||
 							loadedMiles == null ||

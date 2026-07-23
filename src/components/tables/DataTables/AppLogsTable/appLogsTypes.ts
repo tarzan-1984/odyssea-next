@@ -109,6 +109,18 @@ export function isAppLogFailed(data: unknown): boolean {
 	return false;
 }
 
+/** True when create/update succeeded with skipped-participant warnings. */
+export function isAppLogWarning(data: unknown): boolean {
+	if (isAppLogFailed(data)) return false;
+	const payload = asRecord(data);
+	if (!payload) return false;
+	const result = asRecord(payload.result);
+	if (!result) return false;
+	if (result.level === "warning") return true;
+	if (Array.isArray(result.warnings) && result.warnings.length > 0) return true;
+	return false;
+}
+
 /** Formats naive NY wall-clock `YYYY-MM-DD HH:mm:ss` for display. */
 export function formatAppLogCreatedAt(value: string | null | undefined): string {
 	if (!value) return "—";
