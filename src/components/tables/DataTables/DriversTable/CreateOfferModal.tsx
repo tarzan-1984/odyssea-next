@@ -20,7 +20,9 @@ import {
 	formatOfferDateTime,
 	formatOfferDateTimeRange,
 	getRouteChronologyError,
+	isOfferAsapTime,
 	isOfferDateWithoutTime,
+	OFFER_ASAP_TIME,
 	OFFER_TIME_REQUIRED_ERROR,
 	parseOfferDateOnly,
 	parseOfferDateTimeField,
@@ -33,6 +35,7 @@ import {
 } from "@/utils/offerLocationFormat";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateOffers } from "@/utils/roleAccess";
+import Switch from "@/components/form/switch/Switch";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -306,6 +309,7 @@ function DraggableExtraRow({
 	onAddressBlur,
 	onLocationChange,
 	onTimeBlur,
+	onAsapToggle,
 	locationError,
 	canRemove = true,
 	rowCount,
@@ -320,6 +324,7 @@ function DraggableExtraRow({
 	onAddressBlur?: (index: number, value: string, rowId: string) => void | Promise<void>;
 	onLocationChange?: (rowId: string) => void;
 	onTimeBlur?: () => void;
+	onAsapToggle?: (index: number, enabled: boolean) => void;
 	locationError?: string;
 	/** When false, hide the remove button (e.g. only one row of this type remains) */
 	canRemove?: boolean;
@@ -328,6 +333,8 @@ function DraggableExtraRow({
 }) {
 	const rowRef = useRef<HTMLDivElement>(null);
 	const handleRef = useRef<HTMLDivElement>(null);
+	const isLastDelivery = row.type === "delivery" && index === rowCount - 1;
+	const isAsap = isOfferAsapTime(row.time);
 
 	const [{ isDragging }, drag, dragPreview] = useDrag({
 		type: DND_EXTRA_ROW_TYPE,
@@ -463,17 +470,36 @@ function DraggableExtraRow({
 			{/* Time field + remove button grouped together */}
 			<div className="flex items-end gap-2 shrink-0">
 				<div className="w-full shrink-0 sm:w-[calc(16rem+10px)]">
-					<DateTimePicker
-						id={`datetime-${row.id}`}
-						allowTimeRange
-						label={
-							row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"
-						}
-						value={row.time}
-						onChange={v => updateExtraRow(index, "time", v)}
-						onBlur={onTimeBlur}
-						className="dark:bg-gray-900"
-					/>
+					<div className="mb-1.5 flex items-center justify-between gap-2">
+						<Label htmlFor={`datetime-${row.id}`} className="mb-0">
+							{row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
+						</Label>
+						{isLastDelivery && (
+							<Switch
+								label="ASAP"
+								checked={isAsap}
+								onChange={checked => onAsapToggle?.(index, checked)}
+							/>
+						)}
+					</div>
+					{isAsap ? (
+						<Input
+							id={`datetime-${row.id}`}
+							type="text"
+							value={OFFER_ASAP_TIME}
+							readOnly
+							className="dark:bg-gray-900 cursor-default"
+						/>
+					) : (
+						<DateTimePicker
+							id={`datetime-${row.id}`}
+							allowTimeRange
+							value={row.time}
+							onChange={v => updateExtraRow(index, "time", v)}
+							onBlur={onTimeBlur}
+							className="dark:bg-gray-900"
+						/>
+					)}
 				</div>
 
 				{canRemove && (
@@ -510,6 +536,9 @@ export default function CreateOfferModal({
 	const effectiveExternalId = editData?.externalId ?? externalId;
 	const effectiveDriverIds = editData?.selectedDriverIds ?? selectedDriverIds;
 	const effectiveDriverEmptyMiles = editData?.driverEmptyMiles ?? driverEmptyMiles;
+	const lockRouteStructureFromUrl = Boolean(
+		!editData && initialCreateOfferFromUrl?.route?.some(s => s.location.trim())
+	);
 
 	const [formValues, setFormValues] = useState(initialFormState);
 	const [routeRows, setRouteRows] = useState<RouteRow[]>([]);
@@ -542,12 +571,15 @@ export default function CreateOfferModal({
 	const initialLocationsAppliedRef = useRef(false);
 	/** When true, keep URL-provided loaded miles and skip route-distance API. */
 	const preserveUrlLoadedMilesRef = useRef(false);
+	/** Previous date/time before ASAP toggle, keyed by route row id. */
+	const timeBeforeAsapRef = useRef<Record<string, string>>({});
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
 		if (!isOpen) {
 			initialLocationsAppliedRef.current = false;
 			preserveUrlLoadedMilesRef.current = false;
+			timeBeforeAsapRef.current = {};
 			return;
 		}
 
@@ -667,6 +699,15 @@ export default function CreateOfferModal({
 		setManualLoadedMiles(null);
 	}, []);
 
+	const clearAsapFromNonLastRows = useCallback((rows: RouteRow[]): RouteRow[] => {
+		const lastIndex = rows.length - 1;
+		return rows.map((row, i) => {
+			if (i === lastIndex || !isOfferAsapTime(row.time)) return row;
+			delete timeBeforeAsapRef.current[row.id];
+			return { ...row, time: "" };
+		});
+	}, []);
+
 	const addPickUpRow = (afterIndex: number) => {
 		preserveUrlLoadedMilesRef.current = false;
 		setCommittedLocations([]);
@@ -674,7 +715,7 @@ export default function CreateOfferModal({
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("pickup"));
-			return next;
+			return clearAsapFromNonLastRows(next);
 		});
 	};
 
@@ -685,13 +726,40 @@ export default function CreateOfferModal({
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("delivery"));
-			return next;
+			return clearAsapFromNonLastRows(next);
 		});
 	};
 
 	const validateRouteChronology = useCallback((rows: RouteRow[]) => {
 		setRouteError(getRouteChronologyError(rows.map(row => row.time)));
 	}, []);
+
+	const handleAsapToggle = useCallback(
+		(index: number, enabled: boolean) => {
+			setRouteRows(prev => {
+				if (index !== prev.length - 1) return prev;
+				const row = prev[index];
+				if (!row || row.type !== "delivery") return prev;
+				const next = [...prev];
+				if (enabled) {
+					if (!isOfferAsapTime(row.time)) {
+						timeBeforeAsapRef.current[row.id] = row.time;
+					}
+					next[index] = { ...row, time: OFFER_ASAP_TIME };
+				} else {
+					const restored = timeBeforeAsapRef.current[row.id] ?? "";
+					delete timeBeforeAsapRef.current[row.id];
+					next[index] = {
+						...row,
+						time: isOfferAsapTime(restored) ? "" : restored,
+					};
+				}
+				validateRouteChronology(next);
+				return next;
+			});
+		},
+		[validateRouteChronology]
+	);
 
 	const updateExtraRow = useCallback(
 		(index: number, field: "location" | "time" | "coordinates", value: string) => {
@@ -901,12 +969,13 @@ export default function CreateOfferModal({
 				const next = [...prev];
 				const [removed] = next.splice(dragIndex, 1);
 				next.splice(hoverIndex, 0, removed);
-				commitLocations(next);
-				validateRouteChronology(next);
-				return next;
+				const cleaned = clearAsapFromNonLastRows(next);
+				commitLocations(cleaned);
+				validateRouteChronology(cleaned);
+				return cleaned;
 			});
 		},
-		[commitLocations, validateRouteChronology]
+		[clearAsapFromNonLastRows, commitLocations, validateRouteChronology]
 	);
 
 	const validate = (): {
@@ -942,7 +1011,9 @@ export default function CreateOfferModal({
 			routeError = "At least one Pick up and one Delivery are required";
 		} else {
 			const missingTime = trimmedRoute.some(row => row.time === "");
-			const dateWithoutTime = trimmedRoute.some(row => isOfferDateWithoutTime(row.time));
+			const dateWithoutTime = trimmedRoute.some(
+				row => !isOfferAsapTime(row.time) && isOfferDateWithoutTime(row.time)
+			);
 			const missingLocation = trimmedRoute.some(row => row.location === "");
 			if (missingTime) {
 				routeError = "Each stop must have a date and time";
@@ -1185,16 +1256,23 @@ export default function CreateOfferModal({
 										)
 									);
 								}}
+								onAsapToggle={handleAsapToggle}
 								locationError={routeRowLocationErrors[row.id]}
 								canRemove={
-									(row.type === "pickup" &&
+									!lockRouteStructureFromUrl &&
+									((row.type === "pickup" &&
 										routeRows.filter(r => r.type === "pickup").length > 1) ||
-									(row.type === "delivery" &&
-										routeRows.filter(r => r.type === "delivery").length > 1)
+										(row.type === "delivery" &&
+											routeRows.filter(r => r.type === "delivery").length >
+												1))
 								}
 								rowCount={routeRows.length}
 								onAddRow={
-									row.type === "pickup" ? addPickUpRow : addDeliveryRow
+									lockRouteStructureFromUrl
+										? undefined
+										: row.type === "pickup"
+											? addPickUpRow
+											: addDeliveryRow
 								}
 							/>
 						))}
