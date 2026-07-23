@@ -298,8 +298,10 @@ export default function DriversListTable({
 		};
 
 		// Build route in URL appearance order: pu[0], del[0], pu[1], ...
+		// Collect locations first, then attach times (param order is not guaranteed).
 		const route: NonNullable<CreateOfferUrlPrefill["route"]> = [];
 		const stopsByKey = new Map<string, NonNullable<CreateOfferUrlPrefill["route"]>[number]>();
+		const pendingTimes = new Map<string, string>();
 
 		searchParams.forEach((value, key) => {
 			const locationMatch = key.match(/^(pu|del)\[(\d+)\]$/);
@@ -308,12 +310,14 @@ export default function DriversListTable({
 				const index = locationMatch[2];
 				const location = stripQuotes(value);
 				if (!location) return;
+				const stopKey = `${prefix}:${index}`;
 				const stop = {
 					type: (prefix === "pu" ? "pickup" : "delivery") as "pickup" | "delivery",
 					location,
+					...(pendingTimes.has(stopKey) ? { time: pendingTimes.get(stopKey) } : {}),
 				};
 				route.push(stop);
-				stopsByKey.set(`${prefix}:${index}`, stop);
+				stopsByKey.set(stopKey, stop);
 				return;
 			}
 
@@ -321,9 +325,12 @@ export default function DriversListTable({
 			if (timeMatch) {
 				const time = stripQuotes(value);
 				if (!time) return;
-				const stop = stopsByKey.get(`${timeMatch[1]}:${timeMatch[2]}`);
+				const stopKey = `${timeMatch[1]}:${timeMatch[2]}`;
+				const stop = stopsByKey.get(stopKey);
 				if (stop) {
 					stop.time = time;
+				} else {
+					pendingTimes.set(stopKey, time);
 				}
 			}
 		});

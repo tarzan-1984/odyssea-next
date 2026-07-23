@@ -29,6 +29,22 @@ function parse12hClock(hour: number, minute: number, period: string): { hour: nu
 	return { hour: h, minute };
 }
 
+/** Date-only: "23 July 2026" (no time) — midnight local, for display/URL prefill. */
+export function parseOfferDateOnly(s: string): Date | null {
+	const trimmed = s.trim();
+	const m = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/i);
+	if (!m) return null;
+	const day = parseInt(m[1], 10);
+	const month = monthIndexFromName(m[2]);
+	const year = parseInt(m[3], 10);
+	if (month < 0 || Number.isNaN(day) || Number.isNaN(year)) return null;
+	const d = new Date(year, month, day, 0, 0, 0, 0);
+	if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
+		return null;
+	}
+	return d;
+}
+
 /** "4 June 2026 8 AM" or "4 June 2026 8:30 AM" */
 export function parseLongOfferDateTime(s: string): Date | null {
 	const trimmed = s.trim();
@@ -51,6 +67,24 @@ export function parseLongOfferDateTime(s: string): Date | null {
 	}
 	return d;
 }
+
+/** Client format without time: "23 July 2026" */
+export function formatOfferDateOnly(d: Date): string {
+	const day = d.getDate();
+	const month = MONTH_NAMES[d.getMonth()];
+	const year = d.getFullYear();
+	return `${day} ${month} ${year}`;
+}
+
+/** True when value is a date without a time component (e.g. URL `pu_at=23 July 2026`). */
+export function isOfferDateWithoutTime(value: string): boolean {
+	const trimmed = value.trim();
+	if (!trimmed) return false;
+	if (parseOfferDateTimeField(trimmed).start) return false;
+	return parseOfferDateOnly(trimmed) != null;
+}
+
+export const OFFER_TIME_REQUIRED_ERROR = "Each stop must include a time";
 
 /** Legacy: "03/24/2026 02:30 pm" */
 export function parseSlashOfferDateTime(s: string): Date | null {
@@ -148,9 +182,9 @@ export function formatOfferDateTimeRange(start: Date, end?: Date | null): string
 	return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatOfferDateTime(end)}`;
 }
 
-/** For flatpickr initial date sync */
+/** For flatpickr initial date sync (full datetime or date-only). */
 export function parseOfferRouteDateTime(s: string): Date | null {
-	return parseOfferDateTimeField(s).start;
+	return parseOfferDateTimeField(s).start ?? parseOfferDateOnly(s);
 }
 
 export const ROUTE_CHRONOLOGY_ERROR =

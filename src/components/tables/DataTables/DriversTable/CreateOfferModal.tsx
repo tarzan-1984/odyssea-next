@@ -16,9 +16,13 @@ import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
+	formatOfferDateOnly,
 	formatOfferDateTime,
 	formatOfferDateTimeRange,
 	getRouteChronologyError,
+	isOfferDateWithoutTime,
+	OFFER_TIME_REQUIRED_ERROR,
+	parseOfferDateOnly,
 	parseOfferDateTimeField,
 } from "@/utils/offerDateTimeRange";
 import {
@@ -87,8 +91,11 @@ function normalizeOfferTimeFromUrl(raw: string): string {
 	const trimmed = raw.trim();
 	if (!trimmed) return "";
 	const { start, end } = parseOfferDateTimeField(trimmed);
-	if (!start) return trimmed;
-	return formatOfferDateTimeRange(start, end);
+	if (start) return formatOfferDateTimeRange(start, end);
+	// Date without time (e.g. "23 July 2026") — keep date; Create validates time is required.
+	const dateOnly = parseOfferDateOnly(trimmed);
+	if (dateOnly) return formatOfferDateOnly(dateOnly);
+	return "";
 }
 
 export interface CreateOfferFormValues {
@@ -935,9 +942,12 @@ export default function CreateOfferModal({
 			routeError = "At least one Pick up and one Delivery are required";
 		} else {
 			const missingTime = trimmedRoute.some(row => row.time === "");
+			const dateWithoutTime = trimmedRoute.some(row => isOfferDateWithoutTime(row.time));
 			const missingLocation = trimmedRoute.some(row => row.location === "");
 			if (missingTime) {
 				routeError = "Each stop must have a date and time";
+			} else if (dateWithoutTime) {
+				routeError = OFFER_TIME_REQUIRED_ERROR;
 			} else if (missingLocation) {
 				routeError = "Each stop must have a location";
 			} else {
