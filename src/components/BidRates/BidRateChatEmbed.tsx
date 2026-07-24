@@ -5,7 +5,7 @@ import ChatBox from "@/components/chats/ChatBox";
 import { chatApi } from "@/app-api/chatApi";
 import { useChatStore } from "@/stores/chatStore";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
-import type { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
+import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 
 type BidRateChatEmbedProps = {
@@ -14,18 +14,18 @@ type BidRateChatEmbedProps = {
 	bidOwnerId?: string | null;
 	/** True when the current user created this bid. */
 	disableBidPlusOne?: boolean;
-	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 };
 
 /**
  * Embeds the BID chat (same ChatBox as LOAD/GROUP) inside an expanded bid card.
+ * Chat sync is mounted only while expanded — keeps the bid list page light.
  */
 export default function BidRateChatEmbed({
 	chatRoomId,
 	bidOwnerId = null,
 	disableBidPlusOne = false,
-	webSocketChatSync,
 }: BidRateChatEmbedProps) {
+	const webSocketChatSync = useWebSocketChatSync();
 	const [ready, setReady] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const leaveChatRoomRef = useRef(webSocketChatSync.leaveChatRoom);

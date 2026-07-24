@@ -80,10 +80,14 @@ export function countActiveBidRateOffers(
 	}).length;
 }
 
-function useBidRateVotersState(bidRateId: number): {
+function useBidRateVotersState(
+	bidRateId: number,
+	options?: { enabled?: boolean },
+): {
 	voters: BidRateVoter[];
 	nowUnixSec: number;
 } {
+	const enabled = options?.enabled ?? true;
 	const [voters, setVoters] = useState<BidRateVoter[]>(
 		() => votersCache.get(bidRateId) ?? [],
 	);
@@ -91,12 +95,14 @@ function useBidRateVotersState(bidRateId: number): {
 
 	useEffect(() => {
 		setVoters(votersCache.get(bidRateId) ?? []);
+		if (!enabled) return;
 		fetchVotersCached(bidRateId)
 			.then(setVoters)
 			.catch(() => undefined);
-	}, [bidRateId]);
+	}, [bidRateId, enabled]);
 
 	useEffect(() => {
+		if (!enabled) return;
 		const onBidRateUpdated = (event: Event) => {
 			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
 			if (detail?.bidRateId != null && detail.bidRateId !== bidRateId) return;
@@ -116,7 +122,7 @@ function useBidRateVotersState(bidRateId: number): {
 				onBidRateUpdated,
 			);
 		};
-	}, [bidRateId]);
+	}, [bidRateId, enabled]);
 
 	const activeCount = countActiveBidRateOffers(voters, nowUnixSec);
 
@@ -135,14 +141,18 @@ function useBidRateVotersState(bidRateId: number): {
 export function useHasActiveBidRateOffer(
 	bidRateId: number,
 	userId: string | null | undefined,
+	options?: { enabled?: boolean },
 ): boolean {
-	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId, options);
 	return userHasActiveBidRateOffer(voters, userId, nowUnixSec);
 }
 
 /** Live count of active rate offers on this bid (max BID_MAX_ACTIVE_OFFERS). */
-export function useActiveBidRateOffersCount(bidRateId: number): number {
-	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+export function useActiveBidRateOffersCount(
+	bidRateId: number,
+	options?: { enabled?: boolean },
+): number {
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId, options);
 	return countActiveBidRateOffers(voters, nowUnixSec);
 }
 
@@ -150,8 +160,9 @@ export function useActiveBidRateOffersCount(bidRateId: number): number {
 export function useBidRateOffersGate(
 	bidRateId: number,
 	userId: string | null | undefined,
+	options?: { enabled?: boolean },
 ): { offerLocked: boolean; activeOffersCount: number; offersAtLimit: boolean } {
-	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId);
+	const { voters, nowUnixSec } = useBidRateVotersState(bidRateId, options);
 	const activeOffersCount = countActiveBidRateOffers(voters, nowUnixSec);
 	return {
 		offerLocked: userHasActiveBidRateOffer(voters, userId, nowUnixSec),
@@ -162,7 +173,7 @@ export function useBidRateOffersGate(
 
 export { BID_MAX_ACTIVE_OFFERS };
 
-function fetchVotersCached(
+export function fetchVotersCached(
 	bidRateId: number,
 	options?: { force?: boolean },
 ): Promise<BidRateVoter[]> {
@@ -236,8 +247,8 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 	useEffect(() => {
 		setVoters(votersCache.get(bidRateId) ?? []);
 		setError(null);
-		loadVoters({ silent: votersCache.has(bidRateId) }).catch(() => undefined);
-	}, [bidRateId, loadVoters]);
+		// Badge starts from cache only — fetch on hover/open to avoid N+1 on list mount.
+	}, [bidRateId]);
 
 	useEffect(() => {
 		const onBidRateUpdated = (event: Event) => {
@@ -249,6 +260,7 @@ export default function BidRateVotersPopup({ bidRateId }: BidRateVotersPopupProp
 				setError(null);
 				return;
 			}
+			// Realtime updates only — no N+1 on list mount.
 			loadVoters({ force: true, silent: true }).catch(() => undefined);
 		};
 

@@ -7,7 +7,13 @@ import {
 	getBidParticipantRemainingSeconds,
 	getNowUnixSeconds,
 } from "@/utils/bidTimer";
-import { useBidRateOffersGate, BID_MAX_ACTIVE_OFFERS } from "./BidRateVotersPopup";
+import {
+	useBidRateOffersGate,
+	BID_MAX_ACTIVE_OFFERS,
+	userHasActiveBidRateOffer,
+	countActiveBidRateOffers,
+	fetchVotersCached,
+} from "./BidRateVotersPopup";
 import {
 	ODYSSEA_BID_RATE_UPDATED_EVENT,
 	isBidRateRemovedReason,
@@ -28,19 +34,25 @@ export default function BidEditPriceButton({
 	const isOwner = Boolean(
 		currentUserId && bid.ownerId && currentUserId === bid.ownerId,
 	);
+	/** Gate + participants only matter for non-owners placing offers. */
+	const [gateEnabled, setGateEnabled] = useState(false);
 	const { offerLocked, offersAtLimit } = useBidRateOffersGate(
 		bid.id,
 		currentUserId,
+		{ enabled: !isOwner && gateEnabled },
 	);
 	const [plusOneActive, setPlusOneActive] = useState(isOwner);
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
+	const [plusOneLoaded, setPlusOneLoaded] = useState(isOwner);
+	const [checkingGate, setCheckingGate] = useState(false);
 
 	const refreshPlusOne = useCallback(async () => {
 		if (!currentUserId || isOwner) {
 			setPlusOneActive(true);
 			setPlusOneUpdatedAt(null);
-			return;
+			setPlusOneLoaded(true);
+			return true;
 		}
 		try {
 			const result = await getBidParticipants(bid.id);
@@ -50,7 +62,8 @@ export default function BidEditPriceButton({
 			if (!mine) {
 				setPlusOneActive(false);
 				setPlusOneUpdatedAt(null);
-				return;
+				setPlusOneLoaded(true);
+				return false;
 			}
 			const updatedAt = Number(mine.updatedAt);
 			setPlusOneUpdatedAt(Number.isFinite(updatedAt) ? updatedAt : null);
@@ -58,27 +71,77 @@ export default function BidEditPriceButton({
 				updatedAt,
 				getNowUnixSeconds(),
 			);
-			setPlusOneActive(remaining != null && remaining > 0);
+			const active = remaining != null && remaining > 0;
+			setPlusOneActive(active);
+			setPlusOneLoaded(true);
+			return active;
 		} catch {
 			setPlusOneActive(false);
 			setPlusOneUpdatedAt(null);
+			setPlusOneLoaded(true);
+			return false;
 		}
 	}, [bid.id, currentUserId, isOwner]);
 
-	useEffect(() => {
-		refreshPlusOne().catch(() => undefined);
-	}, [refreshPlusOne]);
+	const ensureGateData = useCallback(() => {
+		if (isOwner) return;
+		setGateEnabled(true);
+		if (!plusOneLoaded) {
+			refreshPlusOne().catch(() => undefined);
+		}
+	}, [isOwner, plusOneLoaded, refreshPlusOne]);
 
 	useEffect(() => {
 		const onBidRateUpdated = (event: Event) => {
 			const detail = (event as CustomEvent<BidRateUpdatedEventDetail>).detail;
+			const matchesById =
+				detail?.bidRateId != null && detail.bidRateId === bid.id;
+			const matchesByChat =
+				detail?.chatRoomId != null &&
+				bid.chatId != null &&
+				detail.chatRoomId === bid.chatId;
 			if (detail?.bidRateId != null && detail.bidRateId !== bid.id) return;
+			if (
+				detail?.chatRoomId != null &&
+				bid.chatId != null &&
+				detail.chatRoomId !== bid.chatId &&
+				!matchesById
+			) {
+				return;
+			}
 			if (isBidRateRemovedReason(detail?.reason)) {
 				setPlusOneActive(false);
 				setPlusOneUpdatedAt(null);
 				return;
 			}
-			refreshPlusOne().catch(() => undefined);
+			// Optimistic / WS join payload: unlock edit immediately without waiting for refetch.
+			const participant = detail?.participant;
+			if (
+				!isOwner &&
+				currentUserId &&
+				participant &&
+				participant.userId === currentUserId &&
+				(matchesById || matchesByChat)
+			) {
+				const updatedAt = Number(participant.updatedAt);
+				if (Number.isFinite(updatedAt)) {
+					setPlusOneUpdatedAt(prev =>
+						prev != null && prev > updatedAt ? prev : updatedAt,
+					);
+					const remaining = getBidParticipantRemainingSeconds(
+						updatedAt,
+						getNowUnixSeconds(),
+					);
+					if (remaining != null && remaining > 0) {
+						setPlusOneActive(true);
+						setPlusOneLoaded(true);
+						return;
+					}
+				}
+			}
+			if (gateEnabled || plusOneLoaded) {
+				refreshPlusOne().catch(() => undefined);
+			}
 		};
 		window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
 		return () => {
@@ -87,7 +150,15 @@ export default function BidEditPriceButton({
 				onBidRateUpdated,
 			);
 		};
-	}, [bid.id, refreshPlusOne]);
+	}, [
+		bid.chatId,
+		bid.id,
+		currentUserId,
+		gateEnabled,
+		isOwner,
+		plusOneLoaded,
+		refreshPlusOne,
+	]);
 
 	useEffect(() => {
 		if (isOwner || plusOneUpdatedAt == null) return;
@@ -104,16 +175,43 @@ export default function BidEditPriceButton({
 		return () => window.clearInterval(intervalId);
 	}, [isOwner, plusOneUpdatedAt, nowUnixSec]);
 
-	const blockedByPlusOne = !isOwner && !plusOneActive;
-	const disabled = offerLocked || blockedByPlusOne || offersAtLimit;
+	const blockedByPlusOne = !isOwner && plusOneLoaded && !plusOneActive;
+	const disabled =
+		!isOwner &&
+		(offerLocked || blockedByPlusOne || offersAtLimit || checkingGate);
 
 	let title = "Edit price";
-	if (offerLocked) {
+	if (checkingGate) {
+		title = "Checking offer status…";
+	} else if (offerLocked) {
 		title = "You already have an active offer. Wait until the timer expires.";
 	} else if (offersAtLimit) {
 		title = `Maximum of ${BID_MAX_ACTIVE_OFFERS} active offers. Wait until one expires or is resolved.`;
 	} else if (blockedByPlusOne) {
 		title = "Press +1 and keep an active timer before placing an offer.";
+	}
+
+	async function handleEditClick() {
+		if (isOwner) {
+			onEdit(bid);
+			return;
+		}
+		setCheckingGate(true);
+		setGateEnabled(true);
+		try {
+			const [voters, plusOneOk] = await Promise.all([
+				fetchVotersCached(bid.id),
+				refreshPlusOne(),
+			]);
+			const now = getNowUnixSeconds();
+			const locked = userHasActiveBidRateOffer(voters, currentUserId, now);
+			const atLimit =
+				countActiveBidRateOffers(voters, now) >= BID_MAX_ACTIVE_OFFERS;
+			if (locked || atLimit || !plusOneOk) return;
+			onEdit(bid);
+		} finally {
+			setCheckingGate(false);
+		}
 	}
 
 	return (
@@ -122,10 +220,12 @@ export default function BidEditPriceButton({
 			title={title}
 			aria-label={disabled ? title : "Edit price"}
 			disabled={disabled}
+			onMouseEnter={ensureGateData}
+			onFocus={ensureGateData}
 			onClick={e => {
 				e.stopPropagation();
 				if (disabled) return;
-				onEdit(bid);
+				handleEditClick().catch(() => undefined);
 			}}
 			className={
 				disabled

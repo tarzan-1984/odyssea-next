@@ -27,8 +27,12 @@ import {
 	joinBidByChat,
 } from "@/app-api/bidRates";
 import { getBidRemainingSeconds, getNowUnixSeconds } from "@/utils/bidTimer";
-import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
+import {
+	ODYSSEA_BID_RATE_UPDATED_EVENT,
+	type BidRateUpdatedEventDetail,
+} from "@/lib/bidRateRealtimeEvents";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
+
 import BidComposePlusOneTimer from "./BidComposePlusOneTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -116,6 +120,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const [message, setMessage] = useState<string>("");
 		const [composeResetKey, setComposeResetKey] = useState(0);
 		const [isSending, setIsSending] = useState(false);
+		const isSendingRef = useRef(false);
 		const [plusOneLocked, setPlusOneLocked] = useState(false);
 		const [plusOneStatusLoaded, setPlusOneStatusLoaded] = useState(!isBidChat);
 		const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
@@ -246,6 +251,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			loadParticipation();
 
 			const onBidRateUpdated = () => {
+				// Skip refetch while +1 join is in flight so optimistic timer is not rewound.
+				if (isSendingRef.current) return;
 				loadParticipation();
 			};
 			window.addEventListener(ODYSSEA_BID_RATE_UPDATED_EVENT, onBidRateUpdated);
@@ -869,6 +876,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											if (
 												!onSendMessage ||
 												!chatRoomId ||
+												!currentUser?.id ||
 												disabled ||
 												isSending ||
 												isPlusOneBlockedForOwner ||
@@ -876,8 +884,30 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 											) {
 												return;
 											}
+											const optimisticAt = getNowUnixSeconds();
+											const optimisticParticipant = {
+												userId: currentUser.id,
+												createdAt: optimisticAt,
+												updatedAt: optimisticAt,
+											};
+											const optimisticDetail: BidRateUpdatedEventDetail = {
+												bidRateId: bidAuction?.bidRateId ?? undefined,
+												chatRoomId,
+												reason: "participant_joined",
+												participant: optimisticParticipant,
+											};
 											try {
+												isSendingRef.current = true;
 												setIsSending(true);
+												// Optimistic path: unlock price edit + start timer before join API returns.
+												setPlusOneUpdatedAt(optimisticAt);
+												setPlusOneLocked(true);
+												bidAuction?.upsertParticipant(optimisticParticipant);
+												window.dispatchEvent(
+													new CustomEvent(ODYSSEA_BID_RATE_UPDATED_EVENT, {
+														detail: optimisticDetail,
+													}),
+												);
 												const joinResult = await joinBidByChat(chatRoomId);
 												const nextUpdatedAt =
 													joinResult.updatedAt != null
@@ -898,15 +928,23 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 														),
 												);
 												if (
-													currentUser?.id &&
 													joinResult.createdAt != null &&
 													joinResult.updatedAt != null
 												) {
-													bidAuction?.upsertParticipant({
+													const confirmedParticipant = {
 														userId: currentUser.id,
 														createdAt: Number(joinResult.createdAt),
 														updatedAt: Number(joinResult.updatedAt),
-													});
+													};
+													bidAuction?.upsertParticipant(confirmedParticipant);
+													window.dispatchEvent(
+														new CustomEvent(ODYSSEA_BID_RATE_UPDATED_EVENT, {
+															detail: {
+																...optimisticDetail,
+																participant: confirmedParticipant,
+															} satisfies BidRateUpdatedEventDetail,
+														}),
+													);
 												}
 												if (!joinResult.alreadyJoined) {
 													await onSendMessage({
@@ -918,7 +956,20 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 												}
 											} catch (error) {
 												console.error("Failed to send +1 message:", error);
+												setPlusOneUpdatedAt(null);
+												setPlusOneLocked(false);
+												// Roll back optimistic unlock on the price edit button.
+												window.dispatchEvent(
+													new CustomEvent(ODYSSEA_BID_RATE_UPDATED_EVENT, {
+														detail: {
+															bidRateId: bidAuction?.bidRateId ?? undefined,
+															chatRoomId,
+															reason: "participant_join_failed",
+														} satisfies BidRateUpdatedEventDetail,
+													}),
+												);
 											} finally {
+												isSendingRef.current = false;
 												setIsSending(false);
 											}
 										}}

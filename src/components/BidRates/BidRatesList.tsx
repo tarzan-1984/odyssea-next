@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
@@ -27,8 +28,6 @@ import {
 } from "@/utils/bidTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
-import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
-import BidRateChatEmbed from "./BidRateChatEmbed";
 import BidRateVotersPopup, {
 	clearBidRateVotersCache,
 } from "./BidRateVotersPopup";
@@ -38,6 +37,15 @@ import BidPlusOneParticipantsPopup, {
 import BidEditPriceButton from "./BidEditPriceButton";
 import BidCardUnreadCount from "./BidCardUnreadCount";
 import EditBidPriceModal from "./EditBidPriceModal";
+
+const BidRateChatEmbed = dynamic(() => import("./BidRateChatEmbed"), {
+	ssr: false,
+	loading: () => (
+		<div className="flex justify-center py-10">
+			<SpinnerOne />
+		</div>
+	),
+});
 
 const ITEMS_PER_PAGE = 10;
 
@@ -113,7 +121,6 @@ function showBidExpiringToast(bidName: string, bidId: number) {
 export default function BidRatesList() {
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
-	const webSocketChatSync = useWebSocketChatSync();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [expandedBidId, setExpandedBidId] = useState<number | null>(null);
 	const [deleteConfirmBid, setDeleteConfirmBid] = useState<BidRate | null>(null);
@@ -132,6 +139,7 @@ export default function BidRatesList() {
 		queryKey: ["bid-rates-list", queryParams],
 		queryFn: () => getBidRates(queryParams),
 		placeholderData: keepPreviousData,
+		staleTime: 30_000,
 	});
 
 	const rows = data?.data?.results ?? [];
@@ -402,7 +410,6 @@ export default function BidRatesList() {
 													chatRoomId={row.chatId}
 													bidOwnerId={row.ownerId}
 													disableBidPlusOne={isOwner}
-													webSocketChatSync={webSocketChatSync}
 												/>
 											) : (
 												<p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
