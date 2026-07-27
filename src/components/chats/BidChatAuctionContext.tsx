@@ -97,8 +97,10 @@ export function BidChatAuctionProvider({
 
 		setByUserId(prev => {
 			const existing = prev[participant.userId];
-			// Ignore stale WS/refetch payloads that would rewind the timer.
-			if (existing && existing.updatedAt > updatedAt) {
+			// Fresh +1 cycle (rejoin / confirm-vote reset): always take server values.
+			const isFreshCycle = !existing || createdAt > existing.createdAt;
+			// Ignore stale WS/refetch payloads that would rewind the same cycle.
+			if (!isFreshCycle && existing && existing.updatedAt > updatedAt) {
 				return prev;
 			}
 			return {
@@ -135,11 +137,15 @@ export function BidChatAuctionProvider({
 							const createdAt = toUnixNumber(row.createdAt);
 							const updatedAt = toUnixNumber(row.updatedAt);
 							const existing = prev[row.userId];
+							const isFreshCycle =
+								!existing || createdAt > existing.createdAt;
 							next[row.userId] = {
 								userId: row.userId,
 								createdAt,
 								updatedAt:
-									existing && existing.updatedAt > updatedAt
+									!isFreshCycle &&
+									existing &&
+									existing.updatedAt > updatedAt
 										? existing.updatedAt
 										: updatedAt,
 							};
