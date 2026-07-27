@@ -288,20 +288,23 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{showLegacySingleFile && legacyAttachment && isImageFile(message.fileName) && (
 					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
-							<IncomingMessageBubble
-								message={message}
-								currentUserId={currentUser?.id}
-								allowReactions={allowReactions}
-							>
-								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
-									<MessageAttachmentCard
-										item={legacyAttachment}
-										itemKey={legacyAttachmentKey}
-										downloadingKey={singleAttachmentDownloadingKey}
-										setDownloadingKey={setSingleAttachmentDownloadingKey}
-									/>
-								</div>
-							</IncomingMessageBubble>
+							<div className="flex min-w-0 items-start gap-2">
+								<IncomingMessageBubble
+									message={message}
+									currentUserId={currentUser?.id}
+									allowReactions={allowReactions}
+								>
+									<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+										<MessageAttachmentCard
+											item={legacyAttachment}
+											itemKey={legacyAttachmentKey}
+											downloadingKey={singleAttachmentDownloadingKey}
+											setDownloadingKey={setSingleAttachmentDownloadingKey}
+										/>
+									</div>
+								</IncomingMessageBubble>
+								{renderMessageMenu()}
+							</div>
 						) : (
 							<div className="flex items-start justify-end gap-2">
 								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
@@ -313,14 +316,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										setDownloadingKey={setSingleAttachmentDownloadingKey}
 									/>
 								</div>
-								<MessageDropdown
-									message={message}
-									currentUser={currentUser}
-									onDelete={onDelete}
-									onEdit={onEdit}
-									onReply={onReply}
-									onMarkUnread={onMarkUnread}
-								/>
+								{renderMessageMenu()}
 							</div>
 						)}
 					</div>
@@ -330,20 +326,23 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{showLegacySingleFile && legacyAttachment && isPreviewableFile(message.fileName) && (
 					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
-							<IncomingMessageBubble
-								message={message}
-								currentUserId={currentUser?.id}
-								allowReactions={allowReactions}
-							>
-								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
-									<MessageAttachmentCard
-										item={legacyAttachment}
-										itemKey={legacyAttachmentKey}
-										downloadingKey={singleAttachmentDownloadingKey}
-										setDownloadingKey={setSingleAttachmentDownloadingKey}
-									/>
-								</div>
-							</IncomingMessageBubble>
+							<div className="flex min-w-0 items-start gap-2">
+								<IncomingMessageBubble
+									message={message}
+									currentUserId={currentUser?.id}
+									allowReactions={allowReactions}
+								>
+									<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+										<MessageAttachmentCard
+											item={legacyAttachment}
+											itemKey={legacyAttachmentKey}
+											downloadingKey={singleAttachmentDownloadingKey}
+											setDownloadingKey={setSingleAttachmentDownloadingKey}
+										/>
+									</div>
+								</IncomingMessageBubble>
+								{renderMessageMenu()}
+							</div>
 						) : (
 							<div className="flex items-start justify-end gap-2">
 								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
@@ -355,14 +354,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										setDownloadingKey={setSingleAttachmentDownloadingKey}
 									/>
 								</div>
-								<MessageDropdown
-									message={message}
-									currentUser={currentUser}
-									onDelete={onDelete}
-									onEdit={onEdit}
-									onReply={onReply}
-									onMarkUnread={onMarkUnread}
-								/>
+								{renderMessageMenu()}
 							</div>
 						)}
 					</div>
@@ -379,84 +371,87 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						}
 					>
 						{!isSender ? (
-							<IncomingMessageBubble
-								message={message}
-								currentUserId={currentUser?.id}
-								allowReactions={allowReactions}
-							>
-								<a
-									href={legacyFileUrl}
-									download={message.fileName}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+							<div className="flex min-w-0 items-start gap-2">
+								<IncomingMessageBubble
+									message={message}
+									currentUserId={currentUser?.id}
+									allowReactions={allowReactions}
 								>
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
+									<a
+										href={legacyFileUrl}
+										download={message.fileName}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 									>
-										<path
-											d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-										<polyline
-											points="14,2 14,8 20,8"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
-									<div className="flex-1 min-w-0">
-										<p className="chat-msg-body font-medium text-gray-900 dark:text-white truncate">
-											{message.fileName || "Download file"}
-										</p>
-										{message.fileSize && (
-											<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
-												{Math.round(message.fileSize / 1024)}KB
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2Z"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+											<polyline
+												points="14,2 14,8 20,8"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+										</svg>
+										<div className="flex-1 min-w-0">
+											<p className="chat-msg-body font-medium text-gray-900 dark:text-white truncate">
+												{message.fileName || "Download file"}
 											</p>
-										)}
-									</div>
-									<svg
-										width="16"
-										height="16"
-										viewBox="0 0 24 24"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<path
-											d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-										<polyline
-											points="7,10 12,15 17,10"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-										<line
-											x1="12"
-											y1="15"
-											x2="12"
-											y2="3"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										/>
-									</svg>
-								</a>
-							</IncomingMessageBubble>
+											{message.fileSize && (
+												<p className="chat-msg-meta text-gray-500 dark:text-gray-400">
+													{Math.round(message.fileSize / 1024)}KB
+												</p>
+											)}
+										</div>
+										<svg
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+											<polyline
+												points="7,10 12,15 17,10"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+											<line
+												x1="12"
+												y1="15"
+												x2="12"
+												y2="3"
+												stroke="currentColor"
+												strokeWidth="2"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+										</svg>
+									</a>
+								</IncomingMessageBubble>
+								{renderMessageMenu()}
+							</div>
 						) : (
 							<div className="flex items-start justify-end gap-2">
 							<a
