@@ -16,6 +16,7 @@ import {
 	getBidRates,
 	type BidRate,
 	type BidRateRoutePoint,
+	type BidRatesListScope,
 } from "@/app-api/bidRates";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import {
@@ -118,7 +119,11 @@ function showBidExpiringToast(bidName: string, bidId: number) {
 	});
 }
 
-export default function BidRatesList() {
+export default function BidRatesList({
+	scope = "general",
+}: {
+	scope?: BidRatesListScope;
+}) {
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
 	const [currentPage, setCurrentPage] = useState(1);
@@ -133,6 +138,7 @@ export default function BidRatesList() {
 	const queryParams = {
 		page: currentPage,
 		limit: ITEMS_PER_PAGE,
+		scope,
 	};
 
 	const { data, isPending, isError, error, isPlaceholderData } = useQuery({

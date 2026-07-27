@@ -40,9 +40,13 @@ export interface BidRatesPagination {
 	has_prev_page: boolean;
 }
 
+export type BidRatesListScope = "general" | "my";
+
 export interface GetBidRatesParams {
 	page?: number;
 	limit?: number;
+	/** general = all chat-visible bids; my = bids where user is in bid_rate_participants */
+	scope?: BidRatesListScope;
 }
 
 export interface GetBidRatesResponse {
@@ -66,6 +70,7 @@ export async function getBidRates(
 		params: {
 			page: params.page ?? 1,
 			limit: params.limit ?? 10,
+			scope: params.scope === "my" ? "my" : "general",
 		},
 		withCredentials: true,
 	});

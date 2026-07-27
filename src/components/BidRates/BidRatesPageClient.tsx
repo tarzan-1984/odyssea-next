@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
+import type { BidRatesListScope } from "@/app-api/bidRates";
 import BidRatesList from "./BidRatesList";
 import LeaveBidPlusIcon from "./LeaveBidPlusIcon";
 
@@ -16,6 +17,7 @@ const LeaveBidModal = dynamic(() => import("./LeaveBidModal"), {
 export default function BidRatesPageClient() {
 	const queryClient = useQueryClient();
 	const [isLeaveBidModalOpen, setIsLeaveBidModalOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState<BidRatesListScope>("general");
 
 	return (
 		<>
@@ -33,8 +35,32 @@ export default function BidRatesPageClient() {
 					Leave bid
 				</Button>
 			</div>
-			<ComponentCard title="Bid rates">
-				<BidRatesList />
+			<ComponentCard
+				title="Bid rates"
+				headerRight={
+					<>
+						<Button
+							type="button"
+							size="sm"
+							variant={activeTab === "general" ? "primary" : "outline"}
+							className="h-9 whitespace-nowrap"
+							onClick={() => setActiveTab("general")}
+						>
+							General
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant={activeTab === "my" ? "primary" : "outline"}
+							className="h-9 whitespace-nowrap"
+							onClick={() => setActiveTab("my")}
+						>
+							My bids
+						</Button>
+					</>
+				}
+			>
+				<BidRatesList key={activeTab} scope={activeTab} />
 			</ComponentCard>
 			{isLeaveBidModalOpen ? (
 				<LeaveBidModal
