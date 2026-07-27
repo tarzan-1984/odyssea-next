@@ -37,6 +37,7 @@ export default function BidRatesPageClient() {
 			</div>
 			<ComponentCard
 				title="Bid rates"
+				headerBesideTitle
 				headerRight={
 					<>
 						<Button
