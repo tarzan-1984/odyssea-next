@@ -121,8 +121,10 @@ function showBidExpiringToast(bidName: string, bidId: number) {
 
 export default function BidRatesList({
 	scope = "general",
+	search = "",
 }: {
 	scope?: BidRatesListScope;
+	search?: string;
 }) {
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
@@ -135,10 +137,17 @@ export default function BidRatesList({
 	const [nowUnixSec, setNowUnixSec] = useState(() => getNowUnixSeconds());
 	const warnedBidIdsRef = useRef<Set<number>>(new Set());
 
+	const searchQuery = search.trim();
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [searchQuery, scope]);
+
 	const queryParams = {
 		page: currentPage,
 		limit: ITEMS_PER_PAGE,
 		scope,
+		...(searchQuery ? { search: searchQuery } : {}),
 	};
 
 	const { data, isPending, isError, error, isPlaceholderData } = useQuery({

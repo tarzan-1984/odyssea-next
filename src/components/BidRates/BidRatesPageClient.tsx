@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
 import type { BidRatesListScope } from "@/app-api/bidRates";
 import BidRatesList from "./BidRatesList";
@@ -18,6 +19,13 @@ export default function BidRatesPageClient() {
 	const queryClient = useQueryClient();
 	const [isLeaveBidModalOpen, setIsLeaveBidModalOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState<BidRatesListScope>("general");
+	const [searchInput, setSearchInput] = useState("");
+	const [debouncedSearch, setDebouncedSearch] = useState("");
+
+	useEffect(() => {
+		const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
+		return () => window.clearTimeout(t);
+	}, [searchInput]);
 
 	return (
 		<>
@@ -34,6 +42,15 @@ export default function BidRatesPageClient() {
 				>
 					Leave bid
 				</Button>
+			</div>
+			<div className="mb-4 max-w-xl">
+				<Input
+					type="text"
+					placeholder="Origin / Destination / Broker name"
+					value={searchInput}
+					onChange={e => setSearchInput(e.target.value)}
+					className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
+				/>
 			</div>
 			<ComponentCard
 				title="Bid rates"
@@ -61,7 +78,7 @@ export default function BidRatesPageClient() {
 					</>
 				}
 			>
-				<BidRatesList key={activeTab} scope={activeTab} />
+				<BidRatesList key={activeTab} scope={activeTab} search={debouncedSearch} />
 			</ComponentCard>
 			{isLeaveBidModalOpen ? (
 				<LeaveBidModal

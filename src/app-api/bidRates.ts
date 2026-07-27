@@ -47,6 +47,8 @@ export interface GetBidRatesParams {
 	limit?: number;
 	/** general = all chat-visible bids; my = bids where user is in bid_rate_participants */
 	scope?: BidRatesListScope;
+	/** Filter by origin/destination address or broker name */
+	search?: string;
 }
 
 export interface GetBidRatesResponse {
@@ -66,11 +68,13 @@ export interface CreateBidRatePayload {
 export async function getBidRates(
 	params: GetBidRatesParams = {},
 ): Promise<GetBidRatesResponse> {
+	const search = params.search?.trim() || "";
 	const res = await axios.get<GetBidRatesResponse>("/api/bid-rates", {
 		params: {
 			page: params.page ?? 1,
 			limit: params.limit ?? 10,
 			scope: params.scope === "my" ? "my" : "general",
+			...(search ? { search } : {}),
 		},
 		withCredentials: true,
 	});

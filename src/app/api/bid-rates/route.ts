@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
 		const page = searchParams.get("page") || "1";
 		const limit = searchParams.get("limit") || "10";
 		const scope = searchParams.get("scope") === "my" ? "my" : "general";
+		const search = searchParams.get("search")?.trim() || "";
 		const qs = new URLSearchParams({ page, limit, scope });
+		if (search) qs.set("search", search);
 
 		const response = await fetch(
 			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/bid-rates?${qs.toString()}`,
