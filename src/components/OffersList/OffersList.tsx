@@ -31,6 +31,9 @@ import { formatOfferCreateTimeEst } from "@/utils/nyWallClock";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
 import DriverRatingBadge from "@/components/tables/DataTables/DriversTable/DriverRatingBadge";
 import DriverRatingModal from "@/components/tables/DataTables/DriversTable/DriverRatingModal";
+import CounterOfferModal, {
+	type CounterOfferModalState,
+} from "./CounterOfferModal";
 
 const DRIVER_ACCEPTED_MESSAGE =
 	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
@@ -285,18 +288,25 @@ function OfferDriverBadge({
 			}`}
 		>
 			{driver.rate != null ? (
-				<span
-					className={`shrink-0 text-[10px] font-medium tabular-nums ${
-						isInactiveDriver
-							? "text-[#a20000] dark:text-red-200"
-							: hasActiveTimer
-								? "text-green-800 dark:text-green-200"
-								: isExpiredBid
-									? "text-gray-500 dark:text-gray-400"
-									: "text-gray-500 dark:text-gray-400"
-					}`}
-				>
-					{formatDriverBidRate(driver.rate)}
+				<span className="flex shrink-0 flex-col items-start leading-tight">
+					<span
+						className={`text-[10px] font-medium tabular-nums ${
+							isInactiveDriver
+								? "text-[#a20000] dark:text-red-200"
+								: hasActiveTimer
+									? "text-green-800 dark:text-green-200"
+									: isExpiredBid
+										? "text-gray-500 dark:text-gray-400"
+										: "text-gray-500 dark:text-gray-400"
+						}`}
+					>
+						{formatDriverBidRate(driver.rate)}
+					</span>
+					{driver.counter_offer != null ? (
+						<span className="text-[10px] font-medium tabular-nums text-yellow-500 dark:text-yellow-400">
+							{formatDriverBidRate(driver.counter_offer)}
+						</span>
+					) : null}
 				</span>
 			) : null}
 			<span
@@ -436,6 +446,8 @@ const OffersList = () => {
 		name: string;
 		avgRating: number | null;
 	} | null>(null);
+	const [counterOfferModal, setCounterOfferModal] =
+		useState<CounterOfferModalState | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
@@ -970,7 +982,14 @@ const OffersList = () => {
 																			: ""}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																		{formatDriverBidRate(driver.rate) ?? ""}
+																		<div className="flex flex-col items-center gap-0.5">
+																			<span>{formatDriverBidRate(driver.rate) ?? ""}</span>
+																			{driver.counter_offer != null && (
+																				<span className="text-xs font-medium text-yellow-500 dark:text-yellow-400">
+																					{formatDriverBidRate(driver.counter_offer)}
+																				</span>
+																			)}
+																		</div>
 																	</TableCell>
 																	<TableCell className="px-2 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																		{(() => {
@@ -1033,7 +1052,7 @@ const OffersList = () => {
 																					Return
 																				</button>
 																			) : (
-																				<div className="flex items-center justify-center gap-1.5">
+																				<div className="flex flex-wrap items-center justify-center gap-1.5">
 																					<button
 																						type="button"
 																						disabled={
@@ -1066,7 +1085,7 @@ const OffersList = () => {
 																								console.error(res.error);
 																							}
 																						}}
-																						className="min-w-0 flex-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																						className="shrink-0 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 																					>
 																						Delete
 																					</button>
@@ -1098,10 +1117,32 @@ const OffersList = () => {
 																								setAcceptingDriverKey(null);
 																							});
 																						}}
-																						className="min-w-0 flex-1 rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																						className="shrink-0 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																					>
 																						Accept
 																					</button>
+																					{/* Temporarily hidden: Counter offer button
+																					{driver.rate != null && driver.counter_offer == null && (
+																						<button
+																							type="button"
+																							disabled={!canModifyOffersByRole}
+																							onClick={() => {
+																								if (!canModifyOffersByRole) return;
+																								const key = driver.externalId ?? driver.driver_id;
+																								if (!key) return;
+																								setCounterOfferModal({
+																									offerId: row.id,
+																									driverExternalId: key,
+																									driverName: driverDisplayName || "Driver",
+																									driverRate: driver.rate,
+																								});
+																							}}
+																							className="shrink-0 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+																						>
+																							Counter offer
+																						</button>
+																					)}
+																					*/}
 																				</div>
 																			)}
 																		</TableCell>
@@ -1222,6 +1263,15 @@ const OffersList = () => {
 					avgRating={ratingModalDriver.avgRating}
 				/>
 			)}
+
+			<CounterOfferModal
+				isOpen={counterOfferModal != null}
+				state={counterOfferModal}
+				onClose={() => setCounterOfferModal(null)}
+				onSaved={async () => {
+					await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+				}}
+			/>
 
 			<ConfirmModal
 				isOpen={deactivateConfirmOffer != null}

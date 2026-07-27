@@ -12,6 +12,7 @@ export interface OfferDriver {
 	active: boolean;
 	is_selected: boolean;
 	rate: number | null;
+	counter_offer?: number | null;
 	action_time?: number | null;
 	action_time_display?: string | null;
 	empty_miles: number | null;
@@ -177,6 +178,14 @@ export interface ExtendDriverTimeResponse {
 
 export interface SelectDriverForOfferResponse {
 	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+export interface SetDriverCounterOfferResponse {
+	success: boolean;
+	counter_offer?: number | null;
+	rate?: number | null;
 	message?: string;
 	error?: string;
 }
@@ -528,6 +537,46 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in selectDriverForOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async setDriverCounterOffer(
+		offerId: number,
+		driverExternalId: string,
+		counterOffer: number
+	): Promise<SetDriverCounterOfferResponse> {
+		try {
+			const response = await axios.patch<SetDriverCounterOfferResponse>(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/counter-offer`,
+				{ counterOffer },
+				{
+					headers: { "Content-Type": "application/json" },
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					counter_offer: data.counter_offer,
+					rate: data.rate,
+					message: data.message,
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to save counter offer",
+			};
+		} catch (error) {
+			console.error("Error in setDriverCounterOffer:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",
