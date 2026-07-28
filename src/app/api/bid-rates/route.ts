@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
 		const rate = Number(body?.rate);
 		const distance = Number(body?.distance);
 		const route = body?.route;
+		const isDoNotBid = Boolean(body?.isDoNotBid);
 
 		if (!Array.isArray(route) || route.length < 2) {
 			return NextResponse.json(
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${accessToken}`,
 			},
-			body: JSON.stringify({ route, broker, rate, distance }),
+			body: JSON.stringify({ route, broker, rate, distance, isDoNotBid }),
 		});
 
 		const data = await response.json();

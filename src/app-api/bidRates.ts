@@ -25,6 +25,8 @@ export interface BidRate {
 	isArchive?: boolean;
 	/** True after bid_rates.rate was changed from the initial create value. */
 	isRateChange?: boolean;
+	/** When true, show Do Not Bid! and disable +1 / offers / votes. */
+	isDoNotBid?: boolean;
 	/** Unix timestamp in seconds. */
 	createdAt: number;
 	/** Unix timestamp in seconds. */
@@ -63,6 +65,7 @@ export interface CreateBidRatePayload {
 	broker: string;
 	rate: number;
 	distance: number;
+	isDoNotBid?: boolean;
 }
 
 export async function getBidRates(

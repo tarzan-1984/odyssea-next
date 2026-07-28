@@ -173,6 +173,7 @@ export default function BidRatesList({
 		if (!currentUser?.id) return;
 
 		for (const row of rows) {
+			if (row.isDoNotBid) continue;
 			const isOwner = row.ownerId === currentUser.id;
 			if (!isOwner) continue;
 
@@ -289,6 +290,7 @@ export default function BidRatesList({
 							const showMaxExtendMessage =
 								isOwner && inWarningWindow && !canExtend;
 							const isExpanded = expandedBidId === row.id;
+							const isDoNotBid = Boolean(row.isDoNotBid);
 
 							return (
 								<div
@@ -318,7 +320,9 @@ export default function BidRatesList({
 															</>
 														) : null}
 													</span>
-													<BidPlusOneParticipantsPopup bidRateId={row.id} />
+													{!isDoNotBid ? (
+														<BidPlusOneParticipantsPopup bidRateId={row.id} />
+													) : null}
 												</div>
 												<p className="text-base font-medium text-gray-900 dark:text-white">
 													{routeLabel ? (
@@ -340,15 +344,23 @@ export default function BidRatesList({
 													)}
 												</p>
 												<div className="flex items-center gap-2">
-													<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
-														{formatBidRate(row.rate)}
-													</p>
-													<BidEditPriceButton
-														bid={row}
-														currentUserId={currentUser?.id}
-														onEdit={setEditPriceBid}
-													/>
-													<BidRateVotersPopup bidRateId={row.id} />
+													{isDoNotBid ? (
+														<p className="text-xl font-semibold text-red-600 dark:text-red-500">
+															Do Not Bid!
+														</p>
+													) : (
+														<>
+															<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">
+																{formatBidRate(row.rate)}
+															</p>
+															<BidEditPriceButton
+																bid={row}
+																currentUserId={currentUser?.id}
+																onEdit={setEditPriceBid}
+															/>
+															<BidRateVotersPopup bidRateId={row.id} />
+														</>
+													)}
 												</div>
 											</div>
 											<div className="flex flex-shrink-0 flex-col items-end gap-2">
@@ -370,7 +382,7 @@ export default function BidRatesList({
 													</button>
 												) : null}
 
-												{hasActiveTimer ? (
+												{!isDoNotBid && hasActiveTimer ? (
 													<div className="flex max-w-[280px] flex-col items-end gap-1.5 sm:max-w-xs">
 														<div className="flex items-center gap-2">
 															<span
@@ -407,7 +419,7 @@ export default function BidRatesList({
 															</p>
 														) : null}
 													</div>
-												) : isExpired ? (
+												) : !isDoNotBid && isExpired ? (
 													<span className="text-sm text-gray-800 dark:text-gray-200">
 														Bid time Expired
 													</span>
@@ -424,7 +436,7 @@ export default function BidRatesList({
 												<BidRateChatEmbed
 													chatRoomId={row.chatId}
 													bidOwnerId={row.ownerId}
-													disableBidPlusOne={isOwner}
+													disableBidPlusOne={isOwner || isDoNotBid}
 												/>
 											) : (
 												<p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">

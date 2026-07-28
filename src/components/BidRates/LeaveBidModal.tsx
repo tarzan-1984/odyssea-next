@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Checkbox from "@/components/form/input/Checkbox";
+import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { EditLoadedMilesIcon } from "@/icons";
@@ -27,11 +28,13 @@ type LeaveBidModalProps = {
 type LeaveBidForm = {
 	broker: string;
 	rate: string;
+	isDoNotBid: boolean;
 };
 
 const EMPTY_FORM: LeaveBidForm = {
 	broker: "",
 	rate: "",
+	isDoNotBid: false,
 };
 
 export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
@@ -141,6 +144,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 
 		const broker = form.broker.trim();
 		const rateRaw = form.rate.trim();
+		const isDoNotBid = form.isDoNotBid;
 		const nextRouteError = validateBidRouteRows(routeRows);
 
 		if (nextRouteError) {
@@ -160,15 +164,24 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 			setError("Please enter broker.");
 			return;
 		}
-		if (!rateRaw) {
-			setError("Please enter rate.");
-			return;
-		}
 
-		const rate = Number(rateRaw.replace(",", "."));
-		if (!Number.isFinite(rate) || rate < 0) {
-			setError("Please enter a valid rate.");
-			return;
+		let rate = 0;
+		if (!isDoNotBid) {
+			if (!rateRaw) {
+				setError("Please enter rate.");
+				return;
+			}
+			rate = Number(rateRaw.replace(",", "."));
+			if (!Number.isFinite(rate) || rate < 0) {
+				setError("Please enter a valid rate.");
+				return;
+			}
+		} else if (rateRaw) {
+			rate = Number(rateRaw.replace(",", "."));
+			if (!Number.isFinite(rate) || rate < 0) {
+				setError("Please enter a valid rate.");
+				return;
+			}
 		}
 
 		setSubmitting(true);
@@ -178,6 +191,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 				broker,
 				rate,
 				distance: Math.round(distance),
+				isDoNotBid,
 			});
 			onClose();
 		} catch (err) {
@@ -273,17 +287,25 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 
 						<div>
 							<Label htmlFor="leave-bid-rate">Rate</Label>
-							<div className="mt-1.5">
-								<Input
-									id="leave-bid-rate"
-									name="rate"
-									type="number"
-									step={0.01}
-									min="0"
-									inputMode="decimal"
-									value={form.rate}
-									onChange={e => updateField("rate", e.target.value)}
-									placeholder="0.00"
+							<div className="mt-1.5 flex items-center gap-4">
+								<div className="min-w-0 flex-1">
+									<Input
+										id="leave-bid-rate"
+										name="rate"
+										type="number"
+										step={0.01}
+										min="0"
+										inputMode="decimal"
+										value={form.rate}
+										onChange={e => updateField("rate", e.target.value)}
+										placeholder="0.00"
+										disabled={form.isDoNotBid}
+									/>
+								</div>
+								<Switch
+									label="Do not bid"
+									checked={form.isDoNotBid}
+									onChange={checked => updateField("isDoNotBid", checked)}
 								/>
 							</div>
 						</div>
