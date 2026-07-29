@@ -48,7 +48,12 @@ export async function PATCH(
 				data.error ??
 				"Failed to save counter offer";
 			return NextResponse.json(
-				{ error: errorMessage, errors },
+				{
+					error: errorMessage,
+					errors,
+					code: data.code ?? undefined,
+					message: data.message ?? undefined,
+				},
 				{ status: response.status }
 			);
 		}

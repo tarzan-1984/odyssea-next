@@ -186,8 +186,10 @@ export interface SetDriverCounterOfferResponse {
 	success: boolean;
 	counter_offer?: number | null;
 	rate?: number | null;
+	counter_offer_sent_count?: number;
 	message?: string;
 	error?: string;
+	code?: string;
 }
 
 export interface DeactivateOfferResponse {
@@ -559,20 +561,26 @@ const offers = {
 					validateStatus: () => true,
 				}
 			);
-			const data = response.data;
+			const data = response.data as SetDriverCounterOfferResponse & {
+				errors?: string[];
+			};
 			if (response.status >= 200 && response.status < 300) {
 				return {
 					success: true,
 					counter_offer: data.counter_offer,
 					rate: data.rate,
+					counter_offer_sent_count: data.counter_offer_sent_count,
 					message: data.message,
 				};
 			}
+			const errors = Array.isArray(data.errors) ? data.errors : [];
 			return {
 				success: false,
+				code: data.code,
 				error:
-					(data as { error?: string; message?: string })?.error ??
-					(data as { message?: string })?.message ??
+					(typeof errors[0] === "string" ? errors[0] : null) ??
+					data.error ??
+					data.message ??
 					"Failed to save counter offer",
 			};
 		} catch (error) {

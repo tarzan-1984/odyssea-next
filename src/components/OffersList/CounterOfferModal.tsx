@@ -21,6 +21,9 @@ type CounterOfferModalProps = {
 	onSaved?: () => void | Promise<void>;
 };
 
+const COUNTER_OFFER_LIMIT_MESSAGE =
+	"You have reached the maximum number of counteroffers for this driver. Additional counteroffers are no longer available. If you would like to continue negotiating, please contact the driver directly through the chat.";
+
 function initialRateValue(rate: number | null | undefined): string {
 	if (rate == null || !Number.isFinite(rate)) return "";
 	return String(rate);
@@ -38,18 +41,20 @@ export default function CounterOfferModal({
 }: CounterOfferModalProps) {
 	const [rateInput, setRateInput] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const [limitReached, setLimitReached] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	useEffect(() => {
 		if (!isOpen || !state) return;
 		setError(null);
+		setLimitReached(false);
 		setSubmitting(false);
 		setRateInput(initialRateValue(state.driverRate));
 	}, [isOpen, state]);
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
-		if (!state || submitting) return;
+		if (!state || submitting || limitReached) return;
 
 		const trimmed = rateInput.replace(/,/g, "").trim();
 		if (!trimmed) {
@@ -84,7 +89,15 @@ export default function CounterOfferModal({
 				rate,
 			);
 			if (!res.success) {
-				setError(res.error ?? "Failed to save counter offer.");
+				const isLimit =
+					res.code === "COUNTER_OFFER_LIMIT_REACHED" ||
+					(res.error ?? "").includes("maximum number of counteroffers");
+				if (isLimit) {
+					setLimitReached(true);
+					setError(res.error ?? COUNTER_OFFER_LIMIT_MESSAGE);
+				} else {
+					setError(res.error ?? "Failed to save counter offer.");
+				}
 				return;
 			}
 			await onSaved?.();
@@ -110,40 +123,57 @@ export default function CounterOfferModal({
 			) : (
 				<div className="mb-5" />
 			)}
-			<form onSubmit={handleSubmit} className="space-y-4">
-				<div>
-					<Label htmlFor="counter-offer-rate-input">Your offer ($)</Label>
-					<Input
-						id="counter-offer-rate-input"
-						type="text"
-						inputMode="decimal"
-						value={rateInput}
-						onChange={e => {
-							setRateInput(e.target.value);
-							if (error) setError(null);
-						}}
-						placeholder="Enter rate"
-						className="dark:bg-gray-900"
-						error={Boolean(error)}
-						hint={error ?? undefined}
-						disabled={submitting}
-					/>
-				</div>
-				<div className="flex justify-end gap-3 pt-2">
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={onClose}
-						disabled={submitting}
+
+			{limitReached ? (
+				<div className="space-y-4">
+					<div
+						role="alert"
+						className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
 					>
-						Cancel
-					</Button>
-					<Button type="submit" size="sm" disabled={submitting}>
-						{submitting ? "Sending…" : "Send"}
-					</Button>
+						{error ?? COUNTER_OFFER_LIMIT_MESSAGE}
+					</div>
+					<div className="flex justify-end">
+						<Button type="button" size="sm" onClick={onClose}>
+							OK
+						</Button>
+					</div>
 				</div>
-			</form>
+			) : (
+				<form onSubmit={handleSubmit} className="space-y-4">
+					<div>
+						<Label htmlFor="counter-offer-rate-input">Your offer ($)</Label>
+						<Input
+							id="counter-offer-rate-input"
+							type="text"
+							inputMode="decimal"
+							value={rateInput}
+							onChange={e => {
+								setRateInput(e.target.value);
+								if (error) setError(null);
+							}}
+							placeholder="Enter rate"
+							className="dark:bg-gray-900"
+							error={Boolean(error)}
+							hint={error ?? undefined}
+							disabled={submitting}
+						/>
+					</div>
+					<div className="flex justify-end gap-3 pt-2">
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={onClose}
+							disabled={submitting}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" size="sm" disabled={submitting}>
+							{submitting ? "Sending…" : "Send"}
+						</Button>
+					</div>
+				</form>
+			)}
 		</Modal>
 	);
 }
