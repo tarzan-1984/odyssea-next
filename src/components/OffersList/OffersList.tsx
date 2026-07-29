@@ -8,7 +8,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon, OfferAcceptIcon, OfferDeleteIcon, OfferCounterOfferIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import Button from "@/components/ui/button/Button";
@@ -1085,8 +1085,9 @@ const OffersList = () => {
 																								console.error(res.error);
 																							}
 																						}}
-																						className="shrink-0 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																						className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 																					>
+																						<OfferDeleteIcon className="h-3.5 w-3.5 shrink-0" />
 																						Delete
 																					</button>
 																					<button
@@ -1117,11 +1118,11 @@ const OffersList = () => {
 																								setAcceptingDriverKey(null);
 																							});
 																						}}
-																						className="shrink-0 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																						className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																					>
+																						<OfferAcceptIcon className="h-3.5 w-3.5 shrink-0" />
 																						Accept
 																					</button>
-																					{/* Temporarily hidden: Counter offer button
 																					{driver.rate != null && driver.counter_offer == null && (
 																						<button
 																							type="button"
@@ -1137,12 +1138,12 @@ const OffersList = () => {
 																									driverRate: driver.rate,
 																								});
 																							}}
-																							className="shrink-0 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
 																						>
+																							<OfferCounterOfferIcon className="h-3.5 w-3.5 shrink-0" />
 																							Counter offer
 																						</button>
 																					)}
-																					*/}
 																				</div>
 																			)}
 																		</TableCell>

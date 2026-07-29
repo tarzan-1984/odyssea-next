@@ -85,6 +85,9 @@ import BidUnreadMessagesIcon from "./BidUnreadMessagesIcon";
 import BidParticipantRateIcon from "./BidParticipantRateIcon";
 import BidOfferAcceptIcon from "./BidOfferAcceptIcon";
 import BidOfferRejectIcon from "./BidOfferRejectIcon";
+import OfferAcceptIcon from "./OfferAcceptIcon";
+import OfferDeleteIcon from "./OfferDeleteIcon";
+import OfferCounterOfferIcon from "./OfferCounterOfferIcon";
 import AddedValueIcon from "./AddedValueIcon";
 import TwicIcon from "./additional/twic.svg";
 import HazmatIcon from "./additional/hazmat.svg";
@@ -179,6 +182,9 @@ export {
 	BidParticipantRateIcon,
 	BidOfferAcceptIcon,
 	BidOfferRejectIcon,
+	OfferAcceptIcon,
+	OfferDeleteIcon,
+	OfferCounterOfferIcon,
 	AddedValueIcon,
 	BoxTapped,
 	TruckDelivery,
