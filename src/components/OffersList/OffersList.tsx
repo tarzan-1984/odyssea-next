@@ -1112,6 +1112,11 @@ const OffersList = () => {
 																									setShowDriverAcceptedModal(true);
 																								} else {
 																									console.error(res.error);
+																									window.alert(
+																										typeof res.error === "string"
+																											? res.error
+																											: "Failed to accept driver"
+																									);
 																								}
 																							})
 																							.finally(() => {
