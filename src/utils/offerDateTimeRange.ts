@@ -193,10 +193,13 @@ export const ROUTE_CHRONOLOGY_ERROR =
 export const END_TIME_AFTER_START_ERROR = "End time must be after start time";
 
 /** Standard delivery-time placeholder when driver should deliver as soon as possible. */
-export const OFFER_ASAP_TIME = "ASAP";
+export const OFFER_ASAP_TIME = "As soon as possible, negotiable";
 
 export function isOfferAsapTime(value: string): boolean {
-	return value.trim().toUpperCase() === OFFER_ASAP_TIME;
+	const normalized = value.trim().toUpperCase();
+	return (
+		normalized === OFFER_ASAP_TIME.toUpperCase() || normalized === "ASAP"
+	);
 }
 
 /** Ensures route stops are in non-decreasing chronological order by start time. */
