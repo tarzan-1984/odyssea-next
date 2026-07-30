@@ -156,7 +156,7 @@ export function middleware(request: NextRequest) {
 		}
 	}
 
-	// App Logs: administrators only
+	// App Logs: administrators and tracking team leads
 	const isAppLogsPage =
 		pathname === "/app-logs" || pathname.startsWith("/app-logs/");
 	if (isAppLogsPage && hasToken) {
