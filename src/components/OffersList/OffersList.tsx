@@ -361,6 +361,7 @@ const DRIVER_TABLE_COL_UNIT = "280px";
 const DRIVER_TABLE_COL_PHONE = "130px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
+const DRIVER_TABLE_COL_DRIVER_ETA = "104px";
 const DRIVER_TABLE_COL_BID_TIMER = "126px";
 
 function fixedDriverTableCol(width: string) {
@@ -751,7 +752,7 @@ const OffersList = () => {
 								</div>
 									{isExpanded && (
 										<div className="border-t border-gray-100 dark:border-white/[0.05] px-4 py-3">
-											<div className="w-full max-w-[1300px]">
+											<div className="w-full max-w-[1400px]">
 											<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
 												Details
 											</h3>
@@ -865,6 +866,7 @@ const OffersList = () => {
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_DRIVER_ETA)} />
 													<col
 														style={fixedDriverTableCol(row.is_driver_selected ? "96px" : "88px")}
 													/>
@@ -886,6 +888,9 @@ const OffersList = () => {
 																</TableCell>
 																<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																	Total miles
+																</TableCell>
+																<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																	Driver&apos;s ETA
 																</TableCell>
 																<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																	Rate
@@ -976,6 +981,9 @@ const OffersList = () => {
 																		{driver.total_miles != null
 																			? Math.round(driver.total_miles)
 																			: ""}
+																	</TableCell>
+																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																		{driver.driver_eta?.trim() || ""}
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		<div className="flex flex-col items-center gap-0.5">
