@@ -183,6 +183,33 @@ export function canCreateOffers(role: string | undefined | null): boolean {
 /** Alias: all offer write actions (create, deactivate, drivers, accept, push, etc.). */
 export const canModifyOffers = canCreateOffers;
 
+/** My Loads secondary chat tab (TMS teams without subordinates). */
+export const MY_LOADS_CHAT_TAB_ROLES = [
+	"TRACKING_TL",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+] as const;
+
+/** My Team secondary chat tab (TMS teams with subordinates). */
+export const MY_TEAM_CHAT_TAB_ROLES = [
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+] as const;
+
+export function canAccessMyLoadsChatTab(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (MY_LOADS_CHAT_TAB_ROLES as readonly string[]).includes(normalized);
+}
+
+export function canAccessMyTeamChatTab(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (MY_TEAM_CHAT_TAB_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Default in-app landing path after login / generic "home" redirects. */
 export function getAppHomePath(role: string | undefined | null): string {
 	if (isGastRole(role)) return "/user-list";

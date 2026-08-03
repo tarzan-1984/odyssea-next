@@ -316,6 +316,15 @@ export function useChatOutboxSend({
 		[chatRoomId, dispatchOutboxSend, setOptimisticMessages]
 	);
 
+	const discardFailedOptimisticMessage = useCallback(
+		async (message: Message) => {
+			const clientMessageId = message.pendingOutgoing?.clientMessageId;
+			if (!clientMessageId) return;
+			await removeConfirmedOptimistic(clientMessageId);
+		},
+		[removeConfirmedOptimistic]
+	);
+
 	const hydrateRoomOutbox = useCallback(async (retryFailed = false) => {
 		if (!chatRoomId || !sender) return;
 		const items = await chatOutboxService.getForRoom(chatRoomId);
@@ -498,5 +507,6 @@ export function useChatOutboxSend({
 		sendTextMessage,
 		sendMediaMessage,
 		retryOptimisticMessage,
+		discardFailedOptimisticMessage,
 	};
 }

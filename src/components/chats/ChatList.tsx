@@ -19,6 +19,16 @@ import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import { canShowOfferId } from "@/utils/offerDisplay";
+import {
+	canAccessMyLoadsChatTab,
+	canAccessMyTeamChatTab,
+} from "@/utils/roleAccess";
+import { useQuery } from "@tanstack/react-query";
+import {
+	fetchTrackingTeamsLoadIds,
+	TRACKING_TEAMS_STALE_TIME_MS,
+	trackingTeamsQueryKey,
+} from "@/app-api/trackingTeams";
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
@@ -32,10 +42,17 @@ interface ChatListProps {
 }
 
 type FilterType = "all" | "muted" | "unread" | "favorite";
-type ChatTab = "chats" | "shipments" | "offers";
+type ChatTab = "chats" | "shipments" | "offers" | "my-loads" | "my-team";
 
 const CHAT_LIST_TAB_STORAGE_KEY = "odyssea-chat-list-active-tab";
 const MAX_EXPANDED_OFFER_GROUPS = 3;
+const CHAT_TAB_VALUES: ChatTab[] = [
+	"chats",
+	"shipments",
+	"offers",
+	"my-loads",
+	"my-team",
+];
 
 function pushExpandedOfferId(prev: string[], offerId: string): string[] {
 	if (prev.includes(offerId)) return prev;
@@ -55,10 +72,18 @@ function toggleExpandedOfferId(prev: string[], offerId: string): string[] {
 function readStoredChatTab(): ChatTab {
 	if (typeof window === "undefined") return "chats";
 	const stored = sessionStorage.getItem(CHAT_LIST_TAB_STORAGE_KEY);
-	if (stored === "chats" || stored === "shipments" || stored === "offers") {
-		return stored;
+	if (stored && (CHAT_TAB_VALUES as string[]).includes(stored)) {
+		return stored as ChatTab;
 	}
 	return "chats";
+}
+
+function isLoadChatInIdSet(room: ChatRoom, loadIdSet: Set<string> | null): boolean {
+	if (room.type !== "LOAD" || room.isLoadArchived === true) return false;
+	if (!loadIdSet) return false;
+	const loadId = room.loadId?.trim();
+	if (!loadId) return false;
+	return loadIdSet.has(loadId);
 }
 
 /** These roles do not see the Offers tab in the chat sidebar. */
@@ -95,6 +120,15 @@ export default function ChatList({
 		return !ROLES_WITHOUT_OFFERS_CHAT_TAB.has(role);
 	}, [currentUser?.role]);
 
+	const showMyLoadsTab = useMemo(
+		() => canAccessMyLoadsChatTab(currentUser?.role),
+		[currentUser?.role],
+	);
+	const showMyTeamTab = useMemo(
+		() => canAccessMyTeamChatTab(currentUser?.role),
+		[currentUser?.role],
+	);
+
 	const [isOpenTwo, setIsOpenTwo] = useState(false);
 	const headerDropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -105,6 +139,29 @@ export default function ChatList({
 	const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 	// Always "chats" on first render (SSR + hydration); restore tab after mount.
 	const [activeTab, setActiveTab] = useState<ChatTab>("chats");
+
+	const { data: myLoadsIds = [], isFetching: isFetchingMyLoads } = useQuery({
+		queryKey: trackingTeamsQueryKey("mine"),
+		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
+		enabled: showMyLoadsTab,
+		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
+
+	const { data: myTeamIds = [], isFetching: isFetchingMyTeam } = useQuery({
+		queryKey: trackingTeamsQueryKey("team"),
+		queryFn: () => fetchTrackingTeamsLoadIds("team"),
+		enabled: showMyTeamTab,
+		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
+
+	const myLoadsIdSet = useMemo(() => new Set(myLoadsIds), [myLoadsIds]);
+	const myTeamIdSet = useMemo(() => new Set(myTeamIds), [myTeamIds]);
 
 	useEffect(() => {
 		if (offerFromUrl) {
@@ -170,6 +227,18 @@ export default function ChatList({
 			setActiveTab("chats");
 		}
 	}, [showOffersTab, activeTab]);
+
+	useEffect(() => {
+		if (!showMyLoadsTab && activeTab === "my-loads") {
+			setActiveTab("chats");
+		}
+	}, [showMyLoadsTab, activeTab]);
+
+	useEffect(() => {
+		if (!showMyTeamTab && activeTab === "my-team") {
+			setActiveTab(showMyLoadsTab ? "my-loads" : "chats");
+		}
+	}, [showMyTeamTab, showMyLoadsTab, activeTab]);
 
 	const showOfferId = canShowOfferId(currentUser);
 
@@ -256,19 +325,28 @@ export default function ChatList({
 		const offers = chatRooms
 			.filter(r => r.type === "OFFER")
 			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
-		return { chats, shipments, offers };
-	}, [chatRooms]);
+		const myLoads = chatRooms
+			.filter(r => isLoadChatInIdSet(r, myLoadsIdSet))
+			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+		const myTeam = chatRooms
+			.filter(r => isLoadChatInIdSet(r, myTeamIdSet))
+			.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+		return { chats, shipments, offers, myLoads, myTeam };
+	}, [chatRooms, myLoadsIdSet, myTeamIdSet]);
 
 	// Tab filtering:
 	// - Chats tab: show DIRECT and GROUP (exclude LOAD, OFFER, BID)
 	// - Shipments tab: show only LOAD chats
 	// - Offers tab: show only OFFER chats
+	// - My Loads / My Team: LOAD chats filtered by TMS load ids
 	const tabScopedChatRooms = chatRooms.filter(room => {
 		if (activeTab === "chats")
 			return room.type !== "LOAD" && room.type !== "OFFER" && room.type !== "BID";
 		if (activeTab === "shipments")
 			return room.type === "LOAD" && !(room.isLoadArchived === true);
 		if (activeTab === "offers") return room.type === "OFFER";
+		if (activeTab === "my-loads") return isLoadChatInIdSet(room, myLoadsIdSet);
+		if (activeTab === "my-team") return isLoadChatInIdSet(room, myTeamIdSet);
 		return false;
 	});
 
@@ -391,7 +469,10 @@ export default function ChatList({
 			chatRoom,
 			debouncedSearchQuery,
 			getChatDisplayName,
-			{ includeParticipantPhones: activeTab === "shipments" }
+			{ includeParticipantPhones:
+				activeTab === "shipments" ||
+				activeTab === "my-loads" ||
+				activeTab === "my-team" }
 		);
 
 		// Apply selected filter
@@ -635,6 +716,59 @@ export default function ChatList({
 						</button>
 					)}
 				</div>
+				{/* Secondary tabs (My Loads / My Team) — TRACKING_TL* only */}
+				{(showMyLoadsTab || showMyTeamTab) && (
+					<div className="flex gap-1 mt-1">
+						{showMyLoadsTab && (
+							<button
+								type="button"
+								onClick={() => setActiveTab("my-loads")}
+								className={`${showMyTeamTab ? "flex-1" : "w-full"} flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
+									activeTab === "my-loads"
+										? "bg-brand-500 text-white"
+										: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
+								}`}
+							>
+								My Loads
+								{tabUnreadCounts.myLoads > 0 && (
+									<span
+										className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+											activeTab === "my-loads"
+												? "bg-white/25 text-white"
+												: "bg-red-500 text-white dark:bg-red-600"
+										}`}
+									>
+										{tabUnreadCounts.myLoads > 99 ? "99+" : tabUnreadCounts.myLoads}
+									</span>
+								)}
+							</button>
+						)}
+						{showMyTeamTab && (
+							<button
+								type="button"
+								onClick={() => setActiveTab("my-team")}
+								className={`${showMyLoadsTab ? "flex-1" : "w-full"} flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
+									activeTab === "my-team"
+										? "bg-brand-500 text-white"
+										: "border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-brand-500 hover:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-brand-500 dark:hover:border-brand-500"
+								}`}
+							>
+								My Team
+								{tabUnreadCounts.myTeam > 0 && (
+									<span
+										className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 text-xs font-semibold ${
+											activeTab === "my-team"
+												? "bg-white/25 text-white"
+												: "bg-red-500 text-white dark:bg-red-600"
+										}`}
+									>
+										{tabUnreadCounts.myTeam > 99 ? "99+" : tabUnreadCounts.myTeam}
+									</span>
+								)}
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 
 			{/* Filter Section */}
@@ -722,6 +856,16 @@ export default function ChatList({
 									<>
 										<p>No chats found</p>
 										<p className="text-sm">Try a different search term</p>
+									</>
+								) : (activeTab === "my-loads" && isFetchingMyLoads) ||
+								  (activeTab === "my-team" && isFetchingMyTeam) ? (
+									<>
+										<p>Loading loads…</p>
+									</>
+								) : activeTab === "my-loads" || activeTab === "my-team" ? (
+									<>
+										<p>No load chats</p>
+										<p className="text-sm">No matching loads for this tab</p>
 									</>
 								) : (
 									<>

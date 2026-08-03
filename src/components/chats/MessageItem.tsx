@@ -41,6 +41,8 @@ interface MessageItemProps {
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: () => void;
+	/** Discard a failed optimistic/outbox message (not sent to server). */
+	onDiscardFailed?: () => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -55,6 +57,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onReply,
 	onMarkUnread,
 	onRetry,
+	onDiscardFailed,
 }) => {
 	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
 		string | null
@@ -654,6 +657,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 												className="chat-msg-meta rounded-md bg-brand-500 px-2 py-0.5 font-medium text-white hover:bg-brand-600"
 											>
 												Retry
+											</button>
+										) : null}
+										{onDiscardFailed ? (
+											<button
+												type="button"
+												onClick={onDiscardFailed}
+												className="chat-msg-meta rounded-md bg-gray-500/80 px-2 py-0.5 font-medium text-white hover:bg-gray-600"
+											>
+												Delete
 											</button>
 										) : null}
 									</div>

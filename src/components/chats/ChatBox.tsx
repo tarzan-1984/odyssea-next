@@ -216,7 +216,8 @@ export default function ChatBox({
 		[selectedChatRoomId, addMessage]
 	);
 
-	const { sendTextMessage, sendMediaMessage, retryOptimisticMessage } = useChatOutboxSend({
+	const { sendTextMessage, sendMediaMessage, retryOptimisticMessage, discardFailedOptimisticMessage } =
+		useChatOutboxSend({
 		chatRoomId: selectedChatRoomId,
 		sender: outgoingSender,
 		isConnected: Boolean(socket?.connected),
@@ -986,6 +987,11 @@ export default function ChatBox({
 										console.error("Failed to retry message:", error);
 									});
 								}}
+								onDiscardFailed={message => {
+									discardFailedOptimisticMessage(message).catch(error => {
+										console.error("Failed to discard message:", error);
+									});
+								}}
 							/>
 						) : (
 							<div className="flex flex-col gap-6" data-chat-list-mode="plain">
@@ -1015,6 +1021,20 @@ export default function ChatBox({
 																);
 															}
 														);
+													}
+												: undefined
+										}
+										onDiscardFailed={
+											message.pendingOutgoing?.status === "failed"
+												? () => {
+														discardFailedOptimisticMessage(
+															message
+														).catch(error => {
+															console.error(
+																"Failed to discard message:",
+																error
+															);
+														});
 													}
 												: undefined
 										}

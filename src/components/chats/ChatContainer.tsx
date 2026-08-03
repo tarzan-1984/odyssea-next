@@ -20,6 +20,16 @@ import {
 import { useCurrentUser } from "@/stores/userStore";
 import { upsertArchivedLoadChatInCache } from "@/utils/upsertArchivedLoadChatInCache";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
+import { useQuery } from "@tanstack/react-query";
+import {
+	canAccessMyLoadsChatTab,
+	canAccessMyTeamChatTab,
+} from "@/utils/roleAccess";
+import {
+	fetchTrackingTeamsLoadIds,
+	TRACKING_TEAMS_STALE_TIME_MS,
+	trackingTeamsQueryKey,
+} from "@/app-api/trackingTeams";
 
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
@@ -30,6 +40,30 @@ export default function ChatContainer() {
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
 	const currentUser = useCurrentUser();
+
+	const showMyLoadsTab = canAccessMyLoadsChatTab(currentUser?.role);
+	const showMyTeamTab = canAccessMyTeamChatTab(currentUser?.role);
+
+	// Prefetch TMS load ids as soon as chats page loads (shared RQ cache with ChatList tabs).
+	useQuery({
+		queryKey: trackingTeamsQueryKey("mine"),
+		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
+		enabled: showMyLoadsTab,
+		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
+	useQuery({
+		queryKey: trackingTeamsQueryKey("team"),
+		queryFn: () => fetchTrackingTeamsLoadIds("team"),
+		enabled: showMyTeamTab,
+		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
+
 	const [selectedChatRoomId, setSelectedChatRoomId] = useState<string | null>(
 		roomFromUrl || null
 	);

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { useChatStore } from "@/stores/chatStore";
 import { useUserStore } from "@/stores/userStore";
@@ -28,6 +28,36 @@ import {
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
+import {
+	TRACKING_TEAMS_QUERY_KEY,
+	fetchTrackingTeamsLoadIds,
+	type TrackingTeamsScope,
+} from "@/app-api/trackingTeams";
+import {
+	canAccessMyLoadsChatTab,
+	canAccessMyTeamChatTab,
+} from "@/utils/roleAccess";
+
+function invalidateTrackingTeamsOnLoadChatEvent(
+	queryClient: QueryClient,
+	roomType?: string | null,
+) {
+	if (roomType && roomType !== "LOAD") return;
+	const role = useUserStore.getState().currentUser?.role;
+	const scopes: TrackingTeamsScope[] = [];
+	if (canAccessMyLoadsChatTab(role)) scopes.push("mine");
+	if (canAccessMyTeamChatTab(role)) scopes.push("team");
+	if (scopes.length === 0) return;
+
+	for (const scope of scopes) {
+		queryClient
+			.fetchQuery({
+				queryKey: [TRACKING_TEAMS_QUERY_KEY, scope],
+				queryFn: () => fetchTrackingTeamsLoadIds(scope, { refresh: true }),
+			})
+			.catch(() => {});
+	}
+}
 import { clearBidParticipantsCache } from "@/components/BidRates/BidPlusOneParticipantsPopup";
 import { clearBidRateVotersCache } from "@/components/BidRates/BidRateVotersPopup";
 import { ODYSSEA_BID_RATE_UPDATED_EVENT } from "@/lib/bidRateRealtimeEvents";
@@ -747,6 +777,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				queryClient
 					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
 					.catch(() => {});
+				invalidateTrackingTeamsOnLoadChatEvent(queryClient, "LOAD");
 			}
 
 			state.removeChatRoom(data.chatRoomId);
@@ -1005,6 +1036,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			if (!data?.chatRoomId) return;
 			try {
 				await restoreChatRoomById(data.chatRoomId);
+				const room = useChatStore.getState().chatRooms.find(r => r.id === data.chatRoomId);
+				invalidateTrackingTeamsOnLoadChatEvent(queryClient, room?.type ?? "LOAD");
 			} catch (error) {
 				console.error("Failed to load chat room after participant add:", error);
 			}
@@ -1183,6 +1216,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					console.error("Failed to save new chat room to IndexedDB:", dbError);
 				}
 
+				invalidateTrackingTeamsOnLoadChatEvent(queryClient, normalized.type);
+
 				// Automatically join the WebSocket room for the new chat
 				// This ensures the user receives real-time messages in this chat
 				if (newSocket && newSocket.connected) {
@@ -1199,6 +1234,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			const patch = data.updatedChatRoom as Partial<ChatRoom> & {
 				isLoadArchived?: boolean;
 			};
+			const roomType =
+				patch.type ??
+				useChatStore.getState().chatRooms.find(r => r.id === data.chatRoomId)?.type;
+			invalidateTrackingTeamsOnLoadChatEvent(queryClient, roomType);
+
 			if (patch.isLoadArchived === false) {
 				removeArchivedLoadChatFromCache(queryClient, data.chatRoomId);
 			} else if (patch.isLoadArchived === true) {
@@ -1308,7 +1348,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const wasCurrent = state.currentChatRoom?.id === chatRoomId;
 
 				// Remove the entire chat room from the list and cache
+				const roomType = state.chatRooms.find(r => r.id === chatRoomId)?.type;
 				state.removeChatRoom(chatRoomId);
+				invalidateTrackingTeamsOnLoadChatEvent(queryClient, roomType ?? "LOAD");
 
 				if (wasCurrent) {
 					window.dispatchEvent(
