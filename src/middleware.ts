@@ -7,6 +7,7 @@ import {
 	canAccessBidRates,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
+	canAccessLoadBoard,
 	canAccessUserListAndCheckList,
 	getAppHomePath,
 } from "@/utils/roleAccess";
@@ -152,6 +153,15 @@ export function middleware(request: NextRequest) {
 	if (isBidRatesPage && hasToken) {
 		const role = getUserRoleFromCookie(request);
 		if (!canAccessBidRates(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+	}
+
+	const isLoadBoardPage =
+		pathname === "/load-board" || pathname.startsWith("/load-board/");
+	if (isLoadBoardPage && hasToken) {
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessLoadBoard(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}

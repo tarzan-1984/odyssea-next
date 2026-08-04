@@ -158,6 +158,24 @@ export function canAccessAppLogs(role: string | undefined | null): boolean {
 	return (APP_LOGS_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
+/** Load board page. */
+export const LOAD_BOARD_ALLOWED_ROLES = [
+	"DISPATCHER",
+	"DISPATCHER_TL",
+	"EXPEDITE_MANAGER",
+	"MODERATOR",
+	"ADMINISTRATOR",
+	"NIGHTSHIFT_TRACKING",
+	"MORNING_TRACKING",
+	"TRACKING_TL",
+] as const;
+
+export function canAccessLoadBoard(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (LOAD_BOARD_ALLOWED_ROLES as readonly string[]).includes(normalized);
+}
+
 export const CHAT_MESSAGE_DELETE_ROLES = [
 	"ADMINISTRATOR",
 	"TRACKING_TL",

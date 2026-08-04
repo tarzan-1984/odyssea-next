@@ -73,6 +73,7 @@ import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
 import CheckListIcon from "./check-list.svg";
 import BidRatesIcon from "./bid-rates.svg";
+import LoadBoardIcon from "./load-board.svg";
 import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
 import DeactivateOfferIcon from "./deactivate-offer.svg";
@@ -170,6 +171,7 @@ export {
 	WorkstationIcon,
 	CheckListIcon,
 	BidRatesIcon,
+	LoadBoardIcon,
 	OfferDriverChatIcon,
 	ExtendBidTimeIcon,
 	DeactivateOfferIcon,

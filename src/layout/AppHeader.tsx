@@ -76,21 +76,21 @@ const AppHeader: React.FC = () => {
 						{/* Cross Icon */}
 					</button>
 
-					<Link href={mobileLogoHref} className="xl:hidden">
+					<Link
+						href={mobileLogoHref}
+						className="flex items-center gap-2 xl:hidden"
+					>
 						<Image
-							width={154}
-							height={32}
-							className="dark:hidden"
-							src="./images/logo/logo.svg"
-							alt="Logo"
+							src="/images/logo/odysseia-ship.png"
+							alt="Odysseia"
+							width={40}
+							height={36}
+							className="h-9 w-auto shrink-0 object-contain"
+							priority
 						/>
-						<Image
-							width={154}
-							height={32}
-							className="hidden dark:block"
-							src="./images/logo/logo-dark.svg"
-							alt="Logo"
-						/>
+						<span className="text-xl font-medium text-gray-800 dark:text-white">
+							Odysseia
+						</span>
 					</Link>
 
 					<HeaderTimeZonesBar />

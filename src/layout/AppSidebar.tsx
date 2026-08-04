@@ -10,6 +10,7 @@ import {
 	canAccessBidRates,
 	canAccessCheckList,
 	canAccessDriversAndOffers,
+	canAccessLoadBoard,
 	canAccessUserListAndCheckList,
 	getAppHomePath,
 } from "@/utils/roleAccess";
@@ -23,6 +24,7 @@ import {
 	WorkstationIcon,
 	CheckListIcon,
 	BidRatesIcon,
+	LoadBoardIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Users, MessageCircle, ScrollText } from "lucide-react";
@@ -80,6 +82,11 @@ const navItems: NavItem[] = [
 		icon: <BidRatesIcon className="h-7 w-7" />,
 		name: "Bid rates",
 		path: "/bid-rates",
+	},
+	{
+		icon: <LoadBoardIcon className="h-5 w-5" />,
+		name: "Load board",
+		path: "/load-board",
 	},
 	{
 		icon: <ScrollText className="h-5 w-5" />,
@@ -177,6 +184,7 @@ const DRIVERS_OFFERS_PATHS = ["/drivers-list", "/offers"];
 const USER_LIST_PATHS = ["/user-list"];
 const CHECK_LIST_PATHS = ["/check-list"];
 const BID_RATES_PATHS = ["/bid-rates"];
+const LOAD_BOARD_PATHS = ["/load-board"];
 const APP_LOGS_PATHS = ["/app-logs"];
 
 const AppSidebar: React.FC = () => {
@@ -189,6 +197,7 @@ const AppSidebar: React.FC = () => {
 	const canSeeUserList = canAccessUserListAndCheckList(currentUser?.role);
 	const canSeeCheckList = canAccessCheckList(currentUser?.role);
 	const canSeeBidRates = canAccessBidRates(currentUser?.role);
+	const canSeeLoadBoard = canAccessLoadBoard(currentUser?.role);
 	const canSeeAppLogs = canAccessAppLogs(currentUser?.role);
 	const appHomePath = getAppHomePath(currentUser?.role);
 	const menuNavItems = useMemo(
@@ -202,6 +211,7 @@ const AppSidebar: React.FC = () => {
 					(!item.path || !USER_LIST_PATHS.includes(item.path) || canSeeUserList) &&
 					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList) &&
 					(!item.path || !BID_RATES_PATHS.includes(item.path) || canSeeBidRates) &&
+					(!item.path || !LOAD_BOARD_PATHS.includes(item.path) || canSeeLoadBoard) &&
 					(!item.path || !APP_LOGS_PATHS.includes(item.path) || canSeeAppLogs),
 			),
 		[
@@ -211,6 +221,7 @@ const AppSidebar: React.FC = () => {
 			canSeeUserList,
 			canSeeCheckList,
 			canSeeBidRates,
+			canSeeLoadBoard,
 			canSeeAppLogs,
 		],
 	);
@@ -429,28 +440,30 @@ const AppSidebar: React.FC = () => {
 					!isExpanded && !isHovered ? "xl:justify-center" : "justify-start"
 				}`}
 			>
-				<Link href={appHomePath}>
+				<Link href={appHomePath} className="flex items-center gap-2.5 min-w-0">
 					{isExpanded || isHovered || isMobileOpen ? (
 						<>
-							{/*<Image*/}
-							{/*    className="dark:hidden"*/}
-							{/*    src="/images/logo/logo.svg"*/}
-							{/*    alt="Logo"*/}
-							{/*    width={150}*/}
-							{/*    height={40}*/}
-							{/*/>*/}
-
-							{/*<Image*/}
-							{/*    className="hidden dark:block"*/}
-							{/*    src="/images/logo/logo-dark.svg"*/}
-							{/*    alt="Logo"*/}
-							{/*    width={150}*/}
-							{/*    height={40}*/}
-							{/*/>*/}
-							<p className="text-gray-800 text-2xl">Odysseia</p>
+							<Image
+								src="/images/logo/odysseia-ship.png"
+								alt="Odysseia"
+								width={56}
+								height={50}
+								className="h-12 w-auto shrink-0 object-contain"
+								priority
+							/>
+							<p className="truncate text-2xl text-gray-800 dark:text-white">
+								Odysseia
+							</p>
 						</>
 					) : (
-						<Image src="/images/logo/logo-icon.svg" alt="Logo" width={32} height={32} />
+						<Image
+							src="/images/logo/odysseia-ship.png"
+							alt="Odysseia"
+							width={44}
+							height={44}
+							className="h-11 w-11 object-contain"
+							priority
+						/>
 					)}
 				</Link>
 			</div>
