@@ -274,7 +274,7 @@ const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 							id="roomName"
 							type="text"
 							placeholder="Enter group name (e.g., Project Team, Marketing Group)"
-							defaultValue={formData.name}
+							value={formData.name}
 							onChange={e => handleInputChange("name", e.target.value)}
 						/>
 					</div>

@@ -288,21 +288,22 @@ export default function BidRateRouteBuilder({
 
 	const removeRow = useCallback(
 		(index: number) => {
+			const removedId = rows[index]?.id;
+			if (removedId) {
+				setLocationErrors(errors => {
+					if (!(removedId in errors)) return errors;
+					const next = { ...errors };
+					delete next[removedId];
+					return next;
+				});
+			}
 			onChange(prev => {
-				const removed = prev[index];
-				if (removed) {
-					setLocationErrors(errors => {
-						const next = { ...errors };
-						delete next[removed.id];
-						return next;
-					});
-				}
 				const next = prev.filter((_, rowIndex) => rowIndex !== index);
 				commitLocationsFromRows(next, onLocationsCommit);
 				return next;
 			});
 		},
-		[onChange, onLocationsCommit],
+		[onChange, onLocationsCommit, rows],
 	);
 
 	const moveRow = useCallback(
