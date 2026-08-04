@@ -193,7 +193,12 @@ export default function TrackingMapClient({
 
 	return (
 		<div className="w-full h-full">
-			<TrackingDeliveryMap driverId={driverId} driverData={driverData} />
+			<TrackingDeliveryMap
+				driverId={driverId}
+				driverData={driverData}
+				forceLightMapBasemap
+				enableBasemapModeSwitch
+			/>
 		</div>
 	);
 }
