@@ -10,6 +10,15 @@ export interface Notification {
   isRead: boolean; // Global read status
   readBy?: string[]; // Array of user IDs who read the notification
   createdAt: string;
+  /** Deep-link metadata from backend Notification.data */
+  data?: {
+    chatRoomId?: string;
+    chatRoomType?: string;
+    loadId?: string | null;
+    offerId?: number | string | null;
+    unitId?: string | null;
+    removedSelf?: boolean;
+  } | null;
 }
 
 export interface NotificationsResponse {

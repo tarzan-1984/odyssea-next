@@ -55,6 +55,86 @@ export function buildLoadChatUrl(loadId: string, roomId?: string | null): string
 	return `/chat?${params.toString()}`;
 }
 
+/** Link metadata stored on Notification.data (backend). */
+export type NotificationLinkData = {
+	chatRoomId?: string;
+	chatRoomType?: string;
+	loadId?: string | null;
+	offerId?: number | string | null;
+	unitId?: string | null;
+	removedSelf?: boolean;
+};
+
+const OFFER_NOTIFICATION_TYPES = new Set([
+	"offer_bid",
+	"offer_refused",
+	"offer_extend_time",
+	"offer_selected",
+	"offer_added",
+	"offer_updated",
+	"offer_unavailable",
+	"offer_counter_offer",
+	"offer_custom",
+]);
+
+const CHAT_NOTIFICATION_TYPES = new Set([
+	"private_chat_created",
+	"group_chat_created",
+	"participants_added_to_group_chat",
+	"participant_removed_from_group_chat",
+	"user_left_group_chat",
+	"load_chat_created",
+	"load_chat_participant_added",
+	"load_chat_participant_removed",
+]);
+
+export function parseNotificationLinkData(raw: unknown): NotificationLinkData | null {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+	return raw as NotificationLinkData;
+}
+
+/**
+ * Resolve navigation href for an in-app notification.
+ * Returns null when the item should not be clickable (e.g. you were removed from a chat).
+ */
+export function getNotificationHref(
+	type: string,
+	rawData: unknown
+): string | null {
+	const data = parseNotificationLinkData(rawData);
+
+	if (data?.removedSelf) {
+		return null;
+	}
+
+	if (OFFER_NOTIFICATION_TYPES.has(type)) {
+		return "/offers";
+	}
+
+	if (!CHAT_NOTIFICATION_TYPES.has(type)) {
+		return null;
+	}
+
+	const chatRoomId = data?.chatRoomId?.trim();
+	if (!chatRoomId) {
+		return null;
+	}
+
+	const chatType = (data?.chatRoomType || "").toUpperCase().trim();
+	if (chatType === "LOAD") {
+		const loadId = String(data?.loadId ?? "").trim();
+		if (loadId) return buildLoadChatUrl(loadId, chatRoomId);
+	}
+	if (chatType === "OFFER") {
+		const offerId = data?.offerId != null ? String(data.offerId).trim() : "";
+		if (offerId) {
+			return buildOfferChatUrl(offerId, data?.unitId);
+		}
+	}
+
+	return `/chat?room=${encodeURIComponent(chatRoomId)}`;
+}
+
 export function buildChatUrlForRoom(
 	chatRoom: ChatRoom,
 	currentUserId?: string | null

@@ -152,6 +152,14 @@ interface NotificationData {
 	readBy?: string[]; // Array of user IDs who read the notification
 	createdAt: string;
 	chatRoomId?: string;
+	data?: {
+		chatRoomId?: string;
+		chatRoomType?: string;
+		loadId?: string | null;
+		offerId?: number | string | null;
+		unitId?: string | null;
+		removedSelf?: boolean;
+	} | null;
 }
 
 interface RoleBroadcastData {
