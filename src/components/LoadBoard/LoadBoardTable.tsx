@@ -77,7 +77,7 @@ export default function LoadBoardTable({ refreshKey = 0 }: LoadBoardTableProps) 
 
 	useEffect(() => {
 		if (refreshKey > 0) {
-			void queryClient.invalidateQueries({ queryKey: [LOAD_BOARD_QUERY_KEY] });
+			queryClient.invalidateQueries({ queryKey: [LOAD_BOARD_QUERY_KEY] }).catch(() => undefined);
 		}
 	}, [refreshKey, queryClient]);
 
@@ -268,8 +268,9 @@ export default function LoadBoardTable({ refreshKey = 0 }: LoadBoardTableProps) 
 								<TableCell
 									isHeader
 									className="w-14 px-3 py-3 text-xs font-medium sm:px-4"
-									aria-label="Edit"
-								/>
+								>
+									<span className="sr-only">Edit</span>
+								</TableCell>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
