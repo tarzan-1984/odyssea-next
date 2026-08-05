@@ -32,6 +32,7 @@ import {
 type NewShipmentModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
+	onSuccess?: () => void;
 };
 
 type NewShipmentForm = {
@@ -48,6 +49,7 @@ type NewShipmentForm = {
 	equipmentWeight: string;
 	comments: string;
 	referenceId: string;
+	rate: string;
 };
 
 const EMPTY_FORM: NewShipmentForm = {
@@ -64,6 +66,7 @@ const EMPTY_FORM: NewShipmentForm = {
 	equipmentWeight: "",
 	comments: "",
 	referenceId: "",
+	rate: "",
 };
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -74,7 +77,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 	);
 }
 
-export default function NewShipmentModal({ isOpen, onClose }: NewShipmentModalProps) {
+export default function NewShipmentModal({
+	isOpen,
+	onClose,
+	onSuccess,
+}: NewShipmentModalProps) {
 	const [activeTab, setActiveTab] = useState<NewShipmentTabId>("load-details");
 	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
 	const [form, setForm] = useState<NewShipmentForm>(EMPTY_FORM);
@@ -135,6 +142,14 @@ export default function NewShipmentModal({ isOpen, onClose }: NewShipmentModalPr
 			const needsEquipmentSize = showEquipmentSizeFields;
 			const equipmentLengthRaw = form.equipmentLength.replace(/,/g, "").trim();
 			const equipmentWeightRaw = form.equipmentWeight.replace(/,/g, "").trim();
+			const rateRaw = form.rate.replace(/,/g, "").trim();
+			const rate = rateRaw ? Number(rateRaw) : undefined;
+			if (rateRaw && (!Number.isFinite(rate) || (rate ?? 0) < 0)) {
+				setActiveTab("additional-information");
+				setError("Please enter a valid rate.");
+				setSubmitting(false);
+				return;
+			}
 
 			await createLoadBoardShipment({
 				route: bidRouteRowsToPayload(routeRows),
@@ -160,8 +175,10 @@ export default function NewShipmentModal({ isOpen, onClose }: NewShipmentModalPr
 						: undefined,
 				comments: form.comments.trim() || undefined,
 				referenceId: form.referenceId.trim() || undefined,
+				rate,
 			});
 			onClose();
+			onSuccess?.();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create shipment.");
 		} finally {
@@ -434,6 +451,23 @@ export default function NewShipmentModal({ isOpen, onClose }: NewShipmentModalPr
 										value={form.referenceId}
 										onChange={e => updateField("referenceId", e.target.value)}
 										placeholder="Load reference number"
+										className="dark:bg-gray-900"
+									/>
+								</div>
+							</div>
+
+							<div>
+								<Label htmlFor="shipment-rate">Rate</Label>
+								<div className="mt-1.5">
+									<Input
+										id="shipment-rate"
+										type="number"
+										min="0"
+										step={1}
+										inputMode="decimal"
+										value={form.rate}
+										onChange={e => updateField("rate", e.target.value)}
+										placeholder="Estimated rate (optional)"
 										className="dark:bg-gray-900"
 									/>
 								</div>

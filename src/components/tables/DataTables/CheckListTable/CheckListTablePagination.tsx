@@ -8,6 +8,7 @@ type CheckListTablePaginationProps = {
 	paginationKey: string;
 	onPageChange: (page: number) => void;
 	position: "top" | "bottom";
+	selectedCount?: number;
 };
 
 export default function CheckListTablePagination({
@@ -18,6 +19,7 @@ export default function CheckListTablePagination({
 	paginationKey,
 	onPageChange,
 	position,
+	selectedCount,
 }: CheckListTablePaginationProps) {
 	const showingText =
 		totalItems === 0
@@ -33,8 +35,11 @@ export default function CheckListTablePagination({
 		<div className={wrapperClassName}>
 			<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
 				<div className="pb-3 xl:pb-0">
-					<p className="pb-3 text-sm font-medium text-center text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
-						{showingText}
+					<p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pb-3 text-sm font-medium text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:justify-start xl:border-b-0 xl:pb-0 xl:text-left">
+						<span>{showingText}</span>
+						{selectedCount != null && selectedCount > 0 && (
+							<span>{selectedCount} selected</span>
+						)}
 					</p>
 				</div>
 				{totalPages > 1 && (

@@ -35,6 +35,18 @@ export const EQUIPMENT_OPTIONS = [
 
 export type EquipmentType = (typeof EQUIPMENT_OPTIONS)[number]["value"];
 export type LoadType = "full" | "partial";
+export type ShipmentStatus = "posted" | "unposted";
+
+export function getEquipmentLabel(equipment: string): string {
+	return (
+		EQUIPMENT_OPTIONS.find(option => option.value === equipment)?.label ?? equipment
+	);
+}
+
+export function getShipmentStatusLabel(status: string): string {
+	if (status === "unposted") return "Unposted";
+	return "Posted";
+}
 
 export type NewShipmentTabId =
 	| "load-details"

@@ -3,6 +3,55 @@ import { serverAuth } from "@/utils/auth";
 import { canAccessLoadBoard } from "@/utils/roleAccess";
 
 /**
+ * GET /api/load-board-shipments
+ * Paginated list of load board shipments (age sort).
+ */
+export async function GET(request: NextRequest) {
+	try {
+		const accessToken = serverAuth.getAccessToken(request);
+		if (!accessToken) {
+			return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+		}
+
+		const userData = serverAuth.getUserData(request);
+		if (!canAccessLoadBoard(userData?.role)) {
+			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+
+		const { searchParams } = new URL(request.url);
+		const page = searchParams.get("page") || "1";
+		const limit = searchParams.get("limit") || "10";
+		const ageSort = searchParams.get("ageSort") === "asc" ? "asc" : "desc";
+		const qs = new URLSearchParams({ page, limit, ageSort });
+
+		const response = await fetch(
+			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/load-board-shipments?${qs.toString()}`,
+			{
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+				},
+				cache: "no-store",
+			},
+		);
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			return NextResponse.json(
+				{ error: data.message || data.error || "Failed to load shipments" },
+				{ status: response.status },
+			);
+		}
+
+		return NextResponse.json(data);
+	} catch (error) {
+		console.error("Error loading load board shipments:", error);
+		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+	}
+}
+
+/**
  * POST /api/load-board-shipments
  * Creates a load_board_shipments row on the backend.
  */
@@ -75,6 +124,12 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid equipment" }, { status: 400 });
 		}
 
+		const rateRaw = body?.rate;
+		const rate =
+			rateRaw != null && rateRaw !== ""
+				? Number(rateRaw)
+				: undefined;
+
 		const payload = {
 			route,
 			pickupEarliest,
@@ -103,6 +158,8 @@ export async function POST(request: NextRequest) {
 				typeof body?.comments === "string" ? body.comments.trim() : undefined,
 			referenceId:
 				typeof body?.referenceId === "string" ? body.referenceId.trim() : undefined,
+			rate: rate != null && Number.isFinite(rate) ? rate : undefined,
+			status: body?.status === "unposted" ? "unposted" : undefined,
 		};
 
 		const response = await fetch(

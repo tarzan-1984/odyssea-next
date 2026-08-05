@@ -2,6 +2,8 @@ import type { CreateOfferRoutePoint } from "./offers";
 import type { EquipmentType, LoadType } from "@/components/LoadBoard/newShipmentConstants";
 
 export type LoadBoardShipmentRoutePoint = CreateOfferRoutePoint;
+export type LoadBoardShipmentStatus = "posted" | "unposted";
+export type LoadBoardAgeSort = "asc" | "desc";
 
 export type LoadBoardShipmentUser = {
 	id: string;
@@ -9,6 +11,19 @@ export type LoadBoardShipmentUser = {
 	lastName: string | null;
 	externalId: string | null;
 };
+
+export interface RateLoadBoard {
+	id: number;
+	loadBoardId: number;
+	driverId: string;
+	driverExternalId: string | null;
+	rate: number | null;
+	active: boolean;
+	isSelected: boolean;
+	createdAt?: string;
+	updatedAt?: string;
+	driver?: LoadBoardShipmentUser | null;
+}
 
 export interface LoadBoardShipment {
 	id: number;
@@ -29,8 +44,33 @@ export interface LoadBoardShipment {
 	equipmentWeight: number | null;
 	comments: string | null;
 	referenceId: string | null;
+	rate: number | null;
+	status: LoadBoardShipmentStatus;
 	createdAt: string;
 	updatedAt: string;
+	rateLoadBoards?: RateLoadBoard[];
+}
+
+export interface LoadBoardShipmentsPagination {
+	current_page: number;
+	per_page: number;
+	total_count: number;
+	total_pages: number;
+	has_next_page: boolean;
+	has_prev_page: boolean;
+}
+
+export interface GetLoadBoardShipmentsParams {
+	page?: number;
+	limit?: number;
+	ageSort?: LoadBoardAgeSort;
+}
+
+export interface GetLoadBoardShipmentsResponse {
+	shipments: LoadBoardShipment[];
+	pagination: LoadBoardShipmentsPagination;
+	/** Nest response `timestamp` (real UTC ISO) — same clock that wrote created_at. */
+	serverTime?: string;
 }
 
 export interface CreateLoadBoardShipmentPayload {
@@ -48,6 +88,76 @@ export interface CreateLoadBoardShipmentPayload {
 	equipmentWeight?: number;
 	comments?: string;
 	referenceId?: string;
+	rate?: number;
+	status?: LoadBoardShipmentStatus;
+}
+
+function parseErrorMessage(data: unknown, fallback: string): string {
+	const raw =
+		data && typeof data === "object"
+			? ((data as { error?: unknown; message?: unknown }).error ??
+				(data as { message?: unknown }).message)
+			: null;
+	if (typeof raw === "string") return raw;
+	if (Array.isArray(raw)) {
+		return (
+			raw
+				.map((item: unknown) => {
+					if (typeof item === "string") return item;
+					if (
+						item &&
+						typeof item === "object" &&
+						"constraints" in item &&
+						item.constraints &&
+						typeof item.constraints === "object"
+					) {
+						return Object.values(item.constraints as Record<string, string>).join(
+							", ",
+						);
+					}
+					return null;
+				})
+				.filter(Boolean)
+				.join("; ") || fallback
+		);
+	}
+	return fallback;
+}
+
+export async function getLoadBoardShipments(
+	params: GetLoadBoardShipmentsParams = {},
+): Promise<GetLoadBoardShipmentsResponse> {
+	const qs = new URLSearchParams({
+		page: String(params.page ?? 1),
+		limit: String(params.limit ?? 10),
+		ageSort: params.ageSort === "asc" ? "asc" : "desc",
+	});
+	const res = await fetch(`/api/load-board-shipments?${qs.toString()}`, {
+		method: "GET",
+		credentials: "include",
+		cache: "no-store",
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to load shipments"));
+	}
+	// Nest TransformInterceptor: { data: { shipments, pagination }, timestamp, path }.
+	const envelope = data && typeof data === "object" ? data : {};
+	const payload =
+		"data" in envelope && envelope.data != null && typeof envelope.data === "object"
+			? envelope.data
+			: envelope;
+	const serverTime =
+		typeof (envelope as { timestamp?: unknown }).timestamp === "string"
+			? (envelope as { timestamp: string }).timestamp
+			: undefined;
+	return {
+		shipments: Array.isArray((payload as { shipments?: unknown }).shipments)
+			? (payload as { shipments: LoadBoardShipment[] }).shipments
+			: [],
+		pagination: (payload as { pagination: LoadBoardShipmentsPagination }).pagination,
+		serverTime,
+	};
 }
 
 export async function createLoadBoardShipment(
@@ -63,31 +173,7 @@ export async function createLoadBoardShipment(
 	const data = await res.json().catch(() => ({}));
 
 	if (!res.ok) {
-		const raw = data?.error ?? data?.message;
-		const message =
-			typeof raw === "string"
-				? raw
-				: Array.isArray(raw)
-					? raw
-							.map((item: unknown) => {
-								if (typeof item === "string") return item;
-								if (
-									item &&
-									typeof item === "object" &&
-									"constraints" in item &&
-									item.constraints &&
-									typeof item.constraints === "object"
-								) {
-									return Object.values(
-										item.constraints as Record<string, string>,
-									).join(", ");
-								}
-								return null;
-							})
-							.filter(Boolean)
-							.join("; ") || "Failed to create shipment"
-					: "Failed to create shipment";
-		throw new Error(message);
+		throw new Error(parseErrorMessage(data, "Failed to create shipment"));
 	}
 
 	if (data && typeof data === "object" && "data" in data) {

@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
 import NewShipmentPlusIcon from "./NewShipmentPlusIcon";
+import ShipmentCreatedSuccessModal from "./ShipmentCreatedSuccessModal";
+import LoadBoardTable from "./LoadBoardTable";
 
 const NewShipmentModal = dynamic(() => import("./NewShipmentModal"), {
 	ssr: false,
@@ -12,6 +14,8 @@ const NewShipmentModal = dynamic(() => import("./NewShipmentModal"), {
 
 export default function LoadBoardPageClient() {
 	const [isNewShipmentOpen, setIsNewShipmentOpen] = useState(false);
+	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+	const [tableRefreshKey, setTableRefreshKey] = useState(0);
 
 	return (
 		<div>
@@ -29,13 +33,20 @@ export default function LoadBoardPageClient() {
 					New Shipment
 				</Button>
 			</div>
-			<div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-				<p className="text-gray-500 dark:text-gray-400">Load board</p>
-			</div>
+
+			<LoadBoardTable refreshKey={tableRefreshKey} />
 
 			<NewShipmentModal
 				isOpen={isNewShipmentOpen}
 				onClose={() => setIsNewShipmentOpen(false)}
+				onSuccess={() => {
+					setIsSuccessOpen(true);
+					setTableRefreshKey(prev => prev + 1);
+				}}
+			/>
+			<ShipmentCreatedSuccessModal
+				isOpen={isSuccessOpen}
+				onClose={() => setIsSuccessOpen(false)}
 			/>
 		</div>
 	);
