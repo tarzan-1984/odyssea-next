@@ -324,14 +324,18 @@ export default function LoadBoardTable({
 										onEdit={() => onEditShipment?.(shipment)}
 										onDuplicate={() => onDuplicateShipment?.(shipment)}
 										onStatusChanged={() => {
-											void queryClient.invalidateQueries({
-												queryKey: [LOAD_BOARD_QUERY_KEY],
-											});
+											queryClient
+												.invalidateQueries({
+													queryKey: [LOAD_BOARD_QUERY_KEY],
+												})
+												.catch(() => undefined);
 										}}
 										onDeleted={() => {
-											void queryClient.invalidateQueries({
-												queryKey: [LOAD_BOARD_QUERY_KEY],
-											});
+											queryClient
+												.invalidateQueries({
+													queryKey: [LOAD_BOARD_QUERY_KEY],
+												})
+												.catch(() => undefined);
 										}}
 									/>
 								))
@@ -536,7 +540,7 @@ function ShipmentRows({
 						>
 							<DropdownItem
 								onItemClick={() => {
-									void handleToggleStatus();
+									handleToggleStatus().catch(() => undefined);
 								}}
 								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
 							>
@@ -553,7 +557,7 @@ function ShipmentRows({
 							</DropdownItem>
 							<DropdownItem
 								onItemClick={() => {
-									void handleDelete();
+									handleDelete().catch(() => undefined);
 								}}
 								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10"
 							>
