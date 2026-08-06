@@ -182,3 +182,70 @@ export async function createLoadBoardShipment(
 
 	return data as LoadBoardShipment;
 }
+
+export async function updateLoadBoardShipment(
+	id: number,
+	payload: CreateLoadBoardShipmentPayload,
+): Promise<LoadBoardShipment> {
+	const res = await fetch(`/api/load-board-shipments/${id}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		credentials: "include",
+		body: JSON.stringify(payload),
+	});
+
+	const data = await res.json().catch(() => ({}));
+
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to update shipment"));
+	}
+
+	if (data && typeof data === "object" && "data" in data) {
+		return data.data as LoadBoardShipment;
+	}
+
+	return data as LoadBoardShipment;
+}
+
+export async function updateLoadBoardShipmentStatus(
+	id: number,
+	status: LoadBoardShipmentStatus,
+): Promise<LoadBoardShipment> {
+	const res = await fetch(`/api/load-board-shipments/${id}/status`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		credentials: "include",
+		body: JSON.stringify({ status }),
+	});
+
+	const data = await res.json().catch(() => ({}));
+
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to update shipment status"));
+	}
+
+	if (data && typeof data === "object" && "data" in data) {
+		return data.data as LoadBoardShipment;
+	}
+
+	return data as LoadBoardShipment;
+}
+
+export async function deleteLoadBoardShipment(id: number): Promise<{ id: number }> {
+	const res = await fetch(`/api/load-board-shipments/${id}`, {
+		method: "DELETE",
+		credentials: "include",
+	});
+
+	const data = await res.json().catch(() => ({}));
+
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to delete shipment"));
+	}
+
+	if (data && typeof data === "object" && "data" in data) {
+		return data.data as { id: number };
+	}
+
+	return data as { id: number };
+}

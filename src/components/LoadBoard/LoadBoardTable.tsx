@@ -3,14 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import {
+	deleteLoadBoardShipment,
 	getLoadBoardShipments,
+	updateLoadBoardShipmentStatus,
 	type LoadBoardAgeSort,
 	type LoadBoardShipment,
 	type RateLoadBoard,
 } from "@/app-api/loadBoardShipments";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import Button from "@/components/ui/button/Button";
-import { AngleDownIcon, AngleUpIcon, PencilIcon } from "@/icons";
+import { Dropdown } from "@/components/ui/dropdown/Dropdown";
+import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
+import { AngleDownIcon, AngleUpIcon, LoadBoardActionsIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "@/components/tables/DataTables/CheckListTable/CheckListTablePagination";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
@@ -29,9 +32,15 @@ const LOAD_BOARD_QUERY_KEY = "load-board-shipments";
 
 type LoadBoardTableProps = {
 	refreshKey?: number;
+	onEditShipment?: (shipment: LoadBoardShipment) => void;
+	onDuplicateShipment?: (shipment: LoadBoardShipment) => void;
 };
 
-export default function LoadBoardTable({ refreshKey = 0 }: LoadBoardTableProps) {
+export default function LoadBoardTable({
+	refreshKey = 0,
+	onEditShipment,
+	onDuplicateShipment,
+}: LoadBoardTableProps) {
 	const queryClient = useQueryClient();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage] = useState(10);
@@ -312,6 +321,18 @@ export default function LoadBoardTable({ refreshKey = 0 }: LoadBoardTableProps) 
 											toggleRowSelected(shipment.id, checked)
 										}
 										onToggleExpanded={() => toggleExpanded(shipment.id)}
+										onEdit={() => onEditShipment?.(shipment)}
+										onDuplicate={() => onDuplicateShipment?.(shipment)}
+										onStatusChanged={() => {
+											void queryClient.invalidateQueries({
+												queryKey: [LOAD_BOARD_QUERY_KEY],
+											});
+										}}
+										onDeleted={() => {
+											void queryClient.invalidateQueries({
+												queryKey: [LOAD_BOARD_QUERY_KEY],
+											});
+										}}
 									/>
 								))
 							)}
@@ -348,6 +369,10 @@ function ShipmentRows({
 	now,
 	onToggleSelected,
 	onToggleExpanded,
+	onEdit,
+	onDuplicate,
+	onStatusChanged,
+	onDeleted,
 }: {
 	shipment: LoadBoardShipment;
 	selected: boolean;
@@ -355,12 +380,58 @@ function ShipmentRows({
 	now: Date;
 	onToggleSelected: (checked: boolean) => void;
 	onToggleExpanded: () => void;
+	onEdit?: () => void;
+	onDuplicate?: () => void;
+	onStatusChanged?: () => void;
+	onDeleted?: () => void;
 }) {
 	const trip = getTripEndpoints(shipment);
 	const statusLabel = formatStatus(shipment.status);
 	const isPosted = shipment.status !== "unposted";
 	const bids = (shipment.rateLoadBoards ?? []).filter(bid => bid.active !== false);
 	const bidsCount = bids.length;
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [actionPending, setActionPending] = useState(false);
+	const menuAnchorRef = useRef<HTMLButtonElement>(null);
+
+	const closeMenu = () => setMenuOpen(false);
+
+	const handleToggleStatus = async () => {
+		closeMenu();
+		setActionPending(true);
+		try {
+			await updateLoadBoardShipmentStatus(
+				shipment.id,
+				isPosted ? "unposted" : "posted",
+			);
+			onStatusChanged?.();
+		} catch (err) {
+			window.alert(
+				err instanceof Error ? err.message : "Failed to update shipment status",
+			);
+		} finally {
+			setActionPending(false);
+		}
+	};
+
+	const handleDelete = async () => {
+		closeMenu();
+		const confirmed = window.confirm(
+			"Delete this shipment permanently? This cannot be undone.",
+		);
+		if (!confirmed) return;
+		setActionPending(true);
+		try {
+			await deleteLoadBoardShipment(shipment.id);
+			onDeleted?.();
+		} catch (err) {
+			window.alert(
+				err instanceof Error ? err.message : "Failed to delete shipment",
+			);
+		} finally {
+			setActionPending(false);
+		}
+	};
 
 	return (
 		<>
@@ -444,26 +515,60 @@ function ShipmentRows({
 					</span>
 				</TableCell>
 				<TableCell className="w-14 px-3 py-3 sm:px-4" onClick={e => e.stopPropagation()}>
-					<div className="flex flex-col items-center gap-1">
-						<Button
-							type="button"
-							size="sm"
-							variant="outline"
-							className="!h-8 !w-8 !p-0"
-							aria-label="Edit shipment"
-							onClick={() => {
-								/* Edit will be implemented later */
-							}}
-						>
-							<PencilIcon className="h-4 w-4" />
-						</Button>
+					<div className="relative flex justify-center">
 						<button
+							ref={menuAnchorRef}
 							type="button"
-							className="text-[11px] font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
-							onClick={onToggleExpanded}
+							className="dropdown-toggle inline-flex items-center justify-center rounded-md p-1 text-brand-500 transition-opacity hover:opacity-80 disabled:opacity-50 dark:text-brand-400"
+							aria-label="Shipment actions"
+							aria-expanded={menuOpen}
+							disabled={actionPending}
+							onClick={() => setMenuOpen(open => !open)}
 						>
-							{expanded ? "Show less" : "Show more"}
+							<LoadBoardActionsIcon className="h-5 w-5" aria-hidden />
 						</button>
+						<Dropdown
+							isOpen={menuOpen}
+							onClose={closeMenu}
+							className="w-40 p-2"
+							anchorRef={menuAnchorRef}
+							anchorAlign="right"
+						>
+							<DropdownItem
+								onItemClick={() => {
+									void handleToggleStatus();
+								}}
+								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+							>
+								{isPosted ? "Unpost" : "Post"}
+							</DropdownItem>
+							<DropdownItem
+								onItemClick={() => {
+									closeMenu();
+									onEdit?.();
+								}}
+								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+							>
+								Edit
+							</DropdownItem>
+							<DropdownItem
+								onItemClick={() => {
+									void handleDelete();
+								}}
+								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10"
+							>
+								Delete
+							</DropdownItem>
+							<DropdownItem
+								onItemClick={() => {
+									closeMenu();
+									onDuplicate?.();
+								}}
+								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+							>
+								Duplicate
+							</DropdownItem>
+						</Dropdown>
 					</div>
 				</TableCell>
 			</TableRow>

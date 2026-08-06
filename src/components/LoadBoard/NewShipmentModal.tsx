@@ -12,9 +12,10 @@ import Button from "@/components/ui/button/Button";
 import { TabButton } from "@/components/ui/tabs/TabWithUnderline";
 import { ChevronDownIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import { createLoadBoardShipment } from "@/app-api/loadBoardShipments";
+import { createLoadBoardShipment, updateLoadBoardShipment, type LoadBoardShipment } from "@/app-api/loadBoardShipments";
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
+	createBidRouteRow,
 	initialBidRouteRows,
 	validateBidRouteRows,
 	type BidRouteRow,
@@ -32,7 +33,11 @@ import {
 type NewShipmentModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
-	onSuccess?: () => void;
+	onSuccess?: (mode: "create" | "edit") => void;
+	/** When set, modal opens in edit mode with prefilled values. */
+	shipment?: LoadBoardShipment | null;
+	/** Prefill create form (Duplicate) without switching to edit mode. */
+	prefillShipment?: LoadBoardShipment | null;
 };
 
 type NewShipmentForm = {
@@ -69,6 +74,60 @@ const EMPTY_FORM: NewShipmentForm = {
 	rate: "",
 };
 
+function shipmentToRouteRows(shipment: LoadBoardShipment): BidRouteRow[] {
+	const route = Array.isArray(shipment.route) ? shipment.route : [];
+	if (route.length < 2) return initialBidRouteRows();
+	return route.map(point => ({
+		...createBidRouteRow(
+			point.type === "pick_up_location" ? "pickup" : "delivery",
+		),
+		location: point.location?.trim() || "",
+	}));
+}
+
+function shipmentToForm(shipment: LoadBoardShipment): NewShipmentForm {
+	const special = Array.isArray(shipment.specialInstructions)
+		? shipment.specialInstructions.filter(
+				(item): item is string => typeof item === "string" && item.trim().length > 0,
+			)
+		: [];
+	const equipment =
+		shipment.equipment === "box_truck" ||
+		shipment.equipment === "dry_van" ||
+		shipment.equipment === "cargo_van"
+			? shipment.equipment
+			: "cargo_van";
+
+	return {
+		pickupEarliest: shipment.pickupEarliest?.trim() || "",
+		pickupLatest: shipment.pickupLatest?.trim() || "",
+		pickupHours: shipment.pickupHours?.trim() || "",
+		dropOffHours: shipment.dropOffHours?.trim() || "",
+		weight:
+			shipment.weight != null && Number.isFinite(shipment.weight)
+				? String(shipment.weight)
+				: "",
+		commodity: shipment.commodity?.trim() || "",
+		specialInstructions: special,
+		loadType: shipment.loadType === "partial" ? "partial" : "full",
+		equipment,
+		equipmentLength:
+			shipment.equipmentLength != null && Number.isFinite(shipment.equipmentLength)
+				? String(shipment.equipmentLength)
+				: "",
+		equipmentWeight:
+			shipment.equipmentWeight != null && Number.isFinite(shipment.equipmentWeight)
+				? String(shipment.equipmentWeight)
+				: "",
+		comments: shipment.comments?.trim() || "",
+		referenceId: shipment.referenceId?.trim() || "",
+		rate:
+			shipment.rate != null && Number.isFinite(shipment.rate)
+				? String(shipment.rate)
+				: "",
+	};
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
 	return (
 		<h5 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -81,7 +140,10 @@ export default function NewShipmentModal({
 	isOpen,
 	onClose,
 	onSuccess,
+	shipment = null,
+	prefillShipment = null,
 }: NewShipmentModalProps) {
+	const isEdit = shipment != null;
 	const [activeTab, setActiveTab] = useState<NewShipmentTabId>("load-details");
 	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
 	const [form, setForm] = useState<NewShipmentForm>(EMPTY_FORM);
@@ -90,15 +152,20 @@ export default function NewShipmentModal({
 	const [submitting, setSubmitting] = useState(false);
 
 	useEffect(() => {
-		if (isOpen) {
-			setActiveTab("load-details");
+		if (!isOpen) return;
+		setActiveTab("load-details");
+		const source = shipment ?? prefillShipment;
+		if (source) {
+			setRouteRows(shipmentToRouteRows(source));
+			setForm(shipmentToForm(source));
+		} else {
 			setRouteRows(initialBidRouteRows());
 			setForm(EMPTY_FORM);
-			setFormKey(prev => prev + 1);
-			setError(null);
-			setSubmitting(false);
 		}
-	}, [isOpen]);
+		setFormKey(prev => prev + 1);
+		setError(null);
+		setSubmitting(false);
+	}, [isOpen, shipment, prefillShipment]);
 
 	function updateField<K extends keyof NewShipmentForm>(key: K, value: NewShipmentForm[K]) {
 		setForm(prev => ({ ...prev, [key]: value }));
@@ -107,7 +174,7 @@ export default function NewShipmentModal({
 	const showEquipmentSizeFields =
 		form.equipment === "box_truck" || form.equipment === "dry_van";
 
-	async function handlePost() {
+	async function handleSubmit() {
 		setError(null);
 
 		const routeError = validateBidRouteRows(routeRows);
@@ -151,7 +218,7 @@ export default function NewShipmentModal({
 				return;
 			}
 
-			await createLoadBoardShipment({
+			const payload = {
 				route: bidRouteRowsToPayload(routeRows),
 				pickupEarliest: form.pickupEarliest.trim(),
 				pickupLatest: form.pickupLatest.trim() || undefined,
@@ -176,11 +243,24 @@ export default function NewShipmentModal({
 				comments: form.comments.trim() || undefined,
 				referenceId: form.referenceId.trim() || undefined,
 				rate,
-			});
+				...(isEdit && shipment?.status ? { status: shipment.status } : {}),
+			};
+
+			if (isEdit && shipment) {
+				await updateLoadBoardShipment(shipment.id, payload);
+			} else {
+				await createLoadBoardShipment(payload);
+			}
 			onClose();
-			onSuccess?.();
+			onSuccess?.(isEdit ? "edit" : "create");
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to create shipment.");
+			setError(
+				err instanceof Error
+					? err.message
+					: isEdit
+						? "Failed to update shipment."
+						: "Failed to create shipment.",
+			);
 		} finally {
 			setSubmitting(false);
 		}
@@ -190,14 +270,20 @@ export default function NewShipmentModal({
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
+			isFullscreen
 			containScroll
 			closeOnEscape={!submitting}
-			className="relative m-5 flex w-full max-w-3xl max-h-[95vh] flex-col overflow-hidden rounded-3xl bg-white p-0 shadow-sm dark:bg-gray-900 sm:m-0"
+			className="flex h-full w-full flex-col overflow-hidden bg-white p-0 dark:bg-gray-900"
 		>
-			<div className="relative flex max-h-[95vh] min-h-0 flex-col overflow-hidden">
-				<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-6 [scrollbar-gutter:stable] sm:p-8">
+			<div className="relative flex h-full min-h-0 flex-col overflow-hidden">
+				<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 [scrollbar-gutter:stable] sm:p-8 lg:p-10">
+					<div className="mx-auto w-full max-w-3xl space-y-5">
 					<h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-						New Shipment
+						{isEdit
+							? "Edit Shipment"
+							: prefillShipment
+								? "Duplicate Shipment"
+								: "New Shipment"}
 					</h4>
 
 					<div className="border-b border-gray-200 dark:border-gray-800">
@@ -227,6 +313,7 @@ export default function NewShipmentModal({
 
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<ShipmentDatePicker
+									key={`pickup-earliest-${formKey}`}
 									id="shipment-pickup-earliest"
 									label="Pick up earliest"
 									required
@@ -234,6 +321,7 @@ export default function NewShipmentModal({
 									onChange={v => updateField("pickupEarliest", v)}
 								/>
 								<ShipmentDatePicker
+									key={`pickup-latest-${formKey}`}
 									id="shipment-pickup-latest"
 									label="Pick up latest"
 									value={form.pickupLatest}
@@ -478,6 +566,7 @@ export default function NewShipmentModal({
 					{error ? (
 						<p className="text-sm text-red-500 dark:text-red-400">{error}</p>
 					) : null}
+					</div>
 				</div>
 
 				<div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800 sm:px-8">
@@ -499,10 +588,10 @@ export default function NewShipmentModal({
 						type="button"
 						size="sm"
 						variant="primary"
-						onClick={handlePost}
+						onClick={handleSubmit}
 						disabled={submitting}
 					>
-						Post
+						{isEdit ? "Save" : "Post"}
 					</Button>
 				</div>
 			</div>

@@ -73,9 +73,9 @@ export const Modal: React.FC<ModalProps> = ({
 
 	const modalMarkup = (
 		<div
-			className={`fixed inset-0 z-[99999] flex items-center justify-center p-4 ${
-				containScroll ? "overflow-hidden" : "overflow-y-auto"
-			}`}
+			className={`fixed inset-0 z-[99999] flex items-center justify-center ${
+				isFullscreen ? "p-0" : "p-4"
+			} ${containScroll ? "overflow-hidden" : "overflow-y-auto"}`}
 		>
 			{(!isFullscreen || closeOnBackdropClick) && (
 				<div

@@ -354,21 +354,16 @@ export const useChatStore = create<ChatState>()(
 						return false;
 					}
 
-					const { messages, chatRooms } = get();
-					const currentUserId = useUserStore.getState().currentUser?.id;
+					const { messages } = get();
 
+					// Read receipts only. Never touch unreadCount here —
+					// messagesMarkedAsRead is broadcast to the whole chat room, so clearing
+					// badges from this event resets counters for users who never read.
+					// Authoritative unread: chatUnreadCountUpdated → user_${id}.
 					const readersToAdd = new Map<string, Set<string>>();
 					const readByFromServer = new Map<string, string[]>();
-					const roomsToClearUnread = new Set<string>();
 
 					for (const event of events) {
-						if (
-							currentUserId &&
-							event.userId === currentUserId &&
-							event.chatRoomId
-						) {
-							roomsToClearUnread.add(event.chatRoomId);
-						}
 						for (const snapshot of event.messages ?? []) {
 							if (snapshot.id && snapshot.readBy?.length) {
 								readByFromServer.set(snapshot.id, snapshot.readBy);
@@ -417,36 +412,18 @@ export const useChatStore = create<ChatState>()(
 									};
 								});
 
-					let roomsChanged = false;
-					const nextRooms = chatRooms.map(room => {
-						if (!roomsToClearUnread.has(room.id)) {
-							return room;
-						}
-						if ((room.unreadCount ?? 0) === 0) {
-							return room;
-						}
-						roomsChanged = true;
-						indexedDBChatService
-							.updateChatRoom(room.id, { unreadCount: 0 })
-							.catch((error: Error) => {
-								console.error("Failed to update chat room in IndexedDB:", error);
-							});
-						return { ...room, unreadCount: 0 };
-					});
-
-					if (!messagesChanged && !roomsChanged) {
+					if (!messagesChanged) {
 						return false;
 					}
 
-					const patch: Partial<ChatState> = { error: null };
-					if (messagesChanged) {
-						patch.messages = trimChatMessagesWindow(nextMessages);
-					}
-					if (roomsChanged) {
-						patch.chatRooms = sortChatRoomsByLastMessage(nextRooms);
-					}
-
-					set(patch, false, "applyBulkMessagesMarkedAsRead");
+					set(
+						{
+							error: null,
+							messages: trimChatMessagesWindow(nextMessages),
+						},
+						false,
+						"applyBulkMessagesMarkedAsRead"
+					);
 					return true;
 				},
 
@@ -501,7 +478,7 @@ export const useChatStore = create<ChatState>()(
 						return;
 					}
 
-					const { messages } = get();
+					const { messages, chatRooms } = get();
 					get().applyBulkMessagesMarkedAsRead(
 						chatRoomIds.map(chatRoomId => ({
 							chatRoomId,
@@ -512,6 +489,29 @@ export const useChatStore = create<ChatState>()(
 							userId: currentUserId,
 						}))
 					);
+
+					// Optimistic unread clear for "Read all" (current user only)
+					const roomIdSet = new Set(chatRoomIds);
+					let roomsChanged = false;
+					const nextRooms = chatRooms.map(room => {
+						if (!roomIdSet.has(room.id) || (room.unreadCount ?? 0) === 0) {
+							return room;
+						}
+						roomsChanged = true;
+						indexedDBChatService
+							.updateChatRoom(room.id, { unreadCount: 0 })
+							.catch((error: Error) => {
+								console.error("Failed to update chat room in IndexedDB:", error);
+							});
+						return { ...room, unreadCount: 0 };
+					});
+					if (roomsChanged) {
+						set(
+							{ chatRooms: sortChatRoomsByLastMessage(nextRooms) },
+							false,
+							"markChatRoomsAsReadLocally:unread"
+						);
+					}
 				},
 
 				addMessage: message => {

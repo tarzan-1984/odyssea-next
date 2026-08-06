@@ -6,12 +6,15 @@ import Button from "@/components/ui/button/Button";
 type ShipmentCreatedSuccessModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
+	mode?: "create" | "edit";
 };
 
 export default function ShipmentCreatedSuccessModal({
 	isOpen,
 	onClose,
+	mode = "create",
 }: ShipmentCreatedSuccessModalProps) {
+	const isEdit = mode === "edit";
 	return (
 		<Modal
 			isOpen={isOpen}
@@ -32,10 +35,12 @@ export default function ShipmentCreatedSuccessModal({
 					</svg>
 				</div>
 				<h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-					Shipment created
+					{isEdit ? "Shipment updated" : "Shipment created"}
 				</h3>
 				<p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-					Your shipment was created successfully.
+					{isEdit
+						? "Your shipment was updated successfully."
+						: "Your shipment was created successfully."}
 				</p>
 				<Button type="button" size="sm" variant="primary" onClick={onClose} className="w-full">
 					OK

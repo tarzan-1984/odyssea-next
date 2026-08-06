@@ -22,14 +22,43 @@ const EMPTY_PLACEHOLDER = "mm/dd/yyyy";
 function parseDateString(s: string): Date | null {
 	const trimmed = s.trim();
 	if (!trimmed) return null;
-	const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-	if (!match) return null;
-	const month = Number.parseInt(match[1], 10);
-	const day = Number.parseInt(match[2], 10);
-	const year = Number.parseInt(match[3], 10);
-	const d = new Date(year, month - 1, day);
-	if (Number.isNaN(d.getTime())) return null;
-	return d;
+
+	// mm/dd/yyyy or m/d/yyyy (with optional leading zeros)
+	const us = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+	if (us) {
+		const month = Number.parseInt(us[1], 10);
+		const day = Number.parseInt(us[2], 10);
+		const year = Number.parseInt(us[3], 10);
+		const d = new Date(year, month - 1, day);
+		if (
+			!Number.isNaN(d.getTime()) &&
+			d.getFullYear() === year &&
+			d.getMonth() === month - 1 &&
+			d.getDate() === day
+		) {
+			return d;
+		}
+		return null;
+	}
+
+	// yyyy-mm-dd (ISO date only)
+	const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	if (iso) {
+		const year = Number.parseInt(iso[1], 10);
+		const month = Number.parseInt(iso[2], 10);
+		const day = Number.parseInt(iso[3], 10);
+		const d = new Date(year, month - 1, day);
+		if (
+			!Number.isNaN(d.getTime()) &&
+			d.getFullYear() === year &&
+			d.getMonth() === month - 1 &&
+			d.getDate() === day
+		) {
+			return d;
+		}
+	}
+
+	return null;
 }
 
 export default function ShipmentDatePicker({
@@ -55,12 +84,11 @@ export default function ShipmentDatePicker({
 			dateFormat: DISPLAY_FORMAT,
 			allowInput: false,
 			defaultDate: parsedDefault ?? undefined,
+			// Only emit when user picks a date. Do not emit "" on clear/destroy —
+			// that was wiping prefilled edit form values (unlike TimePicker).
 			onChange: selectedDates => {
-				if (selectedDates[0]) {
-					onChangeRef.current?.(fp.formatDate(selectedDates[0], DISPLAY_FORMAT));
-				} else {
-					onChangeRef.current?.("");
-				}
+				if (!selectedDates[0]) return;
+				onChangeRef.current?.(fp.formatDate(selectedDates[0], DISPLAY_FORMAT));
 			},
 		});
 
@@ -70,6 +98,8 @@ export default function ShipmentDatePicker({
 			fp.destroy();
 			fpRef.current = null;
 		};
+		// value is synced below; parent may remount via key after form prefill.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [id]);
 
 	useEffect(() => {
@@ -78,7 +108,8 @@ export default function ShipmentDatePicker({
 		if (parsed) {
 			fpRef.current.setDate(parsed, false);
 		} else {
-			fpRef.current.clear();
+			// clear(false) = do not fire onChange
+			fpRef.current.clear(false);
 		}
 	}, [value]);
 

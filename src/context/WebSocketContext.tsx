@@ -28,6 +28,7 @@ import {
 import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
+import { stripPerUserChatRoomFields } from "@/utils/stripPerUserChatRoomFields";
 import {
 	TRACKING_TEAMS_QUERY_KEY,
 	fetchTrackingTeamsLoadIds,
@@ -173,6 +174,12 @@ interface RoleBroadcastData {
 interface OfferUpdatedData {
 	offerId?: number;
 	reason?: string;
+	refreshedAt?: string;
+}
+
+interface LoadBoardShipmentUpdatedData {
+	shipmentId?: number;
+	reason?: "created" | "updated" | string;
 	refreshedAt?: string;
 }
 
@@ -480,6 +487,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
 			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
 			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
+		});
+
+		newSocket.on("loadBoardShipmentUpdated", (_data: LoadBoardShipmentUpdatedData) => {
+			queryClient.invalidateQueries({ queryKey: ["load-board-shipments"] });
+			queryClient.refetchQueries({
+				queryKey: ["load-board-shipments"],
+				type: "active",
+			});
 		});
 
 		newSocket.on("bidRateUpdated", (data: BidRateUpdatedData) => {
@@ -1237,7 +1252,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.on("chatRoomUpdated", (data: ChatRoomUpdatedData) => {
-			updateChatRoom(data.chatRoomId, data.updatedChatRoom);
+			const safePatch = stripPerUserChatRoomFields(
+				data.updatedChatRoom as Partial<ChatRoom>
+			);
+			updateChatRoom(data.chatRoomId, safePatch);
 
 			const patch = data.updatedChatRoom as Partial<ChatRoom> & {
 				isLoadArchived?: boolean;

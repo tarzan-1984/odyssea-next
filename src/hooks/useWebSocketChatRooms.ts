@@ -7,6 +7,7 @@ import { ChatRoom, ChatRoomParticipant } from "@/app-api/chatApi";
 import { useQueryClient } from "@tanstack/react-query";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
+import { stripPerUserChatRoomFields } from "@/utils/stripPerUserChatRoomFields";
 
 interface UseWebSocketChatRoomsProps {
 	onChatRoomCreated?: (chatRoom: ChatRoom) => void;
@@ -79,8 +80,11 @@ export const useWebSocketChatRooms = ({
 			updatedChatRoom: ChatRoom;
 			updatedBy: string;
 		}) => {
-			// Update chat room in store
-			updateChatRoom(data.chatRoomId, data.updatedChatRoom);
+			// Per-user fields (unreadCount etc.) must not come from room-wide updates
+			updateChatRoom(
+				data.chatRoomId,
+				stripPerUserChatRoomFields(data.updatedChatRoom)
+			);
 
 			const patch = data.updatedChatRoom as Partial<ChatRoom> & { isLoadArchived?: boolean };
 			if (patch.isLoadArchived === true) {
