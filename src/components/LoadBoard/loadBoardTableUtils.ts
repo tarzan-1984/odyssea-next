@@ -121,3 +121,119 @@ export function formatSpecialInstructions(
 	if (!values || values.length === 0) return "—";
 	return values.join(", ");
 }
+
+type UsDateParts = { year: number; month: number; day: number };
+type TimeParts = { hour: number; minute: number };
+
+function parseLoadBoardUsDate(value: string): UsDateParts | null {
+	const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+	if (!match) return null;
+	const month = Number(match[1]);
+	const day = Number(match[2]);
+	const year = Number(match[3]);
+	const probe = new Date(Date.UTC(year, month - 1, day));
+	if (
+		probe.getUTCFullYear() !== year ||
+		probe.getUTCMonth() !== month - 1 ||
+		probe.getUTCDate() !== day
+	) {
+		return null;
+	}
+	return { year, month, day };
+}
+
+function parseLoadBoardPickupHours(value: string): TimeParts | null {
+	const match = value
+		.trim()
+		.toLowerCase()
+		.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+	if (!match) return null;
+	let hour = Number(match[1]);
+	const minute = Number(match[2]);
+	const meridiem = match[3];
+	if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+	if (meridiem === "am") {
+		if (hour === 12) hour = 0;
+	} else if (hour !== 12) {
+		hour += 12;
+	}
+	return { hour, minute };
+}
+
+/** Pickup window end in naive NY wall-clock (same rules as Nest). */
+export function resolveLoadBoardPickupDeadline(fields: {
+	pickupEarliest?: string | null;
+	pickupLatest?: string | null;
+	pickupHours?: string | null;
+}): Date | null {
+	const dateRaw =
+		fields.pickupLatest?.trim() || fields.pickupEarliest?.trim() || "";
+	const date = parseLoadBoardUsDate(dateRaw);
+	if (!date) return null;
+
+	const hoursRaw = fields.pickupHours?.trim();
+	if (hoursRaw) {
+		const time = parseLoadBoardPickupHours(hoursRaw);
+		if (!time) return null;
+		return new Date(
+			Date.UTC(date.year, date.month - 1, date.day, time.hour, time.minute, 0),
+		);
+	}
+
+	return new Date(Date.UTC(date.year, date.month - 1, date.day, 23, 59, 59));
+}
+
+export function isLoadBoardPickupExpired(
+	fields: {
+		pickupEarliest?: string | null;
+		pickupLatest?: string | null;
+		pickupHours?: string | null;
+		pickupExpired?: boolean;
+	},
+	now: Date = new Date(),
+): boolean {
+	const deadline = resolveLoadBoardPickupDeadline(fields);
+	if (deadline) {
+		return deadline.getTime() < getNyNaiveNow(now).getTime();
+	}
+	if (typeof fields.pickupExpired === "boolean") {
+		return fields.pickupExpired;
+	}
+	return false;
+}
+
+/** Client-side create/edit validation message, or null when OK. */
+export function getLoadBoardPickupPastError(fields: {
+	pickupEarliest?: string | null;
+	pickupLatest?: string | null;
+	pickupHours?: string | null;
+}): string | null {
+	const earliestRaw = fields.pickupEarliest?.trim() || "";
+	if (!earliestRaw) return "Pick up earliest is required.";
+	const earliest = parseLoadBoardUsDate(earliestRaw);
+	if (!earliest) return "Pick up earliest must be a valid date (mm/dd/yyyy).";
+
+	const latestRaw = fields.pickupLatest?.trim() || "";
+	if (latestRaw) {
+		const latest = parseLoadBoardUsDate(latestRaw);
+		if (!latest) return "Pick up latest must be a valid date (mm/dd/yyyy).";
+		const earliestMs = Date.UTC(earliest.year, earliest.month - 1, earliest.day);
+		const latestMs = Date.UTC(latest.year, latest.month - 1, latest.day);
+		if (latestMs < earliestMs) {
+			return "Pick up latest cannot be before Pick up earliest.";
+		}
+	}
+
+	const hoursRaw = fields.pickupHours?.trim() || "";
+	if (hoursRaw && !parseLoadBoardPickupHours(hoursRaw)) {
+		return "Pick up hours must be a valid time (e.g. 12:00 pm).";
+	}
+
+	const deadline = resolveLoadBoardPickupDeadline(fields);
+	if (!deadline) return "Unable to resolve pickup date/time.";
+	if (deadline.getTime() < getNyNaiveNow().getTime()) {
+		return "Pick up earliest / Pick up latest / Pick up hours cannot be in the past.";
+	}
+	return null;
+}
+

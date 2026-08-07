@@ -46,6 +46,8 @@ export interface LoadBoardShipment {
 	referenceId: string | null;
 	rate: number | null;
 	status: LoadBoardShipmentStatus;
+	/** True when pickup window (latest/earliest + hours) is already in the past (NY). */
+	pickupExpired?: boolean;
 	createdAt: string;
 	updatedAt: string;
 	rateLoadBoards?: RateLoadBoard[];

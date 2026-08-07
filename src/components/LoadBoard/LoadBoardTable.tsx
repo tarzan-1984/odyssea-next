@@ -13,7 +13,16 @@ import {
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
-import { AngleDownIcon, AngleUpIcon, LoadBoardActionsIcon } from "@/icons";
+import {
+	AngleDownIcon,
+	AngleUpIcon,
+	LoadBoardActionsIcon,
+	LoadBoardDeleteIcon,
+	LoadBoardDuplicateIcon,
+	LoadBoardEditIcon,
+	OfferAcceptIcon,
+	OfferDeleteIcon,
+} from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "@/components/tables/DataTables/CheckListTable/CheckListTablePagination";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
@@ -26,6 +35,7 @@ import {
 	formatStatus,
 	formatWeightLbs,
 	getTripEndpoints,
+	isLoadBoardPickupExpired,
 } from "./loadBoardTableUtils";
 
 const LOAD_BOARD_QUERY_KEY = "load-board-shipments";
@@ -84,11 +94,24 @@ export default function LoadBoardTable({
 		setExpandedId(null);
 	}, [currentPage, itemsPerPage, ageSort]);
 
+	const refreshLoadBoard = () => {
+		queryClient
+			.invalidateQueries({ queryKey: [LOAD_BOARD_QUERY_KEY] })
+			.catch(() => undefined);
+		queryClient
+			.refetchQueries({
+				queryKey: [LOAD_BOARD_QUERY_KEY],
+				type: "active",
+			})
+			.catch(() => undefined);
+	};
+
 	useEffect(() => {
 		if (refreshKey > 0) {
-			queryClient.invalidateQueries({ queryKey: [LOAD_BOARD_QUERY_KEY] }).catch(() => undefined);
+			refreshLoadBoard();
 		}
-	}, [refreshKey, queryClient]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- only react to refreshKey bumps
+	}, [refreshKey]);
 
 	useEffect(() => {
 		const totalPages = query.data?.pagination?.total_pages ?? 0;
@@ -323,20 +346,8 @@ export default function LoadBoardTable({
 										onToggleExpanded={() => toggleExpanded(shipment.id)}
 										onEdit={() => onEditShipment?.(shipment)}
 										onDuplicate={() => onDuplicateShipment?.(shipment)}
-										onStatusChanged={() => {
-											queryClient
-												.invalidateQueries({
-													queryKey: [LOAD_BOARD_QUERY_KEY],
-												})
-												.catch(() => undefined);
-										}}
-										onDeleted={() => {
-											queryClient
-												.invalidateQueries({
-													queryKey: [LOAD_BOARD_QUERY_KEY],
-												})
-												.catch(() => undefined);
-										}}
+										onStatusChanged={refreshLoadBoard}
+										onDeleted={refreshLoadBoard}
 									/>
 								))
 							)}
@@ -392,6 +403,8 @@ function ShipmentRows({
 	const trip = getTripEndpoints(shipment);
 	const statusLabel = formatStatus(shipment.status);
 	const isPosted = shipment.status !== "unposted";
+	const pickupExpired = isLoadBoardPickupExpired(shipment, now);
+	const postBlocked = !isPosted && pickupExpired;
 	const bids = (shipment.rateLoadBoards ?? []).filter(bid => bid.active !== false);
 	const bidsCount = bids.length;
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -437,12 +450,18 @@ function ShipmentRows({
 		}
 	};
 
+	const isUnposted = shipment.status === "unposted";
+	const unpostedRowBg = "bg-warning-50 dark:bg-warning-500/15";
+	const rowBg = isUnposted
+		? unpostedRowBg
+		: expanded
+			? "bg-gray-50/70 dark:bg-white/[0.02]"
+			: "";
+
 	return (
 		<>
 			<TableRow
-				className={`border-b border-gray-100 dark:border-white/[0.05] ${
-					expanded ? "bg-gray-50/70 dark:bg-white/[0.02]" : ""
-				}`}
+				className={`border-b border-gray-100 dark:border-white/[0.05] ${rowBg}`}
 			>
 				<TableCell className="w-12 px-3 py-3 sm:px-4" onClick={e => e.stopPropagation()}>
 					<input
@@ -512,7 +531,7 @@ function ShipmentRows({
 						className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
 							isPosted
 								? "bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400"
-								: "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300"
+								: "bg-warning-100 text-warning-700 dark:bg-warning-500/25 dark:text-warning-400"
 						}`}
 					>
 						{statusLabel}
@@ -534,16 +553,38 @@ function ShipmentRows({
 						<Dropdown
 							isOpen={menuOpen}
 							onClose={closeMenu}
-							className="w-40 p-2"
+							className="w-44 p-2"
 							anchorRef={menuAnchorRef}
 							anchorAlign="right"
 						>
 							<DropdownItem
+								disabled={postBlocked || actionPending}
+								title={
+									postBlocked
+										? "Edit pickup date/time before posting"
+										: undefined
+								}
 								onItemClick={() => {
+									if (postBlocked) return;
 									handleToggleStatus().catch(() => undefined);
 								}}
-								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+								className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-normal ${
+									postBlocked
+										? "cursor-not-allowed text-gray-400 opacity-60 dark:text-gray-500"
+										: "text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+								}`}
 							>
+								{isPosted ? (
+									<OfferDeleteIcon className="h-4 w-4 shrink-0" />
+								) : (
+									<OfferAcceptIcon
+										className={`h-4 w-4 shrink-0 ${
+											postBlocked
+												? "text-gray-400 dark:text-gray-500"
+												: "text-green-600 dark:text-green-400"
+										}`}
+									/>
+								)}
 								{isPosted ? "Unpost" : "Post"}
 							</DropdownItem>
 							<DropdownItem
@@ -551,16 +592,18 @@ function ShipmentRows({
 									closeMenu();
 									onEdit?.();
 								}}
-								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
 							>
+								<LoadBoardEditIcon className="h-4 w-4 shrink-0" aria-hidden />
 								Edit
 							</DropdownItem>
 							<DropdownItem
 								onItemClick={() => {
 									handleDelete().catch(() => undefined);
 								}}
-								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10"
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-normal text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10"
 							>
+								<LoadBoardDeleteIcon className="h-4 w-4 shrink-0" aria-hidden />
 								Delete
 							</DropdownItem>
 							<DropdownItem
@@ -568,8 +611,9 @@ function ShipmentRows({
 									closeMenu();
 									onDuplicate?.();
 								}}
-								className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+								className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
 							>
+								<LoadBoardDuplicateIcon className="h-4 w-4 shrink-0" aria-hidden />
 								Duplicate
 							</DropdownItem>
 						</Dropdown>
@@ -577,7 +621,11 @@ function ShipmentRows({
 				</TableCell>
 			</TableRow>
 			{expanded && (
-				<TableRow className="border-b border-gray-100 dark:border-white/[0.05]">
+				<TableRow
+					className={`border-b border-gray-100 dark:border-white/[0.05] ${
+						isUnposted ? unpostedRowBg : ""
+					}`}
+				>
 					<TableCell colSpan={11} className="px-4 py-3 sm:px-5">
 						<div className="w-full max-w-[1400px]">
 							<h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">

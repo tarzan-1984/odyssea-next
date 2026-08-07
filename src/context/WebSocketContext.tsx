@@ -179,7 +179,7 @@ interface OfferUpdatedData {
 
 interface LoadBoardShipmentUpdatedData {
 	shipmentId?: number;
-	reason?: "created" | "updated" | string;
+	reason?: "created" | "updated" | "posted" | "unposted" | "deleted" | string;
 	refreshedAt?: string;
 }
 

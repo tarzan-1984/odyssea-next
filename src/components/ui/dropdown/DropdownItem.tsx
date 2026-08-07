@@ -9,6 +9,8 @@ interface DropdownItemProps {
 	baseClassName?: string;
 	className?: string;
 	children: React.ReactNode;
+	disabled?: boolean;
+	title?: string;
 }
 
 export const DropdownItem: React.FC<DropdownItemProps> = ({
@@ -19,10 +21,17 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 	baseClassName = "block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900",
 	className = "",
 	children,
+	disabled = false,
+	title,
 }) => {
 	const combinedClasses = `${baseClassName} ${className}`.trim();
 
 	const handleClick = (event: React.MouseEvent) => {
+		if (disabled) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
 		if (tag === "button") {
 			event.preventDefault();
 		}
@@ -32,7 +41,7 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 
 	if (tag === "a" && href) {
 		return (
-			<Link href={href} className={combinedClasses} onClick={handleClick}>
+			<Link href={href} className={combinedClasses} onClick={handleClick} title={title}>
 				{children}
 			</Link>
 		);
@@ -40,14 +49,20 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 
 	if (tag === "div") {
 		return (
-			<div onClick={handleClick} className={combinedClasses}>
+			<div onClick={handleClick} className={combinedClasses} title={title}>
 				{children}
 			</div>
 		);
 	}
 
 	return (
-		<button onClick={handleClick} className={combinedClasses}>
+		<button
+			type="button"
+			onClick={handleClick}
+			className={combinedClasses}
+			disabled={disabled}
+			title={title}
+		>
 			{children}
 		</button>
 	);

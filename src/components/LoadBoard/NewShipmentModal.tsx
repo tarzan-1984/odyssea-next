@@ -21,6 +21,7 @@ import BidRateRouteBuilder, {
 	type BidRouteRow,
 } from "@/components/BidRates/BidRateRouteBuilder";
 import ShipmentDatePicker from "./ShipmentDatePicker";
+import { getLoadBoardPickupPastError } from "./loadBoardTableUtils";
 import {
 	EQUIPMENT_OPTIONS,
 	NEW_SHIPMENT_TABS,
@@ -187,6 +188,17 @@ export default function NewShipmentModal({
 		if (!form.pickupEarliest.trim()) {
 			setActiveTab("load-details");
 			setError("Pick up earliest is required.");
+			return;
+		}
+
+		const pickupPastError = getLoadBoardPickupPastError({
+			pickupEarliest: form.pickupEarliest,
+			pickupLatest: form.pickupLatest,
+			pickupHours: form.pickupHours,
+		});
+		if (pickupPastError) {
+			setActiveTab("load-details");
+			setError(pickupPastError);
 			return;
 		}
 

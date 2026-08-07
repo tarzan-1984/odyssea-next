@@ -75,6 +75,10 @@ import CheckListIcon from "./check-list.svg";
 import BidRatesIcon from "./bid-rates.svg";
 import LoadBoardIcon from "./load-board.svg";
 import LoadBoardEditIcon from "./load-board-edit.svg";
+import LoadBoardDeleteIcon from "./load-board-delete.svg";
+import LoadBoardDuplicateIcon from "./load-board-duplicate.svg";
+import LoadBoardPostIcon from "./load-board-post.svg";
+import LoadBoardUnpostIcon from "./load-board-unpost.svg";
 import LoadBoardActionsIcon from "./load-board-actions.svg";
 import OfferDriverChatIcon from "./offer-driver-chat.svg";
 import ExtendBidTimeIcon from "./extend-bid-time.svg";
@@ -175,6 +179,10 @@ export {
 	BidRatesIcon,
 	LoadBoardIcon,
 	LoadBoardEditIcon,
+	LoadBoardDeleteIcon,
+	LoadBoardDuplicateIcon,
+	LoadBoardPostIcon,
+	LoadBoardUnpostIcon,
 	LoadBoardActionsIcon,
 	OfferDriverChatIcon,
 	ExtendBidTimeIcon,

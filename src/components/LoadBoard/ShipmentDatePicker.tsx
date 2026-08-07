@@ -14,10 +14,16 @@ type Props = {
 	placeholder?: string;
 	className?: string;
 	required?: boolean;
+	/** Disallow selecting calendar days before this date (local midnight). Default: today. */
+	minDate?: Date | "today" | null;
 };
 
 const DISPLAY_FORMAT = "m/d/Y";
 const EMPTY_PLACEHOLDER = "mm/dd/yyyy";
+
+function startOfLocalDay(d: Date = new Date()): Date {
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 function parseDateString(s: string): Date | null {
 	const trimmed = s.trim();
@@ -69,6 +75,7 @@ export default function ShipmentDatePicker({
 	placeholder = EMPTY_PLACEHOLDER,
 	className = "",
 	required = false,
+	minDate = "today",
 }: Props) {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const fpRef = useRef<flatpickr.Instance | null>(null);
@@ -79,11 +86,18 @@ export default function ShipmentDatePicker({
 		if (!inputRef.current) return;
 
 		const parsedDefault = value ? parseDateString(value) : null;
+		const resolvedMinDate =
+			minDate === "today"
+				? startOfLocalDay()
+				: minDate instanceof Date
+					? startOfLocalDay(minDate)
+					: undefined;
 		const fp = flatpickr(inputRef.current, {
 			enableTime: false,
 			dateFormat: DISPLAY_FORMAT,
 			allowInput: false,
 			defaultDate: parsedDefault ?? undefined,
+			...(resolvedMinDate ? { minDate: resolvedMinDate } : {}),
 			// Only emit when user picks a date. Do not emit "" on clear/destroy —
 			// that was wiping prefilled edit form values (unlike TimePicker).
 			onChange: selectedDates => {
@@ -100,7 +114,7 @@ export default function ShipmentDatePicker({
 		};
 		// value is synced below; parent may remount via key after form prefill.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [id]);
+	}, [id, minDate]);
 
 	useEffect(() => {
 		if (!fpRef.current) return;
