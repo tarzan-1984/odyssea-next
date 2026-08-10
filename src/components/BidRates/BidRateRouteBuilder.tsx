@@ -20,6 +20,8 @@ export type BidRouteRow = {
 	id: string;
 	type: "pickup" | "delivery";
 	location: string;
+	latitude?: number | null;
+	longitude?: number | null;
 };
 
 export function createBidRouteRow(type: "pickup" | "delivery"): BidRouteRow {
@@ -27,6 +29,8 @@ export function createBidRouteRow(type: "pickup" | "delivery"): BidRouteRow {
 		id: `bid-row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
 		type,
 		location: "",
+		latitude: null,
+		longitude: null,
 	};
 }
 
@@ -72,6 +76,12 @@ export function bidRouteRowsToPayload(rows: BidRouteRow[]): CreateOfferRoutePoin
 		type: row.type === "pickup" ? "pick_up_location" : "delivery_location",
 		location: row.location.trim(),
 		time: "",
+		...(row.latitude != null && Number.isFinite(row.latitude)
+			? { latitude: row.latitude }
+			: {}),
+		...(row.longitude != null && Number.isFinite(row.longitude)
+			? { longitude: row.longitude }
+			: {}),
 	}));
 }
 
@@ -268,7 +278,11 @@ export default function BidRateRouteBuilder({
 	const updateRow = useCallback(
 		(index: number, location: string) => {
 			onChange(prev =>
-				prev.map((row, rowIndex) => (rowIndex === index ? { ...row, location } : row)),
+				prev.map((row, rowIndex) =>
+					rowIndex === index
+						? { ...row, location, latitude: null, longitude: null }
+						: row,
+				),
 			);
 		},
 		[onChange],
@@ -358,6 +372,8 @@ export default function BidRateRouteBuilder({
 
 			const geocodeAddress = normalizeLocationForGeocode(trimmed);
 			let finalAddress = trimmed;
+			let latitude: number | null = null;
+			let longitude: number | null = null;
 
 			if (needsLocationGeocode(trimmed)) {
 				try {
@@ -372,23 +388,36 @@ export default function BidRateRouteBuilder({
 				finalAddress = geocodeAddress;
 			}
 
-			if (finalAddress !== trimmed) {
-				onChange(prev => {
-					const next = [...prev];
-					if (next[index]?.id === rowId) {
-						next[index] = { ...next[index], location: finalAddress };
-					} else {
-						const foundIndex = next.findIndex(row => row.id === rowId);
-						if (foundIndex >= 0) {
-							next[foundIndex] = {
-								...next[foundIndex],
-								location: finalAddress,
-							};
-						}
-					}
-					return next;
-				});
+			try {
+				const coords = await offers.geocodeCoordinates(finalAddress);
+				if (coords) {
+					latitude = coords.latitude;
+					longitude = coords.longitude;
+				}
+			} catch {
+				// Coords optional — Nest geocodes on create/update as fallback
 			}
+
+			onChange(prev => {
+				const next = [...prev];
+				const apply = (targetIndex: number) => {
+					next[targetIndex] = {
+						...next[targetIndex],
+						location: finalAddress,
+						latitude,
+						longitude,
+					};
+				};
+				if (next[index]?.id === rowId) {
+					apply(index);
+				} else {
+					const foundIndex = next.findIndex(row => row.id === rowId);
+					if (foundIndex >= 0) {
+						apply(foundIndex);
+					}
+				}
+				return next;
+			});
 
 			// Commit after geocode so distance calc uses the final address
 			setTimeout(() => {

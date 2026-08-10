@@ -18,6 +18,10 @@ export interface RateLoadBoard {
 	driverId: string;
 	driverExternalId: string | null;
 	rate: number | null;
+	driverEta?: string | null;
+	actionTime?: number | string | null;
+	emptyMiles?: number | null;
+	totalMiles?: number | null;
 	active: boolean;
 	isSelected: boolean;
 	createdAt?: string;
@@ -46,6 +50,10 @@ export interface LoadBoardShipment {
 	referenceId: string | null;
 	rate: number | null;
 	status: LoadBoardShipmentStatus;
+	pickupLat?: number | null;
+	pickupLng?: number | null;
+	deliveryLat?: number | null;
+	deliveryLng?: number | null;
 	/** True when pickup window (latest/earliest + hours) is already in the past (NY). */
 	pickupExpired?: boolean;
 	createdAt: string;

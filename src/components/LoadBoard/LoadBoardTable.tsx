@@ -764,6 +764,12 @@ function ShipmentRows({
 													</TableCell>
 													<TableCell
 														isHeader
+														className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+													>
+														ETA
+													</TableCell>
+													<TableCell
+														isHeader
 														className="border-b border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 													>
 														Selected
@@ -784,6 +790,9 @@ function ShipmentRows({
 														</TableCell>
 														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
 															{formatRate(bid.rate)}
+														</TableCell>
+														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+															{bid.driverEta?.trim() || "—"}
 														</TableCell>
 														<TableCell className="border-b border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
 															{bid.isSelected ? "Yes" : "—"}

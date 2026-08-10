@@ -78,12 +78,43 @@ const EMPTY_FORM: NewShipmentForm = {
 function shipmentToRouteRows(shipment: LoadBoardShipment): BidRouteRow[] {
 	const route = Array.isArray(shipment.route) ? shipment.route : [];
 	if (route.length < 2) return initialBidRouteRows();
-	return route.map(point => ({
-		...createBidRouteRow(
-			point.type === "pick_up_location" ? "pickup" : "delivery",
-		),
-		location: point.location?.trim() || "",
-	}));
+	return route.map((point, index) => {
+		const isFirstPickup =
+			point.type === "pick_up_location" &&
+			route.findIndex(p => p.type === "pick_up_location") === index;
+		const isLastDelivery =
+			point.type === "delivery_location" &&
+			[...route]
+				.map((p, i) => ({ p, i }))
+				.reverse()
+				.find(entry => entry.p.type === "delivery_location")?.i === index;
+
+		const latitude =
+			typeof point.latitude === "number"
+				? point.latitude
+				: isFirstPickup && shipment.pickupLat != null
+					? shipment.pickupLat
+					: isLastDelivery && shipment.deliveryLat != null
+						? shipment.deliveryLat
+						: null;
+		const longitude =
+			typeof point.longitude === "number"
+				? point.longitude
+				: isFirstPickup && shipment.pickupLng != null
+					? shipment.pickupLng
+					: isLastDelivery && shipment.deliveryLng != null
+						? shipment.deliveryLng
+						: null;
+
+		return {
+			...createBidRouteRow(
+				point.type === "pick_up_location" ? "pickup" : "delivery",
+			),
+			location: point.location?.trim() || "",
+			latitude,
+			longitude,
+		};
+	});
 }
 
 function shipmentToForm(shipment: LoadBoardShipment): NewShipmentForm {
