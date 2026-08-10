@@ -469,10 +469,12 @@ export function useChatOutboxSend({
 
 		socket.on("messageSent", onMessageSent);
 		socket.on("newMessage", onNewMessage);
+		socket.on("chatError", onSocketError);
 		socket.on("error", onSocketError);
 		return () => {
 			socket.off("messageSent", onMessageSent);
 			socket.off("newMessage", onNewMessage);
+			socket.off("chatError", onSocketError);
 			socket.off("error", onSocketError);
 		};
 	}, [

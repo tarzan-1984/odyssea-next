@@ -38,6 +38,7 @@ import {
 	canAccessMyLoadsChatTab,
 	canAccessMyTeamChatTab,
 } from "@/utils/roleAccess";
+import { formatWebSocketError, logWebSocketError } from "@/utils/websocketError";
 
 function invalidateTrackingTeamsOnLoadChatEvent(
 	queryClient: QueryClient,
@@ -1121,11 +1122,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		// 	// User online status
 		// });
 
-		// Handle error events
-		newSocket.on("error", (data: any) => {
-			console.error("WebSocket error from server:", data);
-		});
-
 		// Handle any other events for debugging
 		newSocket.onAny((eventName: string, ...args: any[]) => {
 			if (process.env.NODE_ENV === "development") {
@@ -1148,18 +1144,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		newSocket.on("connect_error", (error: unknown) => {
-			const message = error instanceof Error ? error.message : String(error);
-			console.error("WebSocket connection error:", message);
-			try {
-				const e = error as Record<string, unknown>;
-				console.error("Error details:", {
-					message: e?.message,
-					description: e?.description,
-					type: e?.type,
-				});
-			} catch {
-				// Avoid dev overlay if error object has throwing getters
-			}
+			const message = formatWebSocketError(error) || String(error);
+			logWebSocketError("WebSocket connection error", error);
 			setIsConnected(false);
 			if (offlineUiTimerRef.current) {
 				clearTimeout(offlineUiTimerRef.current);
@@ -1190,20 +1176,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 		// Handle authentication errors
 		newSocket.on("auth_error", (error: any) => {
-			console.error("WebSocket authentication error:", error);
+			logWebSocketError("WebSocket authentication error", error);
 			setIsConnected(false);
 			// Optionally redirect to login or show error message
 		});
 
-		// Handle general errors
-		newSocket.on("error", (error: any) => {
-			console.error("WebSocket error:", error);
-			if (error.message?.includes("Unauthorized")) {
-				// Token might be expired, try to refresh
+		// Application errors from the gateway (chatError) + legacy "error" event.
+		// Avoid console.error — Next.js 15 treats it as a runtime overlay during remount/nav.
+		const handleServerError = (error: unknown) => {
+			logWebSocketError("WebSocket server error", error);
+			const message = formatWebSocketError(error).toLowerCase();
+			if (message.includes("unauthorized")) {
 				handleAuthError();
 			}
-		});
-
+		};
+		newSocket.on("chatError", handleServerError);
+		newSocket.on("error", handleServerError);
 		// Message events - these are handled by useWebSocketMessages hook
 		// No need to duplicate event handlers here
 

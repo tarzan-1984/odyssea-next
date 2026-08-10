@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
+import { isMeaningfulWebSocketError } from "@/utils/websocketError";
 
 interface Notification {
 	id: string;
@@ -33,38 +34,44 @@ export const useWebSocketNotifications = ({
 	onError,
 }: UseWebSocketNotificationsProps) => {
 	const { socket } = useWebSocket();
+	const onNotificationRef = useRef(onNotification);
+	const onRoleBroadcastRef = useRef(onRoleBroadcast);
+	const onErrorRef = useRef(onError);
+
+	onNotificationRef.current = onNotification;
+	onRoleBroadcastRef.current = onRoleBroadcast;
+	onErrorRef.current = onError;
 
 	useEffect(() => {
 		if (!socket) return;
 
 		const handleNotification = (notification: Notification) => {
-			onNotification?.(notification);
+			onNotificationRef.current?.(notification);
 		};
 
 		const handleRoleBroadcast = (broadcast: RoleBroadcast) => {
-			onRoleBroadcast?.(broadcast);
+			onRoleBroadcastRef.current?.(broadcast);
 		};
 
 		const handleError = (error: { message: string; details?: string }) => {
-			onError?.(error);
+			if (!isMeaningfulWebSocketError(error)) return;
+			onErrorRef.current?.(error);
 		};
 
-		// Register event listeners
 		socket.on("notification", handleNotification);
 		socket.on("roleBroadcast", handleRoleBroadcast);
+		socket.on("chatError", handleError);
 		socket.on("error", handleError);
 
-		// Cleanup listeners
 		return () => {
 			socket.off("notification", handleNotification);
 			socket.off("roleBroadcast", handleRoleBroadcast);
+			socket.off("chatError", handleError);
 			socket.off("error", handleError);
 		};
-	}, [socket, onNotification, onRoleBroadcast, onError]);
+	}, [socket]);
 
-	// Mark notification as read (if you have this functionality)
 	const markNotificationAsRead = useCallback((notificationId: string) => {
-		// Implement if your backend supports this
 		console.log("Mark notification as read:", notificationId);
 	}, []);
 

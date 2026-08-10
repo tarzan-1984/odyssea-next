@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useOnlineStatus } from "@/context/OnlineStatusContext";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
+import { logWebSocketError } from "@/utils/websocketError";
 
 /**
  * Enhanced chat sync hook that integrates WebSocket real-time functionality
@@ -99,7 +100,7 @@ export const useWebSocketChatSync = () => {
 		onMessageRead: () => {},
 		onUserTyping: () => {},
 		onError: error => {
-			console.error("WebSocket message error:", error);
+			logWebSocketError("WebSocket message error", error);
 		},
 	});
 
@@ -140,7 +141,7 @@ export const useWebSocketChatSync = () => {
 			});
 		},
 		onError: error => {
-			console.error("WebSocket chat room error:", error);
+			logWebSocketError("WebSocket chat room error", error);
 		},
 	});
 
@@ -153,7 +154,7 @@ export const useWebSocketChatSync = () => {
 			// Handle role broadcasts as needed
 		},
 		onError: error => {
-			console.error("WebSocket notification error:", error);
+			logWebSocketError("WebSocket notification error", error);
 		},
 	});
 

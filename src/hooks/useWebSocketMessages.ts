@@ -4,13 +4,20 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { useChatStore } from "@/stores/chatStore";
 import { Message } from "@/app-api/chatApi";
+import { isMeaningfulWebSocketError } from "@/utils/websocketError";
 
 interface UseWebSocketMessagesProps {
 	chatRoomId: string;
 	onNewMessage?: (message: Message) => void;
 	onMessageSent?: (data: { messageId: string; chatRoomId: string }) => void;
 	onMessageRead?: (data: { messageId: string; readBy: string }) => void;
-	onUserTyping?: (data: { userId: string; chatRoomId: string; isTyping: boolean; firstName?: string; role?: string }) => void;
+	onUserTyping?: (data: {
+		userId: string;
+		chatRoomId: string;
+		isTyping: boolean;
+		firstName?: string;
+		role?: string;
+	}) => void;
 	onUserOnline?: (data: { userId: string; chatRoomId: string; isOnline: boolean }) => void;
 	onError?: (error: { message: string; details?: string }) => void;
 }
@@ -35,19 +42,30 @@ export const useWebSocketMessages = ({
 		markChatRoomAsRead,
 	} = useWebSocket();
 	const addMessage = useChatStore(s => s.addMessage);
-	const [isTyping, setIsTyping] = useState<Record<string, { isTyping: boolean; firstName?: string; role?: string }>>({});
+	const [isTyping, setIsTyping] = useState<
+		Record<string, { isTyping: boolean; firstName?: string; role?: string }>
+	>({});
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const currentRoomRef = useRef<string | null>(null);
+	const onNewMessageRef = useRef(onNewMessage);
+	const onMessageSentRef = useRef(onMessageSent);
+	const onMessageReadRef = useRef(onMessageRead);
+	const onUserTypingRef = useRef(onUserTyping);
+	const onUserOnlineRef = useRef(onUserOnline);
+	const onErrorRef = useRef(onError);
 
-	// Join chat room when component mounts or chatRoomId changes
+	onNewMessageRef.current = onNewMessage;
+	onMessageSentRef.current = onMessageSent;
+	onMessageReadRef.current = onMessageRead;
+	onUserTypingRef.current = onUserTyping;
+	onUserOnlineRef.current = onUserOnline;
+	onErrorRef.current = onError;
+
+	// Join chat room when component mounts or chatRoomId changes.
+	// Do not leave on empty room / unmount — connection already joins all rooms,
+	// and leave+rejoin on chat↔tracking navigation triggers noisy socket errors.
 	useEffect(() => {
-		// If there is a valid room id and it's different from the current one — join it
 		if (isConnected && chatRoomId && currentRoomRef.current !== chatRoomId) {
-
-			// Don't leave previous room - stay in multiple rooms to receive messages
-			// This ensures we receive messages from all chat rooms, not just the active one
-
-			// Clear typing state and timeout when switching chat rooms
 			setIsTyping({});
 			if (typingTimeoutRef.current) {
 				clearTimeout(typingTimeoutRef.current);
@@ -55,40 +73,18 @@ export const useWebSocketMessages = ({
 			}
 
 			currentRoomRef.current = chatRoomId;
-			// Join the new room (without leaving the previous one)
 			joinChatRoom(chatRoomId);
-
-			// Mark all messages as read in this chat
 			markChatRoomAsRead(chatRoomId);
-			return;
 		}
+	}, [isConnected, chatRoomId, joinChatRoom, markChatRoomAsRead]);
 
-		// When there is no selected room (empty id) but we were previously in a room — leave it
-		if (isConnected && !chatRoomId && currentRoomRef.current) {
-			leaveChatRoom(currentRoomRef.current);
-			currentRoomRef.current = null;
-			setIsTyping({});
-			if (typingTimeoutRef.current) {
-				clearTimeout(typingTimeoutRef.current);
-				typingTimeoutRef.current = null;
-			}
-		}
-	}, [isConnected, chatRoomId, joinChatRoom, leaveChatRoom, markChatRoomAsRead]);
-
-	// Leave chat room on unmount
 	useEffect(() => {
 		return () => {
-			if (currentRoomRef.current) {
-				leaveChatRoom(currentRoomRef.current);
-				currentRoomRef.current = null;
-			}
-
-			// Clear typing timeout on unmount
 			if (typingTimeoutRef.current) {
 				clearTimeout(typingTimeoutRef.current);
 			}
 		};
-	}, [leaveChatRoom]);
+	}, []);
 
 	// Set up event listeners
 	useEffect(() => {
@@ -96,21 +92,19 @@ export const useWebSocketMessages = ({
 
 		const handleNewMessage = (data: { chatRoomId: string; message: Message }) => {
 			if (data.chatRoomId === chatRoomId) {
-				// Add message to store
 				addMessage(data.message);
-				onNewMessage?.(data.message);
+				onNewMessageRef.current?.(data.message);
 			}
 		};
 
 		const handleMessageSent = (data: { messageId: string; chatRoomId: string }) => {
 			if (data.chatRoomId === chatRoomId) {
-				onMessageSent?.(data);
+				onMessageSentRef.current?.(data);
 			}
 		};
 
 		const handleMessageRead = (data: { messageId: string; readBy: string }) => {
-			// Handled globally in WebSocketContext; callback only for local hooks
-			onMessageRead?.(data);
+			onMessageReadRef.current?.(data);
 		};
 
 		const handleUserTyping = (data: {
@@ -129,7 +123,7 @@ export const useWebSocketMessages = ({
 						role: data.role,
 					},
 				}));
-				onUserTyping?.(data);
+				onUserTypingRef.current?.(data);
 			}
 		};
 
@@ -138,44 +132,33 @@ export const useWebSocketMessages = ({
 			chatRoomId: string;
 			isOnline: boolean;
 		}) => {
-			// Process userOnline events globally, not just for current chat room
-			onUserOnline?.(data);
+			onUserOnlineRef.current?.(data);
 		};
 
 		const handleError = (error: { message: string; details?: string }) => {
-			onError?.(error);
+			if (!isMeaningfulWebSocketError(error)) return;
+			onErrorRef.current?.(error);
 		};
 
-		// Register event listeners
 		socket.on("newMessage", handleNewMessage);
 		socket.on("messageSent", handleMessageSent);
 		socket.on("messageRead", handleMessageRead);
 		socket.on("userTyping", handleUserTyping);
 		socket.on("userOnline", handleUserOnline);
+		socket.on("chatError", handleError);
 		socket.on("error", handleError);
 
-		// Cleanup listeners
 		return () => {
 			socket.off("newMessage", handleNewMessage);
 			socket.off("messageSent", handleMessageSent);
 			socket.off("messageRead", handleMessageRead);
 			socket.off("userTyping", handleUserTyping);
 			socket.off("userOnline", handleUserOnline);
+			socket.off("chatError", handleError);
 			socket.off("error", handleError);
 		};
-	}, [
-		socket,
-		chatRoomId,
-		addMessage,
-		onNewMessage,
-		onMessageSent,
-		onMessageRead,
-		onUserTyping,
-		onUserOnline,
-		onError,
-	]);
+	}, [socket, chatRoomId, addMessage]);
 
-	// Send message function
 	const sendMessageHandler = useCallback(
 		(data: {
 			content: string;
@@ -194,12 +177,10 @@ export const useWebSocketMessages = ({
 		[sendMessage, chatRoomId]
 	);
 
-	// Send typing indicator with debouncing
 	const sendTypingHandler = useCallback(
 		(isTyping: boolean) => {
 			sendTyping(chatRoomId, isTyping);
 
-			// Auto-stop typing indicator after 4 seconds
 			if (isTyping) {
 				if (typingTimeoutRef.current) {
 					clearTimeout(typingTimeoutRef.current);
@@ -219,7 +200,6 @@ export const useWebSocketMessages = ({
 		[sendTyping, chatRoomId]
 	);
 
-	// Mark message as read
 	const markAsRead = useCallback(
 		(messageId: string) => {
 			markMessageAsRead(messageId, chatRoomId);

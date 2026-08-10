@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { useChatStore } from "@/stores/chatStore";
 import { ChatRoom, ChatRoomParticipant } from "@/app-api/chatApi";
@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
 import { stripPerUserChatRoomFields } from "@/utils/stripPerUserChatRoomFields";
+import { isMeaningfulWebSocketError } from "@/utils/websocketError";
 
 interface UseWebSocketChatRoomsProps {
 	onChatRoomCreated?: (chatRoom: ChatRoom) => void;
@@ -59,20 +60,31 @@ export const useWebSocketChatRooms = ({
 	const { addChatRoom, updateChatRoom } = useChatStore();
 	const queryClient = useQueryClient();
 	const [isLoading, setIsLoading] = useState(false);
+	const onChatRoomCreatedRef = useRef(onChatRoomCreated);
+	const onChatRoomUpdatedRef = useRef(onChatRoomUpdated);
+	const onParticipantsAddedRef = useRef(onParticipantsAdded);
+	const onParticipantRemovedRef = useRef(onParticipantRemoved);
+	const onAddedToChatRoomRef = useRef(onAddedToChatRoom);
+	const onErrorRef = useRef(onError);
 
-	// Set up event listeners
+	onChatRoomCreatedRef.current = onChatRoomCreated;
+	onChatRoomUpdatedRef.current = onChatRoomUpdated;
+	onParticipantsAddedRef.current = onParticipantsAdded;
+	onParticipantRemovedRef.current = onParticipantRemoved;
+	onAddedToChatRoomRef.current = onAddedToChatRoom;
+	onErrorRef.current = onError;
+
 	useEffect(() => {
 		if (!socket) return;
 
 		const handleChatRoomCreated = (data: { chatRoom: ChatRoom } | ChatRoom) => {
 			const room = parseChatRoomCreatedPayload(data);
 			if (!room || !room.id) {
-				console.error("Invalid chatRoomCreated payload", data);
+				console.warn("Invalid chatRoomCreated payload", data);
 				return;
 			}
-			// Add chat room to store
 			addChatRoom(room);
-			onChatRoomCreated?.(room);
+			onChatRoomCreatedRef.current?.(room);
 		};
 
 		const handleChatRoomUpdated = (data: {
@@ -80,7 +92,6 @@ export const useWebSocketChatRooms = ({
 			updatedChatRoom: ChatRoom;
 			updatedBy: string;
 		}) => {
-			// Per-user fields (unreadCount etc.) must not come from room-wide updates
 			updateChatRoom(
 				data.chatRoomId,
 				stripPerUserChatRoomFields(data.updatedChatRoom)
@@ -95,7 +106,7 @@ export const useWebSocketChatRooms = ({
 				removeArchivedLoadChatFromCache(queryClient, data.chatRoomId);
 			}
 
-			onChatRoomUpdated?.(data);
+			onChatRoomUpdatedRef.current?.(data);
 		};
 
 		const handleParticipantsAdded = (data: {
@@ -103,7 +114,7 @@ export const useWebSocketChatRooms = ({
 			newParticipants: ChatRoomParticipant[];
 			addedBy: string;
 		}) => {
-			onParticipantsAdded?.(data);
+			onParticipantsAddedRef.current?.(data);
 		};
 
 		const handleParticipantRemoved = (data: {
@@ -111,58 +122,41 @@ export const useWebSocketChatRooms = ({
 			removedUserId: string;
 			removedBy: string;
 		}) => {
-			onParticipantRemoved?.(data);
+			onParticipantRemovedRef.current?.(data);
 		};
 
 		const handleAddedToChatRoom = (data: {
 			chatRoomId: string;
 			addedBy: string;
 		}) => {
-			// When user is added to a chat room, we need to reload chat rooms
-			// to include the new chat in the list
-			console.log("🎯 WebSocket received addedToChatRoom event:", data);
-			
-			// Force reload chat rooms from API to get the latest data
-			// This ensures the chat room appears in the list with current state
-			onAddedToChatRoom?.(data);
+			onAddedToChatRoomRef.current?.(data);
 		};
 
 		const handleError = (error: { message: string; details?: string }) => {
 			setIsLoading(false);
-			onError?.(error);
+			if (!isMeaningfulWebSocketError(error)) return;
+			onErrorRef.current?.(error);
 		};
 
-		// Register event listeners
 		socket.on("chatRoomCreated", handleChatRoomCreated);
 		socket.on("chatRoomUpdated", handleChatRoomUpdated);
 		socket.on("participantsAdded", handleParticipantsAdded);
 		socket.on("participantRemoved", handleParticipantRemoved);
 		socket.on("addedToChatRoom", handleAddedToChatRoom);
+		socket.on("chatError", handleError);
 		socket.on("error", handleError);
 
-		// Cleanup listeners
 		return () => {
 			socket.off("chatRoomCreated", handleChatRoomCreated);
 			socket.off("chatRoomUpdated", handleChatRoomUpdated);
 			socket.off("participantsAdded", handleParticipantsAdded);
 			socket.off("participantRemoved", handleParticipantRemoved);
 			socket.off("addedToChatRoom", handleAddedToChatRoom);
+			socket.off("chatError", handleError);
 			socket.off("error", handleError);
 		};
-	}, [
-		socket,
-		addChatRoom,
-		updateChatRoom,
-		queryClient,
-		onChatRoomCreated,
-		onChatRoomUpdated,
-		onParticipantsAdded,
-		onParticipantRemoved,
-		onAddedToChatRoom,
-		onError,
-	]);
+	}, [socket, addChatRoom, updateChatRoom, queryClient]);
 
-	// Create chat room
 	const createChatRoom = useCallback(
 		(data: {
 			name?: string;
@@ -178,9 +172,11 @@ export const useWebSocketChatRooms = ({
 		[socket, isConnected]
 	);
 
-	// Update chat room
-    const updateChatRoomHandler = useCallback(
-        (data: { chatRoomId: string; updates: { name?: string; isArchived?: boolean; avatar?: string } }) => {
+	const updateChatRoomHandler = useCallback(
+		(data: {
+			chatRoomId: string;
+			updates: { name?: string; isArchived?: boolean; avatar?: string };
+		}) => {
 			if (socket && isConnected) {
 				setIsLoading(true);
 				socket.emit("updateChatRoom", data);
@@ -189,7 +185,6 @@ export const useWebSocketChatRooms = ({
 		[socket, isConnected]
 	);
 
-	// Add participants
 	const addParticipants = useCallback(
 		(data: {
 			chatRoomId: string;
@@ -204,7 +199,6 @@ export const useWebSocketChatRooms = ({
 		[socket, isConnected]
 	);
 
-	// Remove participant
 	const removeParticipant = useCallback(
 		(data: {
 			chatRoomId: string;
