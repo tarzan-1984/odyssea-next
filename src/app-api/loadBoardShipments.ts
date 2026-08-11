@@ -3,6 +3,16 @@ import type { EquipmentType, LoadType } from "@/components/LoadBoard/newShipment
 
 export type LoadBoardShipmentRoutePoint = CreateOfferRoutePoint;
 export type LoadBoardShipmentStatus = "posted" | "unposted";
+export type LoadBoardLoadStatus =
+	| "waiting-on-pu-date"
+	| "at-pu"
+	| "loaded-enroute"
+	| "at-del"
+	| "delivered"
+	| "tonu"
+	| "cancelled"
+	| "waiting-on-rc"
+	| "draft";
 export type LoadBoardAgeSort = "asc" | "desc";
 
 export type LoadBoardShipmentUser = {
@@ -50,10 +60,9 @@ export interface LoadBoardShipment {
 	referenceId: string | null;
 	rate: number | null;
 	status: LoadBoardShipmentStatus;
+	loadStatus?: LoadBoardLoadStatus | null;
 	pickupLat?: number | null;
 	pickupLng?: number | null;
-	deliveryLat?: number | null;
-	deliveryLng?: number | null;
 	/** True when pickup window (latest/earliest + hours) is already in the past (NY). */
 	pickupExpired?: boolean;
 	createdAt: string;

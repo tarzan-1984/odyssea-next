@@ -78,33 +78,15 @@ const EMPTY_FORM: NewShipmentForm = {
 function shipmentToRouteRows(shipment: LoadBoardShipment): BidRouteRow[] {
 	const route = Array.isArray(shipment.route) ? shipment.route : [];
 	if (route.length < 2) return initialBidRouteRows();
-	return route.map((point, index) => {
-		const isFirstPickup =
-			point.type === "pick_up_location" &&
-			route.findIndex(p => p.type === "pick_up_location") === index;
-		const isLastDelivery =
-			point.type === "delivery_location" &&
-			[...route]
-				.map((p, i) => ({ p, i }))
-				.reverse()
-				.find(entry => entry.p.type === "delivery_location")?.i === index;
-
+	return route.map((point) => {
 		const latitude =
-			typeof point.latitude === "number"
+			typeof point.latitude === "number" && Number.isFinite(point.latitude)
 				? point.latitude
-				: isFirstPickup && shipment.pickupLat != null
-					? shipment.pickupLat
-					: isLastDelivery && shipment.deliveryLat != null
-						? shipment.deliveryLat
-						: null;
+				: null;
 		const longitude =
-			typeof point.longitude === "number"
+			typeof point.longitude === "number" && Number.isFinite(point.longitude)
 				? point.longitude
-				: isFirstPickup && shipment.pickupLng != null
-					? shipment.pickupLng
-					: isLastDelivery && shipment.deliveryLng != null
-						? shipment.deliveryLng
-						: null;
+				: null;
 
 		return {
 			...createBidRouteRow(
