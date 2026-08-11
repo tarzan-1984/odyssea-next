@@ -19,27 +19,42 @@ export type LocalMessageDeleteSnapshot = {
 
 /** Remove message from Zustand store and IndexedDB immediately (optimistic UI). */
 export function removeChatMessageLocally(
-	messageId: string
+	messageId: string,
+	chatRoomIdHint?: string
 ): LocalMessageDeleteSnapshot | null {
 	const state = useChatStore.getState();
 	const message = state.messages.find(msg => msg.id === messageId);
-	if (!message) {
+
+	const chatRoomId =
+		message?.chatRoomId ||
+		chatRoomIdHint ||
+		state.chatRooms.find(room => room.lastMessage?.id === messageId)?.id;
+
+	if (!chatRoomId) {
+		indexedDBChatService.deleteMessage(messageId).catch((error: Error) => {
+			console.error("Failed to delete message from IndexedDB:", error);
+		});
 		return null;
 	}
 
-	const chatRoomId = message.chatRoomId;
 	const chatRoom = state.chatRooms.find(room => room.id === chatRoomId);
 	const previousLastMessage = chatRoom?.lastMessage;
 
 	const updatedMessages = state.messages.filter(msg => msg.id !== messageId);
-	state.setMessages(updatedMessages);
+	if (message) {
+		state.setMessages(updatedMessages);
+	}
 
 	indexedDBChatService.deleteMessage(messageId).catch((error: Error) => {
 		console.error("Failed to delete message from IndexedDB:", error);
 	});
 
-	if (chatRoom && chatRoom.lastMessage?.id === messageId) {
-		const remainingMessages = updatedMessages.filter(msg => msg.chatRoomId === chatRoomId);
+	// Always clear ghost list preview even when the chat was never opened
+	// (message not present in state.messages).
+	if (chatRoom?.lastMessage?.id === messageId) {
+		const remainingMessages = updatedMessages.filter(
+			msg => msg.chatRoomId === chatRoomId
+		);
 		const newLastMessage =
 			remainingMessages.length > 0
 				? remainingMessages[remainingMessages.length - 1]
@@ -50,6 +65,10 @@ export function removeChatMessageLocally(
 				room.id === chatRoomId ? { ...room, lastMessage: newLastMessage } : room
 			)
 		);
+	}
+
+	if (!message) {
+		return null;
 	}
 
 	return { message, chatRoomId, previousLastMessage };

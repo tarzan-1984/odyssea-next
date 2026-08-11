@@ -11,6 +11,7 @@ import {
 	mergeChatRoomParticipants,
 	normalizeChatParticipants,
 } from "@/utils/normalizeChatParticipants";
+import { pickAuthoritativeLastMessage } from "@/utils/pickAuthoritativeLastMessage";
 
 /** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
 const mergeSourcesUnreadCount = (
@@ -22,6 +23,14 @@ const mergeSourcesUnreadCount = (
 	if (s === 0) return 0;
 	return Math.max(s, st);
 };
+
+const mergeRoomLastMessage = (
+	sourceLast: ChatRoom["lastMessage"],
+	storeLast: ChatRoom["lastMessage"],
+	options?: { preferNewerStore?: boolean }
+) =>
+	pickAuthoritativeLastMessage(sourceLast ?? null, storeLast ?? null, options) ??
+	undefined;
 
 export type LoadChatRoomsOptions = { force?: boolean };
 export type LoadMessagesOptions = { force?: boolean };
@@ -127,8 +136,11 @@ export const useChatSync = () => {
 										return {
 											...cachedRoom,
 											unreadCount: finalUnreadCount,
-											lastMessage:
-												storeRoom.lastMessage || cachedRoom.lastMessage,
+											lastMessage: mergeRoomLastMessage(
+												cachedRoom.lastMessage,
+												storeRoom.lastMessage,
+												{ preferNewerStore: true }
+											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 										};
 									}
@@ -163,7 +175,10 @@ export const useChatSync = () => {
 									return {
 										...apiRoom,
 										unreadCount: finalUnreadCount,
-										lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
+										lastMessage: mergeRoomLastMessage(
+											apiRoom.lastMessage,
+											storeRoom.lastMessage
+										),
 										updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
 									};
 								}
@@ -196,8 +211,11 @@ export const useChatSync = () => {
 												cachedRoom.unreadCount,
 												storeRoom.unreadCount
 											),
-											lastMessage:
-												storeRoom.lastMessage || cachedRoom.lastMessage,
+											lastMessage: mergeRoomLastMessage(
+												cachedRoom.lastMessage,
+												storeRoom.lastMessage,
+												{ preferNewerStore: true }
+											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 										};
 									}
@@ -233,7 +251,10 @@ export const useChatSync = () => {
 								return {
 									...apiRoom,
 									unreadCount: finalUnreadCount,
-									lastMessage: storeRoom.lastMessage || apiRoom.lastMessage,
+									lastMessage: mergeRoomLastMessage(
+										apiRoom.lastMessage,
+										storeRoom.lastMessage
+									),
 									updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
 								};
 							}

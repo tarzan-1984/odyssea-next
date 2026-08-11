@@ -911,7 +911,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				deletedBy: string;
 				deletedByRole: string;
 			}) => {
-				removeChatMessageLocally(data.messageId);
+				removeChatMessageLocally(data.messageId, data.chatRoomId);
 			}
 		);
 

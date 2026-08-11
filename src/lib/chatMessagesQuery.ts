@@ -5,8 +5,13 @@ import {
 	filterMessagesForRoom,
 	mergeMessageLists,
 	shouldForceMessagesApiSync,
+	sortMessagesByCreatedAt,
 } from "@/utils/chatMessagesMerge";
 import { fetchChatMessagesHttp, isAbortError } from "@/lib/chatMessagesSingleFlight";
+import {
+	lastMessageFromTranscriptTail,
+} from "@/utils/pickAuthoritativeLastMessage";
+import { isOptimisticMessageId } from "@/utils/optimisticChatMessage";
 
 export const CHAT_MESSAGES_QUERY_KEY = "chat-messages";
 
@@ -37,6 +42,44 @@ const applyMessagesForRoom = (chatRoomId: string, lists: Message[][]) => {
 	useChatStore
 		.getState()
 		.setMessages(filterMessagesForRoom(merged, chatRoomId));
+};
+
+/** Align chat-list preview with the newest loaded transcript page. */
+const reconcileRoomLastMessageFromMessages = (
+	chatRoomId: string,
+	messages: Message[]
+) => {
+	const state = useChatStore.getState();
+	const room = state.chatRooms.find(r => r.id === chatRoomId);
+	if (!room) return;
+
+	const forRoom = sortMessagesByCreatedAt(
+		filterMessagesForRoom(messages, chatRoomId)
+	);
+	const tail = lastMessageFromTranscriptTail(forRoom) as Message | null;
+	const currentLast = room.lastMessage;
+
+	if (
+		currentLast &&
+		(currentLast.pendingOutgoing || isOptimisticMessageId(currentLast.id))
+	) {
+		const tailTime = tail ? new Date(tail.createdAt).getTime() : 0;
+		const pendingTime = new Date(currentLast.createdAt).getTime();
+		if (pendingTime >= tailTime) {
+			return;
+		}
+	}
+
+	// Page-1 server transcript is authoritative: drop ghost previews that are
+	// not present (or not newest) in the loaded messages.
+	if ((tail?.id ?? null) === (currentLast?.id ?? null)) {
+		return;
+	}
+
+	state.updateChatRoom(chatRoomId, {
+		lastMessage: tail ?? undefined,
+		...(tail?.createdAt ? { updatedAt: tail.createdAt } : {}),
+	});
 };
 
 export type HydrateChatMessagesResult = {
@@ -138,6 +181,18 @@ export async function fetchChatMessagesFromApi(
 	setError(null);
 
 	await indexedDBChatService.saveMessages(chatRoomId, response.messages);
+
+	// Newest page from API is authoritative for list preview vs transcript.
+	if (page === 1) {
+		const mergedForRoom = filterMessagesForRoom(
+			useChatStore.getState().messages,
+			chatRoomId
+		);
+		reconcileRoomLastMessageFromMessages(chatRoomId, [
+			...response.messages,
+			...mergedForRoom,
+		]);
+	}
 
 	return response;
 }
