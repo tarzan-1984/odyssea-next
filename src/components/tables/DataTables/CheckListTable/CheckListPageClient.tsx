@@ -6,7 +6,7 @@ import Button from "@/components/ui/button/Button";
 import { useCurrentUser } from "@/stores/userStore";
 import {
 	canAccessCheckListFull,
-	canAccessCheckListVersionOnly,
+	canAccessCheckListLimited,
 } from "@/utils/roleAccess";
 import CheckListTable from "./CheckListTable";
 import CheckListVersionTable from "./CheckListVersionTable";
@@ -17,22 +17,63 @@ type CheckListTab = "location" | "version" | "several-devices";
 export default function CheckListPageClient() {
 	const currentUser = useCurrentUser();
 	const hasFullCheckListAccess = canAccessCheckListFull(currentUser?.role);
-	const hasVersionOnlyAccess =
-		!hasFullCheckListAccess && canAccessCheckListVersionOnly(currentUser?.role);
+	const hasLimitedCheckListAccess =
+		!hasFullCheckListAccess && canAccessCheckListLimited(currentUser?.role);
 	const [activeTab, setActiveTab] = useState<CheckListTab>(
-		hasVersionOnlyAccess ? "version" : "location",
+		hasLimitedCheckListAccess ? "version" : "location",
 	);
 
-	if (hasVersionOnlyAccess) {
+	const versionTabContent = (
+		<>
+			<p className="text-sm text-gray-600 dark:text-gray-400">
+				ACTIVE drivers with at least one device whose app version is below the latest allowed
+				version (see below). All devices for matching drivers are shown. Default sort is oldest
+				app version first; use the &quot;App Version&quot; column header to toggle. Search by
+				name, driver U, or email.
+			</p>
+			<CheckListVersionTable />
+		</>
+	);
+
+	const severalDevicesTabContent = (
+		<>
+			<p className="text-sm text-gray-600 dark:text-gray-400">
+				ACTIVE drivers with two or more devices on one account. All devices for matching
+				drivers are shown. Default sort is oldest app version first; use the &quot;App
+				Version&quot; column header to toggle. Search by name, driver ID, or email.
+			</p>
+			<CheckListSeveralDevicesTable />
+		</>
+	);
+
+	if (hasLimitedCheckListAccess) {
 		return (
-			<ComponentCard title="Check list">
-				<p className="text-sm text-gray-600 dark:text-gray-400">
-					ACTIVE drivers with at least one device whose app version is below the latest allowed
-					version (see below). All devices for matching drivers are shown. Default sort is oldest
-					app version first; use the &quot;App Version&quot; column header to toggle. Search by
-					name, driver U, or email.
-				</p>
-				<CheckListVersionTable />
+			<ComponentCard
+				title="Check list"
+				headerRight={
+					<>
+						<Button
+							type="button"
+							size="sm"
+							variant={activeTab === "version" ? "primary" : "outline"}
+							className="h-9 whitespace-nowrap"
+							onClick={() => setActiveTab("version")}
+						>
+							Check Update Version
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant={activeTab === "several-devices" ? "primary" : "outline"}
+							className="h-9 whitespace-nowrap"
+							onClick={() => setActiveTab("several-devices")}
+						>
+							Several devices
+						</Button>
+					</>
+				}
+			>
+				{activeTab === "several-devices" ? severalDevicesTabContent : versionTabContent}
 			</ComponentCard>
 		);
 	}
@@ -83,24 +124,9 @@ export default function CheckListPageClient() {
 					<CheckListTable />
 				</>
 			) : activeTab === "version" ? (
-				<>
-					<p className="text-sm text-gray-600 dark:text-gray-400">
-						ACTIVE drivers with at least one device whose app version is below the latest allowed
-						version (see below). All devices for matching drivers are shown. Default sort is oldest
-						app version first; use the &quot;App Version&quot; column header to toggle. Search by
-						name, driver U, or email.
-					</p>
-					<CheckListVersionTable />
-				</>
+				versionTabContent
 			) : (
-				<>
-					<p className="text-sm text-gray-600 dark:text-gray-400">
-						ACTIVE drivers with two or more devices on one account. All devices for matching
-						drivers are shown. Default sort is oldest app version first; use the &quot;App
-						Version&quot; column header to toggle. Search by name, driver ID, or email.
-					</p>
-					<CheckListSeveralDevicesTable />
-				</>
+				severalDevicesTabContent
 			)}
 		</ComponentCard>
 	);

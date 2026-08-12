@@ -25,7 +25,11 @@ import type {
 } from "./checkListTypes";
 import { formatDriverUnitLine } from "./checkListTypes";
 import { useCurrentUser } from "@/stores/userStore";
-import { canManageCheckListDevices } from "@/utils/roleAccess";
+import {
+	canAccessCheckListFull,
+	canManageCheckListDevices,
+	canSendCheckListMessages,
+} from "@/utils/roleAccess";
 
 export type CheckListAppVersionSort = "asc" | "desc";
 
@@ -135,6 +139,9 @@ export default function CheckListDriverDevicesTable({
 }: CheckListDriverDevicesTableProps) {
 	const currentUser = useCurrentUser();
 	const canManageDevices = canManageCheckListDevices(currentUser?.role);
+	const canShowPushAndEmail =
+		canAccessCheckListFull(currentUser?.role) && canSendCheckListMessages(currentUser?.role);
+	const showActionColumn = canManageDevices || canShowPushAndEmail;
 	const queryClient = useQueryClient();
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -289,7 +296,8 @@ export default function CheckListDriverDevicesTable({
 	const emptyMessage = getEmptyMessage(minimumAppVersion);
 	const pushDefaultMessage = getPushDefaultMessage(minimumAppVersion);
 	const emailDefaultMessage = (getEmailDefaultMessage ?? getPushDefaultMessage)(minimumAppVersion);
-	const tableColumnCount = showLastOpenAppColumn ? 8 : 7;
+	const tableColumnCount =
+		(showLastOpenAppColumn ? 8 : 7) - (showActionColumn ? 0 : 1);
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -374,38 +382,42 @@ export default function CheckListDriverDevicesTable({
 							>
 								Create chat
 							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant="primary"
-								className="h-10 shrink-0 whitespace-nowrap"
-								onClick={() => {
-									const selected = drivers
-										.filter(d => selectedDriverIds.has(d.id))
-										.map(toCheckListDriver);
-									if (selected.length > 0) {
-										setPushModalDrivers(selected);
-									}
-								}}
-							>
-								Send push
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant="primary"
-								className="h-10 shrink-0 whitespace-nowrap"
-								onClick={() => {
-									const selected = drivers
-										.filter(d => selectedDriverIds.has(d.id))
-										.map(toCheckListDriver);
-									if (selected.length > 0) {
-										setEmailModalDrivers(selected);
-									}
-								}}
-							>
-								Send Email
-							</Button>
+							{canShowPushAndEmail && (
+								<>
+									<Button
+										type="button"
+										size="sm"
+										variant="primary"
+										className="h-10 shrink-0 whitespace-nowrap"
+										onClick={() => {
+											const selected = drivers
+												.filter(d => selectedDriverIds.has(d.id))
+												.map(toCheckListDriver);
+											if (selected.length > 0) {
+												setPushModalDrivers(selected);
+											}
+										}}
+									>
+										Send push
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										variant="primary"
+										className="h-10 shrink-0 whitespace-nowrap"
+										onClick={() => {
+											const selected = drivers
+												.filter(d => selectedDriverIds.has(d.id))
+												.map(toCheckListDriver);
+											if (selected.length > 0) {
+												setEmailModalDrivers(selected);
+											}
+										}}
+									>
+										Send Email
+									</Button>
+								</>
+							)}
 						</>
 					)}
 				</div>
@@ -515,12 +527,14 @@ export default function CheckListDriverDevicesTable({
 										Last open app
 									</TableCell>
 								)}
-								<TableCell
-									isHeader
-									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap text-right"
-								>
-									Action
-								</TableCell>
+								{showActionColumn && (
+									<TableCell
+										isHeader
+										className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap text-right"
+									>
+										Action
+									</TableCell>
+								)}
 							</TableRow>
 						</TableHeader>
 						<TableBody className="text-sm divide-y divide-gray-100 dark:divide-white/[0.05]">
@@ -584,18 +598,20 @@ export default function CheckListDriverDevicesTable({
 														<span className="text-xs text-gray-500 dark:text-gray-400">
 															<CheckListPhoneLink phone={driver.phone} />
 														</span>
-														<Button
-															size="sm"
-															variant="outline"
-															type="button"
-															className="!mt-2 !px-2 !py-1 !text-xs h-auto w-fit rounded-md"
-															onClick={() =>
-																setEmailModalDrivers([toCheckListDriver(driver)])
-															}
-															disabled={!driver.email?.trim()}
-														>
-															Send Email
-														</Button>
+														{canShowPushAndEmail && (
+															<Button
+																size="sm"
+																variant="outline"
+																type="button"
+																className="!mt-2 !px-2 !py-1 !text-xs h-auto w-fit rounded-md"
+																onClick={() =>
+																	setEmailModalDrivers([toCheckListDriver(driver)])
+																}
+																disabled={!driver.email?.trim()}
+															>
+																Send Email
+															</Button>
+														)}
 													</div>
 												</TableCell>
 											</>
@@ -617,61 +633,65 @@ export default function CheckListDriverDevicesTable({
 												{formatCheckListNyDate(device.lastActiveAt)}
 											</TableCell>
 										)}
-										<TableCell className="px-4 py-3 text-right whitespace-nowrap">
-											<div className="flex flex-wrap items-center justify-end gap-2">
-												{canManageDevices && (
-													<Button
-														size="sm"
-														variant="outline"
-														type="button"
-														className={`!px-2 !py-1 !text-xs h-auto rounded-md ${
-															device.blocked
-																? "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-																: ""
-														}`}
-														onClick={() => handleBlockDevice(device)}
-														disabled={
-															deviceActionLoadingId === device.id || query.isPending
-														}
-													>
-														{deviceActionLoadingId === device.id
-															? device.blocked
-																? "Unblocking…"
-																: "Blocking…"
-															: device.blocked
-																? "Blocked"
-																: "Block"}
-													</Button>
-												)}
-												{canManageDevices && (
-													<Button
-														size="sm"
-														variant="outline"
-														type="button"
-														className="!px-2 !py-1 !text-xs h-auto rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
-														onClick={() => handleDeleteDevice(device)}
-														disabled={
-															deviceActionLoadingId === device.id || query.isPending
-														}
-													>
-														{deviceActionLoadingId === device.id
-															? "Deleting…"
-															: "Delete"}
-													</Button>
-												)}
-												<Button
-													size="sm"
-													variant="primary"
-													type="button"
-													className="!px-2 !py-1 !text-xs h-auto rounded-md"
-													onClick={() =>
-														setPushModalDrivers([toCheckListDriver(driver)])
-													}
-												>
-													Send push
-												</Button>
-											</div>
-										</TableCell>
+										{showActionColumn && (
+											<TableCell className="px-4 py-3 text-right whitespace-nowrap">
+												<div className="flex flex-wrap items-center justify-end gap-2">
+													{canManageDevices && (
+														<Button
+															size="sm"
+															variant="outline"
+															type="button"
+															className={`!px-2 !py-1 !text-xs h-auto rounded-md ${
+																device.blocked
+																	? "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+																	: ""
+															}`}
+															onClick={() => handleBlockDevice(device)}
+															disabled={
+																deviceActionLoadingId === device.id || query.isPending
+															}
+														>
+															{deviceActionLoadingId === device.id
+																? device.blocked
+																	? "Unblocking…"
+																	: "Blocking…"
+																: device.blocked
+																	? "Blocked"
+																	: "Block"}
+														</Button>
+													)}
+													{canManageDevices && (
+														<Button
+															size="sm"
+															variant="outline"
+															type="button"
+															className="!px-2 !py-1 !text-xs h-auto rounded-md text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/20"
+															onClick={() => handleDeleteDevice(device)}
+															disabled={
+																deviceActionLoadingId === device.id || query.isPending
+															}
+														>
+															{deviceActionLoadingId === device.id
+																? "Deleting…"
+																: "Delete"}
+														</Button>
+													)}
+													{canShowPushAndEmail && (
+														<Button
+															size="sm"
+															variant="primary"
+															type="button"
+															className="!px-2 !py-1 !text-xs h-auto rounded-md"
+															onClick={() =>
+																setPushModalDrivers([toCheckListDriver(driver)])
+															}
+														>
+															Send push
+														</Button>
+													)}
+												</div>
+											</TableCell>
+										)}
 									</TableRow>
 								)),
 							)}

@@ -69,13 +69,19 @@ export const CHECK_LIST_FULL_ACCESS_ROLES = [
 	"NIGHTSHIFT_TRACKING",
 ] as const;
 
-/** Check list: version tab only (no block/delete, no other tabs). */
-export const CHECK_LIST_VERSION_ONLY_ROLES = [
+/**
+ * Check list: Version + Several devices tabs only
+ * (no location tab, no block/delete device actions).
+ */
+export const CHECK_LIST_LIMITED_ACCESS_ROLES = [
 	"DISPATCHER",
 	"DISPATCHER_TL",
 	"TRACKING",
 	"EXPEDITE_MANAGER",
 ] as const;
+
+/** @deprecated Use CHECK_LIST_LIMITED_ACCESS_ROLES */
+export const CHECK_LIST_VERSION_ONLY_ROLES = CHECK_LIST_LIMITED_ACCESS_ROLES;
 
 /** @deprecated Use CHECK_LIST_FULL_ACCESS_ROLES */
 export const CHECK_LIST_ALLOWED_ROLES = CHECK_LIST_FULL_ACCESS_ROLES;
@@ -94,14 +100,19 @@ export function canAccessCheckListFull(role: string | undefined | null): boolean
 	return (CHECK_LIST_FULL_ACCESS_ROLES as readonly string[]).includes(normalized);
 }
 
-export function canAccessCheckListVersionOnly(role: string | undefined | null): boolean {
+export function canAccessCheckListLimited(role: string | undefined | null): boolean {
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
-	return (CHECK_LIST_VERSION_ONLY_ROLES as readonly string[]).includes(normalized);
+	return (CHECK_LIST_LIMITED_ACCESS_ROLES as readonly string[]).includes(normalized);
+}
+
+/** @deprecated Use canAccessCheckListLimited */
+export function canAccessCheckListVersionOnly(role: string | undefined | null): boolean {
+	return canAccessCheckListLimited(role);
 }
 
 export function canAccessCheckList(role: string | undefined | null): boolean {
-	return canAccessCheckListFull(role) || canAccessCheckListVersionOnly(role);
+	return canAccessCheckListFull(role) || canAccessCheckListLimited(role);
 }
 
 export function canManageCheckListDevices(role: string | undefined | null): boolean {
