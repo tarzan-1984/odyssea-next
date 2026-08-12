@@ -64,20 +64,29 @@ export const USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES = [
 
 /** Check list: all tabs (location, version, several devices) and device admin actions. */
 export const CHECK_LIST_FULL_ACCESS_ROLES = [
-	...USER_LIST_AND_CHECK_LIST_ALLOWED_ROLES,
-	"MORNING_TRACKING",
-	"NIGHTSHIFT_TRACKING",
+	"ADMINISTRATOR",
+	"MODERATOR",
+	"RECRUITER",
+	"RECRUITER_TL",
+	"HR_MANAGER",
 ] as const;
 
 /**
  * Check list: Version + Several devices tabs only
- * (no location tab, no block/delete device actions).
+ * (no location tab, no Action column, no Send push / Send Email).
  */
 export const CHECK_LIST_LIMITED_ACCESS_ROLES = [
 	"DISPATCHER",
 	"DISPATCHER_TL",
-	"TRACKING",
 	"EXPEDITE_MANAGER",
+	"TRACKING",
+	"TRACKING_TL",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"DRIVER_UPDATES",
+	"MORNING_TRACKING",
+	"NIGHTSHIFT_TRACKING",
 ] as const;
 
 /** @deprecated Use CHECK_LIST_LIMITED_ACCESS_ROLES */
