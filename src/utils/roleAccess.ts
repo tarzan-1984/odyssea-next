@@ -72,8 +72,8 @@ export const CHECK_LIST_FULL_ACCESS_ROLES = [
 ] as const;
 
 /**
- * Check list: Version + Several devices tabs only
- * (no location tab, no Action column, no Send push / Send Email).
+ * Check list: all tabs; on Version + Several devices —
+ * no Action column / Send push / Send Email (Location keeps messaging actions).
  */
 export const CHECK_LIST_LIMITED_ACCESS_ROLES = [
 	"DISPATCHER",
