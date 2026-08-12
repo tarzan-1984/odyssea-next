@@ -1,4 +1,5 @@
 import PaginationWithIcon from "../DriversTable/PaginationWithIcon";
+import type { ReactNode } from "react";
 
 type CheckListTablePaginationProps = {
 	currentPage: number;
@@ -9,6 +10,8 @@ type CheckListTablePaginationProps = {
 	onPageChange: (page: number) => void;
 	position: "top" | "bottom";
 	selectedCount?: number;
+	/** Optional controls on the right (e.g. User filter). */
+	filters?: ReactNode;
 };
 
 export default function CheckListTablePagination({
@@ -20,6 +23,7 @@ export default function CheckListTablePagination({
 	onPageChange,
 	position,
 	selectedCount,
+	filters,
 }: CheckListTablePaginationProps) {
 	const showingText =
 		totalItems === 0
@@ -33,7 +37,7 @@ export default function CheckListTablePagination({
 
 	return (
 		<div className={wrapperClassName}>
-			<div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
+			<div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 				<div className="pb-3 xl:pb-0">
 					<p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pb-3 text-sm font-medium text-gray-500 border-b border-gray-100 dark:border-gray-800 dark:text-gray-400 xl:justify-start xl:border-b-0 xl:pb-0 xl:text-left">
 						<span>{showingText}</span>
@@ -42,14 +46,17 @@ export default function CheckListTablePagination({
 						)}
 					</p>
 				</div>
-				{totalPages > 1 && (
-					<PaginationWithIcon
-						key={paginationKey}
-						totalPages={totalPages}
-						initialPage={currentPage}
-						onPageChange={onPageChange}
-					/>
-				)}
+				<div className="flex flex-wrap items-center justify-center gap-3 xl:justify-end">
+					{filters}
+					{totalPages > 1 && (
+						<PaginationWithIcon
+							key={paginationKey}
+							totalPages={totalPages}
+							initialPage={currentPage}
+							onPageChange={onPageChange}
+						/>
+					)}
+				</div>
 			</div>
 		</div>
 	);

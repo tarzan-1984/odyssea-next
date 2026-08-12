@@ -44,6 +44,8 @@ type NewShipmentModalProps = {
 type NewShipmentForm = {
 	pickupEarliest: string;
 	pickupLatest: string;
+	deliveryEarliest: string;
+	deliveryLatest: string;
 	pickupHours: string;
 	dropOffHours: string;
 	weight: string;
@@ -61,6 +63,8 @@ type NewShipmentForm = {
 const EMPTY_FORM: NewShipmentForm = {
 	pickupEarliest: "",
 	pickupLatest: "",
+	deliveryEarliest: "",
+	deliveryLatest: "",
 	pickupHours: "",
 	dropOffHours: "",
 	weight: "",
@@ -115,6 +119,8 @@ function shipmentToForm(shipment: LoadBoardShipment): NewShipmentForm {
 	return {
 		pickupEarliest: shipment.pickupEarliest?.trim() || "",
 		pickupLatest: shipment.pickupLatest?.trim() || "",
+		deliveryEarliest: shipment.deliveryEarliest?.trim() || "",
+		deliveryLatest: shipment.deliveryLatest?.trim() || "",
 		pickupHours: shipment.pickupHours?.trim() || "",
 		dropOffHours: shipment.dropOffHours?.trim() || "",
 		weight:
@@ -208,6 +214,9 @@ export default function NewShipmentModal({
 			pickupEarliest: form.pickupEarliest,
 			pickupLatest: form.pickupLatest,
 			pickupHours: form.pickupHours,
+			deliveryEarliest: form.deliveryEarliest,
+			deliveryLatest: form.deliveryLatest,
+			dropOffHours: form.dropOffHours,
 		});
 		if (pickupPastError) {
 			setActiveTab("load-details");
@@ -247,6 +256,8 @@ export default function NewShipmentModal({
 				route: bidRouteRowsToPayload(routeRows),
 				pickupEarliest: form.pickupEarliest.trim(),
 				pickupLatest: form.pickupLatest.trim() || undefined,
+				deliveryEarliest: form.deliveryEarliest.trim() || undefined,
+				deliveryLatest: form.deliveryLatest.trim() || undefined,
 				pickupHours: form.pickupHours.trim() || undefined,
 				dropOffHours: form.dropOffHours.trim() || undefined,
 				weight,
@@ -352,21 +363,39 @@ export default function NewShipmentModal({
 									value={form.pickupLatest}
 									onChange={v => updateField("pickupLatest", v)}
 								/>
+								<ShipmentDatePicker
+									key={`delivery-earliest-${formKey}`}
+									id="shipment-delivery-earliest"
+									label="Delivery earliest"
+									value={form.deliveryEarliest}
+									onChange={v => updateField("deliveryEarliest", v)}
+								/>
+								<ShipmentDatePicker
+									key={`delivery-latest-${formKey}`}
+									id="shipment-delivery-latest"
+									label="Delivery latest"
+									value={form.deliveryLatest}
+									onChange={v => updateField("deliveryLatest", v)}
+								/>
 							</div>
 
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<TimePicker
+									key={`pickup-hours-${formKey}`}
 									id="shipment-pickup-hours"
 									label="Pick up hours"
 									value={form.pickupHours}
 									onChange={v => updateField("pickupHours", v)}
+									allowTimeRange
 									className="dark:bg-gray-900"
 								/>
 								<TimePicker
+									key={`dropoff-hours-${formKey}`}
 									id="shipment-dropoff-hours"
 									label="Drop off hours"
 									value={form.dropOffHours}
 									onChange={v => updateField("dropOffHours", v)}
+									allowTimeRange
 									className="dark:bg-gray-900"
 								/>
 							</div>

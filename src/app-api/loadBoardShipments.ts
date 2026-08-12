@@ -47,6 +47,8 @@ export interface LoadBoardShipment {
 	route: LoadBoardShipmentRoutePoint[];
 	pickupEarliest: string;
 	pickupLatest: string | null;
+	deliveryEarliest: string | null;
+	deliveryLatest: string | null;
 	pickupHours: string | null;
 	dropOffHours: string | null;
 	weight: number;
@@ -83,6 +85,8 @@ export interface GetLoadBoardShipmentsParams {
 	page?: number;
 	limit?: number;
 	ageSort?: LoadBoardAgeSort;
+	/** Author filter: externalId or internal user id */
+	user_id?: string;
 }
 
 export interface GetLoadBoardShipmentsResponse {
@@ -96,6 +100,8 @@ export interface CreateLoadBoardShipmentPayload {
 	route: LoadBoardShipmentRoutePoint[];
 	pickupEarliest: string;
 	pickupLatest?: string;
+	deliveryEarliest?: string;
+	deliveryLatest?: string;
 	pickupHours?: string;
 	dropOffHours?: string;
 	weight: number;
@@ -151,6 +157,10 @@ export async function getLoadBoardShipments(
 		limit: String(params.limit ?? 10),
 		ageSort: params.ageSort === "asc" ? "asc" : "desc",
 	});
+	const userId = params.user_id?.trim();
+	if (userId) {
+		qs.set("user_id", userId);
+	}
 	const res = await fetch(`/api/load-board-shipments?${qs.toString()}`, {
 		method: "GET",
 		credentials: "include",

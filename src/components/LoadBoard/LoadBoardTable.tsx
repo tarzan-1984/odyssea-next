@@ -26,7 +26,10 @@ import {
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "@/components/tables/DataTables/CheckListTable/CheckListTablePagination";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
+import UserFilterSelect from "@/components/OffersList/UserFilterSelect";
 import { formatRoute } from "@/app-api/offers";
+import { useCurrentUser } from "@/stores/userStore";
+import { LOAD_BOARD_ALLOWED_ROLES } from "@/utils/roleAccess";
 import {
 	formatEquipment,
 	formatPickupColumn,
@@ -52,9 +55,12 @@ export default function LoadBoardTable({
 	onDuplicateShipment,
 }: LoadBoardTableProps) {
 	const queryClient = useQueryClient();
+	const currentUser = useCurrentUser();
+	const isAdmin = currentUser?.role === "ADMINISTRATOR";
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage] = useState(10);
 	const [ageSort, setAgeSort] = useState<LoadBoardAgeSort>("desc");
+	const [userFilterId, setUserFilterId] = useState("");
 	const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 	const [expandedId, setExpandedId] = useState<number | null>(null);
 	const [now, setNow] = useState(() => new Date());
@@ -62,15 +68,26 @@ export default function LoadBoardTable({
 	/** Align Age "now" with the server clock that wrote created_at (NY wall). */
 	const serverSkewMsRef = useRef(0);
 
+	const ownAuthorId =
+		String(currentUser?.externalId ?? "").trim() ||
+		String(currentUser?.id ?? "").trim();
+
+	const queryParams = {
+		page: currentPage,
+		limit: itemsPerPage,
+		ageSort,
+		...(isAdmin
+			? userFilterId
+				? { user_id: userFilterId }
+				: {}
+			: { user_id: ownAuthorId }),
+	};
+
 	const query = useQuery({
-		queryKey: [LOAD_BOARD_QUERY_KEY, currentPage, itemsPerPage, ageSort],
-		queryFn: () =>
-			getLoadBoardShipments({
-				page: currentPage,
-				limit: itemsPerPage,
-				ageSort,
-			}),
+		queryKey: [LOAD_BOARD_QUERY_KEY, queryParams],
+		queryFn: () => getLoadBoardShipments(queryParams),
 		placeholderData: keepPreviousData,
+		enabled: isAdmin || Boolean(ownAuthorId),
 	});
 
 	useEffect(() => {
@@ -92,7 +109,7 @@ export default function LoadBoardTable({
 	useEffect(() => {
 		setSelectedIds(new Set());
 		setExpandedId(null);
-	}, [currentPage, itemsPerPage, ageSort]);
+	}, [currentPage, itemsPerPage, ageSort, userFilterId]);
 
 	const refreshLoadBoard = () => {
 		queryClient
@@ -188,9 +205,25 @@ export default function LoadBoardTable({
 				itemsPerPage={itemsPerPage}
 				totalItems={totalItems}
 				totalPages={totalPages}
-				paginationKey={`lb-top-${currentPage}-${totalPages}-${itemsPerPage}-${ageSort}`}
+				paginationKey={`lb-top-${currentPage}-${totalPages}-${itemsPerPage}-${ageSort}-${userFilterId}`}
 				onPageChange={setCurrentPage}
 				selectedCount={selectedIds.size}
+				filters={
+					isAdmin ? (
+						<>
+							<span className="text-gray-500 dark:text-gray-400">User</span>
+							<UserFilterSelect
+								value={userFilterId}
+								roles={LOAD_BOARD_ALLOWED_ROLES}
+								queryKeyPrefix="load-board-user-filter"
+								onChangeAction={val => {
+									setUserFilterId(val);
+									setCurrentPage(1);
+								}}
+							/>
+						</>
+					) : undefined
+				}
 			/>
 
 			<div className="overflow-x-auto border-x border-gray-100 dark:border-white/[0.05]">
@@ -362,7 +395,7 @@ export default function LoadBoardTable({
 				itemsPerPage={itemsPerPage}
 				totalItems={totalItems}
 				totalPages={totalPages}
-				paginationKey={`lb-bottom-${currentPage}-${totalPages}-${itemsPerPage}-${ageSort}`}
+				paginationKey={`lb-bottom-${currentPage}-${totalPages}-${itemsPerPage}-${ageSort}-${userFilterId}`}
 				onPageChange={setCurrentPage}
 				selectedCount={selectedIds.size}
 			/>
@@ -696,6 +729,18 @@ function ShipmentRows({
 													{shipment.pickupLatest?.trim() ? (
 														<span className="text-gray-500 dark:text-gray-400">
 															Latest: {shipment.pickupLatest.trim()}
+														</span>
+													) : null}
+													{shipment.deliveryEarliest?.trim() ||
+													shipment.deliveryLatest?.trim() ? (
+														<span className="text-gray-500 dark:text-gray-400">
+															Delivery:{" "}
+															{[
+																shipment.deliveryEarliest?.trim(),
+																shipment.deliveryLatest?.trim(),
+															]
+																.filter(Boolean)
+																.join(" – ")}
 														</span>
 													) : null}
 													{shipment.dropOffHours?.trim() ? (

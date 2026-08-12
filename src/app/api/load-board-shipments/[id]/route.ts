@@ -125,6 +125,14 @@ export async function PATCH(
 			pickupEarliest,
 			pickupLatest:
 				typeof body?.pickupLatest === "string" ? body.pickupLatest.trim() : undefined,
+			deliveryEarliest:
+				typeof body?.deliveryEarliest === "string"
+					? body.deliveryEarliest.trim()
+					: undefined,
+			deliveryLatest:
+				typeof body?.deliveryLatest === "string"
+					? body.deliveryLatest.trim()
+					: undefined,
 			pickupHours:
 				typeof body?.pickupHours === "string" ? body.pickupHours.trim() : undefined,
 			dropOffHours:

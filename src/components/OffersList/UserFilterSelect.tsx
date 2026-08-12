@@ -24,6 +24,8 @@ const ROLE_LABELS: Record<string, string> = {
 	EXPEDITE_MANAGER: "Expedite Manager",
 	MORNING_TRACKING: "Morning Tracking",
 	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
+	MODERATOR: "Moderator",
+	TRACKING_TL: "Tracking TL",
 };
 
 const STALE_TIME_MS = 3 * 60 * 60 * 1000; // 3 hours
@@ -31,6 +33,10 @@ const STALE_TIME_MS = 3 * 60 * 60 * 1000; // 3 hours
 export interface UserFilterSelectProps {
 	value: string;
 	onChangeAction: (val: string) => void;
+	/** Roles included in the dropdown. Defaults to offers creator roles. */
+	roles?: readonly string[];
+	/** React Query key segment so different pages cache separately. */
+	queryKeyPrefix?: string;
 }
 
 function getUserDisplayName(item: UserListItem): string {
@@ -42,18 +48,24 @@ function getRoleLabel(role: string): string {
 	return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
 }
 
-export default function UserFilterSelect({ value, onChangeAction }: UserFilterSelectProps) {
+export default function UserFilterSelect({
+	value,
+	onChangeAction,
+	roles = OFFERS_USER_ROLES,
+	queryKeyPrefix = "offers-user-filter",
+}: UserFilterSelectProps) {
 	const [open, setOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	useClickOutside(dropdownRef, () => setOpen(false));
 
+	const rolesKey = [...roles].join(",");
 	const { data } = useQuery({
-		queryKey: ["offers-user-filter", OFFERS_USER_ROLES],
+		queryKey: [queryKeyPrefix, rolesKey],
 		queryFn: () =>
 			users.getAllUsers({
 				page: 1,
 				limit: 500,
-				roles: [...OFFERS_USER_ROLES],
+				roles: [...roles],
 			}),
 		staleTime: STALE_TIME_MS,
 	});

@@ -695,7 +695,9 @@
 }
 
 .flatpickr-calendar.arrowTop:before,
-.flatpickr-calendar.arrowTop:after {
+.flatpickr-calendar.arrowTop:after,
+.flatpickr-calendar.arrowBottom:before,
+.flatpickr-calendar.arrowBottom:after {
 	@apply hidden;
 }
 
@@ -855,9 +857,16 @@ span.flatpickr-weekday,
 	@apply right-0;
 }
 
-/* Time-only picker: match dropdown width to input */
+/* Time-only picker: match dropdown width to input; no divider stripes */
 .flatpickr-calendar.noCalendar.hasTime .flatpickr-time {
 	@apply !w-full !box-border;
+	border-top: 0 !important;
+	border-bottom: 0 !important;
+}
+
+.flatpickr-calendar.noCalendar.hasTime > .flatpickr-time {
+	padding-top: 0.25rem !important;
+	padding-bottom: 0.25rem !important;
 }
 
 /* Date+time picker: visible hour/minute/AM-PM fields (light + dark) */

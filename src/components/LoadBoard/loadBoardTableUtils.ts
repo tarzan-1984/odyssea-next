@@ -160,6 +160,37 @@ function parseLoadBoardPickupHours(value: string): TimeParts | null {
 	return { hour, minute };
 }
 
+const HOURS_RANGE_SEPARATORS = [" — ", " – ", " - "] as const;
+
+function parseLoadBoardHoursField(value: string): {
+	start: TimeParts | null;
+	end: TimeParts | null;
+} {
+	const trimmed = value.trim();
+	if (!trimmed) return { start: null, end: null };
+
+	for (const sep of HOURS_RANGE_SEPARATORS) {
+		if (!trimmed.includes(sep)) continue;
+		const [startPart, endPart] = trimmed.split(sep).map((p) => p.trim());
+		if (!startPart || !endPart) continue;
+		return {
+			start: parseLoadBoardPickupHours(startPart),
+			end: parseLoadBoardPickupHours(endPart),
+		};
+	}
+
+	return { start: parseLoadBoardPickupHours(trimmed), end: null };
+}
+
+function resolveLoadBoardHoursDeadlineParts(value: string): TimeParts | null {
+	const { start, end } = parseLoadBoardHoursField(value);
+	if (!start) return null;
+	if (end && (start.hour !== end.hour || start.minute !== end.minute)) {
+		return end;
+	}
+	return start;
+}
+
 /** Pickup window end in naive NY wall-clock (same rules as Nest). */
 export function resolveLoadBoardPickupDeadline(fields: {
 	pickupEarliest?: string | null;
@@ -173,7 +204,7 @@ export function resolveLoadBoardPickupDeadline(fields: {
 
 	const hoursRaw = fields.pickupHours?.trim();
 	if (hoursRaw) {
-		const time = parseLoadBoardPickupHours(hoursRaw);
+		const time = resolveLoadBoardHoursDeadlineParts(hoursRaw);
 		if (!time) return null;
 		return new Date(
 			Date.UTC(date.year, date.month - 1, date.day, time.hour, time.minute, 0),
@@ -207,6 +238,9 @@ export function getLoadBoardPickupPastError(fields: {
 	pickupEarliest?: string | null;
 	pickupLatest?: string | null;
 	pickupHours?: string | null;
+	deliveryEarliest?: string | null;
+	deliveryLatest?: string | null;
+	dropOffHours?: string | null;
 }): string | null {
 	const earliestRaw = fields.pickupEarliest?.trim() || "";
 	if (!earliestRaw) return "Pick up earliest is required.";
@@ -225,8 +259,62 @@ export function getLoadBoardPickupPastError(fields: {
 	}
 
 	const hoursRaw = fields.pickupHours?.trim() || "";
-	if (hoursRaw && !parseLoadBoardPickupHours(hoursRaw)) {
-		return "Pick up hours must be a valid time (e.g. 12:00 pm).";
+	if (hoursRaw) {
+		const { start, end } = parseLoadBoardHoursField(hoursRaw);
+		const looksLikeRange = HOURS_RANGE_SEPARATORS.some((sep) =>
+			hoursRaw.includes(sep),
+		);
+		if (!start || (looksLikeRange && !end)) {
+			return "Pick up hours must be a valid time (e.g. 12:00 pm or 10:00 am — 02:00 pm).";
+		}
+		if (end && end.hour * 60 + end.minute <= start.hour * 60 + start.minute) {
+			return "Pick up hours end time must be after start time.";
+		}
+	}
+
+	const deliveryEarliestRaw = fields.deliveryEarliest?.trim() || "";
+	const deliveryLatestRaw = fields.deliveryLatest?.trim() || "";
+	let deliveryEarliest: ReturnType<typeof parseLoadBoardUsDate> = null;
+	if (deliveryEarliestRaw) {
+		deliveryEarliest = parseLoadBoardUsDate(deliveryEarliestRaw);
+		if (!deliveryEarliest) {
+			return "Delivery earliest must be a valid date (mm/dd/yyyy).";
+		}
+	}
+	if (deliveryLatestRaw) {
+		const deliveryLatest = parseLoadBoardUsDate(deliveryLatestRaw);
+		if (!deliveryLatest) {
+			return "Delivery latest must be a valid date (mm/dd/yyyy).";
+		}
+		if (deliveryEarliest) {
+			const earliestMs = Date.UTC(
+				deliveryEarliest.year,
+				deliveryEarliest.month - 1,
+				deliveryEarliest.day,
+			);
+			const latestMs = Date.UTC(
+				deliveryLatest.year,
+				deliveryLatest.month - 1,
+				deliveryLatest.day,
+			);
+			if (latestMs < earliestMs) {
+				return "Delivery latest cannot be before Delivery earliest.";
+			}
+		}
+	}
+
+	const dropOffRaw = fields.dropOffHours?.trim() || "";
+	if (dropOffRaw) {
+		const { start, end } = parseLoadBoardHoursField(dropOffRaw);
+		const looksLikeRange = HOURS_RANGE_SEPARATORS.some((sep) =>
+			dropOffRaw.includes(sep),
+		);
+		if (!start || (looksLikeRange && !end)) {
+			return "Drop off hours must be a valid time (e.g. 12:00 pm or 10:00 am — 02:00 pm).";
+		}
+		if (end && end.hour * 60 + end.minute <= start.hour * 60 + start.minute) {
+			return "Drop off hours end time must be after start time.";
+		}
 	}
 
 	const deadline = resolveLoadBoardPickupDeadline(fields);

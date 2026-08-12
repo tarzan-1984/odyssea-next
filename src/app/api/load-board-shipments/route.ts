@@ -22,7 +22,11 @@ export async function GET(request: NextRequest) {
 		const page = searchParams.get("page") || "1";
 		const limit = searchParams.get("limit") || "10";
 		const ageSort = searchParams.get("ageSort") === "asc" ? "asc" : "desc";
+		const userId = searchParams.get("user_id")?.trim() || "";
 		const qs = new URLSearchParams({ page, limit, ageSort });
+		if (userId) {
+			qs.set("user_id", userId);
+		}
 
 		const response = await fetch(
 			`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/load-board-shipments?${qs.toString()}`,
@@ -135,6 +139,14 @@ export async function POST(request: NextRequest) {
 			pickupEarliest,
 			pickupLatest:
 				typeof body?.pickupLatest === "string" ? body.pickupLatest.trim() : undefined,
+			deliveryEarliest:
+				typeof body?.deliveryEarliest === "string"
+					? body.deliveryEarliest.trim()
+					: undefined,
+			deliveryLatest:
+				typeof body?.deliveryLatest === "string"
+					? body.deliveryLatest.trim()
+					: undefined,
 			pickupHours:
 				typeof body?.pickupHours === "string" ? body.pickupHours.trim() : undefined,
 			dropOffHours:
