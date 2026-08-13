@@ -1,5 +1,6 @@
 import axios from "axios";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
+import { formatOfferDateTimeFieldForDisplay } from "@/utils/offerDateTimeRange";
 
 export interface OfferDriver {
 	driver_id: string;
@@ -95,7 +96,7 @@ export function formatRoute(
 		.map((p) => {
 			const label = p.type === "pick_up_location" ? "Pick up" : "Delivery";
 			const loc = abbreviateStateInLocationString(p.location ?? "");
-			const t = p.time ?? "";
+			const t = formatOfferDateTimeFieldForDisplay(p.time ?? "");
 			return `${label} - ${loc} - ${t}`;
 		})
 		.join("\n");

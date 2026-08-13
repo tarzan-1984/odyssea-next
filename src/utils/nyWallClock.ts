@@ -104,13 +104,13 @@ export function formatNyWallClockForDisplay(
 	}).format(date);
 }
 
-/** Offer card creation time in NY wall-clock: MM/DD/YYYY H:MM AM/PM EST */
+/** Offer card creation time in NY wall-clock: M/D/YYYY H:MM AM/PM EST */
 export function formatOfferCreateTimeEst(value: string | null | undefined): string {
 	const date = parseNaiveNyDateTime(value);
 	if (!date) return "";
 	const datePart = date.toLocaleDateString("en-US", {
-		month: "2-digit",
-		day: "2-digit",
+		month: "numeric",
+		day: "numeric",
 		year: "numeric",
 		timeZone: "UTC",
 	});

@@ -18,6 +18,7 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
 	formatOfferDateOnly,
 	formatOfferDateTime,
+	formatOfferDateTimeFieldForDisplay,
 	formatOfferDateTimeRange,
 	getRouteChronologyError,
 	isOfferAsapTime,
@@ -95,7 +96,7 @@ function normalizeOfferTimeFromUrl(raw: string): string {
 	if (!trimmed) return "";
 	const { start, end } = parseOfferDateTimeField(trimmed);
 	if (start) return formatOfferDateTimeRange(start, end);
-	// Date without time (e.g. "23 July 2026") — keep date; Create validates time is required.
+	// Date without time (e.g. "8/13/2026") — keep date; Create validates time is required.
 	const dateOnly = parseOfferDateOnly(trimmed);
 	if (dateOnly) return formatOfferDateOnly(dateOnly);
 	return "";
@@ -187,7 +188,7 @@ function routePointToRow(
 		id: `row-edit-${index}-${Math.random().toString(36).slice(2, 9)}`,
 		type: point.type === "pick_up_location" ? "pickup" : "delivery",
 		location: point.location ?? "",
-		time: point.time ?? "",
+		time: formatOfferDateTimeFieldForDisplay(point.time ?? ""),
 		coordinates:
 			point.latitude != null &&
 			point.longitude != null &&

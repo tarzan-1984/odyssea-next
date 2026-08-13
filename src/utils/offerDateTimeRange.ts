@@ -1,4 +1,4 @@
-/** Display separator for optional end time, e.g. "4 June 2026 8 AM — 12 PM" */
+/** Display separator for optional end time, e.g. "8/13/2026 8:00 AM — 12:00 PM" */
 export const OFFER_DATETIME_RANGE_SEP = " — ";
 
 const MONTH_NAMES = [
@@ -29,20 +29,33 @@ function parse12hClock(hour: number, minute: number, period: string): { hour: nu
 	return { hour: h, minute };
 }
 
-/** Date-only: "23 July 2026" (no time) — midnight local, for display/URL prefill. */
-export function parseOfferDateOnly(s: string): Date | null {
-	const trimmed = s.trim();
-	const m = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/i);
-	if (!m) return null;
-	const day = parseInt(m[1], 10);
-	const month = monthIndexFromName(m[2]);
-	const year = parseInt(m[3], 10);
-	if (month < 0 || Number.isNaN(day) || Number.isNaN(year)) return null;
-	const d = new Date(year, month, day, 0, 0, 0, 0);
-	if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
+function dateFromParts(year: number, monthIndex: number, day: number): Date | null {
+	if (monthIndex < 0 || Number.isNaN(day) || Number.isNaN(year)) return null;
+	const d = new Date(year, monthIndex, day, 0, 0, 0, 0);
+	if (d.getFullYear() !== year || d.getMonth() !== monthIndex || d.getDate() !== day) {
 		return null;
 	}
 	return d;
+}
+
+/** Date-only: "8/13/2026" or legacy "13 August 2026" — midnight local. */
+export function parseOfferDateOnly(s: string): Date | null {
+	const trimmed = s.trim();
+	const slash = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+	if (slash) {
+		return dateFromParts(
+			parseInt(slash[3], 10),
+			parseInt(slash[1], 10) - 1,
+			parseInt(slash[2], 10),
+		);
+	}
+	const m = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/i);
+	if (!m) return null;
+	return dateFromParts(
+		parseInt(m[3], 10),
+		monthIndexFromName(m[2]),
+		parseInt(m[1], 10),
+	);
 }
 
 /** "4 June 2026 8 AM" or "4 June 2026 8:30 AM" */
@@ -68,15 +81,17 @@ export function parseLongOfferDateTime(s: string): Date | null {
 	return d;
 }
 
-/** Client format without time: "23 July 2026" */
-export function formatOfferDateOnly(d: Date): string {
-	const day = d.getDate();
-	const month = MONTH_NAMES[d.getMonth()];
-	const year = d.getFullYear();
-	return `${day} ${month} ${year}`;
+/** Numeric US date without leading zeros: "8/13/2026" */
+function formatUsMdY(d: Date): string {
+	return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
-/** True when value is a date without a time component (e.g. URL `pu_at=23 July 2026`). */
+/** Client format without time: "8/13/2026" */
+export function formatOfferDateOnly(d: Date): string {
+	return formatUsMdY(d);
+}
+
+/** True when value is a date without a time component (e.g. URL `pu_at=8/13/2026`). */
 export function isOfferDateWithoutTime(value: string): boolean {
 	const trimmed = value.trim();
 	if (!trimmed) return false;
@@ -164,15 +179,12 @@ function formatTimePart(d: Date): string {
 	return `${hours}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-/** Client format: "4 June 2026 8:00 AM" */
+/** Client format: "8/13/2026 8:00 AM" */
 export function formatOfferDateTime(d: Date): string {
-	const day = d.getDate();
-	const month = MONTH_NAMES[d.getMonth()];
-	const year = d.getFullYear();
-	return `${day} ${month} ${year} ${formatTimePart(d)}`;
+	return `${formatUsMdY(d)} ${formatTimePart(d)}`;
 }
 
-/** Same day: "4 June 2026 8:00 AM — 12:00 PM"; different days: full end date */
+/** Same day: "8/13/2026 8:00 AM — 12:00 PM"; different days: full end date */
 export function formatOfferDateTimeRange(start: Date, end?: Date | null): string {
 	if (!end) return formatOfferDateTime(start);
 	const sameDay = start.toDateString() === end.toDateString();
@@ -180,6 +192,18 @@ export function formatOfferDateTimeRange(start: Date, end?: Date | null): string
 		return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatTimePart(end)}`;
 	}
 	return `${formatOfferDateTime(start)}${OFFER_DATETIME_RANGE_SEP}${formatOfferDateTime(end)}`;
+}
+
+/** Reformat a stored route time for UI (legacy month names → M/D/YYYY). */
+export function formatOfferDateTimeFieldForDisplay(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed) return "";
+	if (isOfferAsapTime(trimmed)) return trimmed;
+	const { start, end } = parseOfferDateTimeField(trimmed);
+	if (start) return formatOfferDateTimeRange(start, end);
+	const dateOnly = parseOfferDateOnly(trimmed);
+	if (dateOnly) return formatOfferDateOnly(dateOnly);
+	return trimmed;
 }
 
 /** For flatpickr initial date sync (full datetime or date-only). */
