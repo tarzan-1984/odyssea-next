@@ -23,9 +23,11 @@ import BidRateRouteBuilder, {
 import ShipmentDatePicker from "./ShipmentDatePicker";
 import { getLoadBoardPickupPastError } from "./loadBoardTableUtils";
 import {
+	CARGO_VAN_MAX_WEIGHT_LBS,
 	EQUIPMENT_OPTIONS,
 	NEW_SHIPMENT_TABS,
 	SPECIAL_INSTRUCTION_OPTIONS,
+	getCargoVanWeightLimitError,
 	type EquipmentType,
 	type LoadType,
 	type NewShipmentTabId,
@@ -231,6 +233,13 @@ export default function NewShipmentModal({
 			return;
 		}
 
+		const cargoVanWeightError = getCargoVanWeightLimitError(form.equipment, weight);
+		if (cargoVanWeightError) {
+			setActiveTab("freight-details");
+			setError(cargoVanWeightError);
+			return;
+		}
+
 		const commodity = form.commodity.trim();
 		if (!commodity) {
 			setActiveTab("freight-details");
@@ -417,11 +426,21 @@ export default function NewShipmentModal({
 										id="shipment-weight"
 										type="number"
 										min="0"
+										max={
+											form.equipment === "cargo_van"
+												? String(CARGO_VAN_MAX_WEIGHT_LBS)
+												: undefined
+										}
 										step={1}
 										inputMode="numeric"
 										value={form.weight}
 										onChange={e => updateField("weight", e.target.value)}
 										placeholder="Weight in lbs"
+										hint={
+											form.equipment === "cargo_van"
+												? `Maximum ${CARGO_VAN_MAX_WEIGHT_LBS.toLocaleString("en-US")} lbs for Cargo van`
+												: undefined
+										}
 										className="dark:bg-gray-900"
 									/>
 								</div>

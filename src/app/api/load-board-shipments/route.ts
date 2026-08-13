@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 import { canAccessLoadBoard } from "@/utils/roleAccess";
+import { getCargoVanWeightLimitError } from "@/components/LoadBoard/newShipmentConstants";
 
 /**
  * GET /api/load-board-shipments
@@ -102,6 +103,19 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		if (
+			equipment !== "cargo_van" &&
+			equipment !== "box_truck" &&
+			equipment !== "dry_van"
+		) {
+			return NextResponse.json({ error: "Invalid equipment" }, { status: 400 });
+		}
+
+		const cargoVanWeightError = getCargoVanWeightLimitError(equipment, weight);
+		if (cargoVanWeightError) {
+			return NextResponse.json({ error: cargoVanWeightError }, { status: 400 });
+		}
+
 		if (!commodity) {
 			return NextResponse.json({ error: "commodity is required" }, { status: 400 });
 		}
@@ -118,14 +132,6 @@ export async function POST(request: NextRequest) {
 				{ error: "loadType must be full or partial" },
 				{ status: 400 },
 			);
-		}
-
-		if (
-			equipment !== "cargo_van" &&
-			equipment !== "box_truck" &&
-			equipment !== "dry_van"
-		) {
-			return NextResponse.json({ error: "Invalid equipment" }, { status: 400 });
 		}
 
 		const rateRaw = body?.rate;

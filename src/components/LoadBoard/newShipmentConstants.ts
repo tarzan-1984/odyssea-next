@@ -33,6 +33,19 @@ export const EQUIPMENT_OPTIONS = [
 	{ value: "dry_van", label: "Dry van" },
 ] as const;
 
+/** Max freight weight (lbs) allowed for Cargo van equipment. */
+export const CARGO_VAN_MAX_WEIGHT_LBS = 4500;
+
+export function getCargoVanWeightLimitError(
+	equipment: string,
+	weight: number,
+): string | null {
+	if (equipment === "cargo_van" && weight > CARGO_VAN_MAX_WEIGHT_LBS) {
+		return `Weight for Cargo van cannot exceed ${CARGO_VAN_MAX_WEIGHT_LBS.toLocaleString("en-US")} lbs`;
+	}
+	return null;
+}
+
 export type EquipmentType = (typeof EQUIPMENT_OPTIONS)[number]["value"];
 export type LoadType = "full" | "partial";
 export type ShipmentStatus = "posted" | "unposted";
