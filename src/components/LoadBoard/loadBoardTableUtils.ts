@@ -317,6 +317,39 @@ export function getLoadBoardPickupPastError(fields: {
 		}
 	}
 
+	const deliveryDateRaw =
+		fields.deliveryLatest?.trim() || fields.deliveryEarliest?.trim() || "";
+	if (deliveryDateRaw) {
+		const pickupDate = parseLoadBoardUsDate(fields.pickupEarliest?.trim() || "");
+		const deliveryDate = parseLoadBoardUsDate(deliveryDateRaw);
+		if (pickupDate && deliveryDate) {
+			const pickupTime = parseLoadBoardHoursField(
+				fields.pickupHours?.trim() || "",
+			).start;
+			const dropOff = parseLoadBoardHoursField(fields.dropOffHours?.trim() || "");
+			const deliveryTime = dropOff.end ?? dropOff.start;
+			const pickupMs = Date.UTC(
+				pickupDate.year,
+				pickupDate.month - 1,
+				pickupDate.day,
+				pickupTime?.hour ?? 0,
+				pickupTime?.minute ?? 0,
+				0,
+			);
+			const deliveryMs = Date.UTC(
+				deliveryDate.year,
+				deliveryDate.month - 1,
+				deliveryDate.day,
+				deliveryTime?.hour ?? 23,
+				deliveryTime?.minute ?? 59,
+				deliveryTime ? 0 : 59,
+			);
+			if (pickupMs > deliveryMs) {
+				return "Pick up cannot be later than delivery.";
+			}
+		}
+	}
+
 	const deadline = resolveLoadBoardPickupDeadline(fields);
 	if (!deadline) return "Unable to resolve pickup date/time.";
 	if (deadline.getTime() < getNyNaiveNow().getTime()) {

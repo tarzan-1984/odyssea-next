@@ -262,6 +262,34 @@ async function geocodeBareFiveDigitPostal(
 	return null;
 }
 
+async function geocodeFreeTextToFormatted(
+	trimmed: string,
+	userAgent: string,
+): Promise<string | null> {
+	const country = resolveOfferGeocodeCountry(trimmed);
+	const query = buildNominatimQuery(trimmed, country);
+	const results = await fetchNominatim(query, country, {
+		limit: "5",
+		addressdetails: "1",
+		userAgent,
+	});
+	const withPostal = results.find((r) => r.address?.postcode);
+	if (!withPostal?.address?.postcode) return null;
+
+	const addr = withPostal.address;
+	const fallbackCity = trimmed.split(",")[0]?.trim() || "";
+	const city = cityFromNominatimAddress(addr, fallbackCity);
+	const state = addr.state ?? "";
+	const postcode = addr.postcode;
+	if (city && state && postcode) {
+		return `${city}, ${state} ${postcode}`;
+	}
+	if (city && postcode) {
+		return `${city} ${postcode}`;
+	}
+	return null;
+}
+
 /** Geocode address via Nominatim. Returns lat/lon or null. */
 export async function geocodeOfferAddressCoordinates(
 	address: string,
@@ -335,10 +363,6 @@ export async function geocodeOfferToFormattedAddress(
 	const isUsPostal = isUsZipCode(trimmed);
 	const cityRegion = parseCityRegionCode(trimmed);
 
-	if (!isCaPostal && !isFiveDigit && !isUsPostal && !cityRegion) {
-		return trimmed;
-	}
-
 	if (cityRegion) {
 		const { city, regionCode, country: regionCountry } = cityRegion;
 
@@ -359,8 +383,6 @@ export async function geocodeOfferToFormattedAddress(
 			const resolvedCity = cityFromNominatimAddress(addr, city);
 			return `${resolvedCity}, ${regionCode} ${addr.postcode}`;
 		}
-
-		return `${city}, ${regionCode}`;
 	}
 
 	if (isCaPostal && isBarePostalInput(trimmed)) {
@@ -401,6 +423,9 @@ export async function geocodeOfferToFormattedAddress(
 			}
 		}
 	}
+
+	const fromFreeText = await geocodeFreeTextToFormatted(trimmed, userAgent);
+	if (fromFreeText) return fromFreeText;
 
 	return trimmed;
 }

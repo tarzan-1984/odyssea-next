@@ -22,6 +22,23 @@ export const CITY_STATE_ABBR_PATTERN = /^([^,]+),\s*([A-Za-z]{2,4})\s*$/;
 export const LOCATION_FORMAT_ERROR =
 	"Use format: City, State (e.g. Los Angeles, CA / Chatham, ON), City State, or postal/ZIP (e.g. N7M, 06600, 90210)";
 
+export const LOCATION_GEOCODE_ERROR =
+	"Could not find this location. Enter a real city, state, and ZIP.";
+
+export const LOCATION_POSTAL_ERROR =
+	"Each stop must include a ZIP / postal code (e.g. Los Angeles, CA 90001).";
+
+/** True when the location already contains a US ZIP, CA postal, or MX CP. */
+export function locationHasPostalCode(value: string): boolean {
+	const trimmed = normalizePostalInput(value.trim());
+	if (!trimmed) return false;
+	if (isBarePostalInput(trimmed) || CA_FSA_PATTERN.test(trimmed)) return true;
+	if (/\b\d{5}(?:-\d{4})?\b/.test(trimmed)) return true;
+	if (/\b[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d\b/.test(trimmed)) return true;
+	const last = trimmed.split(/\s+/).pop() ?? "";
+	return CA_FSA_PATTERN.test(last);
+}
+
 function isValidSpaceSeparatedLocation(value: string): boolean {
 	if (value.includes(",")) return false;
 	const parts = value.trim().split(/\s+/);
@@ -94,7 +111,10 @@ export function normalizeLocationForGeocode(value: string): string {
 }
 
 export function needsLocationGeocode(value: string): boolean {
-	const geocodeAddress = normalizeLocationForGeocode(value);
+	const trimmed = value.trim();
+	if (!trimmed) return false;
+
+	const geocodeAddress = normalizeLocationForGeocode(trimmed);
 	const compact = geocodeAddress.replace(/\s/g, "");
 
 	if (ZIP_PATTERN.test(compact) || isCanadianPostalCode(geocodeAddress)) {
@@ -109,5 +129,6 @@ export function needsLocationGeocode(value: string): boolean {
 		return true;
 	}
 
-	return false;
+	// City/state (or free-text place) without a postal code still needs lookup.
+	return !locationHasPostalCode(geocodeAddress);
 }

@@ -15,6 +15,7 @@ import { EditLoadedMilesIcon } from "@/icons";
 import { isValidLocationFormat } from "@/utils/offerLocationFormat";
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
+	geocodeBidRouteRows,
 	initialBidRouteRows,
 	validateBidRouteRows,
 	type BidRouteRow,
@@ -145,7 +146,14 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 		const broker = form.broker.trim();
 		const rateRaw = form.rate.trim();
 		const isDoNotBid = form.isDoNotBid;
-		const nextRouteError = validateBidRouteRows(routeRows);
+		const { rows: geocodedRows, error: geocodeError } = await geocodeBidRouteRows(routeRows);
+		setRouteRows(geocodedRows);
+		if (geocodeError) {
+			setRouteError(geocodeError);
+			return;
+		}
+
+		const nextRouteError = validateBidRouteRows(geocodedRows);
 
 		if (nextRouteError) {
 			setRouteError(nextRouteError);
@@ -187,7 +195,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 		setSubmitting(true);
 		try {
 			await createBidRate({
-				route: bidRouteRowsToPayload(routeRows),
+				route: bidRouteRowsToPayload(geocodedRows),
 				broker,
 				rate,
 				distance: Math.round(distance),

@@ -16,6 +16,7 @@ import { createLoadBoardShipment, updateLoadBoardShipment, type LoadBoardShipmen
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
 	createBidRouteRow,
+	geocodeBidRouteRows,
 	initialBidRouteRows,
 	validateBidRouteRows,
 	type BidRouteRow,
@@ -198,17 +199,29 @@ export default function NewShipmentModal({
 
 	async function handleSubmit() {
 		setError(null);
+		setSubmitting(true);
 
-		const routeError = validateBidRouteRows(routeRows);
+		const { rows: geocodedRows, error: geocodeError } = await geocodeBidRouteRows(routeRows);
+		setRouteRows(geocodedRows);
+		if (geocodeError) {
+			setActiveTab("load-details");
+			setError(geocodeError);
+			setSubmitting(false);
+			return;
+		}
+
+		const routeError = validateBidRouteRows(geocodedRows);
 		if (routeError) {
 			setActiveTab("load-details");
 			setError(routeError);
+			setSubmitting(false);
 			return;
 		}
 
 		if (!form.pickupEarliest.trim()) {
 			setActiveTab("load-details");
 			setError("Pick up earliest is required.");
+			setSubmitting(false);
 			return;
 		}
 
@@ -223,6 +236,7 @@ export default function NewShipmentModal({
 		if (pickupPastError) {
 			setActiveTab("load-details");
 			setError(pickupPastError);
+			setSubmitting(false);
 			return;
 		}
 
@@ -230,6 +244,7 @@ export default function NewShipmentModal({
 		if (!form.weight.trim() || !Number.isFinite(weight) || weight < 0) {
 			setActiveTab("freight-details");
 			setError("Please enter a valid weight.");
+			setSubmitting(false);
 			return;
 		}
 
@@ -237,6 +252,7 @@ export default function NewShipmentModal({
 		if (cargoVanWeightError) {
 			setActiveTab("freight-details");
 			setError(cargoVanWeightError);
+			setSubmitting(false);
 			return;
 		}
 
@@ -244,10 +260,10 @@ export default function NewShipmentModal({
 		if (!commodity) {
 			setActiveTab("freight-details");
 			setError("Commodity is required.");
+			setSubmitting(false);
 			return;
 		}
 
-		setSubmitting(true);
 		try {
 			const needsEquipmentSize = showEquipmentSizeFields;
 			const equipmentLengthRaw = form.equipmentLength.replace(/,/g, "").trim();
@@ -262,7 +278,7 @@ export default function NewShipmentModal({
 			}
 
 			const payload = {
-				route: bidRouteRowsToPayload(routeRows),
+				route: bidRouteRowsToPayload(geocodedRows),
 				pickupEarliest: form.pickupEarliest.trim(),
 				pickupLatest: form.pickupLatest.trim() || undefined,
 				deliveryEarliest: form.deliveryEarliest.trim() || undefined,
