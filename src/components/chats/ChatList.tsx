@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
@@ -16,7 +16,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { chatRoomMatchesSearchQuery } from "@/utils/chatSearch";
 import { formatChatPeerDisplayName, formatOfferChatDriverDisplayName } from "@/utils/chatPeerDisplayName";
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
-import { getOfferIdFromChatRoom } from "@/utils/offerChatUrl";
+import { getOfferIdFromChatRoom, parseLoadChatUrlTab, buildChatUrlWithLoadTab, type LoadChatUrlTab } from "@/utils/offerChatUrl";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import { canShowOfferId } from "@/utils/offerDisplay";
 import {
@@ -32,7 +32,7 @@ import {
 // WebSocket functionality is now passed via props
 
 interface ChatListProps {
-	onChatSelect: (chatRoom: ChatRoom) => void;
+	onChatSelect: (chatRoom: ChatRoom, loadTab?: LoadChatUrlTab | null) => void;
 	selectedChatId?: string;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
 	/** Open archive accordion when deep-linking to an archived LOAD chat. */
@@ -103,10 +103,12 @@ export default function ChatList({
 	pinnedArchivedRoom = null,
 }: ChatListProps) {
 	const searchParams = useSearchParams();
+	const router = useRouter();
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const roomFromUrl = searchParams.get("room")?.trim() ?? null;
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
+	const tabFromUrl = parseLoadChatUrlTab(searchParams.get("tab"));
 	const { openAddRoomModal, openContactsModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
@@ -168,6 +170,14 @@ export default function ChatList({
 			setActiveTab("offers");
 			return;
 		}
+		if (tabFromUrl === "my-loads" && showMyLoadsTab) {
+			setActiveTab("my-loads");
+			return;
+		}
+		if (tabFromUrl === "my-team" && showMyTeamTab) {
+			setActiveTab("my-team");
+			return;
+		}
 		// LOAD deep-links use ?load= (and may also include ?room= for a specific fork)
 		if (loadFromUrl) {
 			setActiveTab("shipments");
@@ -178,7 +188,7 @@ export default function ChatList({
 			return;
 		}
 		setActiveTab(readStoredChatTab());
-	}, [loadFromUrl, roomFromUrl, offerFromUrl]);
+	}, [loadFromUrl, roomFromUrl, offerFromUrl, tabFromUrl, showMyLoadsTab, showMyTeamTab]);
 
 	useEffect(() => {
 		try {
@@ -187,6 +197,39 @@ export default function ChatList({
 			// ignore quota / private mode
 		}
 	}, [activeTab]);
+
+	const syncTabInUrl = useCallback(
+		(tab: ChatTab) => {
+			try {
+				const loadTab = tab === "my-loads" || tab === "my-team" ? tab : null;
+				if (loadTab === tabFromUrl) return;
+				if (!loadTab && !tabFromUrl) return;
+				router.replace(buildChatUrlWithLoadTab(searchParams, loadTab), { scroll: false });
+			} catch {
+				// ignore url sync errors
+			}
+		},
+		[router, searchParams, tabFromUrl]
+	);
+
+	const handleTabChange = useCallback(
+		(tab: ChatTab) => {
+			setActiveTab(tab);
+			if (tab === "my-loads" || tab === "my-team" || tab === "shipments") {
+				syncTabInUrl(tab);
+			}
+		},
+		[syncTabInUrl]
+	);
+
+	const handleRoomSelect = useCallback(
+		(chatRoom: ChatRoom) => {
+			const loadTab =
+				activeTab === "my-loads" || activeTab === "my-team" ? activeTab : undefined;
+			onChatSelect(chatRoom, loadTab);
+		},
+		[activeTab, onChatSelect]
+	);
 
 	// Track which chat menu is open (only one at a time)
 	const [openMenuChatId, setOpenMenuChatId] = useState<string | null>(null);
@@ -649,7 +692,7 @@ export default function ChatList({
 				<div className="flex gap-1">
 					<button
 						type="button"
-						onClick={() => setActiveTab("chats")}
+						onClick={() => handleTabChange("chats")}
 						className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 							activeTab === "chats"
 								? "bg-brand-500 text-white"
@@ -671,7 +714,7 @@ export default function ChatList({
 					</button>
 					<button
 						type="button"
-						onClick={() => setActiveTab("shipments")}
+						onClick={() => handleTabChange("shipments")}
 						className={`flex-[1.3] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 							activeTab === "shipments"
 								? "bg-brand-500 text-white"
@@ -694,7 +737,7 @@ export default function ChatList({
 					{showOffersTab && (
 						<button
 							type="button"
-							onClick={() => setActiveTab("offers")}
+							onClick={() => handleTabChange("offers")}
 							className={`flex-[0.85] flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 								activeTab === "offers"
 									? "bg-brand-500 text-white"
@@ -722,7 +765,7 @@ export default function ChatList({
 						{showMyLoadsTab && (
 							<button
 								type="button"
-								onClick={() => setActiveTab("my-loads")}
+								onClick={() => handleTabChange("my-loads")}
 								className={`${showMyTeamTab ? "flex-1" : "w-full"} flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 									activeTab === "my-loads"
 										? "bg-brand-500 text-white"
@@ -746,7 +789,7 @@ export default function ChatList({
 						{showMyTeamTab && (
 							<button
 								type="button"
-								onClick={() => setActiveTab("my-team")}
+								onClick={() => handleTabChange("my-team")}
 								className={`${showMyLoadsTab ? "flex-1" : "w-full"} flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors ${
 									activeTab === "my-team"
 										? "bg-brand-500 text-white"
@@ -963,7 +1006,7 @@ export default function ChatList({
 															chatRoom={chatRoom}
 															isSelected={isSelected}
 															status={status}
-															onChatSelect={onChatSelect}
+															onChatSelect={handleRoomSelect}
 															isUserOnline={
 																webSocketChatSync.isUserOnline
 															}
@@ -1016,7 +1059,7 @@ export default function ChatList({
 										chatRoom={chatRoom}
 										isSelected={isSelected}
 										status={status}
-										onChatSelect={onChatSelect}
+										onChatSelect={handleRoomSelect}
 										isUserOnline={webSocketChatSync.isUserOnline}
 										onChatRoomUpdate={loadChatRooms}
 										isMenuOpen={openMenuChatId === chatRoom.id}
@@ -1033,7 +1076,7 @@ export default function ChatList({
 					<LoadChatsArchiveSection
 						tabActive={activeTab === "shipments"}
 						selectedChatId={selectedChatId}
-						onChatSelect={onChatSelect}
+						onChatSelect={handleRoomSelect}
 						webSocketChatSync={webSocketChatSync}
 						loadChatRooms={opts => webSocketChatSync.loadChatRooms(opts)}
 						expandArchive={expandArchiveSection}

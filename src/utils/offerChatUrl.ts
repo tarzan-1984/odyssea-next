@@ -47,12 +47,37 @@ export function buildOfferChatUrl(offerId: string, unitId?: string | null): stri
 	return `/chat?${params.toString()}`;
 }
 
-export function buildLoadChatUrl(loadId: string, roomId?: string | null): string {
+/** Secondary load-chat tabs encoded in `/chat?tab=`. */
+export type LoadChatUrlTab = "my-loads" | "my-team";
+
+export function parseLoadChatUrlTab(value: string | null | undefined): LoadChatUrlTab | null {
+	if (value === "my-loads" || value === "my-team") return value;
+	return null;
+}
+
+export function buildLoadChatUrl(
+	loadId: string,
+	roomId?: string | null,
+	tab?: LoadChatUrlTab | null
+): string {
 	const params = new URLSearchParams();
 	params.set("load", loadId.trim());
 	const room = roomId?.trim();
 	if (room) params.set("room", room);
+	if (tab === "my-loads" || tab === "my-team") params.set("tab", tab);
 	return `/chat?${params.toString()}`;
+}
+
+/** Keep current chat query, but set or drop the My Loads / My Team tab. */
+export function buildChatUrlWithLoadTab(
+	searchParams: { toString(): string },
+	tab: LoadChatUrlTab | null
+): string {
+	const params = new URLSearchParams(searchParams.toString());
+	if (tab) params.set("tab", tab);
+	else params.delete("tab");
+	const qs = params.toString();
+	return qs ? `/chat?${qs}` : "/chat";
 }
 
 /** Link metadata stored on Notification.data (backend). */
@@ -137,12 +162,13 @@ export function getNotificationHref(
 
 export function buildChatUrlForRoom(
 	chatRoom: ChatRoom,
-	currentUserId?: string | null
+	currentUserId?: string | null,
+	tab?: LoadChatUrlTab | null
 ): string {
 	const type = (chatRoom.type || "").toUpperCase().trim();
 	if (type === "LOAD") {
 		const loadId = String(chatRoom.loadId ?? "").trim();
-		if (loadId) return buildLoadChatUrl(loadId, chatRoom.id);
+		if (loadId) return buildLoadChatUrl(loadId, chatRoom.id, tab);
 	}
 	if (type === "OFFER") {
 		const offerId = getOfferIdFromChatRoom(chatRoom);

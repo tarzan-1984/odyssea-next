@@ -16,6 +16,8 @@ import {
 	buildChatUrlForRoom,
 	buildLoadChatUrl,
 	findOfferChatRoom,
+	parseLoadChatUrlTab,
+	type LoadChatUrlTab,
 } from "@/utils/offerChatUrl";
 import { useCurrentUser } from "@/stores/userStore";
 import { upsertArchivedLoadChatInCache } from "@/utils/upsertArchivedLoadChatInCache";
@@ -39,6 +41,7 @@ export default function ChatContainer() {
 	const loadFromUrl = searchParams.get("load")?.trim() ?? null;
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
+	const tabFromUrl = parseLoadChatUrlTab(searchParams.get("tab"));
 	const currentUser = useCurrentUser();
 
 	const showMyLoadsTab = canAccessMyLoadsChatTab(currentUser?.role);
@@ -173,7 +176,7 @@ export default function ChatContainer() {
 			}
 			// Canonical URL for duplicated loadId: newest chat + its room id
 			try {
-				router.replace(buildLoadChatUrl(loadFromUrl, room.id), { scroll: false });
+				router.replace(buildLoadChatUrl(loadFromUrl, room.id, tabFromUrl), { scroll: false });
 			} catch {
 				// ignore url sync errors
 			}
@@ -210,6 +213,7 @@ export default function ChatContainer() {
 		applySelectedRoom,
 		queryClient,
 		router,
+		tabFromUrl,
 	]);
 
 	useEffect(() => {
@@ -260,7 +264,7 @@ export default function ChatContainer() {
 		};
 	}, [setCurrentChatRoom]);
 
-	const handleChatSelect = (chatRoom: ChatRoom) => {
+	const handleChatSelect = (chatRoom: ChatRoom, loadTab?: LoadChatUrlTab | null) => {
 		setSelectedChatRoomId(chatRoom.id);
 		// Also set in the store for WebSocket functionality
 		webSocketChatSync.setCurrentChatRoom(chatRoom);
@@ -268,7 +272,7 @@ export default function ChatContainer() {
 
 		// Keep URL in sync for LOAD/OFFER chats and direct/group room selection.
 		try {
-			router.replace(buildChatUrlForRoom(chatRoom, currentUser?.id), { scroll: false });
+			router.replace(buildChatUrlForRoom(chatRoom, currentUser?.id, loadTab), { scroll: false });
 		} catch {
 			// ignore url sync errors
 		}
@@ -281,14 +285,16 @@ export default function ChatContainer() {
 			if (!room?.id) return;
 			applySelectedRoom(room);
 			try {
-				router.replace(buildChatUrlForRoom(room, currentUser?.id), { scroll: false });
+				router.replace(buildChatUrlForRoom(room, currentUser?.id, tabFromUrl), {
+					scroll: false,
+				});
 			} catch {
 				// ignore url sync errors
 			}
 		};
 		window.addEventListener("odyssea:selectChatRoom", onSelectChatRoom);
 		return () => window.removeEventListener("odyssea:selectChatRoom", onSelectChatRoom);
-	}, [applySelectedRoom, router, currentUser?.id]);
+	}, [applySelectedRoom, router, currentUser?.id, tabFromUrl]);
 
 	// After delete/leave: clear selection + URL so we do not refetch the removed room.
 	useEffect(() => {
@@ -317,7 +323,7 @@ export default function ChatContainer() {
 			setDeepLinkedArchivedRoom(null);
 			setExpandArchiveSection(false);
 			try {
-				router.replace("/chat", { scroll: false });
+				router.replace(tabFromUrl ? `/chat?tab=${tabFromUrl}` : "/chat", { scroll: false });
 			} catch {
 				// ignore url sync errors
 			}
@@ -325,7 +331,7 @@ export default function ChatContainer() {
 		window.addEventListener("odyssea:clearSelectedChat", onClearSelectedChat);
 		return () =>
 			window.removeEventListener("odyssea:clearSelectedChat", onClearSelectedChat);
-	}, [selectedChatRoomId, setCurrentChatRoom, router, loadFromUrl]);
+	}, [selectedChatRoomId, setCurrentChatRoom, router, loadFromUrl, tabFromUrl]);
 
 	return (
 		<>
