@@ -13,6 +13,29 @@ const MS_PER_DAY = 86_400_000;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
 const MS_PER_MONTH = 30 * MS_PER_DAY;
 
+function formatAgeDiffMs(diffMs: number): string {
+	if (diffMs >= MS_PER_MONTH) return "more than a month ago";
+	if (diffMs >= MS_PER_WEEK) return "more than a week ago";
+
+	if (diffMs >= MS_PER_DAY) {
+		const days = Math.floor(diffMs / MS_PER_DAY);
+		return days === 1 ? "1 day ago" : `${days} days ago`;
+	}
+
+	if (diffMs >= MS_PER_HOUR) {
+		const hours = Math.floor(diffMs / MS_PER_HOUR);
+		return `${hours}h ago`;
+	}
+
+	if (diffMs >= MS_PER_MINUTE) {
+		const minutes = Math.floor(diffMs / MS_PER_MINUTE);
+		return `${minutes}m ago`;
+	}
+
+	const seconds = Math.floor(diffMs / MS_PER_SECOND);
+	return seconds <= 0 ? "just now" : `${seconds}s ago`;
+}
+
 /**
  * Current America/New_York wall-clock as a naive Date (UTC components = NY digits).
  * Same space as backend `nowInNewYorkAsNaiveDate()` / created_at in DB.
@@ -40,27 +63,24 @@ export function formatShipmentAge(
 
 	// Both sides are NY wall-clock naive dates — plain subtraction.
 	const diffMs = Math.max(0, getNyNaiveNow(now).getTime() - created.getTime());
+	return formatAgeDiffMs(diffMs);
+}
 
-	if (diffMs >= MS_PER_MONTH) return "more than a month ago";
-	if (diffMs >= MS_PER_WEEK) return "more than a week ago";
-
-	if (diffMs >= MS_PER_DAY) {
-		const days = Math.floor(diffMs / MS_PER_DAY);
-		return days === 1 ? "1 day ago" : `${days} days ago`;
+/**
+ * Age from an ISO instant (e.g. rate_load_board.bid_time).
+ * Uses the provided `now` snapshot — do not tick this in a live interval.
+ */
+export function formatInstantAge(
+	from: string | null | undefined,
+	now: Date,
+): string {
+	if (!from) return "";
+	const fromMs = Date.parse(from);
+	if (!Number.isFinite(fromMs)) {
+		const fallback = formatShipmentAge(from, now);
+		return fallback === "—" ? "" : fallback;
 	}
-
-	if (diffMs >= MS_PER_HOUR) {
-		const hours = Math.floor(diffMs / MS_PER_HOUR);
-		return `${hours}h ago`;
-	}
-
-	if (diffMs >= MS_PER_MINUTE) {
-		const minutes = Math.floor(diffMs / MS_PER_MINUTE);
-		return `${minutes}m ago`;
-	}
-
-	const seconds = Math.floor(diffMs / MS_PER_SECOND);
-	return seconds <= 0 ? "just now" : `${seconds}s ago`;
+	return formatAgeDiffMs(Math.max(0, now.getTime() - fromMs));
 }
 
 export function formatPickupColumn(shipment: LoadBoardShipment): string {
@@ -68,6 +88,90 @@ export function formatPickupColumn(shipment: LoadBoardShipment): string {
 	const hours = shipment.pickupHours?.trim() || "";
 	if (!date) return "—";
 	return hours ? `${date} ${hours}` : date;
+}
+
+/** Join date range parts: "from – to" when both present. */
+function formatDateRange(
+	earliest: string | null | undefined,
+	latest: string | null | undefined,
+): string {
+	const from = earliest?.trim() || "";
+	const to = latest?.trim() || "";
+	if (from && to && from !== to) return `${from} – ${to}`;
+	return from || to || "";
+}
+
+/**
+ * Schedule line for first pickup / last delivery in Details → Route.
+ * Example: "08/14/2026 12:00 pm – 08/15/2026"
+ */
+export function formatLoadBoardPickupSchedule(shipment: LoadBoardShipment): string {
+	const dateRange = formatDateRange(shipment.pickupEarliest, shipment.pickupLatest);
+	const hours = shipment.pickupHours?.trim() || "";
+	if (!dateRange && !hours) return "";
+	if (!dateRange) return hours;
+	if (!hours) return dateRange;
+	// Attach hours to the earliest date side: "08/14/2026 12:00 pm – 08/15/2026"
+	const earliest = shipment.pickupEarliest?.trim() || "";
+	const latest = shipment.pickupLatest?.trim() || "";
+	if (earliest && latest && earliest !== latest) {
+		return `${earliest} ${hours} – ${latest}`;
+	}
+	return `${dateRange} ${hours}`;
+}
+
+export function formatLoadBoardDeliverySchedule(shipment: LoadBoardShipment): string {
+	const dateRange = formatDateRange(
+		shipment.deliveryEarliest,
+		shipment.deliveryLatest,
+	);
+	const hours = shipment.dropOffHours?.trim() || "";
+	if (!dateRange && !hours) return "";
+	if (!dateRange) return hours;
+	if (!hours) return dateRange;
+	return `${dateRange}, ${hours}`;
+}
+
+export type LoadBoardRouteDetailLine = {
+	label: "Pick up" | "Delivery";
+	location: string;
+	/** From–to schedule for first pickup / last delivery only. */
+	schedule: string;
+};
+
+/** Route lines for Details: schedule on first pick-up and last delivery. */
+export function getLoadBoardRouteDetailLines(
+	shipment: LoadBoardShipment,
+): LoadBoardRouteDetailLine[] {
+	const route = Array.isArray(shipment.route) ? shipment.route : [];
+	if (route.length === 0) return [];
+
+	const firstPickupIndex = route.findIndex(
+		point => point.type === "pick_up_location",
+	);
+	let lastDeliveryIndex = -1;
+	for (let i = route.length - 1; i >= 0; i--) {
+		if (route[i]?.type === "delivery_location") {
+			lastDeliveryIndex = i;
+			break;
+		}
+	}
+
+	const pickupSchedule = formatLoadBoardPickupSchedule(shipment);
+	const deliverySchedule = formatLoadBoardDeliverySchedule(shipment);
+
+	return route.map((point, index) => {
+		const isPickup = point.type === "pick_up_location";
+		const label: "Pick up" | "Delivery" = isPickup ? "Pick up" : "Delivery";
+		const location = abbreviateStateInLocationString(point.location ?? "") || "—";
+		let schedule = "";
+		if (index === firstPickupIndex) {
+			schedule = pickupSchedule;
+		} else if (index === lastDeliveryIndex) {
+			schedule = deliverySchedule;
+		}
+		return { label, location, schedule };
+	});
 }
 
 /** City + state only (no ZIP) for Trip column. */
@@ -105,6 +209,11 @@ export function formatWeightLbs(weight: number | null | undefined): string {
 export function formatRate(rate: number | null | undefined): string {
 	if (rate == null || !Number.isFinite(rate)) return "—";
 	return `$${Math.round(rate).toLocaleString("en-US")}`;
+}
+
+export function formatLoadedMiles(miles: number | null | undefined): string {
+	if (miles == null || !Number.isFinite(miles)) return "—";
+	return Math.round(miles).toLocaleString("en-US");
 }
 
 export function formatEquipment(equipment: string): string {

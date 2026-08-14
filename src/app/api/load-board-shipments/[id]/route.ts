@@ -163,6 +163,12 @@ export async function PATCH(
 			referenceId:
 				typeof body?.referenceId === "string" ? body.referenceId.trim() : undefined,
 			rate: rate != null && Number.isFinite(rate) ? rate : undefined,
+			loadedMiles:
+				body?.loadedMiles != null &&
+				body.loadedMiles !== "" &&
+				Number.isFinite(Number(body.loadedMiles))
+					? Number(body.loadedMiles)
+					: undefined,
 			status: body?.status === "unposted" ? "unposted" : body?.status === "posted" ? "posted" : undefined,
 		};
 

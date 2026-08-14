@@ -5,6 +5,8 @@ import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-quer
 import {
 	deleteLoadBoardShipment,
 	getLoadBoardShipments,
+	removeLoadBoardDriverBid,
+	selectLoadBoardDriverBid,
 	updateLoadBoardShipmentStatus,
 	type LoadBoardAgeSort,
 	type LoadBoardShipment,
@@ -27,16 +29,20 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "@/components/tables/DataTables/CheckListTable/CheckListTablePagination";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
 import UserFilterSelect from "@/components/OffersList/UserFilterSelect";
-import { formatRoute } from "@/app-api/offers";
+import DriverRatingBadge from "@/components/tables/DataTables/DriversTable/DriverRatingBadge";
+import DriverRatingModal from "@/components/tables/DataTables/DriversTable/DriverRatingModal";
 import { useCurrentUser } from "@/stores/userStore";
 import { LOAD_BOARD_ALLOWED_ROLES } from "@/utils/roleAccess";
+import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 import {
 	formatEquipment,
+	formatInstantAge,
 	formatPickupColumn,
 	formatRate,
 	formatShipmentAge,
 	formatStatus,
 	formatWeightLbs,
+	getLoadBoardRouteDetailLines,
 	getTripEndpoints,
 	isLoadBoardPickupExpired,
 } from "./loadBoardTableUtils";
@@ -64,6 +70,13 @@ export default function LoadBoardTable({
 	const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 	const [expandedId, setExpandedId] = useState<number | null>(null);
 	const [now, setNow] = useState(() => new Date());
+	const [pageLoadedAt, setPageLoadedAt] = useState(() => new Date());
+	const pageLoadedAtFrozenRef = useRef(false);
+	const [ratingModalDriver, setRatingModalDriver] = useState<{
+		driverId: string;
+		name: string;
+		avgRating: number | null;
+	} | null>(null);
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 	/** Align Age "now" with the server clock that wrote created_at (NY wall). */
 	const serverSkewMsRef = useRef(0);
@@ -96,7 +109,12 @@ export default function LoadBoardTable({
 		const serverMs = Date.parse(serverTime);
 		if (!Number.isFinite(serverMs)) return;
 		serverSkewMsRef.current = serverMs - Date.now();
-		setNow(new Date(Date.now() + serverSkewMsRef.current));
+		const skewedNow = new Date(Date.now() + serverSkewMsRef.current);
+		setNow(skewedNow);
+		if (!pageLoadedAtFrozenRef.current) {
+			pageLoadedAtFrozenRef.current = true;
+			setPageLoadedAt(skewedNow);
+		}
 	}, [query.data?.serverTime, query.dataUpdatedAt]);
 
 	useEffect(() => {
@@ -373,6 +391,7 @@ export default function LoadBoardTable({
 										selected={selectedIds.has(shipment.id)}
 										expanded={expandedId === shipment.id}
 										now={now}
+										rateAgeNow={pageLoadedAt}
 										onToggleSelected={checked =>
 											toggleRowSelected(shipment.id, checked)
 										}
@@ -381,6 +400,7 @@ export default function LoadBoardTable({
 										onDuplicate={() => onDuplicateShipment?.(shipment)}
 										onStatusChanged={refreshLoadBoard}
 										onDeleted={refreshLoadBoard}
+										onOpenRating={setRatingModalDriver}
 									/>
 								))
 							)}
@@ -399,6 +419,20 @@ export default function LoadBoardTable({
 				onPageChange={setCurrentPage}
 				selectedCount={selectedIds.size}
 			/>
+
+			{ratingModalDriver && (
+				<DriverRatingModal
+					isOpen
+					onClose={() => {
+						setRatingModalDriver(null);
+						refreshLoadBoard();
+					}}
+					driverId={ratingModalDriver.driverId}
+					driverName={ratingModalDriver.name}
+					ratingsCount={0}
+					avgRating={ratingModalDriver.avgRating}
+				/>
+			)}
 		</div>
 	);
 }
@@ -407,41 +441,95 @@ function driverDisplayName(bid: RateLoadBoard): string {
 	const first = bid.driver?.firstName?.trim() || "";
 	const last = bid.driver?.lastName?.trim() || "";
 	const name = `${first} ${last}`.trim();
-	return name || bid.driverExternalId || bid.driverId || "—";
+	const externalId = bid.driver?.externalId?.trim() || bid.driverExternalId?.trim() || "";
+	const unitLabel = externalId ? `(${externalId})` : "";
+	return [unitLabel, name].filter(Boolean).join(" ") || bid.driverId || "—";
 }
+
+function driverUnitId(bid: RateLoadBoard): string | null {
+	return bid.driver?.externalId?.trim() || bid.driverExternalId?.trim() || bid.driverId || null;
+}
+
+function driverBidKey(bid: RateLoadBoard): string {
+	return bid.driverExternalId?.trim() || bid.driverId;
+}
+
+function formatDriverBidRate(rate: number | null | undefined): string | null {
+	if (rate == null || !Number.isFinite(rate)) return null;
+	return `$${Number(rate).toLocaleString("en-US")}`;
+}
+
+function getEmptyMilesSortValue(bid: RateLoadBoard): number {
+	if (bid.emptyMiles == null) return Number.POSITIVE_INFINITY;
+	const miles = Number(bid.emptyMiles);
+	return Number.isFinite(miles) ? miles : Number.POSITIVE_INFINITY;
+}
+
+function sortLoadBoardBids(bids: RateLoadBoard[]): RateLoadBoard[] {
+	return [...bids].sort((a, b) => {
+		if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+		return getEmptyMilesSortValue(a) - getEmptyMilesSortValue(b);
+	});
+}
+
+function fixedDriverTableCol(width: string) {
+	return { width, minWidth: width, maxWidth: width };
+}
+
+const DRIVER_TABLE_COL_UNIT = "280px";
+const DRIVER_TABLE_COL_PHONE = "130px";
+const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
+const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
+const DRIVER_TABLE_COL_RATE = "88px";
+const DRIVER_TABLE_COL_RATE_AGE = "126px";
+const DRIVER_TABLE_COL_ACTIONS = "168px";
 
 function ShipmentRows({
 	shipment,
 	selected,
 	expanded,
 	now,
+	rateAgeNow,
 	onToggleSelected,
 	onToggleExpanded,
 	onEdit,
 	onDuplicate,
 	onStatusChanged,
 	onDeleted,
+	onOpenRating,
 }: {
 	shipment: LoadBoardShipment;
 	selected: boolean;
 	expanded: boolean;
 	now: Date;
+	rateAgeNow: Date;
 	onToggleSelected: (checked: boolean) => void;
 	onToggleExpanded: () => void;
 	onEdit?: () => void;
 	onDuplicate?: () => void;
 	onStatusChanged?: () => void;
 	onDeleted?: () => void;
+	onOpenRating?: (driver: {
+		driverId: string;
+		name: string;
+		avgRating: number | null;
+	}) => void;
 }) {
 	const trip = getTripEndpoints(shipment);
+	const routeDetailLines = getLoadBoardRouteDetailLines(shipment);
 	const statusLabel = formatStatus(shipment.status);
 	const isPosted = shipment.status !== "unposted";
 	const pickupExpired = isLoadBoardPickupExpired(shipment, now);
 	const postBlocked = !isPosted && pickupExpired;
-	const bids = (shipment.rateLoadBoards ?? []).filter(bid => bid.active !== false);
+	const bids = sortLoadBoardBids(
+		(shipment.rateLoadBoards ?? []).filter(bid => bid.active !== false),
+	);
 	const bidsCount = bids.length;
+	const hasSelectedDriver = bids.some(bid => bid.isSelected);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [actionPending, setActionPending] = useState(false);
+	const [deletingDriverKey, setDeletingDriverKey] = useState<string | null>(null);
+	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const menuAnchorRef = useRef<HTMLButtonElement>(null);
 
 	const closeMenu = () => setMenuOpen(false);
@@ -666,6 +754,18 @@ function ShipmentRows({
 							</h3>
 							<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
 								<Table className="w-full border-collapse table-fixed">
+									<colgroup>
+										{/* Route is the widest — same idea as offers Details */}
+										<col style={{ width: "320px" }} />
+										<col style={{ width: "90px" }} />
+										<col style={{ width: "100px" }} />
+										<col style={{ width: "100px" }} />
+										{/* Extra Equipment column — keep narrow */}
+										<col style={{ width: "110px" }} />
+										<col style={{ width: "160px" }} />
+										<col style={{ width: "90px" }} />
+										<col style={{ width: "186px" }} />
+									</colgroup>
 									<TableHeader className="border-b border-gray-200 bg-gray-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
 										<TableRow className="border-gray-200 dark:border-white/[0.08]">
 											<TableCell
@@ -673,12 +773,6 @@ function ShipmentRows({
 												className="border-b border-r border-gray-200 px-3 py-2 text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 											>
 												Route
-											</TableCell>
-											<TableCell
-												isHeader
-												className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
-											>
-												Pick up
 											</TableCell>
 											<TableCell
 												isHeader
@@ -712,6 +806,12 @@ function ShipmentRows({
 											</TableCell>
 											<TableCell
 												isHeader
+												className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+											>
+												Total miles
+											</TableCell>
+											<TableCell
+												isHeader
 												className="border-b border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 											>
 												Comments
@@ -721,43 +821,28 @@ function ShipmentRows({
 									<TableBody>
 										<TableRow className="border-gray-200 dark:border-white/[0.08]">
 											<TableCell className="whitespace-pre-line border-b border-r border-gray-200 px-3 py-2 text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												{formatRoute(shipment.route) || "—"}
+												{routeDetailLines.length === 0
+													? ""
+													: routeDetailLines
+															.map(line =>
+																line.schedule
+																	? `${line.label} - ${line.location} - ${line.schedule}`
+																	: `${line.label} - ${line.location}`,
+															)
+															.join("\n")}
 											</TableCell>
 											<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												<div className="flex flex-col gap-0.5">
-													<span>{formatPickupColumn(shipment)}</span>
-													{shipment.pickupLatest?.trim() ? (
-														<span className="text-gray-500 dark:text-gray-400">
-															Latest: {shipment.pickupLatest.trim()}
-														</span>
-													) : null}
-													{shipment.deliveryEarliest?.trim() ||
-													shipment.deliveryLatest?.trim() ? (
-														<span className="text-gray-500 dark:text-gray-400">
-															Delivery:{" "}
-															{[
-																shipment.deliveryEarliest?.trim(),
-																shipment.deliveryLatest?.trim(),
-															]
-																.filter(Boolean)
-																.join(" – ")}
-														</span>
-													) : null}
-													{shipment.dropOffHours?.trim() ? (
-														<span className="text-gray-500 dark:text-gray-400">
-															Drop off: {shipment.dropOffHours.trim()}
-														</span>
-													) : null}
-												</div>
+												{shipment.weight != null && Number.isFinite(shipment.weight)
+													? `${Math.round(shipment.weight).toLocaleString("en-US")} lbs`
+													: ""}
 											</TableCell>
 											<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												{formatWeightLbs(shipment.weight)}
+												{shipment.rate != null && Number.isFinite(shipment.rate)
+													? formatRate(shipment.rate)
+													: ""}
 											</TableCell>
 											<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												{formatRate(shipment.rate)}
-											</TableCell>
-											<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												{shipment.commodity || "—"}
+												{shipment.commodity?.trim() || ""}
 											</TableCell>
 											<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
 												{formatEquipment(shipment.equipment)}
@@ -768,8 +853,14 @@ function ShipmentRows({
 													value={shipment.specialInstructions}
 												/>
 											</TableCell>
+											<TableCell className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+												{shipment.loadedMiles != null &&
+												Number.isFinite(shipment.loadedMiles)
+													? Math.round(shipment.loadedMiles)
+													: ""}
+											</TableCell>
 											<TableCell className="border-b border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-												{shipment.comments?.trim() || "—"}
+												{shipment.comments?.trim() || ""}
 											</TableCell>
 										</TableRow>
 									</TableBody>
@@ -786,20 +877,47 @@ function ShipmentRows({
 									</p>
 								) : (
 									<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
-										<Table className="w-full border-collapse">
+										<Table className="w-full table-fixed border-collapse">
+											<colgroup>
+												<col style={fixedDriverTableCol(DRIVER_TABLE_COL_UNIT)} />
+												<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
+												<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
+												<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
+												<col
+													style={fixedDriverTableCol(
+														hasSelectedDriver ? "96px" : DRIVER_TABLE_COL_RATE,
+													)}
+												/>
+												<col style={fixedDriverTableCol(DRIVER_TABLE_COL_RATE_AGE)} />
+												{!hasSelectedDriver && (
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_ACTIONS)} />
+												)}
+											</colgroup>
 											<TableHeader className="border-b border-gray-200 bg-gray-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
 												<TableRow className="border-gray-200 dark:border-white/[0.08]">
 													<TableCell
 														isHeader
 														className="border-b border-r border-gray-200 px-3 py-2 text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 													>
-														Driver
+														Unit
 													</TableCell>
 													<TableCell
 														isHeader
-														className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+														className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 													>
-														External ID
+														Phone
+													</TableCell>
+													<TableCell
+														isHeader
+														className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+													>
+														Empty miles
+													</TableCell>
+													<TableCell
+														isHeader
+														className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+													>
+														Total miles
 													</TableCell>
 													<TableCell
 														isHeader
@@ -809,41 +927,176 @@ function ShipmentRows({
 													</TableCell>
 													<TableCell
 														isHeader
-														className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+														className="whitespace-nowrap border-b border-r border-gray-200 px-2 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
 													>
-														ETA
+														Rate age
 													</TableCell>
-													<TableCell
-														isHeader
-														className="border-b border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
-													>
-														Selected
-													</TableCell>
+													{!hasSelectedDriver && (
+														<TableCell
+															isHeader
+															className="border-b border-gray-200 px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:border-white/[0.08] dark:text-gray-300"
+														>
+															Actions
+														</TableCell>
+													)}
 												</TableRow>
 											</TableHeader>
 											<TableBody>
-												{bids.map(bid => (
-													<TableRow
-														key={bid.id}
-														className="border-gray-200 dark:border-white/[0.08]"
-													>
-														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-															{driverDisplayName(bid)}
-														</TableCell>
-														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-															{bid.driverExternalId || "—"}
-														</TableCell>
-														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-															{formatRate(bid.rate)}
-														</TableCell>
-														<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-															{bid.driverEta?.trim() || "—"}
-														</TableCell>
-														<TableCell className="border-b border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
-															{bid.isSelected ? "Yes" : "—"}
-														</TableCell>
-													</TableRow>
-												))}
+												{bids.map(bid => {
+													const unitId = driverUnitId(bid);
+													const name = driverDisplayName(bid);
+													const tmsDriverUrl = buildTmsDriverPageUrl(unitId);
+													const key = driverBidKey(bid);
+													const phone =
+														bid.driver?.phone?.trim() ||
+														bid.phone?.trim() ||
+														"";
+
+													return (
+														<TableRow
+															key={bid.id}
+															className={`border-gray-200 dark:border-white/[0.08] ${
+																bid.isSelected
+																	? "bg-green-100 dark:bg-green-900/25"
+																	: ""
+															}`}
+														>
+															<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																<span className="inline-flex items-center gap-1.5">
+																	{tmsDriverUrl ? (
+																		<a
+																			href={tmsDriverUrl}
+																			target="_blank"
+																			rel="noopener noreferrer"
+																			onClick={e => e.stopPropagation()}
+																			className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+																		>
+																			{name}
+																		</a>
+																	) : (
+																		<span>{name}</span>
+																	)}
+																	{unitId ? (
+																		<span onClick={e => e.stopPropagation()}>
+																			<DriverRatingBadge
+																				avgRating={bid.driver?.driverRating}
+																				onClick={() =>
+																					onOpenRating?.({
+																						driverId: String(unitId),
+																						name,
+																						avgRating:
+																							bid.driver?.driverRating ?? null,
+																					})
+																				}
+																			/>
+																		</span>
+																	) : null}
+																</span>
+															</TableCell>
+															<TableCell className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																{phone ? (
+																	<a
+																		href={`tel:${phone.replace(/\s/g, "")}`}
+																		className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+																	>
+																		{phone}
+																	</a>
+																) : null}
+															</TableCell>
+															<TableCell className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																{bid.emptyMiles != null
+																	? Math.round(bid.emptyMiles)
+																	: ""}
+															</TableCell>
+															<TableCell className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																{bid.totalMiles != null
+																	? Math.round(bid.totalMiles)
+																	: ""}
+															</TableCell>
+															<TableCell className="border-b border-r border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																<div className="flex flex-col items-center gap-0.5">
+																	<span>{formatDriverBidRate(bid.rate) ?? ""}</span>
+																	{bid.counterOffer != null && (
+																		<span className="text-xs font-medium text-yellow-500 dark:text-yellow-400">
+																			{formatDriverBidRate(bid.counterOffer)}
+																		</span>
+																	)}
+																</div>
+															</TableCell>
+															<TableCell className="whitespace-nowrap border-b border-r border-gray-200 px-2 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																{formatInstantAge(bid.bidTime, rateAgeNow)}
+															</TableCell>
+															{!hasSelectedDriver && (
+																<TableCell className="border-b border-gray-200 px-3 py-2 text-center text-theme-sm text-gray-800 dark:border-white/[0.08] dark:text-gray-200">
+																	<div className="flex flex-wrap items-center justify-center gap-1.5">
+																		<button
+																			type="button"
+																			disabled={deletingDriverKey === key}
+																			onClick={async () => {
+																				if (!key) return;
+																				setDeletingDriverKey(key);
+																				try {
+																					await removeLoadBoardDriverBid(
+																						shipment.id,
+																						key,
+																					);
+																					onStatusChanged?.();
+																				} catch (err) {
+																					window.alert(
+																						err instanceof Error
+																							? err.message
+																							: "Failed to remove driver",
+																					);
+																				} finally {
+																					setDeletingDriverKey(null);
+																				}
+																			}}
+																			className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																		>
+																			<OfferDeleteIcon className="h-3.5 w-3.5 shrink-0" />
+																			Delete
+																		</button>
+																		<button
+																			type="button"
+																			disabled={
+																				acceptingDriverKey === key ||
+																				bid.rate == null
+																			}
+																			title={
+																				bid.rate == null
+																					? "Rate is not set"
+																					: undefined
+																			}
+																			onClick={async () => {
+																				if (!key) return;
+																				setAcceptingDriverKey(key);
+																				try {
+																					await selectLoadBoardDriverBid(
+																						shipment.id,
+																						key,
+																					);
+																					onStatusChanged?.();
+																				} catch (err) {
+																					window.alert(
+																						err instanceof Error
+																							? err.message
+																							: "Failed to accept driver",
+																					);
+																				} finally {
+																					setAcceptingDriverKey(null);
+																				}
+																			}}
+																			className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																		>
+																			<OfferAcceptIcon className="h-3.5 w-3.5 shrink-0" />
+																			Accept
+																		</button>
+																	</div>
+																</TableCell>
+															)}
+														</TableRow>
+													);
+												})}
 											</TableBody>
 										</Table>
 									</div>

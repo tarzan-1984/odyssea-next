@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import Radio from "@/components/form/input/Radio";
+import Checkbox from "@/components/form/input/Checkbox";
 import MultiSelect from "@/components/form/MultiSelect";
 import TimePicker from "@/components/form/TimePicker";
 import Button from "@/components/ui/button/Button";
 import { TabButton } from "@/components/ui/tabs/TabWithUnderline";
-import { ChevronDownIcon } from "@/icons";
+import { ChevronDownIcon, EditLoadedMilesIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
-import { createLoadBoardShipment, updateLoadBoardShipment, type LoadBoardShipment } from "@/app-api/loadBoardShipments";
+import {
+	createLoadBoardShipment,
+	updateLoadBoardShipment,
+	type LoadBoardShipment,
+} from "@/app-api/loadBoardShipments";
+import offers from "@/app-api/offers";
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
 	createBidRouteRow,
@@ -21,6 +28,7 @@ import BidRateRouteBuilder, {
 	validateBidRouteRows,
 	type BidRouteRow,
 } from "@/components/BidRates/BidRateRouteBuilder";
+import { isValidLocationFormat } from "@/utils/offerLocationFormat";
 import ShipmentDatePicker from "./ShipmentDatePicker";
 import { getLoadBoardPickupPastError } from "./loadBoardTableUtils";
 import {
@@ -174,20 +182,47 @@ export default function NewShipmentModal({
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
+	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
+	const [manualLoadedMiles, setManualLoadedMiles] = useState<number | null>(null);
+	const [editFallbackLoadedMiles, setEditFallbackLoadedMiles] = useState<number | null>(
+		null,
+	);
+	const [isEditMilesModalOpen, setIsEditMilesModalOpen] = useState(false);
+	const [editMilesInput, setEditMilesInput] = useState("");
+	const [editMilesError, setEditMilesError] = useState<string | null>(null);
+	const [editMilesConfirmed, setEditMilesConfirmed] = useState(false);
+
 	useEffect(() => {
 		if (!isOpen) return;
 		setActiveTab("load-details");
 		const source = shipment ?? prefillShipment;
 		if (source) {
-			setRouteRows(shipmentToRouteRows(source));
+			const rows = shipmentToRouteRows(source);
+			setRouteRows(rows);
 			setForm(shipmentToForm(source));
+			const locs = rows
+				.map(row => row.location.trim())
+				.filter(loc => loc !== "" && isValidLocationFormat(loc));
+			setCommittedLocations(locs.length >= 2 ? locs : []);
+			setEditFallbackLoadedMiles(
+				source.loadedMiles != null && Number.isFinite(source.loadedMiles)
+					? source.loadedMiles
+					: null,
+			);
+			setManualLoadedMiles(null);
 		} else {
 			setRouteRows(initialBidRouteRows());
 			setForm(EMPTY_FORM);
+			setCommittedLocations([]);
+			setEditFallbackLoadedMiles(null);
+			setManualLoadedMiles(null);
 		}
 		setFormKey(prev => prev + 1);
 		setError(null);
 		setSubmitting(false);
+		setIsEditMilesModalOpen(false);
+		setEditMilesError(null);
+		setEditMilesConfirmed(false);
 	}, [isOpen, shipment, prefillShipment]);
 
 	function updateField<K extends keyof NewShipmentForm>(key: K, value: NewShipmentForm[K]) {
@@ -196,6 +231,78 @@ export default function NewShipmentModal({
 
 	const showEquipmentSizeFields =
 		form.equipment === "box_truck" || form.equipment === "dry_van";
+
+	const allLocationsFilledAndValid = (locs: string[]) =>
+		locs.length >= 2 &&
+		locs.every(loc => loc.trim() !== "" && isValidLocationFormat(loc.trim()));
+
+	const {
+		data: routeDistanceData,
+		isFetching: isCalculatingRoute,
+		error: routeDistanceQueryError,
+	} = useQuery({
+		queryKey: ["load-board-route-distance", committedLocations],
+		queryFn: () => offers.calculateRouteDistance(committedLocations),
+		enabled:
+			manualLoadedMiles == null && allLocationsFilledAndValid(committedLocations),
+		staleTime: 20 * 60 * 1000,
+		retry: 1,
+	});
+
+	const loadedMiles =
+		manualLoadedMiles ?? routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
+	const routeDistanceError =
+		manualLoadedMiles != null
+			? null
+			: routeDistanceQueryError
+				? routeDistanceQueryError instanceof Error
+					? routeDistanceQueryError.message
+					: "Could not calculate route distance"
+				: null;
+	const showLoadedMilesEditIcon =
+		!isCalculatingRoute &&
+		(manualLoadedMiles != null ||
+			(allLocationsFilledAndValid(committedLocations) &&
+				(routeDistanceData?.loadedMiles != null ||
+					routeDistanceQueryError != null ||
+					editFallbackLoadedMiles != null)));
+
+	const handleLocationsCommit = useCallback((locations: string[]) => {
+		setCommittedLocations(locations);
+		setManualLoadedMiles(null);
+		setEditFallbackLoadedMiles(null);
+	}, []);
+
+	const openEditMilesModal = () => {
+		setEditMilesInput(
+			loadedMiles != null && Number.isFinite(loadedMiles)
+				? String(Math.round(loadedMiles))
+				: "",
+		);
+		setEditMilesError(null);
+		setEditMilesConfirmed(false);
+		setIsEditMilesModalOpen(true);
+	};
+
+	const handleChangeMiles = () => {
+		const trimmed = editMilesInput.replace(/,/g, "").trim();
+		if (!trimmed) {
+			setEditMilesError("Enter a value");
+			return;
+		}
+		const parsed = Number.parseFloat(trimmed);
+		if (Number.isNaN(parsed)) {
+			setEditMilesError("Enter a valid number");
+			return;
+		}
+		if (parsed <= 0) {
+			setEditMilesError("Must be greater than zero");
+			return;
+		}
+		setManualLoadedMiles(Math.round(parsed));
+		setIsEditMilesModalOpen(false);
+		setEditMilesError(null);
+	};
 
 	async function handleSubmit() {
 		setError(null);
@@ -264,6 +371,23 @@ export default function NewShipmentModal({
 			return;
 		}
 
+		if (isCalculatingRoute) {
+			setActiveTab("load-details");
+			setError("Please wait for route distance calculation to complete.");
+			setSubmitting(false);
+			return;
+		}
+
+		if (loadedMiles == null || !Number.isFinite(loadedMiles) || loadedMiles <= 0) {
+			setActiveTab("load-details");
+			setError(
+				routeDistanceError ||
+					"Loaded miles could not be calculated. Fill all addresses and blur, or enter miles manually.",
+			);
+			setSubmitting(false);
+			return;
+		}
+
 		try {
 			const needsEquipmentSize = showEquipmentSizeFields;
 			const equipmentLengthRaw = form.equipmentLength.replace(/,/g, "").trim();
@@ -304,6 +428,7 @@ export default function NewShipmentModal({
 				comments: form.comments.trim() || undefined,
 				referenceId: form.referenceId.trim() || undefined,
 				rate,
+				loadedMiles: Math.round(loadedMiles),
 				...(isEdit && shipment?.status ? { status: shipment.status } : {}),
 			};
 
@@ -328,6 +453,7 @@ export default function NewShipmentModal({
 	}
 
 	return (
+		<>
 		<Modal
 			isOpen={isOpen}
 			onClose={onClose}
@@ -370,7 +496,54 @@ export default function NewShipmentModal({
 								<SectionTitle>Location & Timing</SectionTitle>
 							</div>
 
-							<BidRateRouteBuilder rows={routeRows} onChange={setRouteRows} />
+							<BidRateRouteBuilder
+								rows={routeRows}
+								onChange={setRouteRows}
+								onLocationsCommit={handleLocationsCommit}
+							/>
+
+							<div className="relative max-w-md">
+								<Label htmlFor="shipment-loaded-miles">Loaded miles</Label>
+								<div className="relative mt-1.5">
+									<Input
+										id="shipment-loaded-miles"
+										type="text"
+										readOnly
+										value={
+											loadedMiles != null && Number.isFinite(loadedMiles)
+												? String(Math.round(loadedMiles))
+												: ""
+										}
+										placeholder="Fill all addresses and blur to calculate"
+										className={`cursor-not-allowed dark:bg-gray-900 ${
+											showLoadedMilesEditIcon ? "pr-11" : ""
+										}`}
+									/>
+									{showLoadedMilesEditIcon && (
+										<button
+											type="button"
+											onClick={openEditMilesModal}
+											className="absolute right-2 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+											aria-label="Edit loaded miles"
+										>
+											<EditLoadedMilesIcon className="h-5 w-5" />
+										</button>
+									)}
+									{isCalculatingRoute && (
+										<div
+											className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-gray-900/80"
+											aria-hidden
+										>
+											<SpinnerOne />
+										</div>
+									)}
+								</div>
+								{routeDistanceError ? (
+									<p className="mt-1.5 text-sm text-red-500 dark:text-red-400">
+										{routeDistanceError}
+									</p>
+								) : null}
+							</div>
 
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 								<ShipmentDatePicker
@@ -685,5 +858,67 @@ export default function NewShipmentModal({
 				</div>
 			</div>
 		</Modal>
+
+		<Modal
+			isOpen={isEditMilesModalOpen}
+			onClose={() => {
+				setIsEditMilesModalOpen(false);
+				setEditMilesError(null);
+				setEditMilesConfirmed(false);
+			}}
+			className="relative m-5 w-full max-w-md rounded-3xl bg-white p-6 shadow-sm dark:bg-gray-900 sm:m-0 sm:p-8"
+		>
+			<h4 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90">
+				Change loaded miles
+			</h4>
+			<div className="space-y-4">
+				<div>
+					<Label htmlFor="edit-shipment-loaded-miles">Loaded miles</Label>
+					<Input
+						id="edit-shipment-loaded-miles"
+						type="text"
+						inputMode="numeric"
+						value={editMilesInput}
+						onChange={e => {
+							setEditMilesInput(e.target.value);
+							if (editMilesError) setEditMilesError(null);
+						}}
+						placeholder="Enter miles"
+						className="dark:bg-gray-900"
+						error={Boolean(editMilesError)}
+						hint={editMilesError ?? undefined}
+					/>
+				</div>
+				<Checkbox
+					id="edit-shipment-loaded-miles-confirm"
+					checked={editMilesConfirmed}
+					onChange={setEditMilesConfirmed}
+					label="I am sure I am entering the correct value"
+				/>
+				<div className="flex justify-end gap-3 pt-2">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => {
+							setIsEditMilesModalOpen(false);
+							setEditMilesError(null);
+							setEditMilesConfirmed(false);
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						onClick={handleChangeMiles}
+						disabled={!editMilesConfirmed}
+					>
+						Change miles
+					</Button>
+				</div>
+			</div>
+		</Modal>
+		</>
 	);
 }

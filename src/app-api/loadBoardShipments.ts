@@ -20,6 +20,8 @@ export type LoadBoardShipmentUser = {
 	firstName: string | null;
 	lastName: string | null;
 	externalId: string | null;
+	phone?: string | null;
+	driverRating?: number | null;
 };
 
 export interface RateLoadBoard {
@@ -28,14 +30,16 @@ export interface RateLoadBoard {
 	driverId: string;
 	driverExternalId: string | null;
 	rate: number | null;
-	driverEta?: string | null;
-	actionTime?: number | string | null;
+	counterOffer?: number | null;
+	bidTime?: string | null;
 	emptyMiles?: number | null;
 	totalMiles?: number | null;
 	active: boolean;
 	isSelected: boolean;
 	createdAt?: string;
 	updatedAt?: string;
+	/** users.phone for rate_load_board.driver_id = users.id */
+	phone?: string | null;
 	driver?: LoadBoardShipmentUser | null;
 }
 
@@ -61,6 +65,8 @@ export interface LoadBoardShipment {
 	comments: string | null;
 	referenceId: string | null;
 	rate: number | null;
+	/** Persisted road loaded miles (editable on create/edit). */
+	loadedMiles?: number | null;
 	status: LoadBoardShipmentStatus;
 	loadStatus?: LoadBoardLoadStatus | null;
 	pickupLat?: number | null;
@@ -114,6 +120,8 @@ export interface CreateLoadBoardShipmentPayload {
 	comments?: string;
 	referenceId?: string;
 	rate?: number;
+	/** Road loaded miles (same calculation as offers). */
+	loadedMiles?: number;
 	status?: LoadBoardShipmentStatus;
 }
 
@@ -277,4 +285,38 @@ export async function deleteLoadBoardShipment(id: number): Promise<{ id: number 
 	}
 
 	return data as { id: number };
+}
+
+export async function removeLoadBoardDriverBid(
+	shipmentId: number,
+	driverId: string,
+): Promise<void> {
+	const res = await fetch(
+		`/api/load-board-shipments/${shipmentId}/bids/${encodeURIComponent(driverId)}`,
+		{
+			method: "DELETE",
+			credentials: "include",
+		},
+	);
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to remove driver bid"));
+	}
+}
+
+export async function selectLoadBoardDriverBid(
+	shipmentId: number,
+	driverId: string,
+): Promise<void> {
+	const res = await fetch(
+		`/api/load-board-shipments/${shipmentId}/bids/${encodeURIComponent(driverId)}/select`,
+		{
+			method: "POST",
+			credentials: "include",
+		},
+	);
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) {
+		throw new Error(parseErrorMessage(data, "Failed to accept driver"));
+	}
 }
