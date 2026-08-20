@@ -56,6 +56,7 @@ interface VirtualMessageRowProps {
 	message: Message;
 	measuredHeightsRef: React.MutableRefObject<Map<string, number>>;
 	isScrollingRef: React.MutableRefObject<boolean>;
+	isSelectingRef: React.MutableRefObject<boolean>;
 	pendingMeasureRef: React.MutableRefObject<boolean>;
 	virtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>;
 	currentUser: UserData | null;
@@ -78,6 +79,7 @@ function VirtualMessageRow({
 	message,
 	measuredHeightsRef,
 	isScrollingRef,
+	isSelectingRef,
 	pendingMeasureRef,
 	virtualizer,
 	currentUser,
@@ -101,14 +103,16 @@ function VirtualMessageRow({
 		const node = rowRef.current;
 		if (!node) return;
 
-		if (isScrollingRef.current) {
+		const shouldDeferMeasure = () => isScrollingRef.current || isSelectingRef.current;
+
+		if (shouldDeferMeasure()) {
 			pendingMeasureRef.current = true;
 		} else {
 			virtualizer.measureElement(node);
 		}
 
 		const syncMeasuredHeight = () => {
-			if (isScrollingRef.current) {
+			if (shouldDeferMeasure()) {
 				pendingMeasureRef.current = true;
 				return;
 			}
@@ -144,15 +148,15 @@ function VirtualMessageRow({
 				cancelAnimationFrame(measureRafRef.current);
 			}
 		};
-	}, [isScrollingRef, measuredHeightsRef, message.id, pendingMeasureRef, virtualizer]);
+	}, [isScrollingRef, isSelectingRef, measuredHeightsRef, message.id, pendingMeasureRef, virtualizer]);
 
 	return (
 		<div
 			ref={rowRef}
 			data-index={virtualRow.index}
-			className="absolute left-0 top-0 w-full"
+			className="pointer-events-none absolute left-0 w-full"
 			style={{
-				transform: `translateY(${virtualRow.start}px)`,
+				top: virtualRow.start,
 			}}
 		>
 			<MessageItem
@@ -213,6 +217,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 ) {
 	const measuredHeightsRef = useRef<Map<string, number>>(new Map());
 	const isScrollingRef = useRef(false);
+	const isSelectingRef = useRef(false);
 	const pendingMeasureRef = useRef(false);
 	const scrollIdleTimerRef = useRef<number | null>(null);
 	const virtualizerRef = useRef<ReturnType<
@@ -253,7 +258,12 @@ const ChatBoxVirtualMessageList = forwardRef<
 
 	useLayoutEffect(() => {
 		virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
-			if (suppressScrollAdjustment || isScrollingRef.current || !isUserScrolledUp) {
+			if (
+				suppressScrollAdjustment ||
+				isScrollingRef.current ||
+				isSelectingRef.current ||
+				!isUserScrolledUp
+			) {
 				return false;
 			}
 			const offset = instance.scrollOffset ?? 0;
@@ -319,6 +329,20 @@ const ChatBoxVirtualMessageList = forwardRef<
 	useEffect(() => {
 		if (!scrollElement) return;
 
+		const flushPendingMeasure = () => {
+			if (!pendingMeasureRef.current) return;
+			pendingMeasureRef.current = false;
+			const anchor = getScrollAnchor();
+			virtualizerRef.current?.measure();
+			if (anchor) {
+				requestAnimationFrame(() => {
+					virtualizerRef.current?.measure();
+					restoreScrollAnchor(anchor);
+				});
+			}
+			onContentMeasuredRef.current?.();
+		};
+
 		const markScrolling = () => {
 			isScrollingRef.current = true;
 			if (scrollIdleTimerRef.current != null) {
@@ -327,19 +351,24 @@ const ChatBoxVirtualMessageList = forwardRef<
 			scrollIdleTimerRef.current = window.setTimeout(() => {
 				isScrollingRef.current = false;
 				scrollIdleTimerRef.current = null;
-				if (pendingMeasureRef.current) {
-					pendingMeasureRef.current = false;
-					const anchor = getScrollAnchor();
-					virtualizerRef.current?.measure();
-					if (anchor) {
-						requestAnimationFrame(() => {
-							virtualizerRef.current?.measure();
-							restoreScrollAnchor(anchor);
-						});
-					}
-					onContentMeasuredRef.current?.();
+				if (!isSelectingRef.current) {
+					flushPendingMeasure();
 				}
 			}, SCROLL_IDLE_MEASURE_DELAY_MS);
+		};
+
+		const onSelectStart = (event: Event) => {
+			const target = event.target;
+			if (!(target instanceof Node) || !scrollElement.contains(target)) return;
+			isSelectingRef.current = true;
+		};
+
+		const onSelectEnd = () => {
+			if (!isSelectingRef.current) return;
+			isSelectingRef.current = false;
+			if (!isScrollingRef.current) {
+				flushPendingMeasure();
+			}
 		};
 
 		scrollElement.addEventListener("wheel", markScrolling, { passive: true, capture: true });
@@ -348,15 +377,22 @@ const ChatBoxVirtualMessageList = forwardRef<
 			capture: true,
 		});
 		scrollElement.addEventListener("scroll", markScrolling, { passive: true });
+		document.addEventListener("selectstart", onSelectStart);
+		document.addEventListener("mouseup", onSelectEnd);
+		document.addEventListener("touchend", onSelectEnd);
 		return () => {
 			scrollElement.removeEventListener("wheel", markScrolling, { capture: true });
 			scrollElement.removeEventListener("touchmove", markScrolling, { capture: true });
 			scrollElement.removeEventListener("scroll", markScrolling);
+			document.removeEventListener("selectstart", onSelectStart);
+			document.removeEventListener("mouseup", onSelectEnd);
+			document.removeEventListener("touchend", onSelectEnd);
 			if (scrollIdleTimerRef.current != null) {
 				window.clearTimeout(scrollIdleTimerRef.current);
 				scrollIdleTimerRef.current = null;
 			}
 			isScrollingRef.current = false;
+			isSelectingRef.current = false;
 			pendingMeasureRef.current = false;
 		};
 	}, [getScrollAnchor, restoreScrollAnchor, scrollElement]);
@@ -367,7 +403,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 
 	useEffect(() => {
 		if (!scrollElement || messages.length === 0) return;
-		if (isScrollingRef.current) {
+		if (isScrollingRef.current || isSelectingRef.current) {
 			pendingMeasureRef.current = true;
 			return;
 		}
@@ -393,6 +429,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 						message={message}
 						measuredHeightsRef={measuredHeightsRef}
 						isScrollingRef={isScrollingRef}
+						isSelectingRef={isSelectingRef}
 						pendingMeasureRef={pendingMeasureRef}
 						virtualizer={virtualizer}
 						currentUser={currentUser}

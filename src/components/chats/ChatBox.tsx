@@ -458,6 +458,13 @@ export default function ChatBox({
 		}
 	}, [isUserScrolledUp, scrollToBottom]);
 
+	const handleMessagesMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+		const active = document.activeElement;
+		if (!(active instanceof HTMLElement) || !active.isContentEditable) return;
+		if (event.currentTarget.contains(active)) return;
+		active.blur();
+	}, []);
+
 	const handleMessagesWheelCapture = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
 		if (!isLoadingMoreRef.current && !isRestoringOlderScrollRef.current) {
 			return;
@@ -949,6 +956,7 @@ export default function ChatBox({
 					ref={attachMessagesContainer}
 					onScroll={handleScroll}
 					onWheelCapture={handleMessagesWheelCapture}
+					onMouseDown={handleMessagesMouseDown}
 					className="relative flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
 					style={{ overflowAnchor: "none" }}
 				>

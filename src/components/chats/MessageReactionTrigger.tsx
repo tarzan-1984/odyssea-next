@@ -180,7 +180,7 @@ export default function MessageReactionTrigger({
 	return (
 		<>
 			<div
-				className={`absolute -bottom-1.5 -right-1.5 z-10 transition-opacity ${visible}`}
+				className={`absolute -bottom-1.5 -right-1.5 z-10 select-none transition-opacity ${visible}`}
 			>
 				<button
 					ref={triggerRef}

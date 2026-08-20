@@ -162,10 +162,10 @@ export default function MessageDropdown({
 	return (
 		<div className="relative" ref={dropdownRef}>
 			{/* Dropdown trigger button */}
-			<button
+				<button
 				ref={buttonRef}
 				onClick={() => setIsOpen(!isOpen)}
-				className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+				className="select-none p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 				aria-label="Message options"
 			>
 				<svg

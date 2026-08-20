@@ -1226,19 +1226,17 @@ pre[class*="language-"] {
 	line-height: var(--chat-font-meta-lh, 18px);
 }
 
+/* Single inline formatting context: block <p> + margins make Chrome jump
+   the caret when selecting bottom-to-top across paragraphs. */
 .chat-markdown {
 	color: inherit;
-	display: flex;
-	flex-direction: column;
-	gap: var(--chat-font-body-lh, 20px);
+	display: block;
+	user-select: text;
+	-webkit-user-select: text;
 }
 
-.chat-markdown > :first-child {
-	margin-top: 0;
-}
-
-.chat-markdown > :last-child {
-	margin-bottom: 0;
+.chat-markdown > br[data-chat-md-gap]:nth-last-child(-n + 2) {
+	display: none;
 }
 
 .chat-compose-editor ul {

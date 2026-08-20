@@ -101,8 +101,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
 				: "";
 	const bidPriceTextClass =
-		"[&_.chat-msg-body]:![font-size:calc(var(--chat-font-body,14px)+2px)] [&_.chat-msg-body]:![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
-	const bidNewOfferTextClass = `${bidPriceTextClass} [&_.chat-msg-body]:!text-gray-900`;
+		"![font-size:calc(var(--chat-font-body,14px)+2px)] ![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
+	const bidNewOfferTextClass = `${bidPriceTextClass} !text-gray-900`;
 	const usesWhiteBidText =
 		isBidRateChanged || isBidOfferConfirmed || isBidOfferRejected || isTermsAccepted;
 	const isSpecialColoredBubble = isBidPriceUpdate || isTermsAccepted;
@@ -202,9 +202,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		) : null;
 
 	return (
-		<div className={`flex ${isSender ? "justify-end" : isSystemMessage ? "justify-start" : "items-start gap-4"}`}>
+		<div className={`pointer-events-none flex ${isSender ? "justify-end" : isSystemMessage ? "justify-start" : "items-start gap-4"}`}>
 			{!isSender && !isSystemMessage && (
-				<div className="relative h-10 w-10 shrink-0">
+				<div className="relative h-10 w-10 shrink-0 pointer-events-auto">
 					<div
 						className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full"
 						style={{
@@ -236,8 +236,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			<div
 				className={
 					isSender
-						? "relative min-w-0 w-full max-w-[50%] shrink-0"
-						: "relative min-w-0 w-full max-w-[50%] flex-1"
+						? "relative min-w-0 w-full max-w-[50%] shrink-0 [&>*]:pointer-events-auto"
+						: "relative min-w-0 w-full max-w-[50%] flex-1 [&>*]:pointer-events-auto"
 				}
 			>
 				{/* Incoming: first name above attachments and/or text bubble */}
@@ -549,7 +549,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{/* Message content */}
 				{message.content?.trim() && !multiAttachments &&
 					(isSender ? (
-						<div className="flex items-center justify-end gap-2">
+						<div className="flex items-start justify-end gap-2">
 							<div
 								className={
 									isSpecialColoredBubble
@@ -577,7 +577,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						</div>
 					) : (
 						<>
-							<div className="flex items-center gap-2">
+							<div className="flex w-fit max-w-full items-start gap-2">
 								<IncomingMessageBubble
 									message={message}
 									currentUserId={currentUser?.id}

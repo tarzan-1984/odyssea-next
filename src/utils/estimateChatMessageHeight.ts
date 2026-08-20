@@ -3,7 +3,7 @@ import { Message, getMessageMultiAttachments } from "@/app-api/chatApi";
 const BASE_HEIGHT_PX = 20;
 const LINE_HEIGHT_PX = 20;
 const CHARS_PER_LINE = 42;
-const MAX_TEXT_HEIGHT_PX = 480;
+const MAX_TEXT_HEIGHT_PX = 1200;
 const REPLY_BLOCK_PX = 68;
 const REACTIONS_PX = 40;
 const SINGLE_ATTACHMENT_CARD_PX = 160;
@@ -75,8 +75,10 @@ export function estimateChatMessageHeight(
 
 	const text = message.content?.trim() ?? "";
 	if (text) {
-		const lineCount = Math.max(1, Math.ceil(text.length / CHARS_PER_LINE));
-		height += Math.min(lineCount * LINE_HEIGHT_PX, MAX_TEXT_HEIGHT_PX);
+		const lineCount = text.split("\n").reduce((sum, line) => {
+			return sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE));
+		}, 0);
+		height += Math.min(Math.max(lineCount, 1) * LINE_HEIGHT_PX, MAX_TEXT_HEIGHT_PX);
 	}
 
 	if (message.replyData) {

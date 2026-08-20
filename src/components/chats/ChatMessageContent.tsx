@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import type { Components } from "react-markdown";
 import type { Schema } from "hast-util-sanitize";
 import { BidChatActionIcon } from "@/icons";
 import { isAllowedChatHref, preprocessChatMessageLinks } from "@/utils/chatLinks";
@@ -44,7 +45,29 @@ type ChatMessageContentProps = {
 	isLatestBidPlusOne?: boolean;
 };
 
-export default function ChatMessageContent({
+function MarkdownParagraph({ children }: { children?: React.ReactNode }) {
+	return (
+		<>
+			{children}
+			<br data-chat-md-gap="" />
+			<br data-chat-md-gap="" />
+		</>
+	);
+}
+
+function MarkdownEm({ children }: { children?: React.ReactNode }) {
+	return <em className="italic">{children}</em>;
+}
+
+function MarkdownDel({ children }: { children?: React.ReactNode }) {
+	return <del className="line-through opacity-90">{children}</del>;
+}
+
+function MarkdownUnderline({ children }: { children?: React.ReactNode }) {
+	return <u className="underline">{children}</u>;
+}
+
+function ChatMessageContent({
 	content,
 	className = "",
 	isOutgoing = false,
@@ -52,6 +75,47 @@ export default function ChatMessageContent({
 	canManageBidTimer = false,
 	isLatestBidPlusOne = true,
 }: ChatMessageContentProps) {
+	const isBidPriceUpdate = isBidPriceUpdateMessage(content);
+	const markdownComponents = useMemo<Components>(
+		() => ({
+			a: ({ href, children }) => {
+				if (!href || !isAllowedChatHref(href)) {
+					return <span>{children}</span>;
+				}
+				return (
+					<a
+						href={href}
+						target="_blank"
+						rel="noopener noreferrer"
+						className={
+							isOutgoing
+								? "break-all underline underline-offset-2 !text-white hover:!text-white/90"
+								: "chat-msg-link break-all"
+						}
+					>
+						{children}
+					</a>
+				);
+			},
+			p: MarkdownParagraph,
+			strong: ({ children }) => (
+				<strong
+					className={
+						isBidPriceUpdate
+							? "font-bold text-blue-600 dark:text-blue-600"
+							: "font-bold"
+					}
+				>
+					{children}
+				</strong>
+			),
+			em: MarkdownEm,
+			del: MarkdownDel,
+			u: MarkdownUnderline,
+		}),
+		[isBidPriceUpdate, isOutgoing],
+	);
+
 	if (!content.trim()) {
 		return null;
 	}
@@ -75,7 +139,6 @@ export default function ChatMessageContent({
 		);
 	}
 
-	const isBidPriceUpdate = isBidPriceUpdateMessage(content);
 	const renderContent = escapeChatListSyntax(
 		preprocessChatMessageLinks(
 			isBidPriceUpdate ? formatBidPriceUpdateMarkdown(content) : content,
@@ -83,7 +146,7 @@ export default function ChatMessageContent({
 	);
 
 	const rootClass = [
-		"chat-markdown min-w-0 break-words",
+		"chat-markdown chat-msg-body min-w-0 break-words",
 		isOutgoing ? "chat-markdown--outgoing" : "",
 		className,
 	]
@@ -98,47 +161,12 @@ export default function ChatMessageContent({
 					rehypeRaw,
 					[rehypeSanitize, { schema: chatMarkdownSanitizeSchema }],
 				]}
-				components={{
-					a: ({ href, children }) => {
-						if (!href || !isAllowedChatHref(href)) {
-							return <span>{children}</span>;
-						}
-						return (
-							<a
-								href={href}
-								target="_blank"
-								rel="noopener noreferrer"
-								className={
-									isOutgoing
-										? "break-all underline underline-offset-2 !text-white hover:!text-white/90"
-										: "chat-msg-link break-all"
-								}
-							>
-								{children}
-							</a>
-						);
-					},
-					p: ({ children }) => <p className="chat-msg-body mb-0">{children}</p>,
-					strong: ({ children }) => (
-						<strong
-							className={
-								isBidPriceUpdate
-									? "font-bold text-blue-600 dark:text-blue-600"
-									: "font-bold"
-							}
-						>
-							{children}
-						</strong>
-					),
-					em: ({ children }) => <em className="italic">{children}</em>,
-					del: ({ children }) => (
-						<del className="line-through opacity-90">{children}</del>
-					),
-					u: ({ children }) => <u className="underline">{children}</u>,
-				}}
+				components={markdownComponents}
 			>
 				{renderContent}
 			</ReactMarkdown>
 		</div>
 	);
 }
+
+export default React.memo(ChatMessageContent);

@@ -23,7 +23,7 @@ export default function IncomingMessageBubble({
 }: IncomingMessageBubbleProps) {
 	return (
 		<div
-			className={`group/bubble relative w-fit max-w-full ${className}`.trim()}
+			className={`group/bubble relative w-fit max-w-full select-text ${className}`.trim()}
 		>
 			{children}
 			{allowReactions ? (
