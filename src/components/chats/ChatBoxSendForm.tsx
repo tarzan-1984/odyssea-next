@@ -144,6 +144,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const emojiPickerRef = useRef<HTMLDivElement>(null);
 		const editorRef = useRef<HTMLDivElement>(null);
 		const fileInputRef = useRef<HTMLInputElement>(null);
+		const onTypingRef = useRef(onTyping);
+		const onCancelEditRef = useRef(onCancelEdit);
+		onTypingRef.current = onTyping;
+		onCancelEditRef.current = onCancelEdit;
 		const { formatState, refreshFormatState } = useEditorFormatState(
 			editorRef,
 			composeResetKey
@@ -553,7 +557,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setEmojiPickerMounted(true);
 		}, []);
 
-		// Clear compose state when switching chat rooms
+		// Reset draft only on chat switch — callback identity must not clear the editor.
 		useEffect(() => {
 			if (!chatRoomId) return;
 
@@ -561,9 +565,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setComposeResetKey(k => k + 1);
 			setAttachedFiles([]);
 			setShowEmojiPicker(false);
-			onTyping?.(false);
-			onCancelEdit?.();
-		}, [chatRoomId, onCancelEdit, onTyping]);
+			onTypingRef.current?.(false);
+			onCancelEditRef.current?.();
+		}, [chatRoomId]);
 
 		useEffect(() => {
 			if (!editingMessage) return;

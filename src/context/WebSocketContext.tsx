@@ -1484,11 +1484,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		socket.emit("sendMessage", messageData);
 	};
 
-	const sendTyping = (chatRoomId: string, isTyping: boolean) => {
-		if (socket && isConnected) {
-			socket.emit("typing", { chatRoomId, isTyping });
+	const sendTyping = useCallback((chatRoomId: string, isTyping: boolean) => {
+		const activeSocket = socketRef.current;
+		if (activeSocket?.connected) {
+			activeSocket.emit("typing", { chatRoomId, isTyping });
 		}
-	};
+	}, []);
 
 	const markMessageAsRead = (messageId: string, chatRoomId: string) => {
 		if (socket && isConnected && socket.connected) {
