@@ -31,6 +31,8 @@ import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList
 import UserFilterSelect from "@/components/OffersList/UserFilterSelect";
 import DriverRatingBadge from "@/components/tables/DataTables/DriversTable/DriverRatingBadge";
 import DriverRatingModal from "@/components/tables/DataTables/DriversTable/DriverRatingModal";
+import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
+import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import { useCurrentUser } from "@/stores/userStore";
 import { LOAD_BOARD_ALLOWED_ROLES } from "@/utils/roleAccess";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
@@ -48,6 +50,24 @@ import {
 } from "./loadBoardTableUtils";
 
 const LOAD_BOARD_QUERY_KEY = "load-board-shipments";
+
+const LOAD_BOARD_UNAVAILABLE_PUSH_BODY =
+	"Unfortunately, this offer is no longer available. However, we are continuing to search for new load opportunities for you.\n\nWe apologize for the inconvenience and appreciate your understanding.";
+
+function loadBoardBidToCheckListDriver(bid: RateLoadBoard): CheckListDriver {
+	return {
+		id: bid.driverId,
+		firstName: bid.driver?.firstName ?? "",
+		lastName: bid.driver?.lastName ?? "",
+		email: "",
+		externalId: bid.driver?.externalId ?? bid.driverExternalId,
+		phone: bid.driver?.phone ?? bid.phone ?? "",
+		driverStatus: null,
+		lastActiveApp: null,
+		lastLocationUpdateAt: null,
+		trackingLoadId: null,
+	};
+}
 
 type LoadBoardTableProps = {
 	refreshKey?: number;
@@ -76,6 +96,10 @@ export default function LoadBoardTable({
 		driverId: string;
 		name: string;
 		avgRating: number | null;
+	} | null>(null);
+	const [pushModalState, setPushModalState] = useState<{
+		drivers: CheckListDriver[];
+		defaultMessage: string;
 	} | null>(null);
 	const selectAllPageRef = useRef<HTMLInputElement>(null);
 	/** Align Age "now" with the server clock that wrote created_at (NY wall). */
@@ -401,6 +425,12 @@ export default function LoadBoardTable({
 										onStatusChanged={refreshLoadBoard}
 										onDeleted={refreshLoadBoard}
 										onOpenRating={setRatingModalDriver}
+										onDriverRemoved={bid => {
+											setPushModalState({
+												drivers: [loadBoardBidToCheckListDriver(bid)],
+												defaultMessage: LOAD_BOARD_UNAVAILABLE_PUSH_BODY,
+											});
+										}}
 									/>
 								))
 							)}
@@ -418,6 +448,13 @@ export default function LoadBoardTable({
 				paginationKey={`lb-bottom-${currentPage}-${totalPages}-${itemsPerPage}-${ageSort}-${userFilterId}`}
 				onPageChange={setCurrentPage}
 				selectedCount={selectedIds.size}
+			/>
+
+			<CheckListPushModal
+				isOpen={pushModalState != null}
+				onClose={() => setPushModalState(null)}
+				drivers={pushModalState?.drivers ?? null}
+				defaultMessage={pushModalState?.defaultMessage}
 			/>
 
 			{ratingModalDriver && (
@@ -497,6 +534,7 @@ function ShipmentRows({
 	onStatusChanged,
 	onDeleted,
 	onOpenRating,
+	onDriverRemoved,
 }: {
 	shipment: LoadBoardShipment;
 	selected: boolean;
@@ -514,6 +552,7 @@ function ShipmentRows({
 		name: string;
 		avgRating: number | null;
 	}) => void;
+	onDriverRemoved?: (bid: RateLoadBoard) => void;
 }) {
 	const trip = getTripEndpoints(shipment);
 	const routeDetailLines = getLoadBoardRouteDetailLines(shipment);
@@ -1032,15 +1071,22 @@ function ShipmentRows({
 																		<button
 																			type="button"
 																			disabled={deletingDriverKey === key}
-																			onClick={async () => {
-																				if (!key) return;
+																			onClick={async e => {
+																				e.stopPropagation();
+																				const driverKey = bid.driverId || key;
+																				if (!driverKey) return;
+																				const confirmed = window.confirm(
+																					"Remove this driver from the shipment?",
+																				);
+																				if (!confirmed) return;
 																				setDeletingDriverKey(key);
 																				try {
 																					await removeLoadBoardDriverBid(
 																						shipment.id,
-																						key,
+																						driverKey,
 																					);
 																					onStatusChanged?.();
+																					onDriverRemoved?.(bid);
 																				} catch (err) {
 																					window.alert(
 																						err instanceof Error

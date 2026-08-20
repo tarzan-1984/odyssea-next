@@ -297,7 +297,7 @@ export default function CheckListDriverDevicesTable({
 	const pushDefaultMessage = getPushDefaultMessage(minimumAppVersion);
 	const emailDefaultMessage = (getEmailDefaultMessage ?? getPushDefaultMessage)(minimumAppVersion);
 	const tableColumnCount =
-		(showLastOpenAppColumn ? 8 : 7) - (showActionColumn ? 0 : 1);
+		(showLastOpenAppColumn ? 9 : 8) - (showActionColumn ? 0 : 1);
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -527,6 +527,12 @@ export default function CheckListDriverDevicesTable({
 										Last open app
 									</TableCell>
 								)}
+								<TableCell
+									isHeader
+									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
+								>
+									Device phone
+								</TableCell>
 								{showActionColumn && (
 									<TableCell
 										isHeader
@@ -633,6 +639,9 @@ export default function CheckListDriverDevicesTable({
 												{formatCheckListNyDate(device.lastActiveAt)}
 											</TableCell>
 										)}
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+											<CheckListPhoneLink phone={device.devicePhoneNumber} />
+										</TableCell>
 										{showActionColumn && (
 											<TableCell className="px-4 py-3 text-right whitespace-nowrap">
 												<div className="flex flex-wrap items-center justify-end gap-2">

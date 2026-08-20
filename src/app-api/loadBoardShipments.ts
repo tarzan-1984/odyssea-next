@@ -294,7 +294,7 @@ export async function removeLoadBoardDriverBid(
 	const res = await fetch(
 		`/api/load-board-shipments/${shipmentId}/bids/${encodeURIComponent(driverId)}`,
 		{
-			method: "DELETE",
+			method: "PATCH",
 			credentials: "include",
 		},
 	);

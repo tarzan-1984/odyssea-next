@@ -27,6 +27,10 @@ import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
+import {
+	driverNeedsLoadDispatchTermsAcceptance,
+	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
+} from "@/utils/loadDispatchTerms";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -115,6 +119,7 @@ export default function ChatBox({
 	const updateMessage = useChatStore(state => state.updateMessage);
 	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
+	const [isAcceptingShipmentTerms, setIsAcceptingShipmentTerms] = useState(false);
 
 	const outgoingSender = useMemo(() => {
 		if (!currentUser) return undefined;
@@ -356,6 +361,7 @@ export default function ChatBox({
 	useEffect(() => {
 		dragCounterRef.current = 0;
 		setIsDragOver(false);
+		setIsAcceptingShipmentTerms(false);
 	}, [selectedChatRoomId]);
 	const hasMoreMessages = useChatStore(state => state.hasMoreMessages);
 	const loadMoreMessages = useChatStore(state => state.loadMoreMessages);
@@ -393,6 +399,19 @@ export default function ChatBox({
 			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 		);
 	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id]);
+
+	const needsLoadDispatchTermsAcceptance = driverNeedsLoadDispatchTermsAcceptance({
+		isDriver: currentUser?.role?.trim().toUpperCase() === "DRIVER",
+		chatType: selectedChatRoom?.type,
+		currentUserId: currentUser?.id,
+		messages: [
+			...uniqueMessages,
+			...(selectedChatRoom?.lastMessage ? [selectedChatRoom.lastMessage] : []),
+		],
+		hasMoreMessages,
+	});
+	const hideComposer =
+		isLoadArchivedReadOnlyChat || needsLoadDispatchTermsAcceptance;
 
 	const chatUserNameLookup = React.useMemo(
 		() => buildChatUserNameLookup(chatParticipants, uniqueMessages),
@@ -662,7 +681,7 @@ export default function ChatBox({
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number }[];
 		replyData?: Message["replyData"];
 	}) => {
-		if (!selectedChatRoom) return;
+		if (!selectedChatRoom || needsLoadDispatchTermsAcceptance) return;
 
 		try {
 			sendTyping(false);
@@ -730,6 +749,22 @@ export default function ChatBox({
 		} catch (err) {
 			console.error("Failed to send message:", err);
 			throw err;
+		}
+	};
+
+	const handleAcceptShipmentTerms = async () => {
+		if (isAcceptingShipmentTerms || !needsLoadDispatchTermsAcceptance) return;
+
+		setIsAcceptingShipmentTerms(true);
+		try {
+			await sendTextMessage(LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT);
+			setTimeout(() => {
+				scrollToBottom();
+			}, 50);
+		} catch (err) {
+			console.error("Failed to accept shipment terms:", err);
+		} finally {
+			setIsAcceptingShipmentTerms(false);
 		}
 	};
 
@@ -992,6 +1027,12 @@ export default function ChatBox({
 										console.error("Failed to discard message:", error);
 									});
 								}}
+								onAcceptShipmentTerms={
+									needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat
+										? handleAcceptShipmentTerms
+										: undefined
+								}
+								isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 							/>
 						) : (
 							<div className="flex flex-col gap-6" data-chat-list-mode="plain">
@@ -1038,6 +1079,14 @@ export default function ChatBox({
 													}
 												: undefined
 										}
+										onAcceptShipmentTerms={
+											needsLoadDispatchTermsAcceptance &&
+											!isLoadArchivedReadOnlyChat &&
+											message.isSystemMessage
+												? handleAcceptShipmentTerms
+												: undefined
+										}
+										isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 									/>
 								))}
 							</div>
@@ -1092,8 +1141,8 @@ export default function ChatBox({
 					</ChatMediaLoadProvider>
 				</div>
 
-				{/* Send form hidden for archived LOAD shipments (read-only history) */}
-				{!isLoadArchivedReadOnlyChat && (
+				{/* Send form hidden for archived LOAD shipments and until driver accepts dispatch terms */}
+				{!hideComposer && (
 					<ChatBoxSendForm
 						ref={sendFormRef}
 						chatRoomId={selectedChatRoomId}

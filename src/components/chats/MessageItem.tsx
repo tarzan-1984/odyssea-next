@@ -23,6 +23,10 @@ import {
 	isBidPriceUpdateMessage,
 	isBidRateChangedMessage,
 } from "@/utils/bidPriceUpdateMessage";
+import {
+	isLoadDispatchTermsAcceptedMessage,
+	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
+} from "@/utils/loadDispatchTerms";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
@@ -43,6 +47,8 @@ interface MessageItemProps {
 	onRetry?: () => void;
 	/** Discard a failed optimistic/outbox message (not sent to server). */
 	onDiscardFailed?: () => void;
+	onAcceptShipmentTerms?: () => void;
+	isAcceptingShipmentTerms?: boolean;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -58,6 +64,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onMarkUnread,
 	onRetry,
 	onDiscardFailed,
+	onAcceptShipmentTerms,
+	isAcceptingShipmentTerms = false,
 }) => {
 	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
 		string | null
@@ -83,19 +91,21 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isBidNewOffer = isBidNewOfferMessage(message.content);
 	const isBidOfferConfirmed = isBidOfferConfirmedMessage(message.content);
 	const isBidOfferRejected = isBidOfferRejectedMessage(message.content);
+	const isTermsAccepted = isLoadDispatchTermsAcceptedMessage(message.content);
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
 		: isBidOfferRejected
 			? "px-3 py-2 rounded-lg bg-red-500 text-white dark:bg-red-500"
-			: isBidRateChanged || isBidOfferConfirmed
+			: isBidRateChanged || isBidOfferConfirmed || isTermsAccepted
 				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
 				: "";
 	const bidPriceTextClass =
 		"[&_.chat-msg-body]:![font-size:calc(var(--chat-font-body,14px)+2px)] [&_.chat-msg-body]:![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
 	const bidNewOfferTextClass = `${bidPriceTextClass} [&_.chat-msg-body]:!text-gray-900`;
 	const usesWhiteBidText =
-		isBidRateChanged || isBidOfferConfirmed || isBidOfferRejected;
+		isBidRateChanged || isBidOfferConfirmed || isBidOfferRejected || isTermsAccepted;
+	const isSpecialColoredBubble = isBidPriceUpdate || isTermsAccepted;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
@@ -115,6 +125,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	};
 
 	const isSystemMessage = Boolean(message.isSystemMessage);
+	const showAcceptShipmentTermsButton = Boolean(isSystemMessage && onAcceptShipmentTerms);
 	const senderFirstName = String(message.sender.firstName ?? "").trim();
 	const senderExternalId = String(message.sender.externalId ?? "").trim();
 	const isDriverSender = message.sender.role?.toUpperCase().trim() === "DRIVER";
@@ -541,7 +552,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						<div className="flex items-center justify-end gap-2">
 							<div
 								className={
-									isBidPriceUpdate
+									isSpecialColoredBubble
 										? `${bidPriceBubbleClass} rounded-tr-sm`
 										: "px-3 py-2 rounded-lg bg-brand-500 text-white dark:bg-brand-500 rounded-tr-sm"
 								}
@@ -555,7 +566,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									className={
 										isBidNewOffer
 											? bidNewOfferTextClass
-											: isBidPriceUpdate
+											: isSpecialColoredBubble
 												? bidPriceTextClass
 												: undefined
 									}
@@ -574,7 +585,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								>
 									<div
 										className={
-											isBidPriceUpdate
+											isSpecialColoredBubble
 												? `${bidPriceBubbleClass} rounded-tl-sm`
 												: "px-3 py-2 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-800 dark:text-white/90 rounded-tl-sm"
 										}
@@ -594,6 +605,16 @@ const MessageItem: React.FC<MessageItemProps> = ({
 											}
 											{...plusOneContentProps}
 										/>
+										{showAcceptShipmentTermsButton ? (
+											<button
+												type="button"
+												onClick={onAcceptShipmentTerms}
+												disabled={isAcceptingShipmentTerms}
+												className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL}
+											</button>
+										) : null}
 									</div>
 								</IncomingMessageBubble>
 								<MessageDropdown
