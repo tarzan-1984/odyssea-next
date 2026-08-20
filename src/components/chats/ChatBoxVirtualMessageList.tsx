@@ -292,7 +292,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		};
 	}, [isUserScrolledUp, suppressScrollAdjustment, virtualizer]);
 
-	const remasureVisibleRows = useCallback(() => {
+	const remeasureVisibleRows = useCallback(() => {
 		const instance = virtualizerRef.current;
 		const root = listRootRef.current;
 		if (!instance) return;
@@ -435,7 +435,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 			isSelectingRef.current = false;
 			pendingMeasureRef.current = false;
 		};
-	}, [getScrollAnchor, remasureVisibleRows, restoreScrollAnchor, scrollElement]);
+	}, [getScrollAnchor, remeasureVisibleRows, restoreScrollAnchor, scrollElement]);
 
 	useEffect(() => {
 		measuredHeightsRef.current.clear();
@@ -449,7 +449,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		}
 		remeasureVisibleRows();
 		onContentMeasuredRef.current?.();
-	}, [firstMessageChatRoomId, messages.length, remasureVisibleRows, scrollElement]);
+	}, [firstMessageChatRoomId, messages.length, remeasureVisibleRows, scrollElement]);
 
 	const virtualItems = virtualizer.getVirtualItems();
 
