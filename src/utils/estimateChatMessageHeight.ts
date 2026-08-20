@@ -4,6 +4,8 @@ const BASE_HEIGHT_PX = 20;
 const LINE_HEIGHT_PX = 20;
 const CHARS_PER_LINE = 42;
 const MAX_TEXT_HEIGHT_PX = 1200;
+/** Extra lines between markdown/HTML paragraphs (`<p>` → two `<br>` in chat markdown). */
+const PARAGRAPH_GAP_LINES = 2;
 const REPLY_BLOCK_PX = 68;
 const REACTIONS_PX = 40;
 const SINGLE_ATTACHMENT_CARD_PX = 160;
@@ -66,6 +68,34 @@ function hasVisibleMessageBody(message: Message): boolean {
 	return Boolean(message.content?.trim() || message.fileUrl || (multi && multi.length > 0));
 }
 
+/** Plain text used for height heuristics (HTML emails, markdown, `<br>`). */
+export function visibleChatMessageText(content: string): string {
+	return content
+		.replace(/<br\s*\/?>/gi, "\n")
+		.replace(/<\/(?:p|div|li|h[1-6]|tr)>/gi, "\n")
+		.replace(/<[^>]+>/g, "")
+		.replace(/&nbsp;/gi, " ")
+		.replace(/&amp;/gi, "&")
+		.replace(/&lt;/gi, "<")
+		.replace(/&gt;/gi, ">")
+		.replace(/&quot;/gi, '"')
+		.replace(/\*\*|~~/g, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
+function estimateTextBlockHeight(content: string): number {
+	const text = visibleChatMessageText(content);
+	if (!text) return 0;
+
+	const lineCount = text.split("\n").reduce((sum, line) => {
+		return sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE));
+	}, 0);
+	const paragraphBreaks = Math.max(0, (text.match(/\n\n/g) ?? []).length);
+	const totalLines = lineCount + paragraphBreaks * PARAGRAPH_GAP_LINES;
+	return Math.min(Math.max(totalLines, 1) * LINE_HEIGHT_PX, MAX_TEXT_HEIGHT_PX);
+}
+
 /** Heuristic row height for virtual list before/without DOM measurement. */
 export function estimateChatMessageHeight(
 	message: Message,
@@ -75,10 +105,7 @@ export function estimateChatMessageHeight(
 
 	const text = message.content?.trim() ?? "";
 	if (text) {
-		const lineCount = text.split("\n").reduce((sum, line) => {
-			return sum + Math.max(1, Math.ceil(line.length / CHARS_PER_LINE));
-		}, 0);
-		height += Math.min(Math.max(lineCount, 1) * LINE_HEIGHT_PX, MAX_TEXT_HEIGHT_PX);
+		height += estimateTextBlockHeight(text);
 	}
 
 	if (message.replyData) {
