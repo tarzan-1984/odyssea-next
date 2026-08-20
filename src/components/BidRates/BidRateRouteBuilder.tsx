@@ -12,10 +12,12 @@ import {
 	LOCATION_FORMAT_ERROR,
 	LOCATION_GEOCODE_ERROR,
 	LOCATION_POSTAL_ERROR,
+	LOCATION_ZIP_MISMATCH_ERROR,
 	locationHasPostalCode,
 	needsLocationGeocode,
 	normalizeLocationForGeocode,
 } from "@/utils/offerLocationFormat";
+import { parseCityRegionPostalLine } from "@/utils/offerLocationCountry";
 
 const DND_BID_ROUTE_ROW_TYPE = "BID_ROUTE_ROW";
 
@@ -135,7 +137,15 @@ export async function resolveBidRouteLocation(
 	}
 
 	if (latitude == null || longitude == null) {
-		return { location: trimmed, latitude: null, longitude: null, error: LOCATION_GEOCODE_ERROR };
+		const hasCityAndPostal =
+			parseCityRegionPostalLine(trimmed) != null ||
+			parseCityRegionPostalLine(finalAddress) != null;
+		return {
+			location: trimmed,
+			latitude: null,
+			longitude: null,
+			error: hasCityAndPostal ? LOCATION_ZIP_MISMATCH_ERROR : LOCATION_GEOCODE_ERROR,
+		};
 	}
 	if (!locationHasPostalCode(finalAddress)) {
 		return { location: trimmed, latitude: null, longitude: null, error: LOCATION_POSTAL_ERROR };
@@ -151,15 +161,6 @@ export async function geocodeBidRouteRows(
 	const next = [...rows];
 	for (let index = 0; index < next.length; index++) {
 		const row = next[index];
-		const hasCoords =
-			row.latitude != null &&
-			row.longitude != null &&
-			Number.isFinite(row.latitude) &&
-			Number.isFinite(row.longitude);
-		if (hasCoords && locationHasPostalCode(row.location.trim())) {
-			continue;
-		}
-
 		const resolved = await resolveBidRouteLocation(row.location);
 		if (resolved.error) {
 			return { rows: next, error: resolved.error };

@@ -25,6 +25,9 @@ export const LOCATION_FORMAT_ERROR =
 export const LOCATION_GEOCODE_ERROR =
 	"Could not find this location. Enter a real city, state, and ZIP.";
 
+export const LOCATION_ZIP_MISMATCH_ERROR =
+	"City and ZIP do not match. Enter the real city for this postal code.";
+
 export const LOCATION_POSTAL_ERROR =
 	"Each stop must include a ZIP / postal code (e.g. Los Angeles, CA 90001).";
 
@@ -69,7 +72,7 @@ export function isValidLocationFormat(value: string): boolean {
 
 /**
  * Normalize space-separated input for geocoding or display.
- * - "City ST ZIP" / "City State ZIP" -> ZIP (best geocode result)
+ * - "City ST ZIP" / "City State ZIP" -> "City, ST ZIP"
  * - "City ST" -> "City, ST"
  * - "City State" -> "City, State"
  */
@@ -100,7 +103,7 @@ export function normalizeLocationForGeocode(value: string): string {
 	const city = rest.slice(0, -1).join(" ");
 
 	if (postal) {
-		return postal;
+		return `${city}, ${regionToken} ${postal}`;
 	}
 
 	if (/^[A-Za-z]{2,4}$/.test(regionToken)) {

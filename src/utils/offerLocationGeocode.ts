@@ -5,11 +5,14 @@ import {
 	isCanadianPostalCode,
 	isBarePostalInput,
 	isUsZipCode,
+	lettersOnlyKey,
 	MX_CP_PATTERN,
 	nominatimCountryLabel,
 	normalizePostalInput,
-	parseCityRegionCode,
+	parseCityRegionFromAddress,
 	parseCityRegionPostalLine,
+	placeNamesMatch,
+	regionCodeToFullName,
 	resolveOfferGeocodeCountry,
 	type OfferGeocodeCountry,
 	US_ZIP_PATTERN,
@@ -24,22 +27,54 @@ type NominatimAddress = {
 	town?: string;
 	village?: string;
 	municipality?: string;
+	hamlet?: string;
 	state?: string;
 	postcode?: string;
 };
 
-function nominatimHeaders(userAgent: string): HeadersInit {
-	return {
-		"User-Agent": userAgent,
-		"Accept-Language": "en",
-	};
+function nominatimPlaceName(addr?: NominatimAddress): string {
+	return (
+		addr?.city ??
+		addr?.town ??
+		addr?.village ??
+		addr?.municipality ??
+		addr?.hamlet ??
+		""
+	).trim();
 }
 
 function cityFromNominatimAddress(addr: NominatimAddress, fallback: string): string {
-	return simplifyPlaceName(
-		addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? fallback,
-		fallback,
-	);
+	const resolved = nominatimPlaceName(addr);
+	if (!resolved) return "";
+	return simplifyPlaceName(resolved, fallback);
+}
+
+function regionNameMatchesCode(
+	regionName: string,
+	regionCode: string,
+	country: OfferGeocodeCountry,
+): boolean {
+	const nameKey = lettersOnlyKey(regionName);
+	if (!nameKey) return false;
+	if (nameKey === lettersOnlyKey(regionCode)) return true;
+	return nameKey === lettersOnlyKey(regionCodeToFullName(regionCode, country));
+}
+
+function postalMatchesStatedCity(
+	city: string,
+	regionCode: string,
+	country: OfferGeocodeCountry,
+	zipp: { placeName: string; regionName: string; regionCode?: string },
+): boolean {
+	if (!placeNamesMatch(city, zipp.placeName)) return false;
+	if (zipp.regionCode && zipp.regionCode.toUpperCase() === regionCode.toUpperCase()) {
+		return true;
+	}
+	return regionNameMatchesCode(zipp.regionName, regionCode, country);
+}
+
+function compactPostal(postal: string): string {
+	return postal.replace(/\s/g, "").replace(/-\d{4}$/, "").toUpperCase();
 }
 
 /**
@@ -62,6 +97,13 @@ export function simplifyPlaceName(placeName: string, preferredCity?: string): st
 	}
 
 	return withoutParens || trimmed;
+}
+
+function nominatimHeaders(userAgent: string): HeadersInit {
+	return {
+		"User-Agent": userAgent,
+		"Accept-Language": "en",
+	};
 }
 
 async function fetchNominatim(
@@ -118,7 +160,21 @@ async function tryZippopotamCityRegion(
 async function tryZippopotamPostal(
 	postalInput: string,
 	country: OfferGeocodeCountry,
-): Promise<{ placeName: string; regionName: string; postal: string; lat?: number; lon?: number } | null> {
+): Promise<{
+	placeName: string;
+	regionName: string;
+	regionCode: string;
+	postal: string;
+	lat?: number;
+	lon?: number;
+	places: Array<{
+		placeName: string;
+		regionName: string;
+		regionCode: string;
+		lat?: number;
+		lon?: number;
+	}>;
+} | null> {
 	const url = zippopotamPostalUrl(country, postalInput);
 	if (!url) return null;
 
@@ -129,28 +185,35 @@ async function tryZippopotamPostal(
 		const zippData = (await zippRes.json()) as {
 			"place name"?: string;
 			state?: string;
+			"state abbreviation"?: string;
 			places?: Array<{
 				"place name"?: string;
 				"post code"?: string;
+				state?: string;
+				"state abbreviation"?: string;
 				latitude?: string;
 				longitude?: string;
 			}>;
 		};
-		const firstPlace = zippData.places?.[0];
+		const places = (zippData.places ?? []).map((place) => {
+			const lat = place.latitude != null ? Number.parseFloat(place.latitude) : undefined;
+			const lon = place.longitude != null ? Number.parseFloat(place.longitude) : undefined;
+			return {
+				placeName: simplifyPlaceName(place["place name"] ?? ""),
+				regionName: place.state ?? zippData.state ?? "",
+				regionCode: (place["state abbreviation"] ?? zippData["state abbreviation"] ?? "").toUpperCase(),
+				lat: lat != null && Number.isFinite(lat) ? lat : undefined,
+				lon: lon != null && Number.isFinite(lon) ? lon : undefined,
+			};
+		});
+		const firstPlace = places[0];
 		const postal =
-			firstPlace?.["post code"] ??
+			zippData.places?.[0]?.["post code"] ??
 			postalInput.replace(/\s/g, "").toUpperCase();
-		const placeName = simplifyPlaceName(
-			firstPlace?.["place name"] ?? zippData["place name"] ?? "",
-		);
-		const regionName =
-			zippData.state ??
-			(firstPlace as { state?: string } | undefined)?.state ??
-			"";
-		if (!placeName && !regionName) return null;
-
-		const lat = firstPlace?.latitude != null ? Number.parseFloat(firstPlace.latitude) : undefined;
-		const lon = firstPlace?.longitude != null ? Number.parseFloat(firstPlace.longitude) : undefined;
+		const placeName = firstPlace?.placeName ?? simplifyPlaceName(zippData["place name"] ?? "");
+		const regionName = firstPlace?.regionName ?? zippData.state ?? "";
+		const regionCode = firstPlace?.regionCode ?? (zippData["state abbreviation"] ?? "").toUpperCase();
+		if (!placeName && !regionName && places.length === 0) return null;
 
 		const inputCompact = postalInput.replace(/\s/g, "").toUpperCase();
 		const displayPostal =
@@ -158,9 +221,40 @@ async function tryZippopotamPostal(
 				? `${inputCompact.slice(0, 3)} ${inputCompact.slice(3)}`
 				: postal;
 
-		return { placeName, regionName, postal: displayPostal, lat, lon };
+		return {
+			placeName,
+			regionName,
+			regionCode,
+			postal: displayPostal,
+			lat: firstPlace?.lat,
+			lon: firstPlace?.lon,
+			places,
+		};
 	} catch {
 		return null;
+	}
+}
+
+async function zippopotamCityIncludesPostal(
+	city: string,
+	regionCode: string,
+	country: OfferGeocodeCountry,
+	postal: string,
+): Promise<boolean> {
+	try {
+		const zippRes = await fetch(zippopotamUrl(country, regionCode, city), {
+			headers: { Accept: "application/json" },
+		});
+		if (!zippRes.ok) return false;
+		const data = (await zippRes.json()) as {
+			places?: Array<{ "post code"?: string }>;
+		};
+		const wanted = compactPostal(postal);
+		return (data.places ?? []).some(
+			(place) => compactPostal(place["post code"] ?? "") === wanted,
+		);
+	} catch {
+		return false;
 	}
 }
 
@@ -215,19 +309,58 @@ async function coordsFromFormattedLine(
 ): Promise<{ lat: number; lon: number } | null> {
 	if (!line) return null;
 
-	const fromCity = await coordsFromZippopotamCityRegion(
+	const zipp = await tryZippopotamPostal(line.postal, line.country);
+	if (!zipp) return null;
+
+	const matchedPlace =
+		zipp.places.find((place) =>
+			postalMatchesStatedCity(line.city, line.regionCode, line.country, place),
+		) ??
+		(postalMatchesStatedCity(line.city, line.regionCode, line.country, zipp)
+			? zipp
+			: null);
+
+	if (matchedPlace?.lat != null && matchedPlace.lon != null) {
+		return { lat: matchedPlace.lat, lon: matchedPlace.lon };
+	}
+
+	const cityOwnsPostal = await zippopotamCityIncludesPostal(
 		line.city,
 		line.regionCode,
 		line.country,
+		line.postal,
 	);
-	if (fromCity) return fromCity;
-
-	const zipp = await tryZippopotamPostal(line.postal, line.country);
-	if (zipp?.lat != null && zipp.lon != null) {
+	if (cityOwnsPostal && zipp.lat != null && zipp.lon != null) {
 		return { lat: zipp.lat, lon: zipp.lon };
 	}
 
 	return null;
+}
+
+async function coordsFromNominatimCity(
+	city: string,
+	regionCode: string,
+	country: OfferGeocodeCountry,
+	userAgent: string,
+): Promise<{ lat: number; lon: number } | null> {
+	const query = buildNominatimQuery(`${city}, ${regionCode}`, country);
+	const results = await fetchNominatim(query, country, {
+		limit: "5",
+		addressdetails: "1",
+		userAgent,
+	});
+	const match = results.find(
+		(result) =>
+			result.lat &&
+			result.lon &&
+			placeNamesMatch(city, nominatimPlaceName(result.address)),
+	);
+	if (!match?.lat || !match.lon) return null;
+
+	const lat = Number.parseFloat(match.lat);
+	const lon = Number.parseFloat(match.lon);
+	if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+	return { lat, lon };
 }
 
 function formatZippopotamPostalResult(
@@ -267,18 +400,24 @@ async function geocodeFreeTextToFormatted(
 	userAgent: string,
 ): Promise<string | null> {
 	const country = resolveOfferGeocodeCountry(trimmed);
+	const expectedCity = parseCityRegionFromAddress(trimmed)?.city ?? "";
 	const query = buildNominatimQuery(trimmed, country);
 	const results = await fetchNominatim(query, country, {
 		limit: "5",
 		addressdetails: "1",
 		userAgent,
 	});
-	const withPostal = results.find((r) => r.address?.postcode);
+	const withPostal = results.find((result) => {
+		if (!result.address?.postcode) return false;
+		const city = nominatimPlaceName(result.address);
+		if (!city) return false;
+		return !expectedCity || placeNamesMatch(expectedCity, city);
+	});
 	if (!withPostal?.address?.postcode) return null;
 
 	const addr = withPostal.address;
-	const fallbackCity = trimmed.split(",")[0]?.trim() || "";
-	const city = cityFromNominatimAddress(addr, fallbackCity);
+	const city = cityFromNominatimAddress(addr, expectedCity);
+	if (!city) return null;
 	const state = addr.state ?? "";
 	const postcode = addr.postcode;
 	if (city && state && postcode) {
@@ -299,21 +438,28 @@ export async function geocodeOfferAddressCoordinates(
 	if (!trimmed) return null;
 
 	const country = resolveOfferGeocodeCountry(trimmed);
+	const cityRegion = parseCityRegionFromAddress(trimmed);
 	const formattedLine = parseCityRegionPostalLine(trimmed);
+
 	if (formattedLine) {
-		const fromLine = await coordsFromFormattedLine(formattedLine);
-		if (fromLine) return fromLine;
+		return coordsFromFormattedLine(formattedLine);
 	}
 
-	const parsed = parseCityRegionCode(trimmed);
-
-	if (parsed) {
+	if (cityRegion) {
 		const coords = await coordsFromZippopotamCityRegion(
-			parsed.city,
-			parsed.regionCode,
-			parsed.country,
+			cityRegion.city,
+			cityRegion.regionCode,
+			cityRegion.country,
 		);
 		if (coords) return coords;
+		const fromNominatim = await coordsFromNominatimCity(
+			cityRegion.city,
+			cityRegion.regionCode,
+			cityRegion.country,
+			userAgent,
+		);
+		if (fromNominatim) return fromNominatim;
+		return null;
 	}
 
 	const compact = trimmed.replace(/\s/g, "");
@@ -327,16 +473,22 @@ export async function geocodeOfferAddressCoordinates(
 		}
 	}
 
-	const embeddedPostal = extractEmbeddedPostal(trimmed, country);
-	if (embeddedPostal) {
-		const zipp = await tryZippopotamPostal(embeddedPostal.postal, embeddedPostal.country);
-		if (zipp?.lat != null && zipp.lon != null) {
-			return { lat: zipp.lat, lon: zipp.lon };
+	if (isBarePostalInput(trimmed)) {
+		const embeddedPostal = extractEmbeddedPostal(trimmed, country);
+		if (embeddedPostal) {
+			const zipp = await tryZippopotamPostal(embeddedPostal.postal, embeddedPostal.country);
+			if (zipp?.lat != null && zipp.lon != null) {
+				return { lat: zipp.lat, lon: zipp.lon };
+			}
 		}
 	}
 
 	const query = buildNominatimQuery(trimmed, country);
-	const results = await fetchNominatim(query, country, { userAgent });
+	const results = await fetchNominatim(query, country, {
+		limit: "5",
+		addressdetails: "1",
+		userAgent,
+	});
 	const first = results[0];
 	if (!first?.lat || !first?.lon) return null;
 
@@ -349,6 +501,7 @@ export async function geocodeOfferAddressCoordinates(
 
 /**
  * Geocode ZIP / "City, ST" / Canadian postal / Mexican CP to formatted location string.
+ * Returns empty string when the stated city cannot be verified.
  */
 export async function geocodeOfferToFormattedAddress(
 	input: string,
@@ -361,7 +514,38 @@ export async function geocodeOfferToFormattedAddress(
 	const isCaPostal = isCanadianPostalCode(trimmed);
 	const isFiveDigit = MX_CP_PATTERN.test(compact);
 	const isUsPostal = isUsZipCode(trimmed);
-	const cityRegion = parseCityRegionCode(trimmed);
+	const cityRegion = parseCityRegionFromAddress(trimmed);
+	const formattedLine = parseCityRegionPostalLine(trimmed);
+
+	if (formattedLine) {
+		const postalHit = await tryZippopotamPostal(formattedLine.postal, formattedLine.country);
+		const cityMatchesPostal =
+			postalHit != null &&
+			(postalHit.places.some((place) =>
+				postalMatchesStatedCity(
+					formattedLine.city,
+					formattedLine.regionCode,
+					formattedLine.country,
+					place,
+				),
+			) ||
+				postalMatchesStatedCity(
+					formattedLine.city,
+					formattedLine.regionCode,
+					formattedLine.country,
+					postalHit,
+				) ||
+				(await zippopotamCityIncludesPostal(
+					formattedLine.city,
+					formattedLine.regionCode,
+					formattedLine.country,
+					formattedLine.postal,
+				)));
+		if (postalHit && cityMatchesPostal) {
+			return `${simplifyPlaceName(postalHit.placeName, formattedLine.city)}, ${formattedLine.regionCode} ${formattedLine.postal}`;
+		}
+		return "";
+	}
 
 	if (cityRegion) {
 		const { city, regionCode, country: regionCountry } = cityRegion;
@@ -377,12 +561,19 @@ export async function geocodeOfferToFormattedAddress(
 			addressdetails: "1",
 			userAgent,
 		});
-		const withPostal = results.find((r) => r.address?.postcode);
-		if (withPostal?.address) {
-			const addr = withPostal.address;
-			const resolvedCity = cityFromNominatimAddress(addr, city);
-			return `${resolvedCity}, ${regionCode} ${addr.postcode}`;
+		const withPostal = results.find(
+			(result) =>
+				result.address?.postcode &&
+				placeNamesMatch(city, nominatimPlaceName(result.address)),
+		);
+		if (withPostal?.address?.postcode) {
+			const resolvedCity = cityFromNominatimAddress(withPostal.address, city);
+			if (resolvedCity) {
+				return `${resolvedCity}, ${regionCode} ${withPostal.address.postcode}`;
+			}
 		}
+
+		return "";
 	}
 
 	if (isCaPostal && isBarePostalInput(trimmed)) {
@@ -427,7 +618,7 @@ export async function geocodeOfferToFormattedAddress(
 	const fromFreeText = await geocodeFreeTextToFormatted(trimmed, userAgent);
 	if (fromFreeText) return fromFreeText;
 
-	return trimmed;
+	return "";
 }
 
 export {

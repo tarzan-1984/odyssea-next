@@ -291,12 +291,51 @@ export function parseCityRegionPostalLine(
 	};
 }
 
-function lettersOnlyKey(s: string): string {
+export function lettersOnlyKey(s: string): string {
 	return s
 		.toLowerCase()
 		.normalize("NFD")
 		.replace(/\p{M}/gu, "")
 		.replace(/[^a-z]/g, "");
+}
+
+/** True when two place names refer to the same city (ignores punctuation / "St" vs "Saint"). */
+export function placeNamesMatch(a: string, b: string): boolean {
+	const left = lettersOnlyKey(expandPlaceAbbreviations(a));
+	const right = lettersOnlyKey(expandPlaceAbbreviations(b));
+	if (!left || !right) return false;
+	if (left === right) return true;
+	const shorter = left.length <= right.length ? left : right;
+	const longer = left.length <= right.length ? right : left;
+	return shorter.length >= 4 && longer.includes(shorter);
+}
+
+function expandPlaceAbbreviations(value: string): string {
+	return value
+		.replace(/\bSt\.?\b/gi, "Saint")
+		.replace(/\bFt\.?\b/gi, "Fort")
+		.replace(/\bMt\.?\b/gi, "Mount");
+}
+
+/**
+ * City + region from "City, ST", "City, ST ZIP", or "City, State ZIP".
+ * Used to verify the place exists — do not geocode by ZIP alone when a city is present.
+ */
+export function parseCityRegionFromAddress(
+	address: string,
+): { city: string; regionCode: string; country: OfferGeocodeCountry } | null {
+	const trimmed = normalizePostalInput(address.trim());
+	if (!trimmed) return null;
+
+	const direct = parseCityRegionCode(trimmed);
+	if (direct) return direct;
+
+	const line = parseCityRegionPostalLine(trimmed);
+	if (line) {
+		return { city: line.city, regionCode: line.regionCode, country: line.country };
+	}
+
+	return null;
 }
 
 const REGION_NAME_TO_CODE: Record<string, { regionCode: string; country: OfferGeocodeCountry }> =
