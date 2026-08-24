@@ -8,6 +8,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { isMapTilerConfigured, type MapBasemapMode } from "@/lib/mapTileLayer";
 import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
 import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
+import { collectOrderedTmsLoadStops } from "@/utils/formatTmsLoadRoute";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
@@ -22,12 +23,10 @@ const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ss
 const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
 
 type LoadLocation = {
-	address?: string;
-	short_address?: string;
-	type?: string;
-	order?: number;
-	sort_order?: number;
-	address_id?: string | number;
+	address?: string | null;
+	short_address?: string | null;
+	type?: string | null;
+	address_id?: string | number | null;
 };
 
 type TmsShipperLike = {
@@ -206,37 +205,6 @@ function getLoadLocationAddressCandidates(
 	return Array.from(new Set(candidates));
 }
 
-/** All location objects from TMS JSON (array or single object), or one synthetic object for a plain address string. */
-function parseLocationObjectsFromMeta(raw: unknown): LoadLocation[] {
-	if (!raw) return [];
-
-	let parsed: unknown = raw;
-	if (typeof raw === "string") {
-		const trimmed = raw.trim();
-		if (!trimmed) return [];
-		try {
-			parsed = JSON.parse(trimmed);
-		} catch {
-			return [{ address: trimmed }];
-		}
-	}
-
-	try {
-		const arr = Array.isArray(parsed) ? parsed : [parsed];
-		return arr.filter((item): item is LoadLocation =>
-			Boolean(item && typeof item === "object")
-		);
-	} catch {
-		return [];
-	}
-}
-
-function stopSortKey(loc: LoadLocation, fallbackIndex: number): number {
-	const o = loc.order ?? loc.sort_order;
-	if (typeof o === "number" && Number.isFinite(o)) return o;
-	return fallbackIndex;
-}
-
 function addressCandidatesFromLocationObject(loc: LoadLocation): string[] {
 	const raw = [
 		loc.address?.trim(),
@@ -296,38 +264,36 @@ function resolveShipperCoordsByAddressId(
 }
 
 /**
- * Ordered load stops: all pickups (pick_up_location), then all deliveries (delivery_location).
+ * Ordered load stops by appointment start (`date` + `time_start`), mixed PU/DEL.
  */
 function buildOrderedStopRows(pickUpRaw: unknown, deliveryRaw: unknown): StopBuildRow[] {
-	const pickObjs = parseLocationObjectsFromMeta(pickUpRaw)
-		.map((loc, i) => ({ loc, i }))
-		.sort((a, b) => stopSortKey(a.loc, a.i) - stopSortKey(b.loc, b.i));
-	const delObjs = parseLocationObjectsFromMeta(deliveryRaw)
-		.map((loc, i) => ({ loc, i }))
-		.sort((a, b) => stopSortKey(a.loc, a.i) - stopSortKey(b.loc, b.i));
-
+	const ordered = collectOrderedTmsLoadStops(pickUpRaw, deliveryRaw);
+	const pickupTotal = ordered.filter(stop => stop.type === "pick_up_location").length;
+	const deliveryTotal = ordered.filter(stop => stop.type === "delivery_location").length;
 	const rows: StopBuildRow[] = [];
-	for (let p = 0; p < pickObjs.length; p++) {
-		const candidates = addressCandidatesFromLocationObject(pickObjs[p].loc);
+	let pickupIndex = 0;
+	let deliveryIndex = 0;
+
+	for (const stop of ordered) {
+		const candidates = addressCandidatesFromLocationObject(stop.loc);
 		if (candidates.length === 0) continue;
-		const n = rows.filter(r => r.kind === "pickup").length + 1;
-		rows.push({
-			kind: "pickup",
-			candidates,
-			title: pickObjs.length > 1 ? `Pick up ${n}` : "Pick up",
-			addressId: normalizeLocationAddressId(pickObjs[p].loc),
-		});
-	}
-	for (let d = 0; d < delObjs.length; d++) {
-		const candidates = addressCandidatesFromLocationObject(delObjs[d].loc);
-		if (candidates.length === 0) continue;
-		const n = rows.filter(r => r.kind === "delivery").length + 1;
-		rows.push({
-			kind: "delivery",
-			candidates,
-			title: delObjs.length > 1 ? `Delivery ${n}` : "Delivery",
-			addressId: normalizeLocationAddressId(delObjs[d].loc),
-		});
+		if (stop.type === "pick_up_location") {
+			pickupIndex += 1;
+			rows.push({
+				kind: "pickup",
+				candidates,
+				title: pickupTotal > 1 ? `Pick up ${pickupIndex}` : "Pick up",
+				addressId: normalizeLocationAddressId(stop.loc),
+			});
+		} else {
+			deliveryIndex += 1;
+			rows.push({
+				kind: "delivery",
+				candidates,
+				title: deliveryTotal > 1 ? `Delivery ${deliveryIndex}` : "Delivery",
+				addressId: normalizeLocationAddressId(stop.loc),
+			});
+		}
 	}
 	return rows;
 }
@@ -429,8 +395,25 @@ function buildStopMarkersFromChain(chain: RoutePoint[], rows: StopBuildRow[]): L
 	}));
 }
 
+function closestChainStopIndex(chain: RoutePoint[], target: RoutePoint): number {
+	let bestIndex = 0;
+	let bestDistance = Infinity;
+	for (let i = 0; i < chain.length; i++) {
+		const stop = chain[i];
+		const distance =
+			(stop.lat - target.lat) * (stop.lat - target.lat) +
+			(stop.lng - target.lng) * (stop.lng - target.lng);
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			bestIndex = i;
+		}
+	}
+	return bestIndex;
+}
+
 /**
- * Commercial route for OSRM: all stops except the final, then history, live driver, final stop.
+ * Pickup/delivery chain in time_start order, then every numbered history point
+ * in list order (1…N), then remaining stops after the driver's current progress.
  */
 function buildOsrmWaypointSequence(
 	chain: RoutePoint[],
@@ -438,19 +421,18 @@ function buildOsrmWaypointSequence(
 	currentDriverPoint: RoutePoint | null
 ): RoutePoint[] {
 	if (chain.length < 2) return [];
-	const head = chain.slice(0, -1);
-	const finalStop = chain[chain.length - 1];
+
+	const progressPoint =
+		currentDriverPoint ?? (historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null);
+	const nearestStopIndex = progressPoint ? closestChainStopIndex(chain, progressPoint) : 0;
+	const remainingStops = chain.slice(Math.max(nearestStopIndex, 1));
+
 	return uniqueSequentialRoutePoints([
-		...head,
+		chain[0],
 		...historyPoints,
 		...(currentDriverPoint ? [currentDriverPoint] : []),
-		finalStop,
+		...remainingStops,
 	]);
-}
-
-/** Deduplicate consecutive near-identical coordinates; send all waypoints to OSRM (no cap). */
-function limitOsrmWaypointSequence(seq: RoutePoint[]): RoutePoint[] {
-	return uniqueSequentialRoutePoints(seq);
 }
 
 type OsrmDrivingRouteResult = {
@@ -459,23 +441,20 @@ type OsrmDrivingRouteResult = {
 	limitedRequestPoints: RoutePoint[];
 };
 
-async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingRouteResult | null> {
-	const cleanPoints = uniqueSequentialRoutePoints(points);
-	if (cleanPoints.length < 2) return null;
+async function requestOsrmDrivingRoute(
+	points: RoutePoint[]
+): Promise<OsrmDrivingRouteResult | null> {
+	if (points.length < 2) return null;
 
-	const limitedPoints = limitOsrmWaypointSequence(cleanPoints);
-	const fallbackPath = cleanPoints.map(point => [point.lat, point.lng] as [number, number]);
+	const coordinatesParam = points.map(point => `${point.lng},${point.lat}`).join(";");
+	const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinatesParam}`);
+	url.searchParams.set("overview", "full");
+	url.searchParams.set("geometries", "geojson");
 
 	try {
-		const coordinatesParam = limitedPoints.map(point => `${point.lng},${point.lat}`).join(";");
-		const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinatesParam}`);
-		url.searchParams.set("overview", "full");
-		url.searchParams.set("geometries", "geojson");
-
 		const response = await fetch(url.toString());
-		if (!response.ok) throw new Error(`OSRM ${response.status}`);
-
 		const data = (await response.json()) as {
+			code?: string;
 			waypoints?: Array<{ location?: [number, number] }>;
 			routes?: Array<{
 				geometry?: {
@@ -484,7 +463,9 @@ async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingR
 			}>;
 		};
 		const coordinates = data.routes?.[0]?.geometry?.coordinates;
-		if (!coordinates?.length) throw new Error("OSRM route is empty");
+		if (!response.ok || data.code === "NoRoute" || !coordinates?.length) {
+			return null;
+		}
 
 		const rawSnaps = data.waypoints?.map(w => w.location) ?? [];
 		const snaps = rawSnaps.filter(
@@ -494,22 +475,112 @@ async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingR
 		return {
 			path: coordinates.map(([lng, lat]) => [lat, lng]),
 			waypointSnapsLngLat:
-				snaps.length === limitedPoints.length
+				snaps.length === points.length
 					? snaps
-					: limitedPoints.map(p => [p.lng, p.lat] as [number, number]),
-			limitedRequestPoints: limitedPoints,
+					: points.map(p => [p.lng, p.lat] as [number, number]),
+			limitedRequestPoints: points,
 		};
-	} catch (error) {
-		console.warn(
-			"[TrackingDeliveryMap] Failed to build road route, using straight line:",
-			error
-		);
-		return {
-			path: fallbackPath,
-			waypointSnapsLngLat: limitedPoints.map(p => [p.lng, p.lat] as [number, number]),
-			limitedRequestPoints: limitedPoints,
-		};
+	} catch {
+		return null;
 	}
+}
+
+/**
+ * Stitch road legs. If a waypoint is off the connected network (OSRM NoRoute),
+ * skip it and route from the last good point to a later stop.
+ */
+async function stitchOsrmSkippingUnroutable(
+	points: RoutePoint[]
+): Promise<OsrmDrivingRouteResult | null> {
+	if (points.length < 2) return null;
+
+	const path: [number, number][] = [];
+	const snaps: [number, number][] = [];
+	const usedPoints: RoutePoint[] = [points[0]];
+	let fromIndex = 0;
+
+	for (let i = 1; i < points.length; i++) {
+		const leg = await requestOsrmDrivingRoute([points[fromIndex], points[i]]);
+		if (!leg || leg.path.length < 2) continue;
+		if (path.length > 0) path.pop();
+		path.push(...leg.path);
+		if (snaps.length === 0) {
+			snaps.push(leg.waypointSnapsLngLat[0] ?? [points[fromIndex].lng, points[fromIndex].lat]);
+		}
+		snaps.push(leg.waypointSnapsLngLat[1] ?? [points[i].lng, points[i].lat]);
+		usedPoints.push(points[i]);
+		fromIndex = i;
+	}
+
+	if (path.length < 2) return null;
+	return {
+		path,
+		waypointSnapsLngLat: snaps,
+		limitedRequestPoints: usedPoints,
+	};
+}
+
+const OSRM_WAYPOINT_WINDOW = 8;
+
+/**
+ * Route consecutive numbered waypoints along roads, in windows so every
+ * history pin is visited without one giant OSRM request.
+ */
+async function stitchOsrmInWindows(points: RoutePoint[]): Promise<OsrmDrivingRouteResult | null> {
+	if (points.length < 2) return null;
+	if (points.length <= OSRM_WAYPOINT_WINDOW) {
+		const combined = await requestOsrmDrivingRoute(points);
+		if (combined) return combined;
+		return stitchOsrmSkippingUnroutable(points);
+	}
+
+	const path: [number, number][] = [];
+	const snaps: [number, number][] = [];
+	const usedPoints: RoutePoint[] = [];
+
+	let start = 0;
+	while (start < points.length - 1) {
+		const end = Math.min(start + OSRM_WAYPOINT_WINDOW, points.length);
+		const windowPoints = points.slice(start, end);
+		let windowRoute = await requestOsrmDrivingRoute(windowPoints);
+		if (!windowRoute) {
+			windowRoute = await stitchOsrmSkippingUnroutable(windowPoints);
+		}
+		if (!windowRoute || windowRoute.path.length < 2) {
+			start += 1;
+			continue;
+		}
+		if (path.length > 0) path.pop();
+		path.push(...windowRoute.path);
+		if (snaps.length === 0) {
+			snaps.push(...windowRoute.waypointSnapsLngLat);
+			usedPoints.push(...windowRoute.limitedRequestPoints);
+		} else {
+			snaps.push(...windowRoute.waypointSnapsLngLat.slice(1));
+			usedPoints.push(...windowRoute.limitedRequestPoints.slice(1));
+		}
+		start = end - 1;
+	}
+
+	if (path.length < 2) return null;
+	return {
+		path,
+		waypointSnapsLngLat: snaps,
+		limitedRequestPoints: usedPoints.length >= 2 ? usedPoints : points,
+	};
+}
+
+async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingRouteResult | null> {
+	const cleanPoints = uniqueSequentialRoutePoints(points);
+	if (cleanPoints.length < 2) return null;
+
+	if (cleanPoints.length <= OSRM_WAYPOINT_WINDOW) {
+		const combined = await requestOsrmDrivingRoute(cleanPoints);
+		if (combined) return combined;
+		return stitchOsrmSkippingUnroutable(cleanPoints);
+	}
+
+	return stitchOsrmInWindows(cleanPoints);
 }
 
 function findClosestLimitedWaypointIndex(
@@ -1152,7 +1223,11 @@ export default function TrackingDeliveryMap({
 						? historyPoints[historyPoints.length - 1]
 						: null;
 
-				const osrmSeq = buildOsrmWaypointSequence(chain, historyPoints, currentDriverPoint);
+				const osrmSeq = buildOsrmWaypointSequence(
+					chain,
+					historyPoints,
+					currentDriverPoint
+				);
 
 				let completedPath: [number, number][] = [];
 				let remainingPath: [number, number][] = [];
@@ -1494,6 +1569,7 @@ export default function TrackingDeliveryMap({
 						{loadRoute.completedPath.length > 1 && (
 							<Polyline
 								positions={loadRoute.completedPath}
+								smoothFactor={0}
 								pathOptions={{
 									color: "#dc2626",
 									weight: 5,
@@ -1505,6 +1581,7 @@ export default function TrackingDeliveryMap({
 						{loadRoute.remainingPath.length > 1 && (
 							<Polyline
 								positions={loadRoute.remainingPath}
+								smoothFactor={0}
 								pathOptions={{
 									color: "#2563eb",
 									weight: 5,

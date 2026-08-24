@@ -7,7 +7,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
 import { useCurrentUser } from "@/stores/userStore";
-import { canSendCheckListMessages } from "@/utils/roleAccess";
+import { canAccessCheckListMassEmail, canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
 import { formatDriverShortLabel } from "./checkListTypes";
 import { CHECK_LIST_PUSH_DEFAULT_MESSAGE } from "./CheckListPushModal";
@@ -16,6 +16,12 @@ import {
 	formatBulkEmailFailure,
 	type BulkEmailProgress,
 } from "./checkListBulkEmail";
+import {
+	massEmailProgressPercent,
+	startMassEmailBroadcast,
+	watchMassEmailBroadcast,
+	type MassEmailJobSnapshot,
+} from "./checkListMassEmail";
 
 export const CHECK_LIST_EMAIL_DEFAULT_SUBJECT = "Odyssea";
 
@@ -44,6 +50,8 @@ type CheckListEmailModalProps = {
 	defaultSubject?: string;
 	defaultMessage?: string;
 	onSent?: () => void | Promise<void>;
+	/** Mass broadcast: hide driver list and send to all eligible drivers. */
+	hideRecipients?: boolean;
 };
 
 export default function CheckListEmailModal({
@@ -53,13 +61,17 @@ export default function CheckListEmailModal({
 	defaultSubject = CHECK_LIST_EMAIL_DEFAULT_SUBJECT,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
 	onSent,
+	hideRecipients = false,
 }: CheckListEmailModalProps) {
 	const currentUser = useCurrentUser();
-	const canSend = canSendCheckListMessages(currentUser?.role);
+	const canSend = hideRecipients
+		? canAccessCheckListMassEmail(currentUser?.role)
+		: canSendCheckListMessages(currentUser?.role);
 	const [subject, setSubject] = useState(defaultSubject);
 	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
 	const [progress, setProgress] = useState<BulkEmailProgress | null>(null);
+	const [massJob, setMassJob] = useState<MassEmailJobSnapshot | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 
@@ -73,6 +85,8 @@ export default function CheckListEmailModal({
 			setError(null);
 			setSuccess(null);
 			setProgress(null);
+			setMassJob(null);
+			setSending(false);
 		}
 	}, [isOpen, targetKey, defaultSubject, defaultMessage]);
 
@@ -91,7 +105,48 @@ export default function CheckListEmailModal({
 			setError("Please enter a message.");
 			return;
 		}
-		if (targets.length === 0) return;
+		if (targets.length === 0) {
+			if (hideRecipients) {
+				setSending(true);
+				try {
+					const started = await startMassEmailBroadcast(subj, text);
+					if (!started.jobId) {
+						throw new Error("Mass email job was not created.");
+					}
+					setMassJob(started);
+					const finalJob = await watchMassEmailBroadcast(started.jobId, setMassJob);
+					if (finalJob.status === "failed") {
+						setError(finalJob.error ?? "Mass email failed.");
+						return;
+					}
+					if (finalJob.total === 0) {
+						setSuccess("No eligible drivers to email.");
+						return;
+					}
+					if (finalJob.failed === 0) {
+						setSuccess(`Email sent to ${finalJob.sent} drivers.`);
+						return;
+					}
+					setSuccess(`Email sent to ${finalJob.sent} of ${finalJob.total} drivers.`);
+					setError(
+						finalJob.failed === 1
+							? "1 email failed after retries."
+							: `${finalJob.failed} emails failed after retries.`,
+					);
+				} catch (err) {
+					if (err instanceof DOMException && err.name === "AbortError") {
+						return;
+					}
+					setError(
+						err instanceof Error ? err.message : "Network error while sending email.",
+					);
+				} finally {
+					setSending(false);
+				}
+				return;
+			}
+			return;
+		}
 
 		setSending(true);
 		setProgress({ completed: 0, total: targets.length });
@@ -137,10 +192,12 @@ export default function CheckListEmailModal({
 			onClose={onClose}
 			className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-gray-900"
 			closeOnBackdropClick={!sending}
+			closeOnEscape={!sending}
+			showCloseButton={!sending}
 		>
 			<form onSubmit={onSubmit} className="p-6">
 				<h2 className="text-lg font-semibold text-gray-900 dark:text-white">Send email</h2>
-				{targets.length > 0 && (
+				{!hideRecipients && targets.length > 0 && (
 					<>
 						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{summaryLabel}</p>
 						{targets.length > 1 && (
@@ -187,6 +244,38 @@ export default function CheckListEmailModal({
 					</div>
 				</div>
 
+				{hideRecipients && massJob?.jobId && (
+					<div className="mt-4" aria-live="polite">
+						<div className="mb-1.5 flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300">
+							<span>
+								{massJob.status === "queued"
+									? "Preparing recipients…"
+									: massJob.status === "running"
+										? `Sending ${massJob.processed ?? 0} of ${massJob.total ?? 0}…`
+										: massJob.status === "failed"
+											? "Sending stopped"
+											: (massJob.total ?? 0) === 0
+												? "No eligible drivers"
+												: `Sent ${massJob.sent ?? 0} of ${massJob.total ?? 0}`}
+							</span>
+							<span className="font-medium tabular-nums">
+								{massEmailProgressPercent(massJob)}%
+							</span>
+						</div>
+						<div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+							<div
+								className="h-full rounded-full bg-success-500 transition-[width] duration-300"
+								style={{ width: `${massEmailProgressPercent(massJob)}%` }}
+							/>
+						</div>
+						<p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+							Sent {massJob.sent ?? 0}
+							{(massJob.failed ?? 0) > 0 ? ` · Failed ${massJob.failed}` : ""}
+							{(massJob.total ?? 0) > 0 ? ` · Total ${massJob.total}` : ""}
+						</p>
+					</div>
+				)}
+
 				{sending && progressLabel && (
 					<p className="mt-4 text-sm text-gray-600 dark:text-gray-300" aria-live="polite">
 						{progressLabel}
@@ -206,15 +295,19 @@ export default function CheckListEmailModal({
 
 				<div className="mt-6 flex flex-wrap justify-end gap-3">
 					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
-						Cancel
+						{hideRecipients && !sending ? "Close" : "Cancel"}
 					</Button>
 					<Button
 						type="submit"
 						variant="primary"
 						size="sm"
-						disabled={!canSend || sending || targets.length === 0}
+						disabled={!canSend || sending || (!hideRecipients && targets.length === 0)}
 					>
-						{sending ? progressLabel ?? "Sending…" : "Send"}
+						{sending
+							? hideRecipients
+								? "Sending…"
+								: progressLabel ?? "Sending…"
+							: "Send"}
 					</Button>
 				</div>
 			</form>

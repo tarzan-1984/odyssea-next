@@ -129,6 +129,20 @@ export function canManageCheckListDevices(role: string | undefined | null): bool
 	return canAccessCheckListFull(role);
 }
 
+/** Check list Mass email button (broadcast to all drivers). */
+export const CHECK_LIST_MASS_EMAIL_ROLES = [
+	"ADMINISTRATOR",
+	"HR_MANAGER",
+	"TRACKING_TL",
+	"RECRUITER_TL",
+] as const;
+
+export function canAccessCheckListMassEmail(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (CHECK_LIST_MASS_EMAIL_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Bid rates page: dispatchers and expedite managers. */
 export const BID_RATES_ALLOWED_ROLES = [
 	"DISPATCHER",

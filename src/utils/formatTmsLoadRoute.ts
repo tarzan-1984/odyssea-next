@@ -10,6 +10,7 @@ type TmsLoadLocationPoint = {
 	order?: number | null;
 	sort_order?: number | null;
 	type?: string | null;
+	address_id?: string | number | null;
 };
 
 export type TmsLoadRoutePoint = {
@@ -17,6 +18,11 @@ export type TmsLoadRoutePoint = {
 	label: string;
 	location: string;
 	time: string;
+};
+
+export type OrderedTmsLoadStop = {
+	type: TmsLoadRoutePoint["type"];
+	loc: TmsLoadLocationPoint;
 };
 
 function formatOrdinal(n: number): string {
@@ -59,10 +65,86 @@ function parseLocationPoints(raw: unknown): TmsLoadLocationPoint[] {
 	);
 }
 
-function stopSortKey(loc: TmsLoadLocationPoint, index: number): number {
-	const order = loc.order ?? loc.sort_order;
-	if (typeof order === "number" && Number.isFinite(order)) return order;
-	return index;
+function normalizeStopType(
+	type: unknown,
+	fallback: TmsLoadRoutePoint["type"]
+): TmsLoadRoutePoint["type"] {
+	const normalized = String(type ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/[\s-]+/g, "_");
+	if (normalized === "pick_up_location" || normalized === "pickup") {
+		return "pick_up_location";
+	}
+	if (normalized === "delivery_location" || normalized === "delivery") {
+		return "delivery_location";
+	}
+	return fallback;
+}
+
+/** Appointment start from TMS `date` + `time_start` (time_start overrides the clock on date). */
+function appointmentStartMs(loc: TmsLoadLocationPoint): number | null {
+	const baseDate = parseTmsLocationDate(loc.date);
+	const startTime = loc.time_start?.trim();
+	if (baseDate && startTime) {
+		const withStart = applyClockTime(baseDate, startTime);
+		if (withStart) return withStart.getTime();
+	}
+	if (baseDate) return baseDate.getTime();
+	return null;
+}
+
+function compareOrderedStops(
+	a: OrderedTmsLoadStop & { index: number },
+	b: OrderedTmsLoadStop & { index: number }
+): number {
+	const startA = appointmentStartMs(a.loc);
+	const startB = appointmentStartMs(b.loc);
+	if (startA != null && startB != null && startA !== startB) return startA - startB;
+	if (startA != null && startB == null) return -1;
+	if (startA == null && startB != null) return 1;
+
+	if (a.type !== b.type) {
+		return a.type === "pick_up_location" ? -1 : 1;
+	}
+
+	const orderA = a.loc.order ?? a.loc.sort_order;
+	const orderB = b.loc.order ?? b.loc.sort_order;
+	if (
+		typeof orderA === "number" &&
+		Number.isFinite(orderA) &&
+		typeof orderB === "number" &&
+		Number.isFinite(orderB) &&
+		orderA !== orderB
+	) {
+		return orderA - orderB;
+	}
+
+	return a.index - b.index;
+}
+
+/**
+ * Merge pickup + delivery stops and sort by appointment start (`date` + `time_start`)
+ * so mixed PU/DEL itineraries stay sequential instead of grouped by type.
+ */
+export function collectOrderedTmsLoadStops(
+	pickUpRaw: unknown,
+	deliveryRaw: unknown
+): OrderedTmsLoadStop[] {
+	const pickups = parseLocationPoints(pickUpRaw).map((loc, index) => ({
+		type: normalizeStopType(loc.type, "pick_up_location"),
+		loc,
+		index,
+	}));
+	const deliveries = parseLocationPoints(deliveryRaw).map((loc, index) => ({
+		type: normalizeStopType(loc.type, "delivery_location"),
+		loc,
+		index: pickups.length + index,
+	}));
+
+	return [...pickups, ...deliveries]
+		.sort(compareOrderedStops)
+		.map(({ type, loc }) => ({ type, loc }));
 }
 
 function locationLabel(loc: TmsLoadLocationPoint): string {
@@ -105,7 +187,7 @@ function parseTmsLocationDate(dateStr: string | null | undefined): Date | null {
 }
 
 function applyClockTime(baseDate: Date, timeStr: string): Date | null {
-	const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})$/);
+	const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
 	if (!match) return null;
 
 	const next = new Date(baseDate);
@@ -157,34 +239,34 @@ export function buildTmsLoadRoutePoints(
 	pickUpRaw: unknown,
 	deliveryRaw: unknown
 ): TmsLoadRoutePoint[] {
-	const pickups = parseLocationPoints(pickUpRaw)
-		.map((loc, index) => ({ loc, index }))
-		.sort((a, b) => stopSortKey(a.loc, a.index) - stopSortKey(b.loc, b.index));
-	const deliveries = parseLocationPoints(deliveryRaw)
-		.map((loc, index) => ({ loc, index }))
-		.sort((a, b) => stopSortKey(a.loc, a.index) - stopSortKey(b.loc, b.index));
+	const ordered = collectOrderedTmsLoadStops(pickUpRaw, deliveryRaw);
+	const pickupTotal = ordered.filter(stop => stop.type === "pick_up_location").length;
+	const deliveryTotal = ordered.filter(stop => stop.type === "delivery_location").length;
+	let pickupIndex = 0;
+	let deliveryIndex = 0;
+	const points: TmsLoadRoutePoint[] = [];
 
-	const pickupPoints: TmsLoadRoutePoint[] = [];
-	for (let index = 0; index < pickups.length; index++) {
-		const point = toRoutePoint(
-			pickups[index].loc,
-			"pick_up_location",
-			formatStopLabel("pick_up_location", index + 1, pickups.length)
-		);
-		if (point) pickupPoints.push(point);
+	for (const stop of ordered) {
+		if (stop.type === "pick_up_location") {
+			pickupIndex += 1;
+			const point = toRoutePoint(
+				stop.loc,
+				stop.type,
+				formatStopLabel(stop.type, pickupIndex, pickupTotal)
+			);
+			if (point) points.push(point);
+		} else {
+			deliveryIndex += 1;
+			const point = toRoutePoint(
+				stop.loc,
+				stop.type,
+				formatStopLabel(stop.type, deliveryIndex, deliveryTotal)
+			);
+			if (point) points.push(point);
+		}
 	}
 
-	const deliveryPoints: TmsLoadRoutePoint[] = [];
-	for (let index = 0; index < deliveries.length; index++) {
-		const point = toRoutePoint(
-			deliveries[index].loc,
-			"delivery_location",
-			formatStopLabel("delivery_location", index + 1, deliveries.length)
-		);
-		if (point) deliveryPoints.push(point);
-	}
-
-	return [...pickupPoints, ...deliveryPoints];
+	return points;
 }
 
 function formatRoutePointBlock(point: TmsLoadRoutePoint): string {
