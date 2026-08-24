@@ -17,6 +17,9 @@ describe("canonicalizeOfferLocation", () => {
 		["BENZONIA. MI", "BENZONIA, MI"],
 		["BENZONIA. MI 49616", "BENZONIA, MI 49616"],
 		["CHICAGO, IL 60666", "CHICAGO, IL 60666"],
+		["CHICAGO, IL 60666, USA", "CHICAGO, IL 60666"],
+		["CHICAGO, IL 60666 USA", "CHICAGO, IL 60666"],
+		["Chicago, IL, 60666, United States", "Chicago, IL 60666"],
 		["St. Louis, MO, 63101, USA", "St. Louis, MO 63101"],
 		["Phoenix, AZ, 85001", "Phoenix, AZ 85001"],
 	])("normalizes %j", (input, expected) => {
@@ -51,6 +54,15 @@ describe("parseCityRegionPostalLine", () => {
 			country: "us",
 		});
 	});
+
+	it("parses Chicago airport ZIP with country suffix", () => {
+		expect(parseCityRegionPostalLine("CHICAGO, IL 60666, USA")).toEqual({
+			city: "CHICAGO",
+			regionCode: "IL",
+			postal: "60666",
+			country: "us",
+		});
+	});
 });
 
 describe("parseCityRegionFromAddress", () => {
@@ -77,6 +89,8 @@ describe("location format", () => {
 		"BENZONIA, MI, 49616 USA",
 		"BENZONIA. MI",
 		"CHICAGO, IL 60666",
+		"CHICAGO, IL 60666, USA",
+		"CHICAGO, IL 60666 USA",
 	])("accepts %j", (input) => {
 		expect(isValidLocationFormat(input)).toBe(true);
 	});
@@ -84,6 +98,9 @@ describe("location format", () => {
 	it("normalizes extra commas for geocoding", () => {
 		expect(normalizeLocationForGeocode("BENZONIA, MI, 49616 USA")).toBe(
 			"BENZONIA, MI 49616",
+		);
+		expect(normalizeLocationForGeocode("CHICAGO, IL 60666, USA")).toBe(
+			"CHICAGO, IL 60666",
 		);
 	});
 });

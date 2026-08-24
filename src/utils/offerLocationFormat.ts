@@ -6,6 +6,8 @@ import {
 	MX_CP_PATTERN,
 	normalizePostalInput,
 	parseCityRegionCode,
+	parseCityRegionFromAddress,
+	parseCityRegionPostalLine,
 } from "./offerLocationCountry";
 
 /** Canadian FSA (3-character postal prefix), e.g. N7M */
@@ -14,8 +16,8 @@ export const CA_FSA_PATTERN = /^[A-Za-z]\d[A-Za-z]$/;
 /** ZIP pattern: US 5 digits, optionally +4 */
 export const ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
 
-/** City, State format: "City, State" or "City, State ZIP" */
-const CITY_STATE_PATTERN = /^[^,]+\s*,\s*[^,]+$/;
+/** City, State — extra comma segments (ZIP, USA) are allowed. */
+const CITY_STATE_PATTERN = /^[^,]+(?:\s*,\s*[^,]+)+$/;
 
 /** "City, ST" or "City, JAL" — needs geocoding to add postal code */
 export const CITY_STATE_ABBR_PATTERN = /^([^,]+),\s*([A-Za-z]{2,4})\s*$/;
@@ -70,6 +72,9 @@ export function isValidLocationFormat(value: string): boolean {
 	if (ZIP_PATTERN.test(compact)) return true;
 	if (isCanadianPostalCode(trimmed)) return true;
 	if (MX_CP_PATTERN.test(compact) && trimmed.split(/\s+/).length === 1) return true;
+	if (parseCityRegionPostalLine(value) != null || parseCityRegionFromAddress(value) != null) {
+		return true;
+	}
 	if (CITY_STATE_PATTERN.test(trimmed) && !isCanadianPostalCode(trimmed)) return true;
 	return isValidSpaceSeparatedLocation(trimmed);
 }

@@ -118,11 +118,51 @@ export function normalizePostalInput(value: string): string {
 	return trimmed;
 }
 
-const TRAILING_COUNTRY_PATTERN =
-	/[,\s]+(?:united\s+states(?:\s+of\s+america)?|u\.s\.a\.|u\.s\.|usa|canada|mexico|méxico)\s*$/i;
+const COUNTRY_LABELS = new Set([
+	"usa",
+	"us",
+	"u.s",
+	"u.s.",
+	"u.s.a",
+	"u.s.a.",
+	"united states",
+	"united states of america",
+	"canada",
+	"mexico",
+	"méxico",
+]);
+
+function isCountryLabel(token: string): boolean {
+	const key = token
+		.trim()
+		.replace(/[.,;]+$/g, "")
+		.toLowerCase()
+		.replace(/\s+/g, " ");
+	if (!key) return false;
+	if (COUNTRY_LABELS.has(key)) return true;
+	const collapsed = key.replace(/\./g, "");
+	return collapsed === "usa" || collapsed === "us";
+}
 
 function stripTrailingCountryLabel(value: string): string {
-	return value.replace(TRAILING_COUNTRY_PATTERN, "").trim();
+	let next = value.trim();
+	for (let i = 0; i < 3; i++) {
+		const commaIdx = next.lastIndexOf(",");
+		if (commaIdx > 0) {
+			const lastSeg = next.slice(commaIdx + 1).trim();
+			if (isCountryLabel(lastSeg)) {
+				next = next.slice(0, commaIdx).replace(/[,\s]+$/g, "").trim();
+				continue;
+			}
+		}
+		const spaceMatch = /^(.*?)[\s,]+([A-Za-z.]+)\.?$/.exec(next);
+		if (spaceMatch && isCountryLabel(spaceMatch[2])) {
+			next = spaceMatch[1].trim();
+			continue;
+		}
+		break;
+	}
+	return next;
 }
 
 function replacePeriodBeforeRegionCode(value: string): string {
