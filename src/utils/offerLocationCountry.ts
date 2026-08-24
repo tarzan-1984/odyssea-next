@@ -118,6 +118,63 @@ export function normalizePostalInput(value: string): string {
 	return trimmed;
 }
 
+const TRAILING_COUNTRY_PATTERN =
+	/[,\s]+(?:united\s+states(?:\s+of\s+america)?|u\.s\.a\.|u\.s\.|usa|canada|mexico|méxico)\s*$/i;
+
+function stripTrailingCountryLabel(value: string): string {
+	return value.replace(TRAILING_COUNTRY_PATTERN, "").trim();
+}
+
+function replacePeriodBeforeRegionCode(value: string): string {
+	return value.replace(/\.(\s*)([A-Za-z]{2,4})\b/g, (full, space: string, code: string) => {
+		if (!countryFromRegionCode(code.toUpperCase())) return full;
+		return `,${space || " "}${code}`;
+	});
+}
+
+function collapseExtraLocationCommas(value: string): string {
+	const parts = value
+		.split(",")
+		.map((part) => part.trim())
+		.filter(Boolean);
+	if (parts.length <= 1) return value.trim();
+	if (parts.length === 2) return `${parts[0]}, ${parts[1]}`;
+	return `${parts[0]}, ${parts.slice(1).join(" ")}`;
+}
+
+function stripCityTrailingPunctuation(value: string): string {
+	const commaIdx = value.indexOf(",");
+	if (commaIdx <= 0) {
+		return value.replace(/[.,;:\s]+$/g, "").trim();
+	}
+	const city = value.slice(0, commaIdx).replace(/[.,;:\s]+$/g, "").trim();
+	const rest = value.slice(commaIdx + 1).trim();
+	if (!city) return value.trim();
+	return rest ? `${city}, ${rest}` : city;
+}
+
+/**
+ * Canonicalize typed offer locations so geocoding accepts common variants:
+ * "BENZONIA, MI, 49616" / "BENZONIA, MI, 49616 USA" / "BENZONIA. MI".
+ */
+export function canonicalizeOfferLocation(value: string): string {
+	let next = normalizePostalInput(value.trim().replace(/\s+/g, " "));
+	if (!next) return next;
+	if (isBarePostalInput(next)) {
+		if (isCanadianPostalCode(next)) {
+			return next.replace(/\s+/g, " ").trim().toUpperCase();
+		}
+		return next;
+	}
+
+	next = stripTrailingCountryLabel(next);
+	next = next.replace(/[,\s]+$/g, "").trim();
+	next = replacePeriodBeforeRegionCode(next);
+	next = collapseExtraLocationCommas(next);
+	next = stripCityTrailingPunctuation(next);
+	return next.replace(/\s+/g, " ").trim();
+}
+
 export function isCanadianPostalCode(value: string): boolean {
 	const normalized = normalizePostalInput(value);
 	return (
@@ -235,13 +292,13 @@ export function zippopotamPostalUrl(
 export function parseCityRegionCode(
 	address: string,
 ): { city: string; regionCode: string; country: OfferGeocodeCountry } | null {
-	const match = CITY_REGION_CODE_PATTERN.exec(address.trim());
+	const match = CITY_REGION_CODE_PATTERN.exec(canonicalizeOfferLocation(address));
 	if (!match) return null;
 
 	const city = match[1].trim();
 	const regionCode = match[2].toUpperCase();
 	const country = countryFromRegionCode(regionCode);
-	if (!country) return null;
+	if (!country || !city) return null;
 
 	return { city, regionCode, country };
 }
@@ -255,7 +312,7 @@ export function parseCityRegionPostalLine(
 	postal: string;
 	country: OfferGeocodeCountry;
 } | null {
-	const trimmed = address.trim();
+	const trimmed = canonicalizeOfferLocation(address);
 	const commaIdx = trimmed.indexOf(",");
 	if (commaIdx <= 0) return null;
 
@@ -266,12 +323,14 @@ export function parseCityRegionPostalLine(
 	let postal: string | null = null;
 	let regionToken: string | null = null;
 
-	const caMatch = afterComma.match(/^(.+?)\s+([A-Z]\d[A-Z](?:\s?\d[A-Z]\d)?)$/i);
+	const caMatch = afterComma.match(
+		/^(.+?)[,\s]+([A-Z]\d[A-Z](?:\s?\d[A-Z]\d)?)\b/i,
+	);
 	if (caMatch) {
 		regionToken = caMatch[1].trim();
 		postal = caMatch[2].replace(/\s+/g, " ").trim().toUpperCase();
 	} else {
-		const zipMatch = afterComma.match(/^(.+?)\s+(\d{5}(?:-\d{4})?)$/);
+		const zipMatch = afterComma.match(/^(.+?)[,\s]+(\d{5}(?:-\d{4})?)\b/);
 		if (zipMatch) {
 			regionToken = zipMatch[1].trim();
 			postal = zipMatch[2];
@@ -324,7 +383,7 @@ function expandPlaceAbbreviations(value: string): string {
 export function parseCityRegionFromAddress(
 	address: string,
 ): { city: string; regionCode: string; country: OfferGeocodeCountry } | null {
-	const trimmed = normalizePostalInput(address.trim());
+	const trimmed = canonicalizeOfferLocation(address);
 	if (!trimmed) return null;
 
 	const direct = parseCityRegionCode(trimmed);
@@ -356,11 +415,12 @@ const REGION_NAME_TO_CODE: Record<string, { regionCode: string; country: OfferGe
 function resolveRegionToken(
 	token: string,
 ): { regionCode: string; country: OfferGeocodeCountry } | null {
-	const upper = token.trim().toUpperCase();
+	const cleaned = token.trim().replace(/[.,;]+/g, " ").replace(/\s+/g, " ").trim();
+	const upper = cleaned.toUpperCase();
 	const fromCode = countryFromRegionCode(upper);
 	if (fromCode) return { regionCode: upper, country: fromCode };
 
-	const fromName = REGION_NAME_TO_CODE[lettersOnlyKey(token)];
+	const fromName = REGION_NAME_TO_CODE[lettersOnlyKey(cleaned)];
 	if (fromName) return fromName;
 
 	return null;

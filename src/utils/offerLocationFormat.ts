@@ -1,5 +1,6 @@
 import {
 	CA_POSTAL_PATTERN,
+	canonicalizeOfferLocation,
 	isBarePostalInput,
 	isCanadianPostalCode,
 	MX_CP_PATTERN,
@@ -57,7 +58,7 @@ function isValidSpaceSeparatedLocation(value: string): boolean {
 }
 
 export function isValidLocationFormat(value: string): boolean {
-	const trimmed = normalizePostalInput(value.trim());
+	const trimmed = canonicalizeOfferLocation(value);
 	if (!trimmed) return true;
 
 	if (isBarePostalInput(trimmed) || CA_FSA_PATTERN.test(trimmed)) return true;
@@ -77,7 +78,7 @@ export function isValidLocationFormat(value: string): boolean {
  * - "City State" -> "City, State"
  */
 export function normalizeLocationForGeocode(value: string): string {
-	const trimmed = normalizePostalInput(value.trim());
+	const trimmed = canonicalizeOfferLocation(value);
 	if (!trimmed) return trimmed;
 	if (isCanadianPostalCode(trimmed)) {
 		return trimmed.replace(/\s+/g, " ").trim().toUpperCase();
