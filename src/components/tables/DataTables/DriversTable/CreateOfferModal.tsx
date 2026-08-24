@@ -30,6 +30,7 @@ import {
 } from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
+	LOCATION_COORDINATES_ERROR,
 	LOCATION_FORMAT_ERROR,
 	normalizeLocationForGeocode,
 	needsLocationGeocode,
@@ -1040,9 +1041,10 @@ export default function CreateOfferModal({
 						const missingCoordinates = trimmedRoute.some(
 							row => !parseRouteCoordinates(row.coordinates)
 						);
-						if (missingCoordinates) {
-							routeError =
-								"Each stop must have coordinates — blur each location field to resolve the address";
+						// Manual miles already replace auto distance — coordinates are only
+						// needed to calculate that distance.
+						if (missingCoordinates && manualLoadedMiles == null) {
+							routeError = LOCATION_COORDINATES_ERROR;
 						} else {
 							routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
 						}
@@ -1104,6 +1106,7 @@ export default function CreateOfferModal({
 		setManualLoadedMiles(Math.round(parsed));
 		setIsEditMilesModalOpen(false);
 		setEditMilesError(null);
+		setRouteError(prev => (prev === LOCATION_COORDINATES_ERROR ? null : prev));
 		setSubmitError("");
 	};
 

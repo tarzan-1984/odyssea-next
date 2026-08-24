@@ -32,6 +32,9 @@ export const LOCATION_ZIP_MISMATCH_ERROR =
 export const LOCATION_POSTAL_ERROR =
 	"Each stop must include a ZIP / postal code (e.g. Los Angeles, CA 90001).";
 
+export const LOCATION_COORDINATES_ERROR =
+	"Each stop must have coordinates — blur each location field to resolve the address";
+
 /** True when the location already contains a US ZIP, CA postal, or MX CP. */
 export function locationHasPostalCode(value: string): boolean {
 	const trimmed = normalizePostalInput(value.trim());
