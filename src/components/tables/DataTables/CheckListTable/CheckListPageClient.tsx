@@ -9,7 +9,9 @@ import CheckListSeveralDevicesTable from "./CheckListSeveralDevicesTable";
 import CheckListEmailModal, {
 	CHECK_LIST_EMAIL_DEFAULT_SUBJECT,
 } from "./CheckListEmailModal";
+import CheckListPushModal from "./CheckListPushModal";
 import MassEmailIcon from "./MassEmailIcon";
+import MassPushIcon from "./MassPushIcon";
 import CheckUpdateLocationIcon from "./CheckUpdateLocationIcon";
 import CheckUpdateVersionIcon from "./CheckUpdateVersionIcon";
 import SeveralDevicesIcon from "./SeveralDevicesIcon";
@@ -21,6 +23,7 @@ type CheckListTab = "location" | "version" | "several-devices";
 export default function CheckListPageClient() {
 	const [activeTab, setActiveTab] = useState<CheckListTab>("location");
 	const [isMassEmailOpen, setIsMassEmailOpen] = useState(false);
+	const [isMassPushOpen, setIsMassPushOpen] = useState(false);
 	const currentUser = useCurrentUser();
 	const showMassEmail = canAccessCheckListMassEmail(currentUser?.role);
 
@@ -28,15 +31,26 @@ export default function CheckListPageClient() {
 		<>
 			{showMassEmail && (
 				<div className="mb-4 flex flex-wrap items-start gap-3 sm:gap-4">
-					<Button
-						type="button"
-						size="sm"
-						className="h-9 shrink-0 whitespace-nowrap !bg-success-500 hover:!bg-success-600 disabled:!bg-success-300"
-						startIcon={<MassEmailIcon className="h-5 w-5" />}
-						onClick={() => setIsMassEmailOpen(true)}
-					>
-						Mass email
-					</Button>
+					<div className="flex shrink-0 flex-col gap-2">
+						<Button
+							type="button"
+							size="sm"
+							className="h-9 w-full whitespace-nowrap !bg-success-500 hover:!bg-success-600 disabled:!bg-success-300"
+							startIcon={<MassEmailIcon className="h-5 w-5" />}
+							onClick={() => setIsMassEmailOpen(true)}
+						>
+							Mass email
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							className="h-9 w-full whitespace-nowrap !bg-success-500 hover:!bg-success-600 disabled:!bg-success-300"
+							startIcon={<MassPushIcon className="h-5 w-5" />}
+							onClick={() => setIsMassPushOpen(true)}
+						>
+							Mass Push
+						</Button>
+					</div>
 					<div className="min-w-0 flex-1">
 						<p className="text-sm font-medium text-gray-800 dark:text-white/90">
 							Service updates & alerts
@@ -118,14 +132,23 @@ export default function CheckListPageClient() {
 				)}
 			</ComponentCard>
 			{showMassEmail && (
-				<CheckListEmailModal
-					isOpen={isMassEmailOpen}
-					onClose={() => setIsMassEmailOpen(false)}
-					drivers={[]}
-					hideRecipients
-					defaultSubject={CHECK_LIST_EMAIL_DEFAULT_SUBJECT}
-					defaultMessage=""
-				/>
+				<>
+					<CheckListEmailModal
+						isOpen={isMassEmailOpen}
+						onClose={() => setIsMassEmailOpen(false)}
+						drivers={[]}
+						hideRecipients
+						defaultSubject={CHECK_LIST_EMAIL_DEFAULT_SUBJECT}
+						defaultMessage=""
+					/>
+					<CheckListPushModal
+						isOpen={isMassPushOpen}
+						onClose={() => setIsMassPushOpen(false)}
+						drivers={[]}
+						hideRecipients
+						defaultMessage=""
+					/>
+				</>
 			)}
 		</>
 	);

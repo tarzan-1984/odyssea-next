@@ -5,6 +5,8 @@ import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Button from "@/components/ui/button/Button";
+import SendIcon from "./SendIcon";
+import CloseIcon from "./CloseIcon";
 import type { CheckListDriver } from "./checkListTypes";
 import {
 	bulkCreatePrivateChatsWithMessage,
@@ -182,10 +184,23 @@ export default function CheckListChatModal({
 				)}
 
 				<div className="mt-6 flex flex-wrap justify-end gap-3">
-					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						startIcon={<CloseIcon className="h-4 w-4" />}
+						onClick={onClose}
+						disabled={sending}
+					>
 						Cancel
 					</Button>
-					<Button type="submit" variant="primary" size="sm" disabled={sending || targets.length === 0}>
+					<Button
+						type="submit"
+						variant="primary"
+						size="sm"
+						startIcon={hasMessage ? <SendIcon className="h-4 w-4" /> : undefined}
+						disabled={sending || targets.length === 0}
+					>
 						{sending
 							? progressLabel ?? "Working…"
 							: hasMessage

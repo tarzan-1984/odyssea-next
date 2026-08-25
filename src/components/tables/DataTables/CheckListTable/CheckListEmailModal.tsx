@@ -6,6 +6,8 @@ import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
+import SendIcon from "./SendIcon";
+import CloseIcon from "./CloseIcon";
 import { useCurrentUser } from "@/stores/userStore";
 import { canAccessCheckListMassEmail, canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
@@ -294,13 +296,21 @@ export default function CheckListEmailModal({
 				)}
 
 				<div className="mt-6 flex flex-wrap justify-end gap-3">
-					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						startIcon={<CloseIcon className="h-4 w-4" />}
+						onClick={onClose}
+						disabled={sending}
+					>
 						{hideRecipients && !sending ? "Close" : "Cancel"}
 					</Button>
 					<Button
 						type="submit"
 						variant="primary"
 						size="sm"
+						startIcon={<SendIcon className="h-4 w-4" />}
 						disabled={!canSend || sending || (!hideRecipients && targets.length === 0)}
 					>
 						{sending

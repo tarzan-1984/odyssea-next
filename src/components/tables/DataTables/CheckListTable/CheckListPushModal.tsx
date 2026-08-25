@@ -5,10 +5,18 @@ import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
 import Button from "@/components/ui/button/Button";
+import SendIcon from "./SendIcon";
+import CloseIcon from "./CloseIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { canSendCheckListMessages } from "@/utils/roleAccess";
+import { canAccessCheckListMassEmail, canSendCheckListMessages } from "@/utils/roleAccess";
 import type { CheckListDriver } from "./checkListTypes";
 import { formatDriverShortLabel } from "./checkListTypes";
+import {
+	massPushProgressPercent,
+	startMassPushBroadcast,
+	watchMassPushBroadcast,
+	type MassPushJobSnapshot,
+} from "./checkListMassPush";
 
 export const CHECK_LIST_PUSH_DEFAULT_MESSAGE =
 	"We haven't received location updates from you in a while. Please check if the app is running.";
@@ -59,6 +67,8 @@ type CheckListPushModalProps = {
 	defaultMessage?: string;
 	offerContext?: { offerId: number; offerTitle: string };
 	onSent?: () => void | Promise<void>;
+	/** Mass broadcast: hide driver list and send to all eligible drivers. */
+	hideRecipients?: boolean;
 };
 
 export default function CheckListPushModal({
@@ -68,11 +78,15 @@ export default function CheckListPushModal({
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
 	offerContext,
 	onSent,
+	hideRecipients = false,
 }: CheckListPushModalProps) {
 	const currentUser = useCurrentUser();
-	const canSend = canSendCheckListMessages(currentUser?.role);
+	const canSend = hideRecipients
+		? canAccessCheckListMassEmail(currentUser?.role)
+		: canSendCheckListMessages(currentUser?.role);
 	const [message, setMessage] = useState(defaultMessage);
 	const [sending, setSending] = useState(false);
+	const [massJob, setMassJob] = useState<MassPushJobSnapshot | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 
@@ -84,6 +98,8 @@ export default function CheckListPushModal({
 			setMessage(defaultMessage);
 			setError(null);
 			setSuccess(null);
+			setMassJob(null);
+			setSending(false);
 		}
 	}, [isOpen, targetKey, defaultMessage]);
 
@@ -97,7 +113,48 @@ export default function CheckListPushModal({
 			setError("Please enter a message.");
 			return;
 		}
-		if (targets.length === 0) return;
+		if (targets.length === 0) {
+			if (hideRecipients) {
+				setSending(true);
+				try {
+					const started = await startMassPushBroadcast(text);
+					if (!started.jobId) {
+						throw new Error("Mass push job was not created.");
+					}
+					setMassJob(started);
+					const finalJob = await watchMassPushBroadcast(started.jobId, setMassJob);
+					if (finalJob.status === "failed") {
+						setError(finalJob.error ?? "Mass push failed.");
+						return;
+					}
+					if (finalJob.total === 0) {
+						setSuccess("No eligible drivers to notify.");
+						return;
+					}
+					if (finalJob.failed === 0) {
+						setSuccess(`Push sent to ${finalJob.sent} drivers.`);
+						return;
+					}
+					setSuccess(`Push sent to ${finalJob.sent} of ${finalJob.total} drivers.`);
+					setError(
+						finalJob.failed === 1
+							? "1 push failed."
+							: `${finalJob.failed} pushes failed.`,
+					);
+				} catch (err) {
+					if (err instanceof DOMException && err.name === "AbortError") {
+						return;
+					}
+					setError(
+						err instanceof Error ? err.message : "Network error while sending push.",
+					);
+				} finally {
+					setSending(false);
+				}
+				return;
+			}
+			return;
+		}
 
 		setSending(true);
 		const failures: string[] = [];
@@ -161,13 +218,15 @@ export default function CheckListPushModal({
 			isOpen={isOpen}
 			onClose={onClose}
 			className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-gray-900"
-			closeOnBackdropClick
+			closeOnBackdropClick={!sending}
+			closeOnEscape={!sending}
+			showCloseButton={!sending}
 		>
 			<form onSubmit={onSubmit} className="p-6">
 				<h2 className="text-lg font-semibold text-gray-900 dark:text-white">
 					Send push notification
 				</h2>
-				{targets.length > 0 && (
+				{!hideRecipients && targets.length > 0 && (
 					<>
 						<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{summaryLabel}</p>
 						{offerContext ? (
@@ -188,17 +247,50 @@ export default function CheckListPushModal({
 				)}
 
 				<div className="mt-5">
-					<Label htmlFor="checklist-push-message">Message</Label>
+					<Label htmlFor={hideRecipients ? "checklist-mass-push-message" : "checklist-push-message"}>Message</Label>
 					<div className="mt-1.5">
 						<TextArea
-							id="checklist-push-message"
+							id={hideRecipients ? "checklist-mass-push-message" : "checklist-push-message"}
 							rows={5}
 							value={message}
 							onChange={setMessage}
 							className="min-h-[120px] resize-y"
+							disabled={sending}
 						/>
 					</div>
 				</div>
+
+				{hideRecipients && massJob?.jobId && (
+					<div className="mt-4" aria-live="polite">
+						<div className="mb-1.5 flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-gray-300">
+							<span>
+								{massJob.status === "queued"
+									? "Preparing recipients…"
+									: massJob.status === "running"
+										? `Sending ${massJob.processed ?? 0} of ${massJob.total ?? 0}…`
+										: massJob.status === "failed"
+											? "Sending stopped"
+											: (massJob.total ?? 0) === 0
+												? "No eligible drivers"
+												: `Sent ${massJob.sent ?? 0} of ${massJob.total ?? 0}`}
+							</span>
+							<span className="font-medium tabular-nums">
+								{massPushProgressPercent(massJob)}%
+							</span>
+						</div>
+						<div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+							<div
+								className="h-full rounded-full bg-success-500 transition-[width] duration-300"
+								style={{ width: `${massPushProgressPercent(massJob)}%` }}
+							/>
+						</div>
+						<p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+							Sent {massJob.sent ?? 0}
+							{(massJob.failed ?? 0) > 0 ? ` · Failed ${massJob.failed}` : ""}
+							{(massJob.total ?? 0) > 0 ? ` · Total ${massJob.total}` : ""}
+						</p>
+					</div>
+				)}
 
 				{error && (
 					<div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
@@ -212,14 +304,22 @@ export default function CheckListPushModal({
 				)}
 
 				<div className="mt-6 flex flex-wrap justify-end gap-3">
-					<Button type="button" variant="outline" size="sm" onClick={onClose} disabled={sending}>
-						Cancel
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						startIcon={<CloseIcon className="h-4 w-4" />}
+						onClick={onClose}
+						disabled={sending}
+					>
+						{hideRecipients && !sending ? "Close" : "Cancel"}
 					</Button>
 					<Button
 						type="submit"
 						variant="primary"
 						size="sm"
-						disabled={!canSend || sending || targets.length === 0}
+						startIcon={<SendIcon className="h-4 w-4" />}
+						disabled={!canSend || sending || (!hideRecipients && targets.length === 0)}
 					>
 						{sending ? "Sending…" : "Send"}
 					</Button>

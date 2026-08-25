@@ -129,7 +129,7 @@ export function canManageCheckListDevices(role: string | undefined | null): bool
 	return canAccessCheckListFull(role);
 }
 
-/** Check list Mass email button (broadcast to all drivers). */
+/** Check list Mass email / Mass Push buttons (broadcast to all drivers). */
 export const CHECK_LIST_MASS_EMAIL_ROLES = [
 	"ADMINISTRATOR",
 	"HR_MANAGER",
