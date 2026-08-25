@@ -22,6 +22,8 @@ type PropsType = {
 	disabled?: boolean;
 	/** Optional end time below the calendar time — stored as "start — end" */
 	allowTimeRange?: boolean;
+	/** Earliest selectable datetime (previous stop). Dates and times before this are disabled. */
+	minDate?: Date | null;
 };
 
 /** US-style date + 12h time (legacy single value) */
@@ -184,6 +186,7 @@ export default function DateTimePicker({
 	className = "",
 	disabled = false,
 	allowTimeRange = false,
+	minDate = null,
 }: PropsType) {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const fpRef = useRef<flatpickr.Instance | null>(null);
@@ -196,6 +199,9 @@ export default function DateTimePicker({
 	allowTimeRangeRef.current = allowTimeRange;
 	const valueRef = useRef(value);
 	valueRef.current = value;
+	const minDateRef = useRef<Date | null>(minDate);
+	minDateRef.current = minDate;
+	const minDateMs = minDate?.getTime() ?? null;
 
 	const emitValue = (fp: flatpickr.Instance) => {
 		const start = fp.selectedDates[0];
@@ -234,6 +240,7 @@ export default function DateTimePicker({
 			time_24hr: false,
 			altInput: false,
 			allowInput: false,
+			minDate: minDateRef.current ?? undefined,
 			onOpen: () => {
 				requestAnimationFrame(() => {
 					const input = fp.input;
@@ -244,6 +251,10 @@ export default function DateTimePicker({
 					if (allowTimeRangeRef.current && container) {
 						const { end } = parseOfferDateTimeField(valueRef.current);
 						endRowRef.current = mountEndTimeRow(container, end, () => emitValue(fp));
+					}
+					const min = minDateRef.current;
+					if (!fp.selectedDates[0] && min) {
+						fp.jumpToDate(min, false);
 					}
 				});
 			},
@@ -263,6 +274,11 @@ export default function DateTimePicker({
 			endRowRef.current = null;
 		};
 	}, [id]);
+
+	useEffect(() => {
+		if (!fpRef.current) return;
+		fpRef.current.set("minDate", minDateMs != null ? new Date(minDateMs) : undefined);
+	}, [minDateMs]);
 
 	useEffect(() => {
 		if (!fpRef.current) return;

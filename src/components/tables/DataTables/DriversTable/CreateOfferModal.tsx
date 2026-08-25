@@ -21,6 +21,7 @@ import {
 	formatOfferDateTimeFieldForDisplay,
 	formatOfferDateTimeRange,
 	getRouteChronologyError,
+	getRouteStopMinDate,
 	isOfferAsapTime,
 	isOfferDateWithoutTime,
 	OFFER_ASAP_TIME,
@@ -313,6 +314,7 @@ function DraggableExtraRow({
 	onTimeBlur,
 	onAsapToggle,
 	locationError,
+	minDate,
 	canRemove = true,
 	rowCount,
 	onAddRow,
@@ -328,6 +330,8 @@ function DraggableExtraRow({
 	onTimeBlur?: () => void;
 	onAsapToggle?: (index: number, enabled: boolean) => void;
 	locationError?: string;
+	/** Previous stop datetime — delivery cannot be earlier than pick up. */
+	minDate?: Date | null;
 	/** When false, hide the remove button (e.g. only one row of this type remains) */
 	canRemove?: boolean;
 	rowCount: number;
@@ -497,6 +501,7 @@ function DraggableExtraRow({
 							id={`datetime-${row.id}`}
 							allowTimeRange
 							value={row.time}
+							minDate={minDate ?? null}
 							onChange={v => updateExtraRow(index, "time", v)}
 							onBlur={onTimeBlur}
 							className="dark:bg-gray-900"
@@ -1262,6 +1267,10 @@ export default function CreateOfferModal({
 								}}
 								onAsapToggle={handleAsapToggle}
 								locationError={routeRowLocationErrors[row.id]}
+								minDate={getRouteStopMinDate(
+									routeRows.map(r => r.time),
+									index
+								)}
 								canRemove={
 									!lockRouteStructureFromUrl &&
 									((row.type === "pickup" &&

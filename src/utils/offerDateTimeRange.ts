@@ -260,3 +260,17 @@ export function getRouteChronologyError(times: string[]): string | null {
 
 	return null;
 }
+
+/**
+ * Earliest datetime a stop may use: the previous filled stop's start.
+ * Used to disable delivery dates before pick up.
+ */
+export function getRouteStopMinDate(times: string[], index: number): Date | null {
+	for (let i = index - 1; i >= 0; i--) {
+		const time = times[i]?.trim() ?? "";
+		if (!time || isOfferAsapTime(time)) continue;
+		const start = parseOfferRouteDateTime(time);
+		if (start) return start;
+	}
+	return null;
+}
