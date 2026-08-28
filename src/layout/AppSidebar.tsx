@@ -11,6 +11,7 @@ import {
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessLoadBoard,
+	canAccessNewsUpdates,
 	canAccessUserListAndCheckList,
 	getAppHomePath,
 } from "@/utils/roleAccess";
@@ -25,6 +26,7 @@ import {
 	CheckListIcon,
 	BidRatesIcon,
 	LoadBoardIcon,
+	NewsUpdatesIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 import { Users, MessageCircle, ScrollText } from "lucide-react";
@@ -92,6 +94,11 @@ const navItems: NavItem[] = [
 		icon: <ScrollText className="h-5 w-5" />,
 		name: "App Logs",
 		path: "/app-logs",
+	},
+	{
+		icon: <NewsUpdatesIcon className="h-5 w-5" />,
+		name: "News/Updates",
+		path: "/news-updates",
 	},
 	// {
 	//   name: "AI Assistant",
@@ -186,6 +193,7 @@ const CHECK_LIST_PATHS = ["/check-list"];
 const BID_RATES_PATHS = ["/bid-rates"];
 const LOAD_BOARD_PATHS = ["/load-board"];
 const APP_LOGS_PATHS = ["/app-logs"];
+const NEWS_UPDATES_PATHS = ["/news-updates"];
 
 const AppSidebar: React.FC = () => {
 	const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -199,6 +207,7 @@ const AppSidebar: React.FC = () => {
 	const canSeeBidRates = canAccessBidRates(currentUser?.role);
 	const canSeeLoadBoard = canAccessLoadBoard(currentUser?.role);
 	const canSeeAppLogs = canAccessAppLogs(currentUser?.role);
+	const canSeeNewsUpdates = canAccessNewsUpdates(currentUser?.role);
 	const appHomePath = getAppHomePath(currentUser?.role);
 	const menuNavItems = useMemo(
 		() =>
@@ -212,7 +221,8 @@ const AppSidebar: React.FC = () => {
 					(!item.path || !CHECK_LIST_PATHS.includes(item.path) || canSeeCheckList) &&
 					(!item.path || !BID_RATES_PATHS.includes(item.path) || canSeeBidRates) &&
 					(!item.path || !LOAD_BOARD_PATHS.includes(item.path) || canSeeLoadBoard) &&
-					(!item.path || !APP_LOGS_PATHS.includes(item.path) || canSeeAppLogs),
+					(!item.path || !APP_LOGS_PATHS.includes(item.path) || canSeeAppLogs) &&
+					(!item.path || !NEWS_UPDATES_PATHS.includes(item.path) || canSeeNewsUpdates),
 			),
 		[
 			isAdmin,
@@ -223,6 +233,7 @@ const AppSidebar: React.FC = () => {
 			canSeeBidRates,
 			canSeeLoadBoard,
 			canSeeAppLogs,
+			canSeeNewsUpdates,
 		],
 	);
 

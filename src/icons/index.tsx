@@ -74,6 +74,7 @@ import WorkstationIcon from "./workstation.svg";
 import CheckListIcon from "./check-list.svg";
 import BidRatesIcon from "./bid-rates.svg";
 import LoadBoardIcon from "./load-board.svg";
+import NewsUpdatesIcon from "./news-updates.svg";
 import LoadBoardEditIcon from "./load-board-edit.svg";
 import LoadBoardDeleteIcon from "./load-board-delete.svg";
 import LoadBoardDuplicateIcon from "./load-board-duplicate.svg";
@@ -178,6 +179,7 @@ export {
 	CheckListIcon,
 	BidRatesIcon,
 	LoadBoardIcon,
+	NewsUpdatesIcon,
 	LoadBoardEditIcon,
 	LoadBoardDeleteIcon,
 	LoadBoardDuplicateIcon,

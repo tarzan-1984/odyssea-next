@@ -8,6 +8,7 @@ import {
 	canAccessCheckList,
 	canAccessDriversAndOffers,
 	canAccessLoadBoard,
+	canAccessNewsUpdates,
 	canAccessUserListAndCheckList,
 	getAppHomePath,
 } from "@/utils/roleAccess";
@@ -172,6 +173,16 @@ export function middleware(request: NextRequest) {
 	if (isAppLogsPage && hasToken) {
 		const role = getUserRoleFromCookie(request);
 		if (!canAccessAppLogs(role)) {
+			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
+		}
+	}
+
+	// News/Updates: recruiter TL, tracking TL, administrators
+	const isNewsUpdatesPage =
+		pathname === "/news-updates" || pathname.startsWith("/news-updates/");
+	if (isNewsUpdatesPage && hasToken) {
+		const role = getUserRoleFromCookie(request);
+		if (!canAccessNewsUpdates(role)) {
 			return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 		}
 	}

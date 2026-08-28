@@ -15,6 +15,10 @@ import ReplyPreview from "./ReplyPreview";
 import MessageTemplatesModal from "./MessageTemplatesModal";
 import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
+import {
+	CHAT_ATTACHMENT_ACCEPT,
+	isChatAttachmentFile,
+} from "@/utils/chatAttachmentTypes";
 import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { isChatImageThumbnailCandidate } from "@/config/chatImagePreview";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
@@ -395,30 +399,6 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			handleSendMessage();
 		};
 
-		const isFileAllowed = (file: File): boolean => {
-			const acceptedTypes = [
-				"image/*",
-				"application/pdf",
-				".doc",
-				".docx",
-				".txt",
-				".heic",
-				".heif",
-			];
-			const fileType = file.type;
-			const lowerName = file.name.toLowerCase();
-			return acceptedTypes.some(type => {
-				if (type.startsWith(".")) {
-					return lowerName.endsWith(type);
-				}
-				if (type.endsWith("/*")) {
-					const baseType = type.slice(0, -2);
-					return fileType.startsWith(baseType);
-				}
-				return fileType === type;
-			});
-		};
-
 		const uploadFiles = useCallback(
 			async (picked: File[]) => {
 				if (picked.length === 0 || disabled || isSending) return;
@@ -432,7 +412,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						errors.push(`${file.name}: max 10MB`);
 						continue;
 					}
-					if (!isFileAllowed(file)) {
+					if (!isChatAttachmentFile(file)) {
 						errors.push(`${file.name}: type not allowed`);
 						continue;
 					}
@@ -702,7 +682,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						type="file"
 						multiple
 						onChange={handleFileSelect}
-						accept="image/*,.heic,.heif,application/pdf,.doc,.docx,.txt"
+						accept={CHAT_ATTACHMENT_ACCEPT}
 						className="hidden"
 					/>
 				) : null}

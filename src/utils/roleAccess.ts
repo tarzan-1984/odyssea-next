@@ -192,6 +192,19 @@ export function canAccessAppLogs(role: string | undefined | null): boolean {
 	return (APP_LOGS_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
+/** News/Updates page: recruiters TL, tracking TL, and administrators. */
+export const NEWS_UPDATES_ALLOWED_ROLES = [
+	"RECRUITER_TL",
+	"TRACKING_TL",
+	"ADMINISTRATOR",
+] as const;
+
+export function canAccessNewsUpdates(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (NEWS_UPDATES_ALLOWED_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Load board page. */
 export const LOAD_BOARD_ALLOWED_ROLES = [
 	"DISPATCHER",

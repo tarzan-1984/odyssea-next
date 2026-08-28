@@ -8,10 +8,20 @@ export type PresignResponse = {
 	key: string;
 };
 
+export type S3UploadStage = "presign" | "upload";
+
+export type S3UploadProgress = {
+	stage: S3UploadStage;
+	sizeBytes?: number;
+	presignMs?: number;
+	putMs?: number;
+};
+
 export class S3Uploader {
 	constructor(
 		private presignEndpoint?: string,
-		private extraHeaders: Record<string, string> = {}
+		private extraHeaders: Record<string, string> = {},
+		private onProgress?: (progress: S3UploadProgress) => void,
 	) {}
 
 	private isHeicFile(file: File, filename: string): boolean {
@@ -114,6 +124,8 @@ export class S3Uploader {
 		try {
 			// 1) Ask Nest for a presigned URL
 			let presignData: PresignResponse;
+			const presignStartedAt = performance.now();
+			this.onProgress?.({ stage: "presign", sizeBytes: uploadFile.size });
 
 			if (this.presignEndpoint) {
 				// Use direct endpoint (legacy mode)
@@ -125,6 +137,7 @@ export class S3Uploader {
 					},
 					body: JSON.stringify({ filename, contentType }),
 					cache: "no-store",
+					credentials: "include",
 				});
 
 				if (!presignRes.ok) {
@@ -134,13 +147,17 @@ export class S3Uploader {
 					);
 				}
 
-				presignData = (await presignRes.json()) as PresignResponse;
+				const raw = (await presignRes.json()) as PresignResponse & {
+					data?: PresignResponse;
+				};
+				presignData = raw.data ?? raw;
 			} else {
 				// Use chatApi client
 				presignData = await chatApi.getPresignedUrl(filename, contentType);
 			}
 
 			const { uploadUrl, fileUrl, key } = presignData;
+			const presignMs = Math.round(performance.now() - presignStartedAt);
 
 			// Validate response
 			if (!uploadUrl || !fileUrl || !key) {
@@ -148,21 +165,35 @@ export class S3Uploader {
 			}
 
 			// 2) PUT upload to Wasabi
+			const putStartedAt = performance.now();
+			this.onProgress?.({ stage: "upload", sizeBytes: uploadFile.size, presignMs });
 			const putRes = await fetch(uploadUrl, {
 				method: "PUT",
 				headers: { "Content-Type": contentType },
 				body: uploadFile,
 			});
+			const putMs = Math.round(performance.now() - putStartedAt);
 
 			if (!putRes.ok) {
 				const errorText = await putRes.text().catch(() => "Unknown error");
 				throw new Error(`Upload failed: ${putRes.status} ${errorText}`);
 			}
 
+			if (process.env.NODE_ENV !== "production") {
+				console.debug("[S3Uploader] upload timings", {
+					presignMs,
+					putMs,
+					sizeBytes: uploadFile.size,
+					filename,
+				});
+			}
+
+			this.onProgress?.({ stage: "upload", sizeBytes: uploadFile.size, presignMs, putMs });
+
 			const etag = putRes.headers.get("ETag") ?? undefined;
 
 			// 3) Return for further processing (e.g., save to DB)
-			return { fileUrl, key, etag, fileName: filename, fileSize: uploadFile.size };
+			return { fileUrl, key, etag, fileName: filename, fileSize: uploadFile.size, presignMs, putMs };
 		} catch (error) {
 			// Re-throw with more context
 			if (error instanceof Error) {

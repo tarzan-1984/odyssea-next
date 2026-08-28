@@ -580,8 +580,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 		});
 
 		// Handle user location updates from backend (users table)
-		newSocket.on("userLocationUpdate", (payload: any) => {
-			console.log("[WebSocket] User location update");
+		newSocket.on("userLocationUpdate", () => {
+			// Location updates are high-frequency; no UI action required here.
 		});
 
 		// Handle message sent confirmation (full message body for fast client ack UI)
