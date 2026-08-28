@@ -2,6 +2,14 @@ import Image from "next/image";
 import { UserData, UserListItem } from "@/app-api/api-types";
 import { twMerge } from "tailwind-merge";
 
+export type AvatarUser = {
+	firstName?: string | null;
+	lastName?: string | null;
+	profilePhoto?: string | null;
+	userColor?: string | null;
+	role?: string | null;
+};
+
 /**
  * Stable background color for LOAD/OFFER chat avatars when no image is set.
  * Derived from room id so the same chat always gets the same color.
@@ -73,8 +81,8 @@ export function resolveAvatarBackground(role?: string | null, userColor?: string
 	return normalizeHexColor(userColor) ?? DEFAULT_AVATAR_BG;
 }
 
-function pickAvatarPhotoUrl(item: UserData | UserListItem): string {
-	const loose = item as UserData & UserListItem & { profilePhoto?: string };
+function pickAvatarPhotoUrl(item: UserData | UserListItem | AvatarUser): string {
+	const loose = item as UserData & UserListItem & AvatarUser & { avatar?: string };
 	const fromAvatar = typeof loose.avatar === "string" ? loose.avatar.trim() : "";
 	const fromPhoto = typeof loose.profilePhoto === "string" ? loose.profilePhoto.trim() : "";
 	return fromAvatar || fromPhoto;
@@ -96,14 +104,13 @@ export type RenderAvatarOptions = {
  * @returns The avatar element (either an Image or a div with initials).
  */
 export function renderAvatar(
-	item?: UserData | UserListItem | null,
+	item?: UserData | UserListItem | AvatarUser | null,
 	className?: string,
 	options?: RenderAvatarOptions,
 ) {
 	if (!item) return <div className={twMerge("w-10 h-10 bg-gray-300 rounded-full", className)} />;
 
-	const u = item as UserData | UserListItem;
-	const bg = resolveAvatarBackground(u.role, u.userColor ?? null);
+	const bg = resolveAvatarBackground(item.role, item.userColor ?? null);
 	const photoUrl = pickAvatarPhotoUrl(item);
 	const parentBg = options?.parentProvidesBackground === true;
 
