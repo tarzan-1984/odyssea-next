@@ -31,6 +31,7 @@ import {
 	driverNeedsLoadDispatchTermsAcceptance,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
+import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -444,6 +445,11 @@ export default function ChatBox({
 			});
 		});
 	}, []);
+
+	const handleScrollToBottomClick = useCallback(() => {
+		setIsUserScrolledUp(false);
+		scrollToBottom();
+	}, [scrollToBottom]);
 
 	const handleVirtualContentMeasured = useCallback(() => {
 		if (isRestoringOlderScrollRef.current) {
@@ -952,14 +958,15 @@ export default function ChatBox({
 				<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
 				{/* Messages */}
-				<div
-					ref={attachMessagesContainer}
-					onScroll={handleScroll}
-					onWheelCapture={handleMessagesWheelCapture}
-					onMouseDown={handleMessagesMouseDown}
-					className="relative flex-1 max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
-					style={{ overflowAnchor: "none" }}
-				>
+				<div className="relative min-h-0 flex-1">
+					<div
+						ref={attachMessagesContainer}
+						onScroll={handleScroll}
+						onWheelCapture={handleMessagesWheelCapture}
+						onMouseDown={handleMessagesMouseDown}
+						className="relative h-full max-h-full overflow-auto p-5 custom-scrollbar xl:p-6"
+						style={{ overflowAnchor: "none" }}
+					>
 					<ChatMediaLoadProvider
 						mediaLoadEnabled={messagesReady}
 						scrollRoot={messagesScrollRoot}
@@ -1147,6 +1154,17 @@ export default function ChatBox({
 							</div>
 						)}
 					</ChatMediaLoadProvider>
+					</div>
+					{isUserScrolledUp && uniqueMessages.length > 0 && (
+						<button
+							type="button"
+							onClick={handleScrollToBottomClick}
+							className="absolute bottom-3 right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-500 shadow-md transition hover:text-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:text-white xl:bottom-4 xl:right-4"
+							aria-label="Scroll to latest messages"
+						>
+							<ChatScrollDownIcon className="h-10 w-10" />
+						</button>
+					)}
 				</div>
 
 				{/* Send form hidden for archived LOAD shipments and until driver accepts dispatch terms */}
