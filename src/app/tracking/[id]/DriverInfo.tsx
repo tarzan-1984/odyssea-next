@@ -40,6 +40,8 @@ interface DriverInfoProps {
 	driverData: DriverData | null;
 	/** TMS load post id for "Show in TMS" link (tracking load page). */
 	loadId?: string;
+	/** Display value for "Load number" (TMS meta_data.reference_number). */
+	loadNumber?: string | null;
 	/** Human-readable load status from TMS meta_data.load_status. */
 	loadStatusLabel?: string | null;
 	/** Multiline route details (pick up / delivery, address, time). */
@@ -54,6 +56,7 @@ const TMS_LOAD_PAGE_URL = "https://www.endurance-tms.com/add-load/";
 export default function DriverInfo({
 	driverData,
 	loadId,
+	loadNumber,
 	loadStatusLabel,
 	routeDetails,
 	showLoadTrackingActions = true,
@@ -104,6 +107,7 @@ export default function DriverInfo({
 	const tmsLoadPageUrl = tmsLoadId
 		? `${TMS_LOAD_PAGE_URL}?post_id=${encodeURIComponent(tmsLoadId)}`
 		: null;
+	const loadNumberDisplay = loadNumber?.trim() || tmsLoadId;
 	const openChatUrl = tmsLoadId ? `/chat?load=${encodeURIComponent(tmsLoadId)}` : null;
 
 	// Format coordinates
@@ -208,7 +212,7 @@ export default function DriverInfo({
 								{coordinates}
 							</p>
 						</div>
-						{tmsLoadId && tmsLoadPageUrl && (
+						{tmsLoadId && tmsLoadPageUrl && loadNumberDisplay && (
 							<div className="min-w-0">
 								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
 									Load number
@@ -220,7 +224,7 @@ export default function DriverInfo({
 										rel="noopener noreferrer"
 										className="text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
 									>
-										{tmsLoadId}
+										{loadNumberDisplay}
 									</a>
 								</p>
 							</div>

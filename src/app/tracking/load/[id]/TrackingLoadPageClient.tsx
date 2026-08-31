@@ -54,6 +54,7 @@ type LoadDetailsResponse = {
 				pick_up_location?: string | null;
 				delivery_location?: string | null;
 				load_status?: string | null;
+				reference_number?: string | null;
 				attached_driver?: string | null;
 				attached_second_driver?: string | null;
 				attached_third_driver?: string | null;
@@ -76,6 +77,7 @@ type LoadDetailsResponse = {
 			pick_up_location?: string | null;
 			delivery_location?: string | null;
 			load_status?: string | null;
+			reference_number?: string | null;
 			attached_driver?: string | null;
 			attached_second_driver?: string | null;
 			attached_third_driver?: string | null;
@@ -395,6 +397,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const normalizedLoadStatus = normalizeTrackingStatus(loadMetaData?.load_status ?? null);
 	const isLoadDelivered = normalizedLoadStatus === "delivered";
 	const loadStatusLabel = formatLoadStatusLabel(loadMetaData?.load_status ?? null);
+	const loadReferenceNumber = String(loadMetaData?.reference_number ?? "").trim();
 	const loadRouteDetails = useMemo(
 		() =>
 			formatTmsLoadRoute(
@@ -1448,6 +1451,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							<DriverInfo
 								driverData={driverCardData}
 								loadId={loadId}
+								loadNumber={loadReferenceNumber}
 								loadStatusLabel={loadStatusLabel}
 								routeDetails={loadRouteDetails}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
