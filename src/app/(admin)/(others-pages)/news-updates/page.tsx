@@ -4,14 +4,14 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-	title: "News/Updates | Odysseia Web",
+	title: "Information feed | Odysseia Web",
 	description: "Company news and updates",
 };
 
 export default function NewsUpdatesPage() {
 	return (
 		<div>
-			<PageBreadcrumb pageTitle="News/Updates" />
+			<PageBreadcrumb pageTitle="Information feed" />
 			<NewsUpdatesPageClient />
 		</div>
 	);

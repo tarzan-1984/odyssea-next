@@ -179,7 +179,7 @@ export default function CreateNewsModal({
 		>
 			<form onSubmit={onSubmit} className="flex max-h-[85vh] flex-col p-6">
 				<h2 className="pr-12 text-lg font-semibold text-gray-900 dark:text-white">
-					{isEdit ? "Edit news" : "Create news"}
+					{isEdit ? "Edit post" : "Create post"}
 				</h2>
 
 				<div className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">

@@ -13,7 +13,6 @@ import { deleteNews, getNewsList, type NewsArticle } from "@/app-api/news";
 import CreateNewsIcon from "./CreateNewsIcon";
 import CreateNewsModal from "./CreateNewsModal";
 import NewsArticleBody from "./NewsArticleBody";
-import { cleanupNewsArticleMediaInBackground } from "./newsArticleUploadUtils";
 
 const NEWS_LIST_QUERY_KEY = ["news-list"] as const;
 
@@ -75,7 +74,6 @@ export default function NewsUpdatesPageClient() {
 		setDeletingNewsId(article.id);
 		try {
 			await deleteNews(article.id);
-			cleanupNewsArticleMediaInBackground(article.article);
 			setDeleteConfirmArticle(null);
 			if (expandedNewsId === article.id) {
 				setExpandedNewsId(null);
@@ -102,7 +100,7 @@ export default function NewsUpdatesPageClient() {
 					onClick={() => setIsCreateOpen(true)}
 					startIcon={<CreateNewsIcon className="h-5 w-5" />}
 				>
-					Create new news
+					Post
 				</Button>
 			</div>
 
@@ -169,7 +167,7 @@ export default function NewsUpdatesPageClient() {
 													<div className="flex items-center gap-2">
 														<button
 															type="button"
-															title="Edit news"
+															title="Edit post"
 															onClick={e => {
 																e.stopPropagation();
 																setEditArticle(item);
@@ -186,7 +184,7 @@ export default function NewsUpdatesPageClient() {
 															}}
 															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 														>
-															Delete news
+															Delete
 															<TrashBinIcon className="h-5 w-5 shrink-0" />
 														</button>
 													</div>
@@ -267,7 +265,7 @@ export default function NewsUpdatesPageClient() {
 				isOpen={deleteConfirmArticle != null}
 				onClose={() => setDeleteConfirmArticle(null)}
 				onConfirm={handleConfirmDelete}
-				title="Delete news"
+				title="Delete"
 				message="Are you sure you want to delete this news article? This action cannot be undone."
 				confirmText="Delete"
 				cancelText="Cancel"

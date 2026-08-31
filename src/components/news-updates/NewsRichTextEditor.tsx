@@ -28,6 +28,10 @@ import {
 } from "./news-image-extension";
 import { NewsEditorUploadContext } from "./NewsEditorUploadContext";
 import {
+	unwrapNewsArticleShell,
+	wrapNewsArticleShell,
+} from "./newsArticleBackground";
+import {
 	AlignCenter,
 	AlignLeft,
 	AlignRight,
@@ -44,6 +48,7 @@ import {
 	List,
 	ListOrdered,
 	Minus,
+	PaintBucket,
 	Palette,
 	Quote,
 	Redo2,
@@ -95,6 +100,17 @@ const HIGHLIGHT_COLORS = [
 	"#fbcfe8",
 	"#fed7aa",
 	"#e9d5ff",
+] as const;
+
+const ARTICLE_BACKGROUND_COLORS = [
+	"#ffffff",
+	"#fefce8",
+	"#fef3c7",
+	"#ecfdf3",
+	"#eff6ff",
+	"#fdf2f8",
+	"#f5f3ff",
+	"#f3f4f6",
 ] as const;
 
 const EMOJI_PICKER_WIDTH = 320;
@@ -545,6 +561,17 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 
 	useEffect(() => () => cancelAllUploads(), [cancelAllUploads]);
 
+	const initialParsed = unwrapNewsArticleShell(initialHtml);
+	const [articleBackground, setArticleBackground] = useState<string | null>(
+		initialParsed.backgroundColor,
+	);
+	const articleBackgroundRef = useRef<string | null>(initialParsed.backgroundColor);
+	articleBackgroundRef.current = articleBackground;
+
+	const serializeHtml = useCallback((instance: Editor) => {
+		return wrapNewsArticleShell(instance.getHTML(), articleBackgroundRef.current);
+	}, []);
+
 	const emitChange = useMemo(
 		() => debounceChangeCallback((html, plainText) => onChangeRef.current(html, plainText), 200),
 		[],
@@ -555,7 +582,7 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 	const editor = useEditor({
 		immediatelyRender: false,
 		shouldRerenderOnTransaction: true,
-		content: initialHtml,
+		content: initialParsed.innerHtml,
 		extensions: [
 			StarterKit.configure({
 				heading: { levels: [1, 2, 3] },
@@ -617,14 +644,30 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 			},
 		},
 		onUpdate: ({ editor: instance }) => {
-			emitChange(instance.getHTML(), instance.getText());
+			emitChange(serializeHtml(instance), instance.getText());
 		},
 	});
 
 	useEffect(() => {
 		if (!editor) return;
-		onChangeRef.current(editor.getHTML(), editor.getText());
-	}, [editor]);
+		onChangeRef.current(serializeHtml(editor), editor.getText());
+	}, [editor, serializeHtml]);
+
+	useEffect(() => {
+		if (!editor) return;
+		editor.view.dom.style.backgroundColor = articleBackground ?? "";
+	}, [articleBackground, editor]);
+
+	const applyArticleBackground = useCallback(
+		(color: string | null) => {
+			setArticleBackground(color);
+			articleBackgroundRef.current = color;
+			if (!isEditorAlive(editor)) return;
+			editor.view.dom.style.backgroundColor = color ?? "";
+			emitChange.flush(serializeHtml(editor), editor.getText());
+		},
+		[editor, emitChange, serializeHtml],
+	);
 
 	const setLink = useCallback(() => {
 		if (!editor) return;
@@ -677,7 +720,7 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 			const uploadId = crypto.randomUUID();
 			const previewUrl = URL.createObjectURL(file);
 			editor.chain().focus().setImage({ src: previewUrl }).run();
-			emitChange.flush(editor.getHTML(), editor.getText());
+			emitChange.flush(serializeHtml(editor), editor.getText());
 			beginUpload(uploadId, previewUrl);
 
 			setUploadError(null);
@@ -702,11 +745,11 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 					deleteNewsArticleMediaInBackground(fileUrl);
 					removeImageBySrc(editor, previewUrl);
 				}
-				emitChange.flush(editor.getHTML(), editor.getText());
+				emitChange.flush(serializeHtml(editor), editor.getText());
 			} catch (error) {
 				if (isEditorAlive(editor)) {
 					removeImageBySrc(editor, previewUrl);
-					emitChange.flush(editor.getHTML(), editor.getText());
+					emitChange.flush(serializeHtml(editor), editor.getText());
 				}
 				if (!isUploadCancelled(uploadId)) {
 					setUploadError(
@@ -716,7 +759,7 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 			} finally {
 				endUpload(uploadId);
 				if (isEditorAlive(editor)) {
-					emitChange.flush(editor.getHTML(), editor.getText());
+					emitChange.flush(serializeHtml(editor), editor.getText());
 				}
 				// Revoke after React node view swaps src away from the blob URL.
 				window.setTimeout(() => URL.revokeObjectURL(previewUrl), 0);
@@ -755,7 +798,7 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 						fileSize: uploaded.fileSize,
 					})
 					.run();
-				emitChange.flush(editor.getHTML(), editor.getText());
+				emitChange.flush(serializeHtml(editor), editor.getText());
 			} catch (error) {
 				if (!isUploadCancelled(uploadId)) {
 					setUploadError(
@@ -785,10 +828,10 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 				if (!isEditorAlive(editor)) {
 					return { html: "", plainText: "" };
 				}
-				return { html: editor.getHTML(), plainText: editor.getText() };
+				return { html: serializeHtml(editor), plainText: editor.getText() };
 			},
 		}),
-		[cancelAllUploads, editor],
+		[cancelAllUploads, editor, serializeHtml],
 	);
 
 	if (!editor) {
@@ -869,6 +912,14 @@ export default forwardRef<NewsRichTextEditorHandle, NewsRichTextEditorProps>(
 					defaultCustomColor="#fef08a"
 					onPick={color => editor.chain().focus().setHighlight({ color }).run()}
 					onClear={() => editor.chain().focus().unsetHighlight().run()}
+				/>
+				<ToolbarColorPicker
+					label="Article background"
+					icon={<PaintBucket className={iconClass} />}
+					colors={ARTICLE_BACKGROUND_COLORS}
+					defaultCustomColor={articleBackground ?? "#ffffff"}
+					onPick={color => applyArticleBackground(color)}
+					onClear={() => applyArticleBackground(null)}
 				/>
 				<EmojiPickerButton onPick={insertEmoji} />
 				<input

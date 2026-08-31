@@ -3,16 +3,24 @@
 import { useMemo } from "react";
 import NewsTextFilePreview from "./NewsTextFilePreview";
 import { parseNewsArticleHtml } from "./parseNewsArticleHtml";
+import { unwrapNewsArticleShell } from "./newsArticleBackground";
 
 type NewsArticleBodyProps = {
 	html: string;
 };
 
 export default function NewsArticleBody({ html }: NewsArticleBodyProps) {
-	const parts = useMemo(() => parseNewsArticleHtml(html), [html]);
+	const { backgroundColor, innerHtml } = useMemo(
+		() => unwrapNewsArticleShell(html),
+		[html],
+	);
+	const parts = useMemo(() => parseNewsArticleHtml(innerHtml), [innerHtml]);
 
 	return (
-		<div className="news-article-body">
+		<div
+			className="news-article-body"
+			style={backgroundColor ? { backgroundColor } : undefined}
+		>
 			{parts.map((part, index) => {
 				if (part.type === "textFile") {
 					return (

@@ -97,7 +97,7 @@ const navItems: NavItem[] = [
 	},
 	{
 		icon: <NewsUpdatesIcon className="h-5 w-5" />,
-		name: "News/Updates",
+		name: "Information feed",
 		path: "/news-updates",
 	},
 	// {
