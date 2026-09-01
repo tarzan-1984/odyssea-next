@@ -143,12 +143,13 @@ export function canAccessCheckListMassEmail(role: string | undefined | null): bo
 	return (CHECK_LIST_MASS_EMAIL_ROLES as readonly string[]).includes(normalized);
 }
 
-/** Bid rates page: dispatchers and expedite managers. */
+/** Bid rates page: dispatchers, expedite managers, and tracking team leads. */
 export const BID_RATES_ALLOWED_ROLES = [
 	"DISPATCHER",
 	"DISPATCHER_TL",
 	"EXPEDITE_MANAGER",
 	"ADMINISTRATOR",
+	"TRACKING_TL",
 ] as const;
 
 export function canAccessBidRates(role: string | undefined | null): boolean {
