@@ -30,12 +30,16 @@ export default function MessageReadStatus({
 	const [open, setOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	const readers = useMemo(() => {
-		const ids = [...new Set(readBy)]
-			.filter(Boolean)
-			.filter(id => !(senderId && id === senderId));
+	const readerIds = useMemo(
+		() =>
+			[...new Set(readBy)]
+				.filter(Boolean)
+				.filter(id => !(senderId && id === senderId)),
+		[readBy, senderId]
+	);
 
-		return ids
+	const readers = useMemo(() => {
+		return readerIds
 			.map(id => ({
 				id,
 				label: resolveChatUserDisplayName(id, {
@@ -45,9 +49,10 @@ export default function MessageReadStatus({
 				}),
 			}))
 			.filter((reader): reader is { id: string; label: string } => Boolean(reader.label));
-	}, [readBy, participants, userNameLookup, currentUserId, senderId]);
+	}, [readerIds, participants, userNameLookup, currentUserId]);
 
-	const canOpenDetails = isRead && readers.length > 0;
+	const shownAsRead = isRead || readerIds.length > 0;
+	const canOpenDetails = shownAsRead && readers.length > 0;
 
 	useEffect(() => {
 		if (!open) return;
@@ -121,8 +126,8 @@ export default function MessageReadStatus({
 					{readIcon}
 				</button>
 			) : (
-				<div className="inline-flex items-center justify-center" aria-hidden={!isRead}>
-					{isRead ? readIcon : sentIcon}
+				<div className="inline-flex items-center justify-center" aria-hidden={!shownAsRead}>
+					{shownAsRead ? readIcon : sentIcon}
 				</div>
 			)}
 

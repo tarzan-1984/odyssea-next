@@ -726,6 +726,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 								chatRoomId: messageData.chatRoomId,
 							});
 						}
+
+						// A reply means the sender has seen earlier messages in this room.
+						// Covers the race where messageRead arrived before our outgoing
+						// message was in the store.
+						useChatStore.getState().applyCatchUpReadReceipts({
+							chatRoomId: messageData.chatRoomId,
+							readByUserId: messageData.message.senderId,
+							until: messageData.message.createdAt,
+						});
 					}
 				}
 			}

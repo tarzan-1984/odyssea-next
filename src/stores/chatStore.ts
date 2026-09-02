@@ -4,6 +4,12 @@ import { ChatRoom, Message, User, isMessageReadByUser } from "@/app-api/chatApi"
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeMessageLists, mergeReadByArrays, filterMessagesForRoom } from "@/utils/chatMessagesMerge";
 import {
+	applyPendingReadsToMessage,
+	applyPendingReadsToMessages,
+	stashCatchUpRead,
+	stashReadReceipt,
+} from "@/lib/pendingMessageReadReceipts";
+import {
 	archiveDayHasRemaining,
 	archiveDayKey,
 	ArchivedDayCacheEntry,
@@ -14,6 +20,40 @@ import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 import { trimChatMessagesWindow } from "@/utils/trimChatMessagesWindow";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { useUserStore } from "./userStore";
+
+const persistMessageReadState = (message: Message) => {
+	indexedDBChatService
+		.updateMessage(message.id, {
+			isRead: message.isRead,
+			readBy: message.readBy,
+		})
+		.catch((error: Error) => {
+			console.error("Failed to update message read receipt in IndexedDB:", error);
+		});
+};
+
+const persistReadStateUpdates = (previous: Message[], next: Message[]) => {
+	const prevById = new Map(previous.map(msg => [msg.id, msg]));
+	for (const msg of next) {
+		const prev = prevById.get(msg.id);
+		if (!prev) {
+			if (msg.isRead) {
+				persistMessageReadState(msg);
+			}
+			continue;
+		}
+		const prevReadBy = prev.readBy ?? [];
+		const nextReadBy = msg.readBy ?? [];
+		if (
+			prev.isRead === msg.isRead &&
+			prevReadBy.length === nextReadBy.length &&
+			nextReadBy.every(id => prevReadBy.includes(id))
+		) {
+			continue;
+		}
+		persistMessageReadState(msg);
+	}
+};
 
 // Helper function to sort chat rooms by pin, mute status, and last message date (read/unread does not affect order)
 const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
@@ -108,6 +148,12 @@ interface ChatState {
 	applyMessageReadReceipt: (data: {
 		messageId: string;
 		readByUserId: string;
+	}) => boolean;
+	/** Sender of an incoming message has seen earlier messages in this room. */
+	applyCatchUpReadReceipts: (data: {
+		chatRoomId: string;
+		readByUserId: string;
+		until: string;
 	}) => boolean;
 	/** Optimistic local sync when user clicks "Read all" before WebSocket events arrive. */
 	markChatRoomsAsReadLocally: (chatRoomIds: string[]) => void;
@@ -342,8 +388,12 @@ export const useChatStore = create<ChatState>()(
 
 				// Message actions
 				setMessages: messages => {
+					const hydrated = applyPendingReadsToMessages(messages);
+					if (hydrated !== messages) {
+						persistReadStateUpdates(messages, hydrated);
+					}
 					set(
-						{ messages: trimChatMessagesWindow(messages), error: null },
+						{ messages: trimChatMessagesWindow(hydrated), error: null },
 						false,
 						"setMessages"
 					);
@@ -362,11 +412,20 @@ export const useChatStore = create<ChatState>()(
 					// Authoritative unread: chatUnreadCountUpdated → user_${id}.
 					const readersToAdd = new Map<string, Set<string>>();
 					const readByFromServer = new Map<string, string[]>();
+					const knownIds = new Set(messages.map(msg => msg.id));
 
 					for (const event of events) {
 						for (const snapshot of event.messages ?? []) {
 							if (snapshot.id && snapshot.readBy?.length) {
 								readByFromServer.set(snapshot.id, snapshot.readBy);
+							}
+							if (snapshot.id && !knownIds.has(snapshot.id)) {
+								for (const readerId of snapshot.readBy ?? []) {
+									stashReadReceipt(snapshot.id, readerId);
+								}
+								if (event.userId) {
+									stashReadReceipt(snapshot.id, event.userId);
+								}
 							}
 						}
 						for (const messageId of event.messageIds) {
@@ -374,6 +433,9 @@ export const useChatStore = create<ChatState>()(
 								readersToAdd.set(messageId, new Set());
 							}
 							readersToAdd.get(messageId)!.add(event.userId);
+							if (!knownIds.has(messageId)) {
+								stashReadReceipt(messageId, event.userId);
+							}
 						}
 					}
 
@@ -434,6 +496,7 @@ export const useChatStore = create<ChatState>()(
 					const { messages } = get();
 					const message = messages.find(m => m.id === data.messageId);
 					if (!message) {
+						stashReadReceipt(data.messageId, data.readByUserId);
 						return false;
 					}
 					if (
@@ -455,17 +518,60 @@ export const useChatStore = create<ChatState>()(
 						false,
 						"applyMessageReadReceipt"
 					);
-					indexedDBChatService
-						.updateMessage(data.messageId, {
+					persistMessageReadState({
+						...message,
+						isRead: true,
+						readBy: updatedReadBy,
+					});
+					return true;
+				},
+
+				applyCatchUpReadReceipts: data => {
+					stashCatchUpRead(data.chatRoomId, data.readByUserId, data.until);
+					const untilMs = new Date(data.until).getTime();
+					if (!Number.isFinite(untilMs)) {
+						return false;
+					}
+
+					const { messages } = get();
+					let messagesChanged = false;
+					const nextMessages = messages.map(msg => {
+						if (msg.chatRoomId !== data.chatRoomId) {
+							return msg;
+						}
+						if (msg.senderId === data.readByUserId) {
+							return msg;
+						}
+						if (new Date(msg.createdAt).getTime() > untilMs) {
+							return msg;
+						}
+						if (
+							isMessageReadByUser(msg, data.readByUserId) &&
+							msg.isRead !== false
+						) {
+							return msg;
+						}
+						messagesChanged = true;
+						const updatedReadBy = mergeReadByArrays(msg.readBy, [
+							data.readByUserId,
+						]);
+						persistMessageReadState({
+							...msg,
 							isRead: true,
 							readBy: updatedReadBy,
-						})
-						.catch((error: Error) => {
-							console.error(
-								"Failed to update message read receipt in IndexedDB:",
-								error
-							);
 						});
+						return { ...msg, isRead: true, readBy: updatedReadBy };
+					});
+
+					if (!messagesChanged) {
+						return false;
+					}
+
+					set(
+						{ messages: nextMessages, error: null },
+						false,
+						"applyCatchUpReadReceipts"
+					);
 					return true;
 				},
 
@@ -535,15 +641,52 @@ export const useChatStore = create<ChatState>()(
 						return;
 					}
 
-					const roomMessages = messages.filter(m => m.chatRoomId === message.chatRoomId);
-					if (roomMessages.some(msg => msg.id === message.id)) {
+					const incoming = applyPendingReadsToMessage(message, {
+						applyCatchUp: true,
+					});
+					if (incoming !== message) {
+						persistMessageReadState(incoming);
+					}
+
+					const roomMessages = messages.filter(m => m.chatRoomId === incoming.chatRoomId);
+					const existing = roomMessages.find(msg => msg.id === incoming.id);
+					if (existing) {
+						const mergedReadBy = mergeReadByArrays(existing.readBy, incoming.readBy);
+						const mergedIsRead = Boolean(existing.isRead || incoming.isRead);
+						const prevReadBy = existing.readBy ?? [];
+						if (
+							mergedIsRead !== existing.isRead ||
+							mergedReadBy.length !== prevReadBy.length ||
+							!mergedReadBy.every(id => prevReadBy.includes(id))
+						) {
+							const merged = {
+								...existing,
+								...incoming,
+								isRead: mergedIsRead,
+								readBy: mergedReadBy,
+							};
+							persistMessageReadState(merged);
+							set(
+								{
+									messages: trimChatMessagesWindow(
+										roomMessages.map(msg =>
+											msg.id === incoming.id ? merged : msg
+										)
+									),
+									chatRooms: sortedRooms,
+								},
+								false,
+								"addMessage:mergeRead"
+							);
+							return;
+						}
 						set({ chatRooms: sortedRooms }, false, "addMessage:duplicate");
 						return;
 					}
 
 					set(
 						{
-							messages: trimChatMessagesWindow([...roomMessages, message]),
+							messages: trimChatMessagesWindow([...roomMessages, incoming]),
 							chatRooms: sortedRooms,
 						},
 						false,
@@ -578,8 +721,10 @@ export const useChatStore = create<ChatState>()(
 				prependMessages: newMessages => {
 					const { messages } = get();
 					// Filter out messages that already exist to avoid duplicates
-					const uniqueNewMessages = newMessages.filter(
-						newMsg => !messages.some(existingMsg => existingMsg.id === newMsg.id)
+					const uniqueNewMessages = applyPendingReadsToMessages(
+						newMessages.filter(
+							newMsg => !messages.some(existingMsg => existingMsg.id === newMsg.id)
+						)
 					);
 					set(
 						{
@@ -1280,6 +1425,7 @@ export const useChatActions = () =>
 		applyMessagesMarkedAsRead: state.applyMessagesMarkedAsRead,
 		applyBulkMessagesMarkedAsRead: state.applyBulkMessagesMarkedAsRead,
 		applyMessageReadReceipt: state.applyMessageReadReceipt,
+		applyCatchUpReadReceipts: state.applyCatchUpReadReceipts,
 		markChatRoomsAsReadLocally: state.markChatRoomsAsReadLocally,
 		addMessage: state.addMessage,
 		updateMessage: state.updateMessage,
