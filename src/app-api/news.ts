@@ -82,3 +82,44 @@ export async function deleteNews(id: number): Promise<void> {
 		withCredentials: true,
 	});
 }
+
+export type NewsReader = {
+	userId: string;
+	firstName: string | null;
+	lastName: string | null;
+	email: string | null;
+	externalId: string | null;
+	profilePhoto?: string | null;
+	userColor?: string | null;
+	role?: string | null;
+	openedAt: string;
+};
+
+export type NewsReadersResponse = {
+	articleId: number;
+	title: string;
+	readers: NewsReader[];
+	pagination: NewsPagination;
+};
+
+export async function getNewsReaders(
+	id: number,
+	params: { page?: number; limit?: number; search?: string } = {},
+): Promise<NewsReadersResponse> {
+	const res = await axios.get<{ data: NewsReadersResponse } | NewsReadersResponse>(
+		`/api/news/${id}/readers`,
+		{
+			params: {
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+				...(params.search?.trim() ? { search: params.search.trim() } : {}),
+			},
+			withCredentials: true,
+		},
+	);
+	const body = res.data;
+	if (body && typeof body === "object" && "data" in body && body.data) {
+		return body.data;
+	}
+	return body as NewsReadersResponse;
+}

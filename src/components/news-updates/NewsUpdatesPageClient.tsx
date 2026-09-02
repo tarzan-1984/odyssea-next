@@ -13,6 +13,8 @@ import { deleteNews, getNewsList, type NewsArticle } from "@/app-api/news";
 import CreateNewsIcon from "./CreateNewsIcon";
 import CreateNewsModal from "./CreateNewsModal";
 import NewsArticleBody from "./NewsArticleBody";
+import NewsReadersIcon from "./NewsReadersIcon";
+import NewsReadersModal from "./NewsReadersModal";
 
 const NEWS_LIST_QUERY_KEY = ["news-list"] as const;
 
@@ -46,6 +48,7 @@ export default function NewsUpdatesPageClient() {
 	const [itemsPerPage, setItemsPerPage] = useState(10);
 	const [expandedNewsId, setExpandedNewsId] = useState<number | null>(null);
 	const [deleteConfirmArticle, setDeleteConfirmArticle] = useState<NewsArticle | null>(null);
+	const [readersArticle, setReadersArticle] = useState<NewsArticle | null>(null);
 	const [deletingNewsId, setDeletingNewsId] = useState<number | null>(null);
 
 	const queryParams = {
@@ -167,6 +170,18 @@ export default function NewsUpdatesPageClient() {
 													<div className="flex items-center gap-2">
 														<button
 															type="button"
+															title="Who read this post"
+															onClick={e => {
+																e.stopPropagation();
+																setReadersArticle(item);
+															}}
+															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-0 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+														>
+															<NewsReadersIcon className="h-5 w-5 shrink-0" />
+															Readers
+														</button>
+														<button
+															type="button"
 															title="Edit post"
 															onClick={e => {
 																e.stopPropagation();
@@ -259,6 +274,12 @@ export default function NewsUpdatesPageClient() {
 				onUpdated={() => {
 					queryClient.invalidateQueries({ queryKey: NEWS_LIST_QUERY_KEY }).catch(() => undefined);
 				}}
+			/>
+
+			<NewsReadersModal
+				article={readersArticle}
+				isOpen={readersArticle != null}
+				onClose={() => setReadersArticle(null)}
 			/>
 
 			<ConfirmModal
