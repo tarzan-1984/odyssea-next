@@ -244,7 +244,6 @@ export default function ChatImageLightbox({
 	const hasNext = currentIndex < images.length - 1;
 	const fileExtension = current?.fileName.toLowerCase().split(".").pop();
 	const isHeic = fileExtension === "heic" || fileExtension === "heif";
-	const needsServerPreview = isHeic || fileExtension === "dng";
 	const isEditing = viewMode === "edit";
 	const isCropMode = isEditing && editSubTool === "crop";
 	const isEraserMode = isEditing && editSubTool === "eraser";
@@ -352,32 +351,25 @@ export default function ChatImageLightbox({
 
 			if (!isChatImageFileName(current.fileName)) return;
 
-			if (needsServerPreview) {
-				setIsModalImageLoading(true);
-				try {
-					const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
-					if (cancelled) {
-						URL.revokeObjectURL(blobUrl);
-						return;
-					}
-					if (previewBlobUrlRef.current) {
-						URL.revokeObjectURL(previewBlobUrlRef.current);
-					}
-					previewBlobUrlRef.current = blobUrl;
-					setPreviewUrl(blobUrl);
-				} catch (error) {
-					console.error("[ChatImageLightbox] Failed to load image preview:", error);
-					if (!cancelled) {
-						setPreviewLoadError(
-							"Failed to load image. Please try downloading the file."
-						);
-						setIsModalImageLoading(false);
-					}
+			setIsModalImageLoading(true);
+			try {
+				const blobUrl = await loadChatImageBlobUrl(current.fileUrl, current.fileName);
+				if (cancelled) {
+					URL.revokeObjectURL(blobUrl);
+					return;
 				}
-				return;
+				if (previewBlobUrlRef.current) {
+					URL.revokeObjectURL(previewBlobUrlRef.current);
+				}
+				previewBlobUrlRef.current = blobUrl;
+				setPreviewUrl(blobUrl);
+			} catch (error) {
+				console.error("[ChatImageLightbox] Failed to load image preview:", error);
+				if (!cancelled) {
+					setPreviewLoadError("Failed to load image. Please try downloading the file.");
+					setIsModalImageLoading(false);
+				}
 			}
-
-			setPreviewUrl(current.fileUrl);
 		};
 
 		loadPreview().catch(console.error);
@@ -389,7 +381,7 @@ export default function ChatImageLightbox({
 				previewBlobUrlRef.current = null;
 			}
 		};
-	}, [isOpen, current?.fileUrl, current?.fileName, currentIndex, needsServerPreview, resetView]);
+	}, [isOpen, current?.fileUrl, current?.fileName, currentIndex, resetView]);
 
 	useEffect(() => {
 		if (!isOpen || !modalImgNaturalSize || isEditing) return;
@@ -1032,7 +1024,7 @@ export default function ChatImageLightbox({
 					/>
 				) : (
 					<div className="relative box-border flex min-h-full min-w-full items-center justify-center p-4 sm:p-8">
-						{isModalImageLoading && needsServerPreview ? (
+						{isModalImageLoading ? (
 							<HeicConvertingOverlay
 								variant="modal"
 								message={isHeic ? "Converting HEIC..." : "Loading image..."}
@@ -1078,11 +1070,7 @@ export default function ChatImageLightbox({
 									setPreviewLoadError("Failed to display image. Please try downloading the file.");
 								}}
 							/>
-						) : (
-							<div className="flex h-64 items-center justify-center">
-								<div className="h-8 w-8 animate-spin rounded-full border-b-2 border-white" />
-							</div>
-						)}
+						) : null}
 					</div>
 				)}
 			</div>

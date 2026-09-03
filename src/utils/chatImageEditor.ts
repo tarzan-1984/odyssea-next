@@ -464,9 +464,6 @@ export function canvasToObjectUrl(canvas: HTMLCanvasElement): string {
 	return canvas.toDataURL("image/jpeg", 0.92);
 }
 
-function isDngFileName(fileName: string): boolean {
-	return /\.dng$/i.test(fileName.trim());
-}
 
 function resolveCropSourceUrl(fileUrl: string, fileName: string): string {
 	if (isHeicFileName(fileName, fileUrl)) {
@@ -478,10 +475,8 @@ function resolveCropSourceUrl(fileUrl: string, fileName: string): string {
 			throw new Error("HEIC preview conversion is disabled");
 		}
 	}
-	if (isDngFileName(fileName)) {
-		return buildChatImagePreviewProxyUrl(fileUrl, { maxWidth: 2400, quality: 90 });
-	}
-	return `/api/storage/download?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
+	// Authenticated preview proxy — direct Wasabi URLs may be inaccessible in the browser.
+	return buildChatImagePreviewProxyUrl(fileUrl, { maxWidth: 1600, quality: 90 });
 }
 
 export async function loadChatImageBlobUrl(
