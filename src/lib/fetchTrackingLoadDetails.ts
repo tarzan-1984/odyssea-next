@@ -42,6 +42,27 @@ export type TrackingLoadDetailsPayload = {
 	data: TmsLoadBody;
 };
 
+function unwrapTmsLoadBody(body: unknown): TmsLoadBody | null {
+	if (!body || typeof body !== "object") return null;
+
+	let current = body as Record<string, unknown>;
+	for (let i = 0; i < 4; i++) {
+		const inner = current.data;
+		if (!inner || typeof inner !== "object" || Array.isArray(inner)) break;
+		const rec = inner as Record<string, unknown>;
+		if ("meta_data" in rec || "shippers" in rec) {
+			return { success: true, data: rec };
+		}
+		current = rec;
+	}
+
+	if ("meta_data" in current || "shippers" in current) {
+		return { success: true, data: current };
+	}
+
+	return null;
+}
+
 async function fetchTmsLoad(loadId: string, publicView: boolean): Promise<TmsLoadBody> {
 	const tmsUrl = publicView
 		? `/api/tms/load/${encodeURIComponent(loadId)}?public=1`
@@ -60,11 +81,12 @@ async function fetchTmsLoad(loadId: string, publicView: boolean): Promise<TmsLoa
 		);
 	}
 
-	if (!tmsJson || !("data" in tmsJson) || !tmsJson.data) {
+	const unwrapped = unwrapTmsLoadBody(tmsJson);
+	if (!unwrapped?.data) {
 		throw new Error("TMS returned empty load data");
 	}
 
-	return tmsJson;
+	return unwrapped;
 }
 
 async function fetchLoadEnrichment(
