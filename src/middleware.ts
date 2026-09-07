@@ -45,6 +45,7 @@ const publicPages = [
 	"/test",
 	// Privacy Policy - public for everyone (including unauthenticated)
 	"/privacy-policy",
+	"/extension-privacy-policy",
 ];
 
 function buildSignInRedirectUrl(request: NextRequest): URL {
@@ -93,7 +94,8 @@ export function middleware(request: NextRequest) {
 	// Check if it's a page accessible to everyone (authenticated and unauthenticated)
 	const isTrackingPage = pathname.startsWith("/tracking");
 	const isTestPage = pathname.startsWith("/test");
-	const isPrivacyPolicyPage = pathname.startsWith("/privacy-policy");
+	const isPrivacyPolicyPage =
+		pathname.startsWith("/privacy-policy") || pathname.startsWith("/extension-privacy-policy");
 
 	// If it's a public page and user is authenticated, redirect to app home
 	// Exception: tracking, test, privacy-policy are accessible to everyone
