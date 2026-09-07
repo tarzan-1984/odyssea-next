@@ -1,11 +1,11 @@
 /**
  * Leaflet raster basemap.
  *
- * MapTiler (paid) is opt-in via `useMapTiler: true` — only /tracking/load/[id].
- * All other maps use CARTO Voyager (free, no key).
+ * MapTiler (paid) is opt-in via `useMapTiler: true` and only for Hybrid
+ * (satellite) on /tracking/load/[id]. Simple streets always use free CARTO.
  *
- * - simple: streets map (roads, labels)
- * - hybrid: satellite + semi-transparent streets-v4 (POI / business names)
+ * - simple: streets map (CARTO Voyager, free)
+ * - hybrid: satellite + semi-transparent streets-v4 (MapTiler, paid)
  */
 
 export type MapTileLayerOptions = {
@@ -57,30 +57,23 @@ export function getLeafletRasterTileLayerProps(
 	mode: MapBasemapMode = "simple",
 	options?: MapTileLayerOptions
 ): LeafletRasterTileLayerProps | LeafletRasterTileLayerProps[] {
-	const useMapTiler = options?.useMapTiler === true;
+	const useMapTiler = options?.useMapTiler === true && mode === "hybrid";
 	const key = useMapTiler ? (process.env.NEXT_PUBLIC_MAPTILER_API_KEY?.trim() ?? "") : "";
 	if (key) {
 		const attribution = mapTilerAttribution();
-		if (mode === "hybrid") {
-			return [
-				{
-					url: mapTilerRasterUrl(MAPTILER_SATELLITE_STYLE, key, "jpg"),
-					attribution,
-					maxZoom: 22,
-				},
-				{
-					url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
-					attribution,
-					maxZoom: 22,
-					opacity: HYBRID_STREETS_OVERLAY_OPACITY,
-				},
-			];
-		}
-		return {
-			url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
-			attribution,
-			maxZoom: 22,
-		};
+		return [
+			{
+				url: mapTilerRasterUrl(MAPTILER_SATELLITE_STYLE, key, "jpg"),
+				attribution,
+				maxZoom: 22,
+			},
+			{
+				url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
+				attribution,
+				maxZoom: 22,
+				opacity: HYBRID_STREETS_OVERLAY_OPACITY,
+			},
+		];
 	}
 	return getCartoVoyagerTileLayerProps();
 }

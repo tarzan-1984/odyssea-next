@@ -17,7 +17,11 @@ import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
-import { normalizeDriverExternalId, normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
+import {
+	normalizeDriverExternalId,
+	normalizeTrackingLoadDriver,
+	normalizeTrackingLoadId,
+} from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
 import { formatTmsLoadRoute } from "@/utils/formatTmsLoadRoute";
@@ -163,8 +167,7 @@ type TrackingDeviceHistoryGroup = {
 };
 
 type LocationUpdatePayload = {
-	externalId?: string | null;
-	trackingLoadId?: string | null;
+	trackingLoadId?: string | number | null;
 };
 
 type DriverTrackingPointCreatedPayload = {
@@ -237,6 +240,8 @@ function normalizeTrackingStatus(value: string | null | undefined): string {
 		.replace(/-/g, "_");
 }
 
+const MAP_REFRESH_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
 function hasValidLastLocationUpdate(value: string | null | undefined): boolean {
 	const raw = String(value ?? "").trim();
 	if (!raw) return false;
@@ -289,8 +294,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			setIsAuthLoading(false);
 		};
 		checkAuth();
-		const interval = setInterval(checkAuth, 1000);
-		return () => clearInterval(interval);
+		const onChange = () => checkAuth();
+		window.addEventListener("focus", onChange);
+		window.addEventListener("storage", onChange);
+		document.addEventListener("visibilitychange", onChange);
+		return () => {
+			window.removeEventListener("focus", onChange);
+			window.removeEventListener("storage", onChange);
+			document.removeEventListener("visibilitychange", onChange);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -357,25 +369,24 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		queryKey: trackingLoadDetailsQueryKey,
 		queryFn: () => fetchTrackingLoadDetails(loadId, { publicView: isPublicView }),
 		enabled: Boolean(loadId) && !isAuthLoading,
-		staleTime: 60 * 1000,
+		staleTime: MAP_REFRESH_MIN_INTERVAL_MS,
 		gcTime: 10 * 60 * 1000,
 		refetchOnWindowFocus: !isLoadDeliveredFromCache,
 		refetchOnReconnect: !isLoadDeliveredFromCache,
 	});
 
-	useEffect(() => {
-		if (!loadId || isAuthLoading || !isAuthenticated) return;
-		queryClient
-			.invalidateQueries({
-				queryKey: ["tracking-load-details", loadId],
-			})
-			.catch(() => {});
-	}, [loadId, isAuthLoading, isAuthenticated, queryClient]);
-
 	const isPageLoading = isAuthLoading || isLoadDetailsPending;
 	const isPageReady = !isPageLoading && Boolean(loadDetails);
+	const lastMapRefreshAtRef = useRef(0);
+
+	useEffect(() => {
+		if (isPageReady && lastMapRefreshAtRef.current === 0) {
+			lastMapRefreshAtRef.current = Date.now();
+		}
+	}, [isPageReady]);
 
 	const refreshLoadDetails = useCallback(() => {
+		lastMapRefreshAtRef.current = Date.now();
 		return queryClient
 			.invalidateQueries({
 				queryKey: ["tracking-load-details", loadId],
@@ -384,6 +395,13 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				console.error("[TrackingLoadPage] Failed to refresh load details:", error);
 			});
 	}, [loadId, queryClient]);
+
+	const refreshMapIfIntervalElapsed = useCallback(() => {
+		if (Date.now() - lastMapRefreshAtRef.current < MAP_REFRESH_MIN_INTERVAL_MS) {
+			return;
+		}
+		refreshLoadDetails();
+	}, [refreshLoadDetails]);
 
 	const routeGeocodeFromApi = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
@@ -437,21 +455,19 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		});
 
 		socket.on("userLocationUpdate", (payload: LocationUpdatePayload) => {
-			if (payload.trackingLoadId?.trim() === loadId) {
-				refreshLoadDetails();
-			}
+			if (normalizeTrackingLoadId(payload.trackingLoadId) !== loadId) return;
+			refreshMapIfIntervalElapsed();
 		});
 
 		socket.on("driverTrackingPointCreated", (payload: DriverTrackingPointCreatedPayload) => {
-			if (payload.loadId?.trim() === loadId) {
-				refreshLoadDetails();
-			}
+			if (normalizeTrackingLoadId(payload.loadId) !== loadId) return;
+			refreshMapIfIntervalElapsed();
 		});
 
 		return () => {
 			socket.disconnect();
 		};
-	}, [isLoadDelivered, isPageReady, loadId, refreshLoadDetails]);
+	}, [isLoadDelivered, isPageReady, loadId, refreshMapIfIntervalElapsed]);
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;

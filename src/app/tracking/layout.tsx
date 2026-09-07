@@ -22,10 +22,15 @@ export default function TrackingLayout({ children }: { children: React.ReactNode
 
 		checkAuth();
 
-		// Re-check auth status periodically (in case user logs in/out in another tab)
-		const interval = setInterval(checkAuth, 1000);
-
-		return () => clearInterval(interval);
+		const onChange = () => checkAuth();
+		window.addEventListener("focus", onChange);
+		window.addEventListener("storage", onChange);
+		document.addEventListener("visibilitychange", onChange);
+		return () => {
+			window.removeEventListener("focus", onChange);
+			window.removeEventListener("storage", onChange);
+			document.removeEventListener("visibilitychange", onChange);
+		};
 	}, []);
 
 	// Dynamic class for main content margin based on sidebar state

@@ -55,6 +55,7 @@ type LoadRoute = {
 	pickup: RoutePoint;
 	delivery: RoutePoint;
 	stopMarkers: LoadStopMarker[];
+	fullPath: [number, number][];
 	completedPath: [number, number][];
 	remainingPath: [number, number][];
 };
@@ -583,26 +584,6 @@ async function fetchOsrmDrivingRoute(points: RoutePoint[]): Promise<OsrmDrivingR
 	return stitchOsrmInWindows(cleanPoints);
 }
 
-function findClosestLimitedWaypointIndex(
-	limitedPoints: RoutePoint[],
-	target: RoutePoint | null
-): number {
-	if (!target || limitedPoints.length < 2) return -1;
-	let bestI = 0;
-	let bestD = Infinity;
-	for (let i = 0; i < limitedPoints.length; i++) {
-		const p = limitedPoints[i];
-		const d =
-			(p.lat - target.lat) * (p.lat - target.lat) +
-			(p.lng - target.lng) * (p.lng - target.lng);
-		if (d < bestD) {
-			bestD = d;
-			bestI = i;
-		}
-	}
-	return bestI;
-}
-
 /** Nominatim usage policy: at most ~1 request per second for heavy use. */
 let nominatimNextAllowedAt = 0;
 const NOMINATIM_MIN_INTERVAL_MS = 1100;
@@ -694,6 +675,24 @@ function uniqueSequentialRoutePoints(points: RoutePoint[]): RoutePoint[] {
 function clampSplitIndex(splitIdx: number, pathLen: number): number {
 	if (pathLen < 2) return 0;
 	return Math.min(Math.max(splitIdx, 1), pathLen - 2);
+}
+
+function splitRoutePaths(
+	fullPath: [number, number][],
+	splitTarget: RoutePoint | null
+): { completedPath: [number, number][]; remainingPath: [number, number][] } {
+	if (fullPath.length < 2) {
+		return { completedPath: [], remainingPath: [] };
+	}
+	if (!splitTarget) {
+		return { completedPath: [], remainingPath: fullPath };
+	}
+	const rawSplit = findClosestPolylineVertexIndex(fullPath, [splitTarget.lat, splitTarget.lng]);
+	const splitIdx = clampSplitIndex(rawSplit, fullPath.length);
+	return {
+		completedPath: fullPath.slice(0, splitIdx + 1),
+		remainingPath: fullPath.slice(splitIdx),
+	};
 }
 
 /** Vertex on the route polyline closest to the driver's coordinates (for splitting completed vs remaining). */
@@ -1213,55 +1212,21 @@ export default function TrackingDeliveryMap({
 					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
 					.filter((point): point is RoutePoint => point !== null);
 
-				const currentDriverPoint = markerPosition
-					? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
-					: null;
-
-				const splitTarget: RoutePoint | null = currentDriverPoint
-					? currentDriverPoint
-					: historyPoints.length > 0
-						? historyPoints[historyPoints.length - 1]
-						: null;
-
-				const osrmSeq = buildOsrmWaypointSequence(
-					chain,
-					historyPoints,
-					currentDriverPoint
-				);
-
-				let completedPath: [number, number][] = [];
-				let remainingPath: [number, number][] = [];
+				// Do not include the live driver point in OSRM — location pings must not
+				// rebuild the paid/ basemap-adjacent route request.
+				const osrmSeq = buildOsrmWaypointSequence(chain, historyPoints, null);
 
 				const osrmResult = await fetchOsrmDrivingRoute(osrmSeq);
 				if (cancelled) return;
 
-				if (!osrmResult || osrmResult.path.length < 2) {
-					completedPath = [];
-					remainingPath = [];
-				} else {
-					const fullPath = osrmResult.path;
-					if (!splitTarget) {
-						completedPath = [];
-						remainingPath = fullPath;
-					} else {
-						const { limitedRequestPoints, waypointSnapsLngLat } = osrmResult;
-						const splitWI = findClosestLimitedWaypointIndex(
-							limitedRequestPoints,
-							splitTarget
-						);
-						const snap =
-							splitWI >= 0 && splitWI < waypointSnapsLngLat.length
-								? waypointSnapsLngLat[splitWI]
-								: null;
-						const targetLatLng: [number, number] = snap
-							? [snap[1], snap[0]]
-							: [splitTarget.lat, splitTarget.lng];
-						const rawSplit = findClosestPolylineVertexIndex(fullPath, targetLatLng);
-						const splitIdx = clampSplitIndex(rawSplit, fullPath.length);
-						completedPath = fullPath.slice(0, splitIdx + 1);
-						remainingPath = fullPath.slice(splitIdx);
-					}
-				}
+				const fullPath =
+					osrmResult && osrmResult.path.length >= 2 ? osrmResult.path : [];
+				const splitTarget = markerPosition
+					? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
+					: historyPoints.length > 0
+						? historyPoints[historyPoints.length - 1]
+						: null;
+				const { completedPath, remainingPath } = splitRoutePaths(fullPath, splitTarget);
 
 				if (cancelled) return;
 
@@ -1269,6 +1234,7 @@ export default function TrackingDeliveryMap({
 					pickup: pickupMarker,
 					delivery: deliveryMarker,
 					stopMarkers,
+					fullPath,
 					completedPath,
 					remainingPath,
 				});
@@ -1301,8 +1267,32 @@ export default function TrackingDeliveryMap({
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
 		historyMarkerPositions,
-		markerPosition,
 	]);
+
+	useEffect(() => {
+		setLoadRoute(prev => {
+			if (!prev || prev.fullPath.length < 2) return prev;
+			const historyPoints = historyMarkerPositions
+				.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
+				.filter((point): point is RoutePoint => point !== null);
+			const splitTarget = markerPosition
+				? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
+				: historyPoints.length > 0
+					? historyPoints[historyPoints.length - 1]
+					: null;
+			const { completedPath, remainingPath } = splitRoutePaths(prev.fullPath, splitTarget);
+			if (
+				completedPath.length === prev.completedPath.length &&
+				remainingPath.length === prev.remainingPath.length &&
+				completedPath[completedPath.length - 1] ===
+					prev.completedPath[prev.completedPath.length - 1] &&
+				remainingPath[0] === prev.remainingPath[0]
+			) {
+				return prev;
+			}
+			return { ...prev, completedPath, remainingPath };
+		});
+	}, [historyMarkerPositions, markerPosition]);
 
 	useEffect(() => {
 		if (!mapRef.current) return;
@@ -1368,50 +1358,6 @@ export default function TrackingDeliveryMap({
 		historyMarkerDetails,
 		selectedLoadHistoryPointIndex,
 		editingLoadHistoryPointIndex,
-	]);
-
-	// Center map when lastLocationUpdateAt changes (every WebSocket update)
-	// This ensures map centers on driver location even if coordinates haven't changed
-	// but a new update was received. User's zoom level is preserved.
-	useEffect(() => {
-		// Only center if we have a valid lastLocationUpdateAt (meaning update was received)
-		if (
-			!driverData?.lastLocationUpdateAt ||
-			!mapRef.current ||
-			!hasValidCoordinates ||
-			!driverData?.latitude ||
-			!driverData?.longitude
-		) {
-			return;
-		}
-
-		const newCenter: [number, number] = [driverData.latitude, driverData.longitude];
-		const map = mapRef.current;
-
-		// Function to center the map while preserving user's zoom level
-		const centerMap = () => {
-			if (mapRef.current === map && map) {
-				// Get current zoom level set by user
-				const currentZoom = map.getZoom();
-
-				// Center map on new coordinates while keeping user's zoom
-				map.setView(newCenter, currentZoom, {
-					animate: true,
-					duration: 0.5,
-				});
-			}
-		};
-
-		// Always use whenReady to ensure map is fully initialized
-		// This is safe even if map is already loaded (whenReady resolves immediately)
-		map.whenReady(() => {
-			centerMap();
-		});
-	}, [
-		driverData?.lastLocationUpdateAt,
-		driverData?.latitude,
-		driverData?.longitude,
-		hasValidCoordinates,
 	]);
 
 	if (!hasValidCoordinates && !showEmptyMap) {
@@ -1560,7 +1506,7 @@ export default function TrackingDeliveryMap({
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<ResilientBasemapTileLayer
 					mode={basemapMode}
-					useMapTilerBasemap={enableBasemapModeSwitch}
+					useMapTilerBasemap={enableBasemapModeSwitch && basemapMode === "hybrid"}
 					onFallback={handleBasemapFallback}
 				/>
 				{loadRoute && (
