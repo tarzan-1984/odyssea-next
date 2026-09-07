@@ -1,5 +1,7 @@
 // Chat API client for communicating with internal Next.js API routes
 
+import type { SystemMessageKind } from "@/utils/systemMessageKind";
+
 const API_BASE_URL = "/api";
 
 // Type for fetch options
@@ -140,6 +142,8 @@ export interface Message {
 	pendingOutgoing?: PendingOutgoingMeta;
 	/** TMS dispatch message from create_load_chat (Odysseia Team, no avatar). */
 	isSystemMessage?: boolean;
+	/** Variant of a system message (styling / behavior in chat UI). */
+	systemMessageKind?: SystemMessageKind;
 	/** Loaded from S3 archive; row no longer exists in messages table. */
 	isArchivedMessage?: boolean;
 }

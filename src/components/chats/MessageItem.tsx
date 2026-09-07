@@ -27,6 +27,7 @@ import {
 	isLoadDispatchTermsAcceptedMessage,
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 } from "@/utils/loadDispatchTerms";
+import { isLoadProximitySystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
@@ -92,20 +93,26 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isBidOfferConfirmed = isBidOfferConfirmedMessage(message.content);
 	const isBidOfferRejected = isBidOfferRejectedMessage(message.content);
 	const isTermsAccepted = isLoadDispatchTermsAcceptedMessage(message.content);
+	const isProximityMessage = isLoadProximitySystemMessage(message.systemMessageKind);
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
 		: isBidOfferRejected
 			? "px-3 py-2 rounded-lg bg-red-500 text-white dark:bg-red-500"
-			: isBidRateChanged || isBidOfferConfirmed || isTermsAccepted
+			: isBidRateChanged || isBidOfferConfirmed || isTermsAccepted || isProximityMessage
 				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
 				: "";
 	const bidPriceTextClass =
 		"![font-size:calc(var(--chat-font-body,14px)+2px)] ![line-height:calc(var(--chat-font-body-lh,20px)+2px)]";
 	const bidNewOfferTextClass = `${bidPriceTextClass} !text-gray-900`;
 	const usesWhiteBidText =
-		isBidRateChanged || isBidOfferConfirmed || isBidOfferRejected || isTermsAccepted;
-	const isSpecialColoredBubble = isBidPriceUpdate || isTermsAccepted;
+		isBidRateChanged ||
+		isBidOfferConfirmed ||
+		isBidOfferRejected ||
+		isTermsAccepted ||
+		isProximityMessage;
+	const isSpecialColoredBubble =
+		isBidPriceUpdate || isTermsAccepted || isProximityMessage;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
