@@ -1,15 +1,15 @@
 /**
  * Leaflet raster basemap.
  *
- * MapTiler (paid) is opt-in via `useMapTiler: true` and only for Hybrid
- * (satellite) on /tracking/load/[id]. Simple streets always use free CARTO.
+ * Paid MapTiler is production-only so local `next dev` does not consume quota,
+ * even if NEXT_PUBLIC_MAPTILER_API_KEY is present in .env.
  *
- * - simple: streets map (CARTO Voyager, free)
- * - hybrid: satellite + semi-transparent streets-v4 (MapTiler, paid)
+ * - production: streets-v4 / hybrid satellite (MapTiler)
+ * - development: free OSM streets; Hybrid is disabled
  */
 
 export type MapTileLayerOptions = {
-	/** When true and API key is set, use MapTiler; otherwise always CARTO Voyager. */
+	/** When true, use MapTiler in production if the API key is set. */
 	useMapTiler?: boolean;
 };
 
@@ -29,18 +29,28 @@ export type LeafletRasterTileLayerProps = {
 	opacity?: number;
 };
 
-export function isMapTilerConfigured(): boolean {
+export function hasMapTilerApiKey(): boolean {
 	return Boolean(process.env.NEXT_PUBLIC_MAPTILER_API_KEY?.trim());
 }
 
-/** CARTO Voyager — same basemap used when no MapTiler key is configured. */
-export function getCartoVoyagerTileLayerProps(): LeafletRasterTileLayerProps {
+/** True only in production builds with a MapTiler key (never during local next dev). */
+export function isPaidMapTilerEnabled(): boolean {
+	return process.env.NODE_ENV === "production" && hasMapTilerApiKey();
+}
+
+/** Paid MapTiler is available for this build. */
+export function isMapTilerConfigured(): boolean {
+	return isPaidMapTilerEnabled();
+}
+
+/** Free OSM streets — used in local development and if MapTiler is unavailable. */
+export function getFreeStreetTileLayerProps(): LeafletRasterTileLayerProps {
 	return {
-		url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+		url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 		attribution:
-			'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-		subdomains: ["a", "b", "c", "d"],
-		maxZoom: 20,
+			'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+		subdomains: ["a", "b", "c"],
+		maxZoom: 19,
 	};
 }
 
@@ -57,25 +67,32 @@ export function getLeafletRasterTileLayerProps(
 	mode: MapBasemapMode = "simple",
 	options?: MapTileLayerOptions
 ): LeafletRasterTileLayerProps | LeafletRasterTileLayerProps[] {
-	const useMapTiler = options?.useMapTiler === true && mode === "hybrid";
+	const useMapTiler = options?.useMapTiler === true && isPaidMapTilerEnabled();
 	const key = useMapTiler ? (process.env.NEXT_PUBLIC_MAPTILER_API_KEY?.trim() ?? "") : "";
 	if (key) {
 		const attribution = mapTilerAttribution();
-		return [
-			{
-				url: mapTilerRasterUrl(MAPTILER_SATELLITE_STYLE, key, "jpg"),
-				attribution,
-				maxZoom: 22,
-			},
-			{
-				url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
-				attribution,
-				maxZoom: 22,
-				opacity: HYBRID_STREETS_OVERLAY_OPACITY,
-			},
-		];
+		if (mode === "hybrid") {
+			return [
+				{
+					url: mapTilerRasterUrl(MAPTILER_SATELLITE_STYLE, key, "jpg"),
+					attribution,
+					maxZoom: 22,
+				},
+				{
+					url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
+					attribution,
+					maxZoom: 22,
+					opacity: HYBRID_STREETS_OVERLAY_OPACITY,
+				},
+			];
+		}
+		return {
+			url: mapTilerRasterUrl(MAPTILER_SIMPLE_STYLE, key, "png"),
+			attribution,
+			maxZoom: 22,
+		};
 	}
-	return getCartoVoyagerTileLayerProps();
+	return getFreeStreetTileLayerProps();
 }
 
 /** Normalizes single- or multi-layer config to an array. */

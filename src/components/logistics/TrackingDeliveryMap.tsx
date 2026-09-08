@@ -1466,7 +1466,9 @@ export default function TrackingDeliveryMap({
 									? "Satellite with roads and labels"
 									: mapTilerUnavailable
 										? "MapTiler unavailable — using standard map"
-										: "Requires MapTiler API key"
+										: process.env.NODE_ENV === "production"
+											? "Requires MapTiler API key"
+											: "Satellite map is available in production"
 							}
 							disabled={!mapTilerUsable}
 							className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -1481,10 +1483,10 @@ export default function TrackingDeliveryMap({
 					</div>
 					{mapTilerUnavailable ? (
 						<p className="pointer-events-none max-w-[220px] rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
-							MapTiler unavailable — standard map (CARTO)
+							MapTiler unavailable — standard map
 						</p>
-					) : !mapTilerConfigured ? (
-						<p className="pointer-events-none max-w-[200px] rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
+					) : !mapTilerConfigured && process.env.NODE_ENV === "production" ? (
+						<p className="pointer-events-none max-w-[220px] rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
 							Hybrid needs NEXT_PUBLIC_MAPTILER_API_KEY
 						</p>
 					) : null}
@@ -1506,7 +1508,7 @@ export default function TrackingDeliveryMap({
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<ResilientBasemapTileLayer
 					mode={basemapMode}
-					useMapTilerBasemap={enableBasemapModeSwitch && basemapMode === "hybrid"}
+					useMapTilerBasemap
 					onFallback={handleBasemapFallback}
 				/>
 				{loadRoute && (

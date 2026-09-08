@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-	getCartoVoyagerTileLayerProps,
+	getFreeStreetTileLayerProps,
 	getLeafletRasterTileLayerStack,
 	isMapTilerConfigured,
 	type MapBasemapMode,
@@ -14,42 +14,42 @@ const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLaye
 	ssr: false,
 });
 
-/** Switch to CARTO after this many tile errors in the error window (quota / 403 overlay tiles). */
+/** Switch to free OSM after this many tile errors in the error window (quota / 403 overlay tiles). */
 const TILE_ERROR_FALLBACK_COUNT = 5;
 const TILE_ERROR_WINDOW_MS = 2500;
 
 type ResilientBasemapTileLayerProps = {
 	mode: MapBasemapMode;
-	/** MapTiler only when true (e.g. /tracking/load/[id]); default is free CARTO. */
+	/** Use paid MapTiler in production when the API key is set. Local dev stays on free OSM. */
 	useMapTilerBasemap?: boolean;
 	onFallback?: () => void;
 };
 
 export function ResilientBasemapTileLayer({
 	mode,
-	useMapTilerBasemap = false,
+	useMapTilerBasemap = true,
 	onFallback,
 }: ResilientBasemapTileLayerProps) {
 	const mapTilerConfigured = useMapTilerBasemap && isMapTilerConfigured();
-	const [useCartoFallback, setUseCartoFallback] = useState(false);
+	const [useFreeFallback, setUseFreeFallback] = useState(false);
 	const errorCountRef = useRef(0);
 	const errorWindowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const tileStack = useMemo((): LeafletRasterTileLayerProps[] => {
-		if (!mapTilerConfigured || useCartoFallback) {
-			return [getCartoVoyagerTileLayerProps()];
+		if (!mapTilerConfigured || useFreeFallback) {
+			return [getFreeStreetTileLayerProps()];
 		}
 		return getLeafletRasterTileLayerStack(mode, { useMapTiler: true });
-	}, [mapTilerConfigured, useCartoFallback, mode]);
+	}, [mapTilerConfigured, useFreeFallback, mode]);
 
 	const activateFallback = useCallback(() => {
-		if (useCartoFallback || !mapTilerConfigured) return;
-		setUseCartoFallback(true);
+		if (useFreeFallback || !mapTilerConfigured) return;
+		setUseFreeFallback(true);
 		onFallback?.();
-	}, [useCartoFallback, mapTilerConfigured, onFallback]);
+	}, [useFreeFallback, mapTilerConfigured, onFallback]);
 
 	const handleTileError = useCallback(() => {
-		if (useCartoFallback || !mapTilerConfigured) return;
+		if (useFreeFallback || !mapTilerConfigured) return;
 
 		errorCountRef.current += 1;
 		if (!errorWindowTimerRef.current) {
@@ -67,9 +67,9 @@ export function ResilientBasemapTileLayer({
 			errorCountRef.current = 0;
 			activateFallback();
 		}
-	}, [useCartoFallback, mapTilerConfigured, activateFallback]);
+	}, [useFreeFallback, mapTilerConfigured, activateFallback]);
 
-	const layerKey = useCartoFallback ? "carto-fallback" : `maptiler-${mode}`;
+	const layerKey = useFreeFallback ? "osm-fallback" : `maptiler-${mode}`;
 
 	return (
 		<>
