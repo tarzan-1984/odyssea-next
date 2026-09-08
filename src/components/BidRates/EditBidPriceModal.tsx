@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
+import { useCurrentUser } from "@/stores/userStore";
 
 type EditBidPriceModalProps = {
 	bid: BidRate | null;
@@ -42,12 +43,22 @@ function minActiveOfferRate(
 	return Math.min(...rates);
 }
 
+function isUnsetBidRate(rate: number | null | undefined): boolean {
+	return Number.isFinite(rate) && rate === 0;
+}
+
 export default function EditBidPriceModal({
 	bid,
 	isOpen,
 	onClose,
 	onSaved,
 }: EditBidPriceModalProps) {
+	const currentUser = useCurrentUser();
+	const isOwner = Boolean(
+		currentUser?.id && bid?.ownerId && currentUser.id === bid.ownerId,
+	);
+	/** Owner may set any valid price only while the card still shows $0. */
+	const canSetInitialRate = isOwner && isUnsetBidRate(bid?.rate);
 	const [priceInput, setPriceInput] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
@@ -61,6 +72,12 @@ export default function EditBidPriceModal({
 		let cancelled = false;
 		setError(null);
 		setSubmitting(false);
+
+		if (canSetInitialRate) {
+			setPriceInput("");
+			return;
+		}
+
 		setPriceInput(initialPriceValue(bid));
 
 		getBidRateVoters(bid.id)
@@ -81,7 +98,7 @@ export default function EditBidPriceModal({
 		return () => {
 			cancelled = true;
 		};
-	}, [isOpen, bid]);
+	}, [isOpen, bid, canSetInitialRate]);
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -99,24 +116,33 @@ export default function EditBidPriceModal({
 			return;
 		}
 
-		const initialRate = bid.rate;
-		if (Number.isFinite(initialRate) && newPrice >= initialRate) {
-			setError(
-				`Your bid must be less than ${formatMinBidUsd(initialRate)}`,
-			);
-			return;
+		if (canSetInitialRate) {
+			if (newPrice <= 0) {
+				setError("Please enter a price greater than $0.");
+				return;
+			}
+		} else {
+			const initialRate = bid.rate;
+			if (Number.isFinite(initialRate) && newPrice >= initialRate) {
+				setError(
+					`Your bid must be less than ${formatMinBidUsd(initialRate)}`,
+				);
+				return;
+			}
 		}
 
 		setSubmitting(true);
 		setError(null);
 		try {
-			const voters = await getBidRateVoters(bid.id);
-			const minRate = minActiveOfferRate(voters.participants ?? []);
-			if (minRate != null && newPrice >= minRate) {
-				setError(
-					`Your bid must be less than ${formatMinBidUsd(minRate)}`,
-				);
-				return;
+			if (!canSetInitialRate) {
+				const voters = await getBidRateVoters(bid.id);
+				const minRate = minActiveOfferRate(voters.participants ?? []);
+				if (minRate != null && newPrice >= minRate) {
+					setError(
+						`Your bid must be less than ${formatMinBidUsd(minRate)}`,
+					);
+					return;
+				}
 			}
 
 			await updateBidRateNewPrice(bid.id, newPrice);
