@@ -2,6 +2,7 @@ import axios from "axios";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import { formatOfferDateTimeFieldForDisplay } from "@/utils/offerDateTimeRange";
 
+
 export interface OfferDriver {
 	driver_id: string;
 	externalId: string | null;
