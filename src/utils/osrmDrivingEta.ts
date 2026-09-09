@@ -5,6 +5,62 @@ export type OsrmDrivingLegStats = {
 	distanceMeters: number;
 };
 
+const NY_TZ = "America/New_York";
+const METERS_PER_MILE = 1609.34;
+/** Door-to-door truck average rarely exceeds this on mixed US routes. */
+const TRUCK_MAX_AVERAGE_MPH = 48;
+
+function easternClock(fromInstant: number): { hour: number; isWeekend: boolean } {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone: NY_TZ,
+		hour: "numeric",
+		hour12: false,
+		weekday: "short",
+	}).formatToParts(new Date(fromInstant));
+	let hour = Number(parts.find(part => part.type === "hour")?.value ?? 0);
+	if (hour === 24) hour = 0;
+	const weekday = parts.find(part => part.type === "weekday")?.value ?? "";
+	return { hour, isWeekend: weekday === "Sat" || weekday === "Sun" };
+}
+
+function peakTrafficMultiplier(fromInstant: number): number {
+	const { hour, isWeekend } = easternClock(fromInstant);
+	if (isWeekend) {
+		return hour >= 11 && hour < 19 ? 1.22 : 1.12;
+	}
+	if (hour >= 6 && hour < 10) return 1.65;
+	if (hour >= 15 && hour < 19) return 1.6;
+	if (hour >= 10 && hour < 15) return 1.3;
+	return 1.18;
+}
+
+function distanceScaleForTraffic(distanceMiles: number): number {
+	if (distanceMiles < 80) return 1;
+	if (distanceMiles < 200) return 0.55;
+	return 0.25;
+}
+
+/**
+ * Public OSRM is a car / free-flow profile (no traffic, parkways trucks cannot use).
+ * Scale duration for a typical US truck trip.
+ */
+export function adjustOsrmDurationForTruckEta(
+	osrmDurationSeconds: number,
+	distanceMeters: number,
+	fromInstant = Date.now()
+): number {
+	if (!Number.isFinite(osrmDurationSeconds) || osrmDurationSeconds <= 0) {
+		return osrmDurationSeconds;
+	}
+	const distanceMiles = Number.isFinite(distanceMeters) ? distanceMeters / METERS_PER_MILE : 0;
+	const peak = peakTrafficMultiplier(fromInstant);
+	const trafficFactor = 1 + (peak - 1) * distanceScaleForTraffic(distanceMiles);
+	const fromOsrm = osrmDurationSeconds * trafficFactor;
+	const floorFromDistance =
+		distanceMiles > 0 ? (distanceMiles / TRUCK_MAX_AVERAGE_MPH) * 3600 : 0;
+	return Math.max(osrmDurationSeconds, fromOsrm, floorFromDistance);
+}
+
 /** Road driving leg via OSRM (same service as TrackingDeliveryMap). */
 export async function fetchOsrmDrivingLegStats(
 	from: LatLng,
@@ -38,12 +94,10 @@ export async function fetchOsrmDrivingLegStats(
 	}
 
 	return {
-		durationSeconds: route.duration,
+		durationSeconds: adjustOsrmDurationForTruckEta(route.duration, route.distance),
 		distanceMeters: route.distance,
 	};
 }
-
-const NY_TZ = "America/New_York";
 
 export function formatDrivingDuration(seconds: number): string {
 	const totalMinutes = Math.max(1, Math.round(seconds / 60));

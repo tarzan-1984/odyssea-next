@@ -970,10 +970,20 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return { lat, lng };
 	}, [showPickupRoadEta, pickupGeocode?.lat, pickupGeocode?.lng]);
 
+	const pickupEtaDestination = useMemo(() => {
+		const fromGeocode = pickupGeocode?.addressLabel?.trim() ?? "";
+		if (fromGeocode) return fromGeocode;
+		if (pickupEtaPickup) {
+			return `${pickupEtaPickup.lat}, ${pickupEtaPickup.lng}`;
+		}
+		return "";
+	}, [pickupEtaPickup, pickupGeocode?.addressLabel]);
+
 	const pickupRoadEta = usePickupRoadEta({
 		enabled: showPickupRoadEta,
 		driver: pickupEtaDriver,
 		pickup: pickupEtaPickup,
+		destination: pickupEtaDestination,
 	});
 
 	const showLoadedEnrouteStaleTopBanner = Boolean(
