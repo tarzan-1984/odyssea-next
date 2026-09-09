@@ -196,7 +196,7 @@ export default function ChatListItem({
 					? `${loadStatusBgClass} ${
 							isSelected
 								? "ring-2 ring-inset ring-blue-500 dark:ring-blue-400"
-								: "hover:brightness-[0.97] dark:hover:brightness-110"
+								: "hover:brightness-[0.97]"
 						}`
 					: isSelected
 						? "bg-blue-100 dark:bg-blue-900/30"
@@ -322,29 +322,61 @@ export default function ChatListItem({
 			<div className="flex-1 ml-3 text-left min-w-0">
 				<div className="flex items-center justify-between gap-2">
 					<h3
-						className={`font-medium text-gray-900 dark:text-white truncate flex-shrink min-w-0 ${
-							chatRoom.type === "OFFER" ? "text-sm" : "text-base"
-						}`}
+						className={`font-medium truncate flex-shrink min-w-0 ${
+							loadStatusBgClass
+								? "text-gray-900"
+								: "text-gray-900 dark:text-white"
+						} ${chatRoom.type === "OFFER" ? "text-sm" : "text-base"}`}
 					>
 						{getChatDisplayName(chatRoom)}
 					</h3>
-					<span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+					<span
+						className={`text-xs flex-shrink-0 ${
+							loadStatusBgClass
+								? "text-gray-500"
+								: "text-gray-500 dark:text-gray-400"
+						}`}
+					>
 						{getChatLastMessageTime(chatRoom)}
 					</span>
 				</div>
 				<div className="flex items-center gap-1">
-					<p className="chat-msg-body text-gray-500 dark:text-gray-400 truncate flex-1">
+					<p
+						className={`chat-msg-body truncate flex-1 ${
+							loadStatusBgClass
+								? "text-gray-500"
+								: "text-gray-500 dark:text-gray-400"
+						}`}
+					>
 						{getChatLastMessage(chatRoom)}
 					</p>
 					{isPinned && (
-						<PushPinIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+						<PushPinIcon
+							className={`w-3 h-3 flex-shrink-0 ${
+								loadStatusBgClass
+									? "text-gray-400"
+									: "text-gray-400 dark:text-gray-500"
+							}`}
+						/>
 					)}
 					{isMuted && (
-						<SoundOffIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+						<SoundOffIcon
+							className={`w-3 h-3 flex-shrink-0 ${
+								loadStatusBgClass
+									? "text-gray-400"
+									: "text-gray-400 dark:text-gray-500"
+							}`}
+						/>
 					)}
 				</div>
 				{loadStatusLabel && (
-					<p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+					<p
+						className={`text-xs truncate mt-0.5 ${
+							loadStatusBgClass
+								? "text-gray-500"
+								: "text-gray-400 dark:text-gray-500"
+						}`}
+					>
 						{loadStatusLabel}
 					</p>
 				)}

@@ -2,7 +2,7 @@ const LOAD_CHAT_STATUS_LABELS: Record<string, string> = {
 	"waiting-on-pu-date": "Waiting on PU Date",
 	"at-pu": "At PU",
 	"loaded-enroute": "Loaded & Enroute",
-	"at-del": "At delivered",
+	"at-del": "At delivery",
 	delivered: "delivered",
 	tonu: "TONU",
 	cancelled: "Cancelled",
@@ -12,15 +12,15 @@ const LOAD_CHAT_STATUS_LABELS: Record<string, string> = {
 
 /** Same palette as mobile Your Loads cards. */
 const LOAD_CHAT_STATUS_BG_CLASS: Record<string, string> = {
-	"waiting-on-pu-date": "bg-[#F3F4F6] dark:bg-gray-800/80",
-	"at-pu": "bg-[#E6F2FF] dark:bg-sky-950/55",
-	"loaded-enroute": "bg-[#f7fef5] dark:bg-emerald-950/35",
-	"at-del": "bg-[#effee9] dark:bg-emerald-950/45",
-	delivered: "bg-[#effee9] dark:bg-emerald-950/45",
-	"waiting-on-rc": "bg-[#FFF7D6] dark:bg-yellow-950/40",
-	tonu: "bg-[#ffdcdc] dark:bg-red-950/45",
-	cancelled: "bg-[#ffdcdc] dark:bg-red-950/45",
-	canceled: "bg-[#ffdcdc] dark:bg-red-950/45",
+	"waiting-on-pu-date": "bg-[#F3F4F6] dark:bg-[#F3F4F6]",
+	"at-pu": "bg-[#E6F2FF] dark:bg-[#E6F2FF]",
+	"loaded-enroute": "bg-[#f7fef5] dark:bg-[#f7fef5]",
+	"at-del": "bg-[#effee9] dark:bg-[#effee9]",
+	delivered: "bg-[#effee9] dark:bg-[#effee9]",
+	"waiting-on-rc": "bg-[#FFF7D6] dark:bg-[#FFF7D6]",
+	tonu: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
+	cancelled: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
+	canceled: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
 };
 
 export function normalizeLoadChatStatus(
