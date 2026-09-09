@@ -274,7 +274,7 @@ const offers = {
 	},
 
 	/**
-	 * Calculate route distance (road miles) for a sequence of addresses using Nominatim + OSRM.
+	 * Calculate route distance (road miles) for a sequence of addresses via Google Maps.
 	 * Requires at least 2 locations. Returns loadedMiles or throws on error.
 	 */
 	async calculateRouteDistance(locations: string[]): Promise<{ loadedMiles: number }> {
@@ -285,6 +285,7 @@ const offers = {
 				headers: { "Content-Type": "application/json" },
 				withCredentials: true,
 				validateStatus: () => true,
+				timeout: 180000,
 			}
 		);
 

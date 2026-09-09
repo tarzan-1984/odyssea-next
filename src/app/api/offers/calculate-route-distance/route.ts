@@ -1,34 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 import { geocodeOfferAddressCoordinates } from "@/utils/offerLocationGeocode";
+import {
+	buildGoogleDirectionsQuery,
+	parseGoogleDirectionsBody,
+} from "@/lib/fetchGooglePickupDirections";
+
+export const maxDuration = 180;
 
 const METERS_TO_MILES = 1 / 1609.344;
+const MAX_GOOGLE_DESTINATIONS = 9;
 const NOMINATIM_DELAY_MS = 1100;
 
 function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Get road distance in meters between two points via OSRM. Returns null on failure. */
-async function getOsrmDistanceMeters(
-	from: { lat: number; lon: number },
-	to: { lat: number; lon: number }
+async function googleDistanceMeters(
+	origin: { lat: number; lon: number },
+	destinations: string[]
 ): Promise<number | null> {
-	const coords = `${from.lon},${from.lat};${to.lon},${to.lat}`;
-	const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`;
+	const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
+	if (!backendBase) return null;
 
-	const res = await fetch(url);
-	if (!res.ok) return null;
+	const qs = buildGoogleDirectionsQuery(
+		{ lat: origin.lat, lng: origin.lon },
+		destinations
+	);
+	const response = await fetch(`${backendBase}/v1/geocoding/google/directions?${qs.toString()}`, {
+		method: "GET",
+		cache: "no-store",
+	});
+	if (!response.ok) return null;
 
-	const data = (await res.json()) as { routes?: Array<{ distance: number }> };
-	if (!data.routes?.[0] || typeof data.routes[0].distance !== "number") return null;
-
-	return data.routes[0].distance;
+	const body: unknown = await response.json().catch(() => null);
+	const route = parseGoogleDirectionsBody(body);
+	return route ? route.distanceMeters : null;
 }
 
 /**
  * POST /api/offers/calculate-route-distance
- * Calculates road distance (miles) for a sequence of addresses using Nominatim + OSRM.
+ * Road miles for a sequence of addresses via Google Maps (first stop is origin).
  * Body: { locations: string[] }
  * Returns: { loadedMiles: number } or { error: string }
  */
@@ -40,7 +52,9 @@ export async function POST(request: NextRequest) {
 		}
 
 		const body = (await request.json()) as { locations?: string[] };
-		const locations = Array.isArray(body.locations) ? body.locations : [];
+		const locations = Array.isArray(body.locations)
+			? body.locations.map(item => String(item).trim()).filter(Boolean)
+			: [];
 
 		if (locations.length < 2) {
 			return NextResponse.json(
@@ -49,30 +63,35 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const coords: { lat: number; lon: number }[] = [];
-		for (let i = 0; i < locations.length; i++) {
-			if (i > 0) await sleep(NOMINATIM_DELAY_MS);
+		let totalMeters = 0;
+		let originIndex = 0;
+		let geocodeCount = 0;
 
-			const point = await geocodeOfferAddressCoordinates(String(locations[i]));
-			if (!point) {
+		while (originIndex < locations.length - 1) {
+			if (geocodeCount > 0) await sleep(NOMINATIM_DELAY_MS);
+			const origin = await geocodeOfferAddressCoordinates(locations[originIndex]);
+			geocodeCount += 1;
+			if (!origin) {
 				return NextResponse.json(
-					{ error: `Could not geocode address: ${String(locations[i]).slice(0, 80)}` },
+					{ error: `Could not geocode address: ${locations[originIndex].slice(0, 80)}` },
 					{ status: 400 }
 				);
 			}
-			coords.push(point);
-		}
 
-		let totalMeters = 0;
-		for (let i = 0; i < coords.length - 1; i++) {
-			const dist = await getOsrmDistanceMeters(coords[i], coords[i + 1]);
+			const destinations = locations.slice(
+				originIndex + 1,
+				originIndex + 1 + MAX_GOOGLE_DESTINATIONS
+			);
+			const dist = await googleDistanceMeters(origin, destinations);
 			if (dist == null) {
 				return NextResponse.json(
 					{ error: "Could not calculate route between addresses" },
 					{ status: 400 }
 				);
 			}
+
 			totalMeters += dist;
+			originIndex += destinations.length;
 		}
 
 		const loadedMiles = totalMeters * METERS_TO_MILES;

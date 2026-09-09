@@ -52,20 +52,40 @@ function unwrapDirectionsPayload(body: unknown): GooglePickupRoute | null {
 	return null;
 }
 
-export async function fetchGooglePickupDirections(
-	origin: { lat: number; lng: number },
-	destination: string,
-	signal?: AbortSignal
-): Promise<GooglePickupRoute | null> {
-	const trimmed = destination.trim();
-	if (trimmed.length < 3) return null;
+export function parseGoogleDirectionsBody(body: unknown): GooglePickupRoute | null {
+	return unwrapDirectionsPayload(body);
+}
 
+export function buildGoogleDirectionsQuery(
+	origin: { lat: number; lng: number },
+	destinations: string[]
+): URLSearchParams {
 	const qs = new URLSearchParams({
 		originLat: String(origin.lat),
 		originLng: String(origin.lng),
-		destination: trimmed,
 	});
+	const cleaned = destinations.map(item => item.trim()).filter(item => item.length >= 3);
+	if (cleaned.length === 1) {
+		qs.set("destination", cleaned[0]);
+		return qs;
+	}
+	for (const item of cleaned) {
+		qs.append("destinations", item);
+	}
+	return qs;
+}
 
+export async function fetchGooglePickupDirections(
+	origin: { lat: number; lng: number },
+	destination: string | string[],
+	signal?: AbortSignal
+): Promise<GooglePickupRoute | null> {
+	const destinations = (Array.isArray(destination) ? destination : [destination])
+		.map(item => item.trim())
+		.filter(item => item.length >= 3);
+	if (destinations.length === 0) return null;
+
+	const qs = buildGoogleDirectionsQuery(origin, destinations);
 	const response = await fetch(`/api/geocoding/google/directions?${qs.toString()}`, {
 		method: "GET",
 		signal,
@@ -74,5 +94,5 @@ export async function fetchGooglePickupDirections(
 	if (!response.ok) return null;
 
 	const body: unknown = await response.json().catch(() => null);
-	return unwrapDirectionsPayload(body);
+	return parseGoogleDirectionsBody(body);
 }
