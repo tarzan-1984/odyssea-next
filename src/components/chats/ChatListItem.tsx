@@ -20,6 +20,7 @@ import {
 } from "@/utils/chatOtherParticipant";
 import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
+import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass } from "@/utils/loadStatusLabel";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -99,6 +100,11 @@ export default function ChatListItem({
 		}
 		return "";
 	};
+
+	const loadStatusLabel =
+		chatRoom.type === "LOAD" ? formatLoadChatStatusLabel(chatRoom.loadStatus) : null;
+	const loadStatusBgClass =
+		chatRoom.type === "LOAD" ? loadChatStatusBackgroundClass(chatRoom.loadStatus) : null;
 
 	const toggleDropdown = () => {
 		if (onMenuToggle) {
@@ -186,11 +192,17 @@ export default function ChatListItem({
 				onChatSelect(chatRoom);
 			}}
 			className={`w-full flex items-center py-3 pl-0 pr-3 rounded-lg transition-colors ${
-				isSelected
-					? "bg-blue-100 dark:bg-blue-900/30"
-					: isMuted
-						? "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50"
-						: "hover:bg-gray-100 dark:hover:bg-gray-800"
+				loadStatusBgClass
+					? `${loadStatusBgClass} ${
+							isSelected
+								? "ring-2 ring-inset ring-blue-500 dark:ring-blue-400"
+								: "hover:brightness-[0.97] dark:hover:brightness-110"
+						}`
+					: isSelected
+						? "bg-blue-100 dark:bg-blue-900/30"
+						: isMuted
+							? "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+							: "hover:bg-gray-100 dark:hover:bg-gray-800"
 			}`}
 		>
 			{/* Menu Icon - positioned before avatar */}
@@ -331,6 +343,11 @@ export default function ChatListItem({
 						<SoundOffIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
 					)}
 				</div>
+				{loadStatusLabel && (
+					<p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+						{loadStatusLabel}
+					</p>
+				)}
 			</div>
 
 			{typeof chatRoom.unreadCount === "number" && chatRoom.unreadCount > 0 && (

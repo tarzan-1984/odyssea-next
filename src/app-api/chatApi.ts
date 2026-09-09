@@ -64,6 +64,8 @@ export interface ChatRoom {
 	isArchived: boolean;
 	/** LOAD chat: load-specific archive flag (cron after deliveryAt + configured hours). */
 	isLoadArchived?: boolean;
+	/** Current loads.status for LOAD chats (from loads table). */
+	loadStatus?: string | null;
 	createdAt: string;
 	updatedAt: string;
 	participants: ChatRoomParticipant[];

@@ -142,6 +142,7 @@ export const useChatSync = () => {
 												{ preferNewerStore: true }
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
+											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
 										};
 									}
 									return cachedRoom;
@@ -217,6 +218,7 @@ export const useChatSync = () => {
 												{ preferNewerStore: true }
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
+											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
 										};
 									}
 									return cachedRoom;
