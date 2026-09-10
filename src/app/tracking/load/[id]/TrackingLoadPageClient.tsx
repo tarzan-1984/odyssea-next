@@ -129,7 +129,7 @@ const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set(["delivered", "tonu", "cancelle
 const LOAD_STATUSES_STALE_TRACKING = new Set(["waiting_on_pu_date", "at_pu"]);
 
 /** Load statuses where live driver location is appended to history list. */
-const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set(["loaded_enroute", "at_del"]);
+const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set(["loaded_enroute", "at_del", "waiting_on_pu_date"]);
 
 type LoadTrackingPoint = {
 	id?: string | null;
@@ -908,7 +908,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isAuthenticated &&
 		showMapAndTrackingTools &&
 		(isDriverLoadedEnroute || isLoadDelivered) &&
-		!LOAD_STATUSES_STALE_TRACKING.has(normalizedLoadStatus)
+		(normalizedLoadStatus !== "at_pu")
 	);
 	const showCurrentLocationHistoryCard = Boolean(
 		showLoadHistoryPanel &&
