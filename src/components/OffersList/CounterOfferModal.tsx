@@ -73,7 +73,8 @@ export default function CounterOfferModal({
 			return;
 		}
 
-		if (rate > state.driverRate) {
+		// When driver accidentally bid $0, allow any valid counter offer.
+		if (state.driverRate > 0 && rate > state.driverRate) {
 			setError(
 				`Counter offer must not be higher than the driver's rate (${formatUsd(state.driverRate)})`,
 			);

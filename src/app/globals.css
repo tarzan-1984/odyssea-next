@@ -890,7 +890,6 @@ span.flatpickr-weekday,
 .flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper,
 .flatpickr-calendar.hasTime .flatpickr-time .flatpickr-am-pm {
 	float: none !important;
-	width: auto !important;
 	flex: 0 0 auto;
 	height: 2.5rem !important;
 	border-radius: 0.5rem;
@@ -906,10 +905,12 @@ span.flatpickr-weekday,
 }
 
 .flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper {
+	width: 4.75rem !important;
 	min-width: 4.75rem;
 }
 
 .flatpickr-calendar.hasTime .flatpickr-time .flatpickr-am-pm {
+	width: 3.5rem !important;
 	min-width: 3.5rem;
 	padding: 0 0.75rem;
 	display: flex !important;
@@ -940,7 +941,9 @@ span.flatpickr-weekday,
 	border: 0 !important;
 	background: transparent !important;
 	box-shadow: none !important;
-	min-width: 1.75rem;
+	width: 100% !important;
+	min-width: 0;
+	max-width: 100%;
 	font-weight: 600;
 	color: var(--color-gray-800);
 }
@@ -993,7 +996,6 @@ span.flatpickr-weekday,
 }
 
 .offer-datetime-end .flatpickr-time {
-	@apply !w-full !max-w-none;
 	border-top: 0 !important;
 }
 

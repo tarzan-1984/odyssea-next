@@ -57,8 +57,10 @@ function readEndTimeFromRow(timeRow: HTMLElement): Date | null {
 	const period = (ampm.textContent ?? "").trim().toUpperCase();
 	if (!hourRaw || (period !== "AM" && period !== "PM")) return null;
 	const hourNum = parseInt(hourRaw, 10);
-	const minuteNum = parseInt(minute.value || "0", 10) || 0;
-	if (Number.isNaN(hourNum)) return null;
+	const minuteRaw = minute.value.trim();
+	const minuteNum = minuteRaw === "" ? 0 : parseInt(minuteRaw, 10);
+	if (Number.isNaN(hourNum) || hourNum < 1 || hourNum > 12) return null;
+	if (Number.isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) return null;
 	let h = hourNum;
 	if (period === "PM" && h < 12) h += 12;
 	if (period === "AM" && h === 12) h = 0;
@@ -86,6 +88,27 @@ function applyEndTimeToRow(timeRow: HTMLElement, end: Date | null) {
 	ampm.textContent = parts.period;
 }
 
+function constrainTimeDigitInput(
+	input: HTMLInputElement,
+	opts: { min: number; max: number },
+	clampToMin: boolean
+) {
+	const pad = input.classList.contains("flatpickr-minute");
+	const digits = input.value.replace(/\D/g, "").slice(0, 2);
+	if (digits === "") {
+		input.value = "";
+		return;
+	}
+	let v = parseInt(digits, 10);
+	if (Number.isNaN(v)) {
+		input.value = "";
+		return;
+	}
+	if (v > opts.max) v = opts.max;
+	if (clampToMin && v < opts.min) v = opts.min;
+	input.value = pad && (clampToMin || digits.length === 2) ? String(v).padStart(2, "0") : String(v);
+}
+
 function bindNumInput(
 	wrapper: Element | null,
 	input: HTMLInputElement,
@@ -93,6 +116,14 @@ function bindNumInput(
 	onChange: () => void
 ) {
 	if (!wrapper) return;
+
+	input.type = "text";
+	input.inputMode = "numeric";
+	input.pattern = "[0-9]*";
+	input.maxLength = 2;
+	input.size = 2;
+	input.autocomplete = "off";
+
 	const adjust = (delta: number) => {
 		const raw = input.value.trim();
 		let v = raw === "" ? opts.min : parseInt(raw, 10);
@@ -111,8 +142,18 @@ function bindNumInput(
 		e.preventDefault();
 		adjust(-1);
 	});
-	input.addEventListener("change", onChange);
-	input.addEventListener("input", onChange);
+	input.addEventListener("input", () => {
+		constrainTimeDigitInput(input, opts, false);
+		onChange();
+	});
+	input.addEventListener("change", () => {
+		constrainTimeDigitInput(input, opts, true);
+		onChange();
+	});
+	input.addEventListener("blur", () => {
+		constrainTimeDigitInput(input, opts, true);
+		onChange();
+	});
 }
 
 function bindEndTimeRow(timeRow: HTMLElement, onChange: () => void) {
