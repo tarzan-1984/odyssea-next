@@ -21,6 +21,7 @@ export interface OfferDriver {
 	total_miles: number | null;
 	driver_eta?: string | null;
 	driver_rating?: number | null;
+	has_offer_chat?: boolean;
 }
 
 export interface OfferRoutePoint {
@@ -554,6 +555,42 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in selectDriverForOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Create (or reopen) an OFFER chat with a driver on this offer.
+	 */
+	async createOfferDriverChat(
+		offerId: number,
+		driverExternalId: string
+	): Promise<{ success: true; chatRoom: unknown } | { success: false; error: string }> {
+		try {
+			const response = await axios.post(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/chat`,
+				{},
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, chatRoom: data };
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to create offer chat",
+			};
+		} catch (error) {
+			console.error("Error in createOfferDriverChat:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

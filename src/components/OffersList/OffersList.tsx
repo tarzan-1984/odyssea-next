@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
@@ -505,6 +504,7 @@ const OffersList = () => {
 	const [deletingDriverKey, setDeletingDriverKey] = useState<string | null>(null);
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
+	const [creatingChatDriverKey, setCreatingChatDriverKey] = useState<string | null>(null);
 	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [deactivateConfirmOffer, setDeactivateConfirmOffer] = useState<OfferRow | null>(null);
@@ -956,7 +956,7 @@ const OffersList = () => {
 													/>
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_BID_TIMER)} />
 													{!row.is_driver_selected && (
-														<col style={fixedDriverTableCol("168px")} />
+														<col style={fixedDriverTableCol("200px")} />
 													)}
 												</colgroup>
 														<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
@@ -1007,16 +1007,6 @@ const OffersList = () => {
 																>
 															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<span className="inline-flex items-center gap-1.5">
-																	{driverUnitId ? (
-																		<Link
-																			href={buildOfferChatUrl(String(row.id), driverUnitId)}
-																			title="Open offer chat"
-																			onClick={(e) => e.stopPropagation()}
-																			className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-300"
-																		>
-																			<OfferDriverChatIcon className="h-4 w-4" />
-																		</Link>
-																	) : null}
 																	{tmsDriverUrl ? (
 																		<a
 																			href={tmsDriverUrl}
@@ -1094,129 +1084,186 @@ const OffersList = () => {
 																	</TableCell>
 																	{!row.is_driver_selected && (
 																		<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
-																			{driver.active === false ? (
-																				<button
-																					type="button"
-																					disabled={
-																						!canModifyOffersByRole ||
-																						returningDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`
-																					}
-																					onClick={async () => {
-																						if (!canModifyOffersByRole) return;
-																						const key = driver.externalId ?? driver.driver_id;
-																						if (!key) return;
-																						setReturningDriverKey(`${row.id}-${key}`);
-																						const res = await offersApi.returnDriverToOffer(row.id, key);
-																						setReturningDriverKey(null);
-																						if (res.success) {
-																							await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																						} else {
-																							console.error(res.error);
-																						}
-																					}}
-																					className="w-full rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
-																				>
-																					Return
-																				</button>
-																			) : (
-																				<div className="flex flex-wrap items-center justify-center gap-1.5">
-																					<button
-																						type="button"
-																						disabled={
-																							!canModifyOffersByRole ||
-																							deletingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}`
-																						}
-																						onClick={async () => {
-																							if (!canModifyOffersByRole) return;
-																							const key = driver.externalId ?? driver.driver_id;
-																							if (!key) return;
-																							setDeletingDriverKey(`${row.id}-${key}`);
-																							const res = await offersApi.removeDriverFromOffer(row.id, key);
-																							setDeletingDriverKey(null);
-																							if (res.success) {
-																								await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																								const offerTitle = getOfferTitle(row);
-																								setPushModalState({
-																									drivers: [driver],
-																									defaultMessage: buildOfferUnavailablePushMessage(row),
-																									...(offerTitle
-																										? {
-																												offerContext: {
-																													offerId: row.id,
-																													offerTitle,
-																												},
-																											}
-																										: {}),
-																								});
-																							} else {
-																								console.error(res.error);
+																			{(() => {
+																				const driverKey = driver.externalId ?? driver.driver_id;
+																				const actionKey = driverKey ? `${row.id}-${driverKey}` : null;
+																				const createChatButton =
+																					driverUnitId && actionKey ? (
+																						<button
+																							type="button"
+																							title={
+																								driver.has_offer_chat
+																									? "Open chat"
+																									: "Add chat"
 																							}
-																						}}
-																						className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-																					>
-																						<OfferDeleteIcon className="h-3.5 w-3.5 shrink-0" />
-																						Delete
-																					</button>
-																					<button
-																						type="button"
-																						disabled={
-																							!canModifyOffersByRole ||
-																							acceptingDriverKey === `${row.id}-${driver.externalId ?? driver.driver_id}` ||
-																							driver.rate == null
-																						}
-																						title={driver.rate == null ? 'Rate is not set' : undefined}
-																					onClick={() => {
-																						if (!canModifyOffersByRole) return;
-																						const key = driver.externalId ?? driver.driver_id;
-																						if (!key) return;
-																						setAcceptingDriverKey(`${row.id}-${key}`);
-																						offersApi
-																							.selectDriverForOffer(row.id, key)
-																							.then(async (res) => {
-																					if (res.success) {
-																						await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																						setShowDriverAcceptedModal(true);
+																							disabled={
+																								!canModifyOffersByRole ||
+																								creatingChatDriverKey === actionKey
+																							}
+																							onClick={async () => {
+																								if (!canModifyOffersByRole || !driverUnitId) return;
+																								const chatUrl = buildOfferChatUrl(
+																									String(row.id),
+																									driverUnitId
+																								);
+																								if (driver.has_offer_chat) {
+																									window.location.href = chatUrl;
+																									return;
+																								}
+																								setCreatingChatDriverKey(actionKey);
+																								const res = await offersApi.createOfferDriverChat(
+																									row.id,
+																									String(driverUnitId)
+																								);
+																								setCreatingChatDriverKey(null);
+																								if (res.success) {
+																									window.location.href = chatUrl;
 																								} else {
 																									console.error(res.error);
 																									window.alert(
 																										typeof res.error === "string"
 																											? res.error
-																											: "Failed to accept driver"
+																											: "Failed to create offer chat"
 																									);
 																								}
-																							})
-																							.finally(() => {
-																								setAcceptingDriverKey(null);
-																							});
-																						}}
-																						className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
-																					>
-																						<OfferAcceptIcon className="h-3.5 w-3.5 shrink-0" />
-																						Accept
-																					</button>
-																					{driver.rate != null && driver.counter_offer == null && (
+																							}}
+																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
+																						>
+																							<OfferDriverChatIcon className="h-3.5 w-3.5 shrink-0" />
+																							{driver.has_offer_chat ? "Open chat" : "Add chat"}
+																						</button>
+																					) : null;
+
+																				if (driver.active === false) {
+																					return (
+																						<div className="flex flex-wrap items-center justify-center gap-1.5">
+																							{createChatButton}
+																							<button
+																								type="button"
+																								disabled={
+																									!canModifyOffersByRole ||
+																									returningDriverKey === actionKey
+																								}
+																								onClick={async () => {
+																									if (!canModifyOffersByRole) return;
+																									if (!driverKey) return;
+																									setReturningDriverKey(`${row.id}-${driverKey}`);
+																									const res = await offersApi.returnDriverToOffer(row.id, driverKey);
+																									setReturningDriverKey(null);
+																									if (res.success) {
+																										await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																									} else {
+																										console.error(res.error);
+																									}
+																								}}
+																								className="rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																							>
+																								Return
+																							</button>
+																						</div>
+																					);
+																				}
+
+																				return (
+																					<div className="flex flex-wrap items-center justify-center gap-1.5">
+																						{createChatButton}
 																						<button
 																							type="button"
-																							disabled={!canModifyOffersByRole}
+																							disabled={
+																								!canModifyOffersByRole ||
+																								deletingDriverKey === actionKey
+																							}
+																							onClick={async () => {
+																								if (!canModifyOffersByRole) return;
+																								if (!driverKey) return;
+																								setDeletingDriverKey(`${row.id}-${driverKey}`);
+																								const res = await offersApi.removeDriverFromOffer(row.id, driverKey);
+																								setDeletingDriverKey(null);
+																								if (res.success) {
+																									await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																									const offerTitle = getOfferTitle(row);
+																									setPushModalState({
+																										drivers: [driver],
+																										defaultMessage: buildOfferUnavailablePushMessage(row),
+																										...(offerTitle
+																											? {
+																													offerContext: {
+																														offerId: row.id,
+																														offerTitle,
+																													},
+																												}
+																											: {}),
+																									});
+																								} else {
+																									console.error(res.error);
+																								}
+																							}}
+																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																						>
+																							<OfferDeleteIcon className="h-3.5 w-3.5 shrink-0" />
+																							Delete
+																						</button>
+																						<button
+																							type="button"
+																							disabled={
+																								!canModifyOffersByRole ||
+																								acceptingDriverKey === actionKey ||
+																								driver.rate == null
+																							}
+																							title={driver.rate == null ? "Rate is not set" : undefined}
 																							onClick={() => {
 																								if (!canModifyOffersByRole) return;
-																								const key = driver.externalId ?? driver.driver_id;
-																								if (!key) return;
-																								setCounterOfferModal({
-																									offerId: row.id,
-																									driverExternalId: key,
-																									driverName: driverDisplayName || "Driver",
-																									driverRate: driver.rate,
-																								});
+																								if (!driverKey) return;
+																								setAcceptingDriverKey(`${row.id}-${driverKey}`);
+																								offersApi
+																									.selectDriverForOffer(row.id, driverKey)
+																									.then(async (res) => {
+																										if (res.success) {
+																											await queryClient.invalidateQueries({
+																												queryKey: ["offers-list-cards"],
+																											});
+																											setShowDriverAcceptedModal(true);
+																										} else {
+																											console.error(res.error);
+																											window.alert(
+																												typeof res.error === "string"
+																													? res.error
+																													: "Failed to accept driver"
+																											);
+																										}
+																									})
+																									.finally(() => {
+																										setAcceptingDriverKey(null);
+																									});
 																							}}
-																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																						>
-																							<OfferCounterOfferIcon className="h-3.5 w-3.5 shrink-0" />
-																							Counter offer
+																							<OfferAcceptIcon className="h-3.5 w-3.5 shrink-0" />
+																							Accept
 																						</button>
-																					)}
-																				</div>
-																			)}
+																						{driver.rate != null && driver.counter_offer == null && (
+																							<button
+																								type="button"
+																								disabled={!canModifyOffersByRole}
+																								onClick={() => {
+																									if (!canModifyOffersByRole) return;
+																									if (!driverKey) return;
+																									setCounterOfferModal({
+																										offerId: row.id,
+																										driverExternalId: driverKey,
+																										driverName: driverDisplayName || "Driver",
+																										driverRate: driver.rate,
+																									});
+																								}}
+																								className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+																							>
+																								<OfferCounterOfferIcon className="h-3.5 w-3.5 shrink-0" />
+																								Counter offer
+																							</button>
+																						)}
+																					</div>
+																				);
+																			})()}
 																		</TableCell>
 																	)}
 																</TableRow>
@@ -1233,7 +1280,8 @@ const OffersList = () => {
 									{(deactivatingOfferId === row.id ||
 										(deletingDriverKey != null && deletingDriverKey.startsWith(`${row.id}-`)) ||
 										(returningDriverKey != null && returningDriverKey.startsWith(`${row.id}-`)) ||
-										(acceptingDriverKey != null && acceptingDriverKey.startsWith(`${row.id}-`))) && (
+										(acceptingDriverKey != null && acceptingDriverKey.startsWith(`${row.id}-`)) ||
+										(creatingChatDriverKey != null && creatingChatDriverKey.startsWith(`${row.id}-`))) && (
 										<div
 											className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/70 dark:bg-white/10"
 											aria-hidden
