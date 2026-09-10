@@ -39,6 +39,7 @@ import {
 	canAccessMyTeamChatTab,
 } from "@/utils/roleAccess";
 import { formatWebSocketError, logWebSocketError } from "@/utils/websocketError";
+import offersApi, { type GetOffersResponse, type OfferRow } from "@/app-api/offers";
 
 function invalidateTrackingTeamsOnLoadChatEvent(
 	queryClient: QueryClient,
@@ -176,6 +177,29 @@ interface OfferUpdatedData {
 	offerId?: number;
 	reason?: string;
 	refreshedAt?: string;
+}
+
+const OFFER_LIST_STRUCTURE_REASONS = new Set([
+	"offer_created",
+	"offer_updated",
+	"offer_deactivated",
+	"driver_selected",
+]);
+
+function replaceOfferInCachedList(
+	old: GetOffersResponse | undefined,
+	updatedOffer: OfferRow,
+): GetOffersResponse | undefined {
+	if (!old?.data?.results?.some(offer => offer.id === updatedOffer.id)) return old;
+	return {
+		...old,
+		data: {
+			...old.data,
+			results: old.data.results.map(offer =>
+				offer.id === updatedOffer.id ? updatedOffer : offer
+			),
+		},
+	};
 }
 
 interface LoadBoardShipmentUpdatedData {
@@ -483,20 +507,37 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			// Connected successfully
 		});
 
-		newSocket.on("offerUpdated", (data: OfferUpdatedData) => {
-			// Invalidate and immediately refetch to update offer cards in real time
-			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
-			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
-			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
+		newSocket.on("offerUpdated", async (data: OfferUpdatedData) => {
+			const offerId = Number(data?.offerId);
+			if (
+				!Number.isInteger(offerId) ||
+				OFFER_LIST_STRUCTURE_REASONS.has(data?.reason ?? "")
+			) {
+				queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+				queryClient.invalidateQueries({ queryKey: ["offers-list"] });
+				return;
+			}
+
+			try {
+				const response = await offersApi.getOffer(offerId);
+				const updatedOffer = response.data;
+				queryClient.setQueriesData<GetOffersResponse>(
+					{ queryKey: ["offers-list-cards"] },
+					old => replaceOfferInCachedList(old, updatedOffer)
+				);
+				queryClient.setQueriesData<GetOffersResponse>(
+					{ queryKey: ["offers-list"] },
+					old => replaceOfferInCachedList(old, updatedOffer)
+				);
+			} catch {
+				// Fall back to a regular list refresh if the targeted request fails.
+				queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+				queryClient.invalidateQueries({ queryKey: ["offers-list"] });
+			}
 		});
 
 		newSocket.on("loadBoardShipmentUpdated", (_data: LoadBoardShipmentUpdatedData) => {
 			queryClient.invalidateQueries({ queryKey: ["load-board-shipments"] });
-			queryClient.refetchQueries({
-				queryKey: ["load-board-shipments"],
-				type: "active",
-			});
 		});
 
 		newSocket.on("bidRateUpdated", (data: BidRateUpdatedData) => {
@@ -570,14 +611,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			);
 
 			queryClient.invalidateQueries({ queryKey: ["bid-rates-list"] });
-			queryClient.refetchQueries({ queryKey: ["bid-rates-list"], type: "active" });
 		});
 
 		newSocket.on("appLocationSettingsUpdated", () => {
 			queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-			queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
 			queryClient.invalidateQueries({ queryKey: ["offers-list"] });
-			queryClient.refetchQueries({ queryKey: ["offers-list"], type: "active" });
 		});
 
 		// Handle user location updates from backend (users table)

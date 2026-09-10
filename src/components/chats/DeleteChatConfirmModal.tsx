@@ -68,12 +68,6 @@ export default function DeleteChatConfirmModal({
 			if (chatRoom.type === "LOAD") {
 				queryClient
 					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
-					.then(() =>
-						queryClient.refetchQueries({
-							queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY],
-							type: "active",
-						})
-					)
 					.catch(() => {});
 			}
 

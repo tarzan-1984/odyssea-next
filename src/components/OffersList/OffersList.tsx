@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
@@ -177,6 +177,48 @@ function formatCountdown(totalSeconds: number): string {
 		.join(":");
 }
 
+const secondClockSubscribers = new Set<(nowUnixSeconds: number) => void>();
+let secondClockIntervalId: number | null = null;
+
+function subscribeToSecondClock(callback: (nowUnixSeconds: number) => void): () => void {
+	secondClockSubscribers.add(callback);
+	if (secondClockIntervalId == null) {
+		secondClockIntervalId = window.setInterval(() => {
+			const nowUnixSeconds = Math.floor(Date.now() / 1000);
+			for (const subscriber of secondClockSubscribers) subscriber(nowUnixSeconds);
+		}, 1000);
+	}
+
+	return () => {
+		secondClockSubscribers.delete(callback);
+		if (secondClockSubscribers.size === 0 && secondClockIntervalId != null) {
+			window.clearInterval(secondClockIntervalId);
+			secondClockIntervalId = null;
+		}
+	};
+}
+
+/** Subscribe only the small timer component, never the full offers list. */
+function useCountdownSeconds(actionTimeUnix: number | null, enabled = true): number | null {
+	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
+		Math.floor(Date.now() / 1000)
+	);
+	const shouldTick = enabled && actionTimeUnix != null && actionTimeUnix > nowUnixSeconds;
+
+	useEffect(() => {
+		setNowUnixSeconds(Math.floor(Date.now() / 1000));
+	}, [actionTimeUnix]);
+
+	useEffect(() => {
+		if (!shouldTick) return;
+		return subscribeToSecondClock(setNowUnixSeconds);
+	}, [shouldTick]);
+
+	return actionTimeUnix == null
+		? null
+		: Math.max(0, actionTimeUnix - nowUnixSeconds);
+}
+
 function formatDriverBidRate(rate: number | null | undefined): string | null {
 	if (rate == null) return null;
 	return `$${Number(rate).toLocaleString("en-US")}`;
@@ -242,14 +284,12 @@ function OfferDriverBadge({
 	offer,
 	driver,
 	driverIdx,
-	nowUnixSeconds,
 	canModifyOffersByRole,
 	onPushClick,
 }: {
 	offer: OfferRow;
 	driver: OfferDriver;
 	driverIdx: number;
-	nowUnixSeconds: number;
 	canModifyOffersByRole: boolean;
 	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
 }) {
@@ -260,10 +300,8 @@ function OfferDriverBadge({
 		.filter(Boolean)
 		.join(" ");
 	const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
-	const remainingSeconds =
-		actionTimeUnix != null ? Math.max(0, actionTimeUnix - nowUnixSeconds) : null;
-
 	const isInactiveDriver = driver.active === false;
+	const remainingSeconds = useCountdownSeconds(actionTimeUnix, !isInactiveDriver);
 	const hasActiveTimer =
 		!isInactiveDriver && remainingSeconds != null && remainingSeconds > 0;
 	const isExpiredBid =
@@ -331,6 +369,44 @@ function OfferDriverBadge({
 				/>
 			) : null}
 		</div>
+	);
+}
+
+function DriverBidTimer({
+	offer,
+	driver,
+	canModifyOffersByRole,
+	onPushClick,
+}: {
+	offer: OfferRow;
+	driver: OfferDriver;
+	canModifyOffersByRole: boolean;
+	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
+}) {
+	const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
+	const remainingSeconds = useCountdownSeconds(actionTimeUnix, driver.active !== false);
+	if (actionTimeUnix == null || remainingSeconds == null) return null;
+
+	if (remainingSeconds > 0) {
+		return (
+			<span className="inline-flex min-w-[78px] items-center justify-center rounded-full bg-brand-600 px-2 py-1 text-xs font-semibold text-white">
+				{formatCountdown(remainingSeconds)}
+			</span>
+		);
+	}
+
+	return (
+		<span className="inline-flex items-center justify-center gap-1">
+			<span className="text-theme-sm text-gray-800 dark:text-gray-200">
+				Offer Expired
+			</span>
+			<ExtendBidTimeButton
+				offer={offer}
+				driver={driver}
+				disabled={!canModifyOffersByRole}
+				onPushClick={onPushClick}
+			/>
+		</span>
 	);
 }
 
@@ -447,7 +523,7 @@ const OffersList = () => {
 		useState<CounterOfferModalState | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
-	const [nowUnixSeconds, setNowUnixSeconds] = useState(() =>
+	const [driverSortTime, setDriverSortTime] = useState(() =>
 		Math.floor(Date.now() / 1000)
 	);
 
@@ -509,18 +585,29 @@ const OffersList = () => {
 		placeholderData: keepPreviousData,
 	});
 
-	const results: OfferRow[] = data?.data?.results ?? [];
+	const results: OfferRow[] = useMemo(
+		() => data?.data?.results ?? [],
+		[data?.data?.results]
+	);
 	const pagination = data?.data?.pagination;
 	const totalItems = pagination?.total_count ?? 0;
 	const totalPages = pagination?.total_pages ?? 1;
 
 	useEffect(() => {
-		const intervalId = window.setInterval(() => {
-			setNowUnixSeconds(Math.floor(Date.now() / 1000));
-		}, 1000);
+		const nowUnixSeconds = Math.floor(Date.now() / 1000);
+		const nextExpiry = results
+			.flatMap(offer => offer.drivers ?? [])
+			.map(driver => normalizeUnixSeconds(driver.action_time))
+			.filter((time): time is number => time != null && time > nowUnixSeconds)
+			.sort((a, b) => a - b)[0];
+		if (nextExpiry == null) return;
 
-		return () => window.clearInterval(intervalId);
-	}, []);
+		const timeoutId = window.setTimeout(
+			() => setDriverSortTime(Math.floor(Date.now() / 1000)),
+			Math.max(0, (nextExpiry - nowUnixSeconds) * 1000 + 50)
+		);
+		return () => window.clearTimeout(timeoutId);
+	}, [results, driverSortTime]);
 
 	return (
 		<div className="bg-white dark:bg-white/[0.03] rounded-xl">
@@ -690,15 +777,15 @@ const OffersList = () => {
 											const participatingDrivers = getParticipatingOfferDrivers(row.drivers);
 											const activeTimerDrivers = sortOfferDriversByBidStatus(
 												participatingDrivers.filter(
-													(d) => getDriverBidSortPriority(d, nowUnixSeconds) === 0
+													(d) => getDriverBidSortPriority(d, driverSortTime) === 0
 												),
-												nowUnixSeconds
+												driverSortTime
 											);
 											const expiredTimerDrivers = sortOfferDriversByBidStatus(
 												participatingDrivers.filter(
-													(d) => getDriverBidSortPriority(d, nowUnixSeconds) !== 0
+													(d) => getDriverBidSortPriority(d, driverSortTime) !== 0
 												),
-												nowUnixSeconds
+												driverSortTime
 											);
 											if (activeTimerDrivers.length === 0 && expiredTimerDrivers.length === 0) {
 												return null;
@@ -713,7 +800,6 @@ const OffersList = () => {
 																	offer={row}
 																	driver={driver}
 																	driverIdx={driverIdx}
-																	nowUnixSeconds={nowUnixSeconds}
 																	canModifyOffersByRole={canModifyOffersByRole}
 																	onPushClick={(offer, driverItem) => {
 																		setPushModalState({
@@ -733,7 +819,6 @@ const OffersList = () => {
 																	offer={row}
 																	driver={driver}
 																	driverIdx={driverIdx}
-																	nowUnixSeconds={nowUnixSeconds}
 																	canModifyOffersByRole={canModifyOffersByRole}
 																	onPushClick={(offer, driverItem) => {
 																		setPushModalState({
@@ -906,7 +991,7 @@ const OffersList = () => {
 															</TableRow>
 														</TableHeader>
 														<TableBody>
-															{sortOfferDriversByBidStatus(row.drivers ?? [], nowUnixSeconds).map((driver, driverIndex) => {
+											{sortOfferDriversByBidStatus(row.drivers ?? [], driverSortTime).map((driver, driverIndex) => {
 																const driverUnitId = driver.externalId ?? driver.driver_id;
 																const driverDisplayName = [
 																	driver.externalId != null ? `(${driver.externalId})` : null,
@@ -996,38 +1081,17 @@ const OffersList = () => {
 																		</div>
 																	</TableCell>
 																	<TableCell className="px-2 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
-																		{(() => {
-																			const actionTimeUnix = normalizeUnixSeconds(driver.action_time);
-																			if (actionTimeUnix == null) return null;
-
-																			const remainingSeconds = Math.max(0, actionTimeUnix - nowUnixSeconds);
-																			if (remainingSeconds > 0) {
-																				return (
-																					<span className="inline-flex min-w-[78px] items-center justify-center rounded-full bg-brand-600 px-2 py-1 text-xs font-semibold text-white">
-																						{formatCountdown(remainingSeconds)}
-																					</span>
-																				);
-																			}
-
-																			return (
-																				<span className="inline-flex items-center justify-center gap-1">
-																					<span className="text-theme-sm text-gray-800 dark:text-gray-200">
-																						Offer Expired
-																					</span>
-																					<ExtendBidTimeButton
-																						offer={row}
-																						driver={driver}
-																						disabled={!canModifyOffersByRole}
-																						onPushClick={(offer, driverItem) => {
-																							setPushModalState({
-																								drivers: [driverItem],
-																								defaultMessage: buildExtendBidTimePushMessage(offer),
-																							});
-																						}}
-																					/>
-																				</span>
-																			);
-																		})()}
+																			<DriverBidTimer
+																				offer={row}
+																				driver={driver}
+																				canModifyOffersByRole={canModifyOffersByRole}
+																				onPushClick={(offer, driverItem) => {
+																					setPushModalState({
+																						drivers: [driverItem],
+																						defaultMessage: buildExtendBidTimePushMessage(offer),
+																					});
+																				}}
+																			/>
 																	</TableCell>
 																	{!row.is_driver_selected && (
 																		<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
@@ -1110,10 +1174,9 @@ const OffersList = () => {
 																						offersApi
 																							.selectDriverForOffer(row.id, key)
 																							.then(async (res) => {
-																								if (res.success) {
-																									await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
-																									await queryClient.refetchQueries({ queryKey: ["offers-list-cards"], type: "active" });
-																									setShowDriverAcceptedModal(true);
+																					if (res.success) {
+																						await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+																						setShowDriverAcceptedModal(true);
 																								} else {
 																									console.error(res.error);
 																									window.alert(

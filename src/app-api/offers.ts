@@ -88,6 +88,10 @@ export interface GetOffersResponse {
 	};
 }
 
+export interface GetOfferResponse {
+	data: OfferRow;
+}
+
 /** Format route array as "Pick up - location - time" / "Delivery - location - time" per line */
 export function formatRoute(
 	route: Array<{ type?: string; location?: string; time?: string }> | null | undefined,
@@ -221,6 +225,13 @@ const offers = {
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
+	},
+
+	async getOffer(offerId: number): Promise<GetOfferResponse> {
+		const response = await axios.get<GetOfferResponse>(`/api/offers/${offerId}`, {
+			withCredentials: true,
+		});
+		return response.data;
 	},
 
 	/**

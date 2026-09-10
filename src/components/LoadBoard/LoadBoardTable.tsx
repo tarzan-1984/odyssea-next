@@ -157,12 +157,6 @@ export default function LoadBoardTable({
 		queryClient
 			.invalidateQueries({ queryKey: [LOAD_BOARD_QUERY_KEY] })
 			.catch(() => undefined);
-		queryClient
-			.refetchQueries({
-				queryKey: [LOAD_BOARD_QUERY_KEY],
-				type: "active",
-			})
-			.catch(() => undefined);
 	};
 
 	useEffect(() => {
