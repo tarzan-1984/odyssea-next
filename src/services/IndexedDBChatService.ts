@@ -598,6 +598,29 @@ class IndexedDBChatService {
 		}
 	}
 
+	async addChatRooms(chatRooms: ChatRoom[]): Promise<void> {
+		if (chatRooms.length === 0) return;
+		try {
+			const db = await this.ensureDB();
+			const transaction = db.transaction([CHAT_ROOMS_STORE], "readwrite");
+			const store = transaction.objectStore(CHAT_ROOMS_STORE);
+			const cachedAt = Date.now();
+
+			await Promise.all(
+				chatRooms.map(chatRoom =>
+					new Promise<void>((resolve, reject) => {
+						const request = store.put({ ...chatRoom, cachedAt, version: 1 });
+						request.onsuccess = () => resolve();
+						request.onerror = () => reject(request.error);
+					})
+				)
+			);
+		} catch (error) {
+			console.error("Failed to add chat rooms to IndexedDB:", error);
+			throw error;
+		}
+	}
+
 	async updateChatRoom(chatRoomId: string, updates: Partial<ChatRoom>): Promise<void> {
 		try {
 			const db = await this.ensureDB();

@@ -124,6 +124,7 @@ interface ChatState {
 	setCurrentChatRoom: (chatRoom: ChatRoom | null) => void;
 	setChatRooms: (chatRooms: ChatRoom[]) => void;
 	addChatRoom: (chatRoom: ChatRoom) => void;
+	addChatRooms: (chatRooms: ChatRoom[]) => void;
 	updateChatRoom: (chatRoomId: string, updates: Partial<ChatRoom>) => void;
 	removeChatRoom: (chatRoomId: string) => void;
 
@@ -343,6 +344,35 @@ export const useChatStore = create<ChatState>()(
 						const sortedRooms = sortChatRoomsByLastMessage(newRooms);
 						set({ chatRooms: sortedRooms }, false, "addChatRoom:add");
 					}
+				},
+
+				addChatRooms: incomingRooms => {
+					if (incomingRooms.length === 0) return;
+					const { chatRooms, currentChatRoom } = get();
+					const incomingById = new Map(incomingRooms.map(room => [room.id, room]));
+					const existingIds = new Set(chatRooms.map(room => room.id));
+					const mergedRooms = chatRooms.map(room => incomingById.get(room.id) ?? room);
+					for (const room of incomingRooms) {
+						if (!existingIds.has(room.id)) mergedRooms.push(room);
+					}
+
+					const patch: Partial<ChatState> = {
+						chatRooms: sortChatRoomsByLastMessage(mergedRooms),
+					};
+					if (currentChatRoom) {
+						const incomingCurrent = incomingById.get(currentChatRoom.id);
+						if (incomingCurrent) {
+							patch.currentChatRoom = {
+								...currentChatRoom,
+								...incomingCurrent,
+								participants: mergeChatRoomParticipants(
+									incomingCurrent.participants,
+									currentChatRoom.participants
+								),
+							};
+						}
+					}
+					set(patch, false, "addChatRooms");
 				},
 
 				updateChatRoom: (chatRoomId, updates) => {
@@ -1419,6 +1449,7 @@ export const useChatActions = () =>
 	useChatStore(state => ({
 		setCurrentChatRoom: state.setCurrentChatRoom,
 		setChatRooms: state.setChatRooms,
+		addChatRooms: state.addChatRooms,
 		addChatRoom: state.addChatRoom,
 		updateChatRoom: state.updateChatRoom,
 		setMessages: state.setMessages,

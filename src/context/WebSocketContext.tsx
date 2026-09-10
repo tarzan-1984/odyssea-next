@@ -269,6 +269,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 	// Stable action selectors — avoid subscribing to messages/chatRooms (prevents re-render loops on read receipts)
 	const addMessage = useChatStore(state => state.addMessage);
 	const addChatRoom = useChatStore(state => state.addChatRoom);
+	const addChatRooms = useChatStore(state => state.addChatRooms);
 	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const updateMessage = useChatStore(state => state.updateMessage);
 	const currentUser = useUserStore(state => state.currentUser);
@@ -1245,6 +1246,40 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				}
 			} else {
 				console.error("Invalid chatRoomCreated payload", data);
+			}
+		});
+
+		newSocket.on("chatRoomsCreatedBatch", async (data: { chatRooms?: any[] }) => {
+			const rawRooms = Array.isArray(data?.chatRooms) ? data.chatRooms : [];
+			const normalizedRooms: ChatRoom[] = rawRooms
+				.filter(raw => raw?.id)
+				.map(raw => ({
+					...raw,
+					participants: Array.isArray(raw.participants)
+						? raw.participants.map((p: any) => ({
+								...p,
+								user: {
+									...p.user,
+									avatar: p.user?.avatar ?? p.user?.profilePhoto ?? "",
+									userColor: p.user?.userColor ?? null,
+								},
+							}))
+						: [],
+				}));
+
+			if (normalizedRooms.length === 0) return;
+			addChatRooms(normalizedRooms);
+			try {
+				await indexedDBChatService.addChatRooms(normalizedRooms);
+			} catch (dbError) {
+				console.error("Failed to save new chat room batch to IndexedDB:", dbError);
+			}
+
+			for (const room of normalizedRooms) {
+				invalidateTrackingTeamsOnLoadChatEvent(queryClient, room.type);
+				if (newSocket.connected) {
+					newSocket.emit("joinChatRoom", { chatRoomId: room.id });
+				}
 			}
 		});
 
