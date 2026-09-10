@@ -48,7 +48,7 @@ export default function ChatParticipantsModal({
 	const [removedParticipants, setRemovedParticipants] = useState<Array<{ id: string; role: string }>>([]);
 	const [chatNameDraft, setChatNameDraft] = useState("");
 	const currentUser = useCurrentUser();
-	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms({});
+	const { addParticipants, removeParticipant, updateChatRoom } = useWebSocketChatRooms();
 	const { socket, isConnected } = useWebSocket();
 	const updateChatRoomInStore = useChatStore(state => state.updateChatRoom);
 	const addChatRoomToStore = useChatStore(state => state.addChatRoom);

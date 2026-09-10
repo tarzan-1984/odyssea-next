@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
@@ -280,7 +280,7 @@ function getParticipatingOfferDrivers(drivers: OfferDriver[] | undefined): Offer
 	);
 }
 
-function OfferDriverBadge({
+const OfferDriverBadge = memo(function OfferDriverBadge({
 	offer,
 	driver,
 	driverIdx,
@@ -370,7 +370,7 @@ function OfferDriverBadge({
 			) : null}
 		</div>
 	);
-}
+});
 
 function DriverBidTimer({
 	offer,
@@ -526,6 +526,12 @@ const OffersList = () => {
 	const [driverSortTime, setDriverSortTime] = useState(() =>
 		Math.floor(Date.now() / 1000)
 	);
+	const handleExtendBidPush = useCallback((offer: OfferRow, driver: OfferDriver) => {
+		setPushModalState({
+			drivers: [driver],
+			defaultMessage: buildExtendBidTimePushMessage(offer),
+		});
+	}, []);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
 	const showOfferId =
@@ -582,7 +588,10 @@ const OffersList = () => {
 	} = useQuery({
 		queryKey: ["offers-list-cards", queryParams],
 		queryFn: () => offersApi.getOffers(queryParams),
+		enabled: currentUser != null,
 		placeholderData: keepPreviousData,
+		staleTime: 30_000,
+		gcTime: 5 * 60_000,
 	});
 
 	const results: OfferRow[] = useMemo(
@@ -682,7 +691,7 @@ const OffersList = () => {
 							return (
 								<div
 									key={row.id}
-									className="relative w-full rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/[0.05] dark:bg-gray-900 overflow-hidden"
+									className="relative w-full rounded-xl border border-gray-100 bg-white shadow-theme-xs dark:border-white/[0.05] dark:bg-gray-900 overflow-hidden [content-visibility:auto] [contain-intrinsic-size:auto_180px]"
 								>
 								<div
 									className={`px-4 py-3 cursor-pointer select-none transition-colors ${
@@ -801,12 +810,7 @@ const OffersList = () => {
 																	driver={driver}
 																	driverIdx={driverIdx}
 																	canModifyOffersByRole={canModifyOffersByRole}
-																	onPushClick={(offer, driverItem) => {
-																		setPushModalState({
-																			drivers: [driverItem],
-																			defaultMessage: buildExtendBidTimePushMessage(offer),
-																		});
-																	}}
+															onPushClick={handleExtendBidPush}
 																/>
 															))}
 														</div>
@@ -820,12 +824,7 @@ const OffersList = () => {
 																	driver={driver}
 																	driverIdx={driverIdx}
 																	canModifyOffersByRole={canModifyOffersByRole}
-																	onPushClick={(offer, driverItem) => {
-																		setPushModalState({
-																			drivers: [driverItem],
-																			defaultMessage: buildExtendBidTimePushMessage(offer),
-																		});
-																	}}
+															onPushClick={handleExtendBidPush}
 																/>
 															))}
 														</div>

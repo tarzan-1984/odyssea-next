@@ -26,7 +26,7 @@ export default function DeleteChatConfirmModal({
 	const [isDeleting, setIsDeleting] = useState(false);
 	const currentUser = useCurrentUser();
 	const queryClient = useQueryClient();
-	const { removeParticipant } = useWebSocketChatRooms({});
+	const { removeParticipant } = useWebSocketChatRooms();
 
 	const handleDelete = async () => {
 		if (!chatRoom || isDeleting || !currentUser || !currentUser.id) return;

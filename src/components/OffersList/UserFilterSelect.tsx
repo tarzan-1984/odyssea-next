@@ -67,6 +67,7 @@ export default function UserFilterSelect({
 				limit: 500,
 				roles: [...roles],
 			}),
+		enabled: open || Boolean(value),
 		staleTime: STALE_TIME_MS,
 	});
 

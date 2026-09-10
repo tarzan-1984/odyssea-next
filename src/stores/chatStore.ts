@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
+import { devtools } from "zustand/middleware";
 import { ChatRoom, Message, User, isMessageReadByUser } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { mergeMessageLists, mergeReadByArrays, filterMessagesForRoom } from "@/utils/chatMessagesMerge";
@@ -56,27 +56,46 @@ const persistReadStateUpdates = (previous: Message[], next: Message[]) => {
 };
 
 // Helper function to sort chat rooms by pin, mute status, and last message date (read/unread does not affect order)
-const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] => {
-	const compareByDate = (a: ChatRoom, b: ChatRoom) => {
+const compareChatRooms = (a: ChatRoom, b: ChatRoom): number => {
+	const compareByDate = () => {
 		const aDate = a.lastMessage?.createdAt || a.createdAt;
 		const bDate = b.lastMessage?.createdAt || b.createdAt;
 		return new Date(bDate).getTime() - new Date(aDate).getTime();
 	};
 
-	return [...chatRooms].sort((a, b) => {
-		// 1. Pinned chats first
-		if (a.isPinned && !b.isPinned) return -1;
-		if (!a.isPinned && b.isPinned) return 1;
+	// 1. Pinned chats first
+	if (a.isPinned && !b.isPinned) return -1;
+	if (!a.isPinned && b.isPinned) return 1;
 
-		// 2. Among non-pinned: muted chats go to the bottom
-		if (!a.isPinned && !b.isPinned) {
-			if (a.isMuted && !b.isMuted) return 1;
-			if (!a.isMuted && b.isMuted) return -1;
-		}
+	// 2. Among non-pinned: muted chats go to the bottom
+	if (!a.isPinned && !b.isPinned) {
+		if (a.isMuted && !b.isMuted) return 1;
+		if (!a.isMuted && b.isMuted) return -1;
+	}
 
-		// 3. Sort by last message date
-		return compareByDate(a, b);
-	});
+	// 3. Sort by last message date
+	return compareByDate();
+};
+
+const sortChatRoomsByLastMessage = (chatRooms: ChatRoom[]): ChatRoom[] =>
+	[...chatRooms].sort(compareChatRooms);
+
+const moveRoomAfterMessage = (chatRooms: ChatRoom[], message: Message): ChatRoom[] => {
+	const roomIndex = chatRooms.findIndex(room => room.id === message.chatRoomId);
+	if (roomIndex === -1) return chatRooms;
+
+	const updatedRoom: ChatRoom = {
+		...chatRooms[roomIndex],
+		lastMessage: message,
+		updatedAt: message.createdAt,
+	};
+	const remaining = [
+		...chatRooms.slice(0, roomIndex),
+		...chatRooms.slice(roomIndex + 1),
+	];
+	const insertAt = remaining.findIndex(room => compareChatRooms(updatedRoom, room) < 0);
+	if (insertAt === -1) return [...remaining, updatedRoom];
+	return [...remaining.slice(0, insertAt), updatedRoom, ...remaining.slice(insertAt)];
 };
 
 // Interface for chat store state
@@ -235,8 +254,7 @@ interface ChatState {
 // Create the chat store with Zustand
 export const useChatStore = create<ChatState>()(
 	devtools(
-		persist(
-			(set, get) => ({
+		(set, get) => ({
 				// Initial state
 				currentChatRoom: null,
 				messages: [],
@@ -653,17 +671,7 @@ export const useChatStore = create<ChatState>()(
 				addMessage: message => {
 					const { messages, chatRooms, currentChatRoom } = get();
 
-					const updatedRooms = chatRooms.map(room => {
-						if (room.id === message.chatRoomId) {
-							return {
-								...room,
-								lastMessage: message,
-								updatedAt: message.createdAt,
-							};
-						}
-						return room;
-					});
-					const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
+					const sortedRooms = moveRoomAfterMessage(chatRooms, message);
 
 					// Only mutate the open chat transcript (avoid mixing rooms in one array)
 					if (currentChatRoom?.id !== message.chatRoomId) {
@@ -1406,24 +1414,10 @@ export const useChatStore = create<ChatState>()(
 						console.error("Failed to load pending archive:", error);
 					});
 				},
-			}),
-			{
-				name: "chat-store", // Name for localStorage persistence
-				// Only persist essential data, not loading states or temporary data
-				partialize: state => ({
-					chatRooms: state.chatRooms,
-					// Note: currentChatRoom is NOT persisted - it should reset on page reload
-					// Note: archivedMessagesCache is not persisted as Map cannot be serialized
-				}),
-				onRehydrateStorage: () => state => {
-					if (state?.chatRooms?.length) {
-						state.chatRooms = sortChatRoomsByLastMessage(state.chatRooms);
-					}
-				},
-			}
-		),
+		}),
 		{
-			name: "chat-store", // Name for Redux DevTools
+			name: "chat-store",
+			enabled: process.env.NODE_ENV === "development",
 		}
 	)
 );

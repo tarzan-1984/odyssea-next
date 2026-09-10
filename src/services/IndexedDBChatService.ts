@@ -91,35 +91,30 @@ class IndexedDBChatService {
 	// Messages operations
 	async saveMessages(chatRoomId: string, messages: Message[]): Promise<void> {
 		try {
-			const existing = await this.getMessages(chatRoomId);
-			const existingById = new Map(existing.map(m => [m.id, m]));
 			const now = Date.now();
-
-			for (const message of messages) {
-				existingById.set(message.id, message);
-			}
-
-			const merged = Array.from(existingById.values()).sort(
-				(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-			);
+			const uniqueMessages = [
+				...new Map(messages.map(message => [message.id, message])).values(),
+			];
 
 			const db = await this.ensureDB();
 			const transaction = db.transaction([MESSAGES_STORE], "readwrite");
 			const store = transaction.objectStore(MESSAGES_STORE);
 
-			const storedMessages: StoredMessage[] = merged.map(message => ({
+			const storedMessages: StoredMessage[] = uniqueMessages.map(message => ({
 				...message,
 				cachedAt: now,
 				version: 1,
 			}));
 
-			for (const message of storedMessages) {
-				await new Promise<void>((resolve, reject) => {
-					const request = store.put(message);
-					request.onsuccess = () => resolve();
-					request.onerror = () => reject(request.error);
-				});
-			}
+			await Promise.all(
+				storedMessages.map(
+					message => new Promise<void>((resolve, reject) => {
+						const request = store.put(message);
+						request.onsuccess = () => resolve();
+						request.onerror = () => reject(request.error);
+					})
+				)
+			);
 
 			await this.cleanupOldMessages(chatRoomId, MAX_CACHED_MESSAGES_PER_ROOM);
 		} catch (error) {
@@ -136,35 +131,28 @@ class IndexedDBChatService {
 			const index = store.index("chatRoomId_createdAt");
 
 			return new Promise((resolve, reject) => {
-				const request = index.getAll(
-					IDBKeyRange.bound([chatRoomId, ""], [chatRoomId, "\uffff"])
+				const messages: Message[] = [];
+				const skipCount = Math.max(0, offset ?? 0);
+				const maxCount = limit && limit > 0 ? limit : Number.POSITIVE_INFINITY;
+				let visited = 0;
+				const request = index.openCursor(
+					IDBKeyRange.bound([chatRoomId, ""], [chatRoomId, "\uffff"]),
+					"prev"
 				);
 
 				request.onsuccess = () => {
-					let messages = request.result as StoredMessage[];
-
-					// Sort by creation time (oldest first - newest at bottom)
-					messages.sort(
-						(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-					);
-
-					// Apply pagination if specified
-					// For chat messages, we want the LATEST messages (reverse order)
-					if (limit) {
-						// Take the last N messages (most recent)
-						messages = messages.slice(-limit);
+					const cursor = request.result;
+					if (!cursor || messages.length >= maxCount) {
+						resolve(messages.reverse());
+						return;
 					}
-					if (offset) {
-						// Apply offset from the beginning of the limited set
-						messages = messages.slice(offset);
+					if (visited++ < skipCount) {
+						cursor.continue();
+						return;
 					}
-
-					// Convert back to Message format (remove cache metadata)
-					const result: Message[] = messages.map(
-						({ cachedAt, version, ...message }) => message
-					);
-
-					resolve(result);
+					const { cachedAt, version, ...message } = cursor.value as StoredMessage;
+					messages.push(message);
+					cursor.continue();
 				};
 
 				request.onerror = () => {
@@ -668,10 +656,16 @@ class IndexedDBChatService {
 		const store = transaction.objectStore(MESSAGES_STORE);
 
 		const roomIds = await new Promise<string[]>((resolve, reject) => {
-			const request = store.getAll();
+			const ids = new Set<string>();
+			const request = store.openCursor();
 			request.onsuccess = () => {
-				const messages = request.result as StoredMessage[];
-				resolve([...new Set(messages.map(message => message.chatRoomId))]);
+				const cursor = request.result;
+				if (!cursor) {
+					resolve([...ids]);
+					return;
+				}
+				ids.add((cursor.value as StoredMessage).chatRoomId);
+				cursor.continue();
 			};
 			request.onerror = () => reject(request.error);
 		});
@@ -692,34 +686,28 @@ class IndexedDBChatService {
 			const store = transaction.objectStore(MESSAGES_STORE);
 			const index = store.index("chatRoomId_createdAt");
 
-			// Get all messages for this chat room, sorted by creation time (oldest first)
-			const allMessages = await new Promise<StoredMessage[]>((resolve, reject) => {
-				const request = index.getAll(
-					IDBKeyRange.bound([chatRoomId, ""], [chatRoomId, "\uffff"])
+			await new Promise<void>((resolve, reject) => {
+				let retained = 0;
+				const request = index.openCursor(
+					IDBKeyRange.bound([chatRoomId, ""], [chatRoomId, "\uffff"]),
+					"prev"
 				);
-				request.onsuccess = () => {
-					const messages = request.result as StoredMessage[];
-					// Sort by creation time (oldest first)
-					messages.sort(
-						(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-					);
-					resolve(messages);
-				};
 				request.onerror = () => reject(request.error);
+				request.onsuccess = () => {
+					const cursor = request.result;
+					if (!cursor) {
+						resolve();
+						return;
+					}
+					if (retained++ < Math.max(0, keepCount)) {
+						cursor.continue();
+						return;
+					}
+					const deleteRequest = cursor.delete();
+					deleteRequest.onerror = () => reject(deleteRequest.error);
+					deleteRequest.onsuccess = () => cursor.continue();
+				};
 			});
-
-			// If we have more messages than keepCount, delete the oldest ones (from the beginning)
-			if (allMessages.length > keepCount) {
-				const messagesToDelete = allMessages.slice(0, allMessages.length - keepCount);
-
-				for (const message of messagesToDelete) {
-					await new Promise<void>((resolve, reject) => {
-						const request = store.delete(message.id);
-						request.onsuccess = () => resolve();
-						request.onerror = () => reject(request.error);
-					});
-				}
-			}
 		} catch (error) {
 			console.error("Failed to cleanup old messages:", error);
 			throw error;

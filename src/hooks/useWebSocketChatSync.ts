@@ -9,7 +9,6 @@ import { useWebSocketNotifications } from "./useWebSocketNotifications";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useOnlineStatus } from "@/context/OnlineStatusContext";
-import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { logWebSocketError } from "@/utils/websocketError";
 
 /**
@@ -31,58 +30,6 @@ export const useWebSocketChatSync = () => {
 		setCurrentChatRoom,
 	} = chatSync;
 
-	// Add specific chat room to cache and store
-	const addChatRoomToCache = useCallback(async (chatRoomId: string) => {
-		try {
-			// Import chatApi to fetch the specific chat room
-			const { chatApi } = await import("@/app-api/chatApi");
-			const { indexedDBChatService } = await import("@/services/IndexedDBChatService");
-
-			// Fetch the specific chat room from API
-			const chatRoom = await chatApi.getChatRoom(chatRoomId);
-			const existingRoom = useChatStore
-				.getState()
-				.chatRooms.find(room => room.id === chatRoomId);
-
-			// Load last message for the chat room
-			try {
-				const messagesResponse = await chatApi.getMessages(chatRoomId, 1, 1);
-				if (messagesResponse.messages.length > 0) {
-					const lastMessage = messagesResponse.messages[0];
-					chatRoom.lastMessage = lastMessage;
-				}
-			} catch (messageError) {
-				console.warn("⚠️ Failed to load last message:", messageError);
-			}
-
-			const normalizedRoom = {
-				...chatRoom,
-				participants: mergeChatRoomParticipants(
-					chatRoom.participants,
-					existingRoom?.participants
-				),
-				unreadCount: chatRoom.unreadCount ?? existingRoom?.unreadCount ?? 0,
-			};
-
-			// Add to Zustand store
-			const { addChatRoom } = useChatStore.getState();
-			addChatRoom(normalizedRoom);
-
-			// Add to IndexedDB cache: get current chat rooms, add new one, save all
-			const currentChatRooms = await indexedDBChatService.getChatRooms();
-			const updatedChatRooms = [
-				...currentChatRooms.filter(room => room.id !== normalizedRoom.id),
-				normalizedRoom,
-			];
-			await indexedDBChatService.saveChatRooms(updatedChatRooms);
-
-			return normalizedRoom;
-		} catch (error) {
-			console.error("❌ Failed to add chat room to cache:", error);
-			throw error;
-		}
-	}, []);
-
 	// WebSocket message handling for current chat room
 	const {
 		sendMessage: wsSendMessage,
@@ -93,15 +40,7 @@ export const useWebSocketChatSync = () => {
 		isTyping,
 	} = useWebSocketMessages({
 		chatRoomId: currentChatRoom?.id || "",
-		onNewMessage: () => {
-			// Message is automatically added to store by WebSocketContext
-		},
-		onMessageSent: () => {},
-		onMessageRead: () => {},
 		onUserTyping: () => {},
-		onError: error => {
-			logWebSocketError("WebSocket message error", error);
-		},
 	});
 
 	// WebSocket chat room management
@@ -111,39 +50,7 @@ export const useWebSocketChatSync = () => {
 		addParticipants: wsAddParticipants,
 		removeParticipant: wsRemoveParticipant,
 		isLoading: wsChatRoomsLoading,
-	} = useWebSocketChatRooms({
-		onChatRoomCreated: chatRoom => {
-			// Chat room is automatically added to store by useWebSocketChatRooms
-		},
-		onChatRoomUpdated: data => {
-			// Chat room is automatically updated in store by useWebSocketChatRooms
-		},
-		onParticipantsAdded: data => {
-			// Participants added via WebSocket
-		},
-		onParticipantRemoved: data => {
-			// If current user was removed from the chat, remove it from cache and store
-			if (data.removedUserId === currentUser?.id) {
-				// Remove from store
-				const { removeChatRoom } = useChatStore.getState();
-				removeChatRoom(data.chatRoomId);
-
-				// Remove from IndexedDB cache
-				import("@/services/IndexedDBChatService").then(({ indexedDBChatService }) => {
-					indexedDBChatService.deleteChatRoom(data.chatRoomId);
-				});
-			}
-		},
-		onAddedToChatRoom: data => {
-			// Add the specific chat room to cache and store
-			addChatRoomToCache(data.chatRoomId).catch(error => {
-				console.error("❌ Failed to add chat room to cache and store:", error);
-			});
-		},
-		onError: error => {
-			logWebSocketError("WebSocket chat room error", error);
-		},
-	});
+	} = useWebSocketChatRooms();
 
 	// WebSocket notifications
 	const webSocketNotifications = useWebSocketNotifications({

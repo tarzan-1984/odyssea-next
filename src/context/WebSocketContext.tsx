@@ -678,13 +678,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					state.currentChatRoom && state.currentChatRoom.id === messageData.chatRoomId;
 				const isMessageFromCurrentUser = messageData.message.senderId === currentUser?.id;
 
-				// Update lastMessage for all chats (only if chat room exists in store)
-				if (chatRoom) {
-					state.updateChatRoom(messageData.chatRoomId, {
-						lastMessage: messageData.message,
-						updatedAt: messageData.message.createdAt,
-					});
-				}
+				// One store update handles both room ordering and the open transcript.
+				addMessage(messageData.message);
 
 				// Play notification sound for ALL participants if:
 				// 1. The message is NOT from the current user
@@ -728,11 +723,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					console.error("Failed to save message to IndexedDB:", error);
 				});
 
-				// Also add to store if this is the current chat (for immediate display)
-				// This ensures messages appear even if useWebSocketMessages hasn't processed yet
 				if (isCurrentChat) {
-					addMessage(messageData.message);
-
 					// Auto-mark message as read if it's in the current active chat
 					// and it's not from the current user (don't mark own messages as read)
 					if (!isMessageFromCurrentUser) {
@@ -777,15 +768,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					}
 				}
 			}
-		});
-
-		// Handle chat room events
-		newSocket.on("chatRoomCreated", (data: any) => {
-			// Chat room created
-		});
-
-		newSocket.on("chatRoomUpdated", (data: any) => {
-			// Chat room updated
 		});
 
 		// Handle notification events
