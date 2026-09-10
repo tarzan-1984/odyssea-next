@@ -268,7 +268,7 @@ export default function DriversListTable({
 			});
 		}
 	}, [addressFilter, extendedSearchEnabled]);
-	const [radiusFilter, setRadiusFilter] = useState<string>("500");
+	const [radiusFilter, setRadiusFilter] = useState<string>("250");
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [statusAutoAppliedByAddress, setStatusAutoAppliedByAddress] = useState(false);
 	const [capabilitiesFilter, setCapabilitiesFilter] = useState<string[]>([]);
@@ -863,7 +863,7 @@ export default function DriversListTable({
 								setExtendedSearchFilter("");
 								setDebouncedExtendedSearchFilter("");
 								setLocationFilter("USA");
-								setRadiusFilter("500");
+								setRadiusFilter("250");
 								setStatusFilter("all");
 								setStatusAutoAppliedByAddress(false);
 								setCapabilitiesFilter([]);
