@@ -55,6 +55,38 @@ function buildPushBody(
 	return body;
 }
 
+/** One request for many drivers — backend queues delivery in the background. */
+function buildBatchPushBody(
+	drivers: CheckListDriver[],
+	message: string,
+	offerContext?: { offerId: number; offerTitle: string },
+): Record<string, unknown> {
+	const text = message.trim();
+	const externalIds: string[] = [];
+	const userIds: string[] = [];
+
+	for (const driver of drivers) {
+		const ext = driver.externalId?.trim();
+		if (ext) {
+			externalIds.push(ext);
+		} else if (driver.id?.trim()) {
+			userIds.push(driver.id.trim());
+		}
+	}
+
+	const body: Record<string, unknown> = {
+		message: text,
+		platform: null,
+		externalIds,
+		userIds,
+	};
+	if (offerContext) {
+		body.offerId = offerContext.offerId;
+		body.offerTitle = offerContext.offerTitle;
+	}
+	return body;
+}
+
 function driverShortLabel(driver: CheckListDriver): string {
 	return formatDriverShortLabel(driver);
 }
@@ -157,50 +189,61 @@ export default function CheckListPushModal({
 		}
 
 		setSending(true);
-		const failures: string[] = [];
 
 		try {
-			for (const driver of targets) {
+			if (targets.length > 1) {
 				const res = await fetch("/api/v1/notifications/push", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					credentials: "include",
-					body: JSON.stringify(buildPushBody(driver, text, offerContext)),
+					body: JSON.stringify(buildBatchPushBody(targets, text, offerContext)),
 				});
 				const json = (await res.json().catch(() => ({}))) as {
 					error?: string;
 					message?: string;
 					success?: boolean;
+					data?: { queued?: boolean; users?: number };
 				};
 				if (!res.ok) {
 					const msg =
 						(typeof json.error === "string" ? json.error : null) ??
 						(typeof json.message === "string" ? json.message : null) ??
 						"Failed to send push notification.";
-					failures.push(`${driverShortLabel(driver)}: ${msg}`);
+					setError(msg);
+					return;
 				}
+
+				await onSent?.();
+				onClose();
+				return;
 			}
 
-			if (failures.length === 0) {
-				await onSent?.();
-				setSuccess(
-					targets.length === 1
-						? "Push sent."
-						: `Push sent to ${targets.length} drivers.`,
-				);
-				window.setTimeout(() => {
-					onClose();
-				}, 800);
-			} else if (failures.length === targets.length) {
-				setError(failures.join(" "));
-			} else {
-				const ok = targets.length - failures.length;
-				setSuccess(`Push sent to ${ok} of ${targets.length} drivers.`);
-				setError(`Failed for some: ${failures.join(" ")}`);
-				window.setTimeout(() => {
-					onClose();
-				}, 1200);
+			const driver = targets[0];
+			const res = await fetch("/api/v1/notifications/push", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify(buildPushBody(driver, text, offerContext)),
+			});
+			const json = (await res.json().catch(() => ({}))) as {
+				error?: string;
+				message?: string;
+				success?: boolean;
+			};
+			if (!res.ok) {
+				const msg =
+					(typeof json.error === "string" ? json.error : null) ??
+					(typeof json.message === "string" ? json.message : null) ??
+					"Failed to send push notification.";
+				setError(`${driverShortLabel(driver)}: ${msg}`);
+				return;
 			}
+
+			await onSent?.();
+			setSuccess("Push sent.");
+			window.setTimeout(() => {
+				onClose();
+			}, 800);
 		} catch {
 			setError("Network error while sending push.");
 		} finally {

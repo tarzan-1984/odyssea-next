@@ -178,6 +178,44 @@ function bindEndTimeRow(timeRow: HTMLElement, onChange: () => void) {
 	});
 }
 
+/** Same digit limits as "To", without rebinding flatpickr arrows / AM-PM. */
+function bindStartTimeInputs(calendar: HTMLElement) {
+	const sourceTime = Array.from(calendar.querySelectorAll(".flatpickr-time")).find(
+		el => !el.closest("[data-offer-datetime-end]")
+	) as HTMLElement | undefined;
+	if (!sourceTime || sourceTime.dataset.offerStartTimeBound === "true") return;
+	sourceTime.dataset.offerStartTimeBound = "true";
+
+	const { hour, minute } = getEndTimeInputs(sourceTime);
+	if (!hour || !minute) return;
+
+	const bindDigits = (input: HTMLInputElement, opts: { min: number; max: number }) => {
+		input.type = "text";
+		input.inputMode = "numeric";
+		input.pattern = "[0-9]*";
+		input.maxLength = 2;
+		input.size = 2;
+		input.autocomplete = "off";
+		// Capture so values are clamped before flatpickr reads them.
+		input.addEventListener(
+			"input",
+			() => {
+				constrainTimeDigitInput(input, opts, false);
+			},
+			true
+		);
+		input.addEventListener("change", () => {
+			constrainTimeDigitInput(input, opts, true);
+		});
+		input.addEventListener("blur", () => {
+			constrainTimeDigitInput(input, opts, true);
+		});
+	};
+
+	bindDigits(hour, { min: 1, max: 12 });
+	bindDigits(minute, { min: 0, max: 59 });
+}
+
 function mountEndTimeRow(
 	calendar: HTMLElement,
 	initialEnd: Date | null,
@@ -288,6 +326,9 @@ export default function DateTimePicker({
 					const container = fp.calendarContainer;
 					if (input && container && input.offsetWidth > 0) {
 						container.style.minWidth = `${Math.max(input.offsetWidth, 280)}px`;
+					}
+					if (container) {
+						bindStartTimeInputs(container);
 					}
 					if (allowTimeRangeRef.current && container) {
 						const { end } = parseOfferDateTimeField(valueRef.current);
