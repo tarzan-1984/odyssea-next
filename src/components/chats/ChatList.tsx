@@ -978,7 +978,8 @@ export default function ChatList({
 													const isSelected =
 														selectedChatId === chatRoom.id;
 													const status =
-														chatRoom.type === "DIRECT" &&
+														(chatRoom.type === "DIRECT" ||
+															chatRoom.type === "OFFER") &&
 														chatRoom.participants.length === 2
 															? (() => {
 																	const otherParticipant =
@@ -1033,7 +1034,8 @@ export default function ChatList({
 							{filteredChatRooms.map(chatRoom => {
 								const isSelected = selectedChatId === chatRoom?.id;
 								const status =
-									chatRoom?.type === "DIRECT" &&
+									(chatRoom?.type === "DIRECT" ||
+										chatRoom?.type === "OFFER") &&
 									chatRoom.participants.length === 2
 										? (() => {
 												const otherParticipant = chatRoom.participants.find(

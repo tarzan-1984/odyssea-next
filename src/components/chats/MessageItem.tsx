@@ -25,9 +25,8 @@ import {
 } from "@/utils/bidPriceUpdateMessage";
 import {
 	isLoadDispatchTermsAcceptedMessage,
-	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 } from "@/utils/loadDispatchTerms";
-import { isLoadProximitySystemMessage } from "@/utils/systemMessageKind";
+import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
@@ -48,8 +47,6 @@ interface MessageItemProps {
 	onRetry?: () => void;
 	/** Discard a failed optimistic/outbox message (not sent to server). */
 	onDiscardFailed?: () => void;
-	onAcceptShipmentTerms?: () => void;
-	isAcceptingShipmentTerms?: boolean;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -65,8 +62,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onMarkUnread,
 	onRetry,
 	onDiscardFailed,
-	onAcceptShipmentTerms,
-	isAcceptingShipmentTerms = false,
 }) => {
 	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
 		string | null
@@ -94,12 +89,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isBidOfferRejected = isBidOfferRejectedMessage(message.content);
 	const isTermsAccepted = isLoadDispatchTermsAcceptedMessage(message.content);
 	const isProximityMessage = isLoadProximitySystemMessage(message.systemMessageKind);
+	const isDispatchMessage = isLoadDispatchSystemMessage(message.systemMessageKind);
+	const useGreenSystemBubble =
+		isTermsAccepted || isProximityMessage || isDispatchMessage;
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
 		: isBidOfferRejected
 			? "px-3 py-2 rounded-lg bg-red-500 text-white dark:bg-red-500"
-			: isBidRateChanged || isBidOfferConfirmed || isTermsAccepted || isProximityMessage
+			: isBidRateChanged || isBidOfferConfirmed || useGreenSystemBubble
 				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
 				: "";
 	const bidPriceTextClass =
@@ -109,10 +107,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		isBidRateChanged ||
 		isBidOfferConfirmed ||
 		isBidOfferRejected ||
-		isTermsAccepted ||
-		isProximityMessage;
+		useGreenSystemBubble;
 	const isSpecialColoredBubble =
-		isBidPriceUpdate || isTermsAccepted || isProximityMessage;
+		isBidPriceUpdate || useGreenSystemBubble;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
@@ -132,7 +129,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	};
 
 	const isSystemMessage = Boolean(message.isSystemMessage);
-	const showAcceptShipmentTermsButton = Boolean(isSystemMessage && onAcceptShipmentTerms);
 	const senderFirstName = String(message.sender.firstName ?? "").trim();
 	const senderExternalId = String(message.sender.externalId ?? "").trim();
 	const isDriverSender = message.sender.role?.toUpperCase().trim() === "DRIVER";
@@ -612,16 +608,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
 											}
 											{...plusOneContentProps}
 										/>
-										{showAcceptShipmentTermsButton ? (
-											<button
-												type="button"
-												onClick={onAcceptShipmentTerms}
-												disabled={isAcceptingShipmentTerms}
-												className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-											>
-												{LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL}
-											</button>
-										) : null}
 									</div>
 								</IncomingMessageBubble>
 								<MessageDropdown

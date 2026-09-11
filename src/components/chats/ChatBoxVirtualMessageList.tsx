@@ -51,8 +51,6 @@ interface ChatBoxVirtualMessageListProps {
 	onContentMeasured?: () => void;
 	isUserScrolledUp?: boolean;
 	suppressScrollAdjustment?: boolean;
-	onAcceptShipmentTerms?: () => void;
-	isAcceptingShipmentTerms?: boolean;
 }
 
 interface VirtualMessageRowProps {
@@ -74,8 +72,6 @@ interface VirtualMessageRowProps {
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
 	onDiscardFailed?: (message: Message) => void;
-	onAcceptShipmentTerms?: () => void;
-	isAcceptingShipmentTerms?: boolean;
 }
 
 function VirtualMessageRow({
@@ -97,8 +93,6 @@ function VirtualMessageRow({
 	onMarkUnread,
 	onRetry,
 	onDiscardFailed,
-	onAcceptShipmentTerms,
-	isAcceptingShipmentTerms = false,
 }: VirtualMessageRowProps) {
 	const rowRef = useRef<HTMLDivElement>(null);
 	const measureRafRef = useRef<number | null>(null);
@@ -200,10 +194,6 @@ function VirtualMessageRow({
 						? () => onDiscardFailed(message)
 						: undefined
 				}
-				onAcceptShipmentTerms={
-					message.isSystemMessage ? onAcceptShipmentTerms : undefined
-				}
-				isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 			/>
 		</div>
 	);
@@ -230,8 +220,6 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onContentMeasured,
 		isUserScrolledUp = false,
 		suppressScrollAdjustment = false,
-		onAcceptShipmentTerms,
-		isAcceptingShipmentTerms = false,
 	},
 	ref
 ) {
@@ -484,8 +472,6 @@ const ChatBoxVirtualMessageList = forwardRef<
 						onMarkUnread={onMarkUnread}
 						onRetry={onRetry}
 						onDiscardFailed={onDiscardFailed}
-						onAcceptShipmentTerms={onAcceptShipmentTerms}
-						isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 					/>
 				);
 			})}

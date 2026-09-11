@@ -11,3 +11,9 @@ export function isLoadProximitySystemMessage(
 ): boolean {
 	return kind === SYSTEM_MESSAGE_KIND.LOAD_PROXIMITY;
 }
+
+export function isLoadDispatchSystemMessage(
+	kind: SystemMessageKind | null | undefined,
+): boolean {
+	return kind === SYSTEM_MESSAGE_KIND.LOAD_DISPATCH;
+}

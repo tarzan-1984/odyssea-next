@@ -29,6 +29,7 @@ import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
 import {
 	driverNeedsLoadDispatchTermsAcceptance,
+	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
@@ -411,6 +412,8 @@ export default function ChatBox({
 		],
 		hasMoreMessages,
 	});
+	const showAcceptShipmentTermsBar =
+		needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat;
 	const hideComposer =
 		isLoadArchivedReadOnlyChat || needsLoadDispatchTermsAcceptance;
 
@@ -1042,12 +1045,6 @@ export default function ChatBox({
 										console.error("Failed to discard message:", error);
 									});
 								}}
-								onAcceptShipmentTerms={
-									needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat
-										? handleAcceptShipmentTerms
-										: undefined
-								}
-								isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 							/>
 						) : (
 							<div className="flex flex-col gap-6" data-chat-list-mode="plain">
@@ -1094,14 +1091,6 @@ export default function ChatBox({
 													}
 												: undefined
 										}
-										onAcceptShipmentTerms={
-											needsLoadDispatchTermsAcceptance &&
-											!isLoadArchivedReadOnlyChat &&
-											message.isSystemMessage
-												? handleAcceptShipmentTerms
-												: undefined
-										}
-										isAcceptingShipmentTerms={isAcceptingShipmentTerms}
 									/>
 								))}
 							</div>
@@ -1167,8 +1156,19 @@ export default function ChatBox({
 					)}
 				</div>
 
-				{/* Send form hidden for archived LOAD shipments and until driver accepts dispatch terms */}
-				{!hideComposer && (
+				{/* Accept terms CTA replaces composer until driver accepts; archived LOAD stays read-only */}
+				{showAcceptShipmentTermsBar ? (
+					<div className="sticky bottom-0 z-10 border-t border-gray-200 bg-white/95 px-4 py-4 shadow-[0_0_40px_rgba(41,41,102,0.2)] dark:border-gray-800 dark:bg-gray-950/95">
+						<button
+							type="button"
+							onClick={handleAcceptShipmentTerms}
+							disabled={isAcceptingShipmentTerms}
+							className="w-full rounded-lg bg-brand-500 px-3 py-3.5 text-base font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL}
+						</button>
+					</div>
+				) : !hideComposer ? (
 					<ChatBoxSendForm
 						ref={sendFormRef}
 						chatRoomId={selectedChatRoomId}
@@ -1183,7 +1183,7 @@ export default function ChatBox({
 						bidOwnerId={bidOwnerId}
 						disableBidPlusOne={disableBidPlusOne}
 					/>
-				)}
+				) : null}
 			</div>
 		</ChatImageGalleryProvider>
 		</BidChatAuctionProvider>

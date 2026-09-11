@@ -36,6 +36,12 @@ interface DriverData {
 	lastActiveApp?: string | null;
 }
 
+type StaleLocationBanner = {
+	thresholdLabel: string;
+	/** When true, note that map and load history stay hidden until a fresh update. */
+	hidesMap?: boolean;
+};
+
 interface DriverInfoProps {
 	driverData: DriverData | null;
 	/** TMS load post id for "Show in TMS" link (tracking load page). */
@@ -48,6 +54,8 @@ interface DriverInfoProps {
 	routeDetails?: string | null;
 	/** Load tracking page: hide chat/TMS/push only when driver has no mobile app. */
 	showLoadTrackingActions?: boolean;
+	/** Full-width stale location warning at the top of the card. */
+	staleLocationBanner?: StaleLocationBanner | null;
 }
 
 const TMS_DRIVER_PAGE_URL = "https://www.endurance-tms.com/add-driver/";
@@ -60,6 +68,7 @@ export default function DriverInfo({
 	loadStatusLabel,
 	routeDetails,
 	showLoadTrackingActions = true,
+	staleLocationBanner = null,
 }: DriverInfoProps) {
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const { resolvedLastActiveApp, usesMobileApp } = useResolvedDriverLastActiveApp(
@@ -133,13 +142,41 @@ export default function DriverInfo({
 		usesMobileAppForUi && Boolean(openChatUrl || tmsLoadPageUrl);
 	const hasRoute = Boolean(routeDetails?.trim());
 
+	const staleThresholdLabel = staleLocationBanner?.thresholdLabel?.trim() || "";
+	const showStaleLocationBanner = Boolean(staleThresholdLabel);
+
 	return (
 		<div
-			className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900 ${
-				hasRoute ? "px-4 py-3.5" : "px-8 py-5"
-			} ${getDriverInfoCardWidthClass(hasRoute)}`}
+			className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900 ${getDriverInfoCardWidthClass(
+				hasRoute
+			)}`}
 		>
-			<div className={`flex min-w-0 items-start ${hasRoute ? "gap-4" : "gap-10"}`}>
+			{showStaleLocationBanner ? (
+				<div className="w-full border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center dark:border-amber-900/60 dark:bg-amber-950/50 [overflow-wrap:anywhere]">
+					<p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+						{staleLocationBanner?.hidesMap
+							? `No driver updates in the last ${staleThresholdLabel}`
+							: `No driver location updates in the last ${staleThresholdLabel}`}
+					</p>
+					<p className="mt-1 break-words text-xs leading-snug text-amber-900/85 dark:text-amber-200/90">
+						{staleLocationBanner?.hidesMap ? (
+							<>
+								The driver&apos;s last location update is older than {staleThresholdLabel}{" "}
+								(Eastern Time). Map and load history are hidden until a new update is
+								received.
+							</>
+						) : (
+							<>
+								The driver has not sent a location update in the last {staleThresholdLabel}{" "}
+								(Eastern Time).
+							</>
+						)}
+					</p>
+				</div>
+			) : null}
+			<div
+				className={`flex min-w-0 items-start ${hasRoute ? "gap-4 px-4 py-3.5" : "gap-10 px-8 py-5"}`}
+			>
 				{/* Avatar + Name */}
 				<div
 					className={`flex shrink-0 flex-col items-center ${

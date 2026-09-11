@@ -12,7 +12,6 @@ import { useCurrentUser } from "@/stores/userStore";
 import DriverInfo, { getDriverInfoCardWidthClass } from "../../[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
-import LoadedEnrouteStaleLocationBanner from "@/components/logistics/LoadedEnrouteStaleLocationBanner";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
@@ -26,7 +25,7 @@ import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastAct
 import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
 import { formatTmsLoadRoute } from "@/utils/formatTmsLoadRoute";
 
-const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { hours: 3 };
+const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { minutes: 30 };
 
 function formatStaleThresholdLabel(): string {
 	if (STALE_LOCATION_THRESHOLD.minutes != null) {
@@ -986,7 +985,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		destination: pickupEtaDestination,
 	});
 
-	const showLoadedEnrouteStaleTopBanner = Boolean(
+	const showLoadedEnrouteStaleBanner = Boolean(
 		isAuthenticated &&
 		showMapAndTrackingTools &&
 		currentTrackingDriver &&
@@ -1000,6 +999,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		)
 	);
 	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
+
+	const driverStaleLocationBanner = showStaleLocationMessage
+		? { thresholdLabel: formatStaleThresholdLabel(), hidesMap: true }
+		: showLoadedEnrouteStaleBanner
+			? { thresholdLabel: formatStaleThresholdLabel(), hidesMap: false }
+			: null;
 
 	return (
 		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
@@ -1073,20 +1078,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						/>
 					)}
 					{mapUiMode === "stale_location" && (
-						<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950">
-							<div className="absolute inset-x-0 top-20 z-[600] flex justify-center px-6 pointer-events-none">
-								<div className="max-w-lg rounded-lg border border-amber-200 bg-amber-50 px-6 py-4 text-center shadow-sm dark:border-amber-900/60 dark:bg-amber-950/40">
-									<p className="text-base font-semibold text-amber-950 dark:text-amber-100">
-										No driver updates in the last {formatStaleThresholdLabel()}
-									</p>
-									<p className="mt-1.5 text-sm text-amber-900/80 dark:text-amber-200/90">
-										The driver&apos;s last location update is older than{" "}
-										{formatStaleThresholdLabel()} (Eastern Time). Map and load
-										history are hidden until a new update is received.
-									</p>
-								</div>
-							</div>
-						</div>
+						<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950" />
 					)}
 					{showMapAndTrackingTools && (
 						<>
@@ -1095,11 +1087,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 									status={pickupRoadEta.status}
 									eta={pickupRoadEta.eta}
 									pickupAddressLabel={pickupGeocode?.addressLabel}
-									reserveRightForHistory={reserveTopBannerRightLane}
-								/>
-							) : showLoadedEnrouteStaleTopBanner ? (
-								<LoadedEnrouteStaleLocationBanner
-									thresholdLabel={formatStaleThresholdLabel()}
 									reserveRightForHistory={reserveTopBannerRightLane}
 								/>
 							) : showDeliveredLoadBanner ? (
@@ -1481,6 +1468,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								loadStatusLabel={loadStatusLabel}
 								routeDetails={loadRouteDetails}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
+								staleLocationBanner={driverStaleLocationBanner}
 							/>
 						</div>
 					)}
