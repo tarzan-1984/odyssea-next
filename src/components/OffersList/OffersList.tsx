@@ -508,6 +508,8 @@ const OffersList = () => {
 	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [deactivateConfirmOffer, setDeactivateConfirmOffer] = useState<OfferRow | null>(null);
+	const [showBulkDeactivateConfirm, setShowBulkDeactivateConfirm] = useState(false);
+	const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
 	const [editOfferData, setEditOfferData] = useState<EditOfferData | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
@@ -523,6 +525,7 @@ const OffersList = () => {
 		useState<CounterOfferModalState | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
+	const [selectedOfferIds, setSelectedOfferIds] = useState<number[]>([]);
 	const [driverSortTime, setDriverSortTime] = useState(() =>
 		Math.floor(Date.now() / 1000)
 	);
@@ -547,6 +550,7 @@ const OffersList = () => {
 		setDeactivatingOfferId(null);
 		setDeactivateConfirmOffer(null);
 		if (res.success) {
+			setSelectedOfferIds((prev) => prev.filter((id) => id !== offer.id));
 			await queryClient.invalidateQueries({
 				queryKey: ["offers-list-cards"],
 			});
@@ -602,6 +606,68 @@ const OffersList = () => {
 	const totalItems = pagination?.total_count ?? 0;
 	const totalPages = pagination?.total_pages ?? 1;
 
+	const visibleOfferIds = useMemo(
+		() => results.map((offer) => offer.id),
+		[results]
+	);
+	const allVisibleSelected =
+		visibleOfferIds.length > 0 &&
+		visibleOfferIds.every((id) => selectedOfferIds.includes(id));
+
+	const toggleAllVisible = useCallback(() => {
+		setSelectedOfferIds((prev) => {
+			if (allVisibleSelected) {
+				return prev.filter((id) => !visibleOfferIds.includes(id));
+			}
+			const next = new Set(prev);
+			visibleOfferIds.forEach((id) => next.add(id));
+			return Array.from(next);
+		});
+	}, [allVisibleSelected, visibleOfferIds]);
+
+	const toggleOfferSelected = useCallback((offerId: number) => {
+		setSelectedOfferIds((prev) =>
+			prev.includes(offerId)
+				? prev.filter((id) => id !== offerId)
+				: [...prev, offerId]
+		);
+	}, []);
+
+	const handleConfirmBulkDeactivateOffers = async () => {
+		if (selectedOfferIds.length === 0) return;
+		const selectedOffers = results.filter((offer) =>
+			selectedOfferIds.includes(offer.id)
+		);
+		const driversByKey = new Map<string, OfferDriver>();
+		for (const offer of selectedOffers) {
+			for (const driver of offer.drivers ?? []) {
+				if (driver.active === false) continue;
+				const key = String(driver.externalId ?? driver.driver_id ?? "");
+				if (!key || driversByKey.has(key)) continue;
+				driversByKey.set(key, driver);
+			}
+		}
+		setIsBulkDeactivating(true);
+		const res = await offersApi.deactivateOffers(selectedOfferIds);
+		setIsBulkDeactivating(false);
+		setShowBulkDeactivateConfirm(false);
+		if (res.success) {
+			setSelectedOfferIds([]);
+			await queryClient.invalidateQueries({
+				queryKey: ["offers-list-cards"],
+			});
+			const driversToNotify = Array.from(driversByKey.values());
+			if (driversToNotify.length > 0) {
+				setPushModalState({
+					drivers: driversToNotify,
+					defaultMessage: OFFER_UNAVAILABLE_PUSH_BODY,
+				});
+			}
+		} else {
+			console.error(res.error);
+		}
+	};
+
 	useEffect(() => {
 		const nowUnixSeconds = Math.floor(Date.now() / 1000);
 		const nextExpiry = results
@@ -639,6 +705,26 @@ const OffersList = () => {
 						}}
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
+					<Button
+						size="sm"
+						variant="primary"
+						disabled={visibleOfferIds.length === 0 || isPending}
+						onClick={toggleAllVisible}
+						className="ml-2 h-9"
+					>
+						{allVisibleSelected ? "Deselect all" : "Select all"}
+					</Button>
+					{selectedOfferIds.length > 0 && (
+						<button
+							type="button"
+							disabled={!canModifyOffersByRole || isBulkDeactivating}
+							onClick={() => setShowBulkDeactivateConfirm(true)}
+							className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+						>
+							Deactivate offers
+							<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
+						</button>
+					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
 					{isAdmin && (
@@ -705,6 +791,14 @@ const OffersList = () => {
 								>
 									<div className="flex items-start justify-between gap-3">
 										<div className="flex min-w-0 flex-1 items-center gap-2">
+											<input
+												type="checkbox"
+												className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+												checked={selectedOfferIds.includes(row.id)}
+												onChange={() => toggleOfferSelected(row.id)}
+												onClick={(e) => e.stopPropagation()}
+												aria-label={`Select offer ${row.id}`}
+											/>
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												{routeSummary(row.route) ||
 													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}
@@ -1402,6 +1496,19 @@ const OffersList = () => {
 				confirmText="Confirm"
 				cancelText="Cancel"
 				isLoading={deactivatingOfferId === deactivateConfirmOffer?.id}
+				icon={<DeactivateOfferIcon className="h-6 w-6" aria-hidden />}
+				variant="danger"
+			/>
+
+			<ConfirmModal
+				isOpen={showBulkDeactivateConfirm}
+				onClose={() => setShowBulkDeactivateConfirm(false)}
+				onConfirm={handleConfirmBulkDeactivateOffers}
+				title="Deactivate offers"
+				message={`Are you sure you want to deactivate ${selectedOfferIds.length} selected offer(s)?`}
+				confirmText="Confirm"
+				cancelText="Cancel"
+				isLoading={isBulkDeactivating}
 				icon={<DeactivateOfferIcon className="h-6 w-6" aria-hidden />}
 				variant="danger"
 			/>

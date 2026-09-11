@@ -206,6 +206,13 @@ export interface DeactivateOfferResponse {
 	error?: string;
 }
 
+export interface DeactivateOffersResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+	deactivatedIds?: number[];
+}
+
 /**
  * Offers API – create offer and rate_offers via backend.
  * Uses axios with credentials (cookies) for auth.
@@ -707,6 +714,40 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in deactivateOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Deactivate multiple offers in one request (sets active=false).
+	 */
+	async deactivateOffers(offerIds: number[]): Promise<DeactivateOffersResponse> {
+		try {
+			const response = await axios.patch<DeactivateOffersResponse>(
+				`/api/offers/deactivate-offers`,
+				{ offerIds },
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					message: data.message,
+					deactivatedIds: data.deactivatedIds ?? [],
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to deactivate offers",
+			};
+		} catch (error) {
+			console.error("Error in deactivateOffers:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",
