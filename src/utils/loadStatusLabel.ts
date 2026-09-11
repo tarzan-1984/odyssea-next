@@ -10,17 +10,17 @@ const LOAD_CHAT_STATUS_LABELS: Record<string, string> = {
 	"waiting-on-rc": "Waiting on RC",
 };
 
-/** Same palette as mobile Your Loads cards. */
+/** Same palette as mobile Your Loads cards; dark mode uses richer (more saturated) tints. */
 const LOAD_CHAT_STATUS_BG_CLASS: Record<string, string> = {
-	"waiting-on-pu-date": "bg-[#F3F4F6] dark:bg-[#F3F4F6]",
-	"at-pu": "bg-[#E6F2FF] dark:bg-[#E6F2FF]",
-	"loaded-enroute": "bg-[#f7fef5] dark:bg-[#f7fef5]",
-	"at-del": "bg-[#effee9] dark:bg-[#effee9]",
-	delivered: "bg-[#effee9] dark:bg-[#effee9]",
-	"waiting-on-rc": "bg-[#FFF7D6] dark:bg-[#FFF7D6]",
-	tonu: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
-	cancelled: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
-	canceled: "bg-[#ffdcdc] dark:bg-[#ffdcdc]",
+	"waiting-on-pu-date": "bg-[#F3F4F6] dark:bg-[#C5CDD8]",
+	"at-pu": "bg-[#E6F2FF] dark:bg-[#9EC5F7]",
+	"loaded-enroute": "bg-[#f7fef5] dark:bg-[#B8F0A8]",
+	"at-del": "bg-[#effee9] dark:bg-[#A8E890]",
+	delivered: "bg-[#effee9] dark:bg-[#A8E890]",
+	"waiting-on-rc": "bg-[#FFF7D6] dark:bg-[#F5D96A]",
+	tonu: "bg-[#ffdcdc] dark:bg-[#F5A0A0]",
+	cancelled: "bg-[#ffdcdc] dark:bg-[#F5A0A0]",
+	canceled: "bg-[#ffdcdc] dark:bg-[#F5A0A0]",
 };
 
 export function normalizeLoadChatStatus(
