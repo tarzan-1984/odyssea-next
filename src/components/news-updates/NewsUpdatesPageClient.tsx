@@ -10,6 +10,8 @@ import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/Pagi
 import { TrashBinIcon, EditOfferIcon } from "@/icons";
 import { renderAvatar } from "@/helpers";
 import { deleteNews, getNewsList, type NewsArticle } from "@/app-api/news";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateNews } from "@/utils/roleAccess";
 import CreateNewsIcon from "./CreateNewsIcon";
 import CreateNewsModal from "./CreateNewsModal";
 import NewsArticleBody from "./NewsArticleBody";
@@ -42,6 +44,8 @@ function authorName(article: NewsArticle): string {
 
 export default function NewsUpdatesPageClient() {
 	const queryClient = useQueryClient();
+	const currentUser = useCurrentUser();
+	const canManageNews = canCreateNews(currentUser?.role);
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [editArticle, setEditArticle] = useState<NewsArticle | null>(null);
 	const [currentPage, setCurrentPage] = useState(1);
@@ -100,7 +104,11 @@ export default function NewsUpdatesPageClient() {
 					type="button"
 					size="sm"
 					variant="primary"
-					onClick={() => setIsCreateOpen(true)}
+					disabled={!canManageNews}
+					onClick={() => {
+						if (!canManageNews) return;
+						setIsCreateOpen(true);
+					}}
 					startIcon={<CreateNewsIcon className="h-5 w-5" />}
 				>
 					Post
@@ -183,21 +191,25 @@ export default function NewsUpdatesPageClient() {
 														<button
 															type="button"
 															title="Edit post"
+															disabled={!canManageNews}
 															onClick={e => {
 																e.stopPropagation();
+																if (!canManageNews) return;
 																setEditArticle(item);
 															}}
-															className="inline-flex h-[39px] w-[39px] shrink-0 items-center justify-center border-0 bg-transparent p-0 hover:opacity-90"
+															className="inline-flex h-[39px] w-[39px] shrink-0 items-center justify-center border-0 bg-transparent p-0 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
 														>
 															<EditOfferIcon className="h-[39px] w-[39px] shrink-0" aria-hidden />
 														</button>
 														<button
 															type="button"
+															disabled={!canManageNews}
 															onClick={e => {
 																e.stopPropagation();
+																if (!canManageNews) return;
 																setDeleteConfirmArticle(item);
 															}}
-															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+															className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 														>
 															Delete
 															<TrashBinIcon className="h-5 w-5 shrink-0" />

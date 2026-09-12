@@ -8,6 +8,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
 import type { BidRatesListScope } from "@/app-api/bidRates";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateBidRates } from "@/utils/roleAccess";
 import BidRatesList from "./BidRatesList";
 import LeaveBidPlusIcon from "./LeaveBidPlusIcon";
 
@@ -17,6 +19,8 @@ const LeaveBidModal = dynamic(() => import("./LeaveBidModal"), {
 
 export default function BidRatesPageClient() {
 	const queryClient = useQueryClient();
+	const currentUser = useCurrentUser();
+	const canLeaveBid = canCreateBidRates(currentUser?.role);
 	const [isLeaveBidModalOpen, setIsLeaveBidModalOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState<BidRatesListScope>("general");
 	const [searchInput, setSearchInput] = useState("");
@@ -35,7 +39,11 @@ export default function BidRatesPageClient() {
 					type="button"
 					size="sm"
 					variant="primary"
-					onClick={() => setIsLeaveBidModalOpen(true)}
+					disabled={!canLeaveBid}
+					onClick={() => {
+						if (!canLeaveBid) return;
+						setIsLeaveBidModalOpen(true);
+					}}
 					startIcon={
 						<LeaveBidPlusIcon className="h-5 w-5 text-green-500 dark:text-green-400" />
 					}

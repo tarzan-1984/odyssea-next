@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
-import { canAccessNewsUpdates } from "@/utils/roleAccess";
+import { canAccessNewsUpdates, canModifyNews } from "@/utils/roleAccess";
 
 function nestErrorMessage(data: { message?: unknown; error?: unknown }, fallback: string): string {
 	const raw = data.message || data.error;
@@ -45,6 +45,12 @@ export async function PATCH(
 		const userData = serverAuth.getUserData(request);
 		if (!canAccessNewsUpdates(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+		if (!canModifyNews(userData?.role)) {
+			return NextResponse.json(
+				{ error: "Guests cannot modify news" },
+				{ status: 403 },
+			);
 		}
 
 		const { id } = await params;
@@ -110,6 +116,12 @@ export async function DELETE(
 		const userData = serverAuth.getUserData(request);
 		if (!canAccessNewsUpdates(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+		if (!canModifyNews(userData?.role)) {
+			return NextResponse.json(
+				{ error: "Guests cannot modify news" },
+				{ status: 403 },
+			);
 		}
 
 		const { id } = await params;

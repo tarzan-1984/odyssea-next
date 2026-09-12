@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
-import { canAccessLoadBoard } from "@/utils/roleAccess";
+import { canAccessLoadBoard, canModifyLoadBoardShipments } from "@/utils/roleAccess";
 import { getCargoVanWeightLimitError } from "@/components/LoadBoard/newShipmentConstants";
 
 /**
@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
 		const userData = serverAuth.getUserData(request);
 		if (!canAccessLoadBoard(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+		if (!canModifyLoadBoardShipments(userData?.role)) {
+			return NextResponse.json(
+				{ error: "Guests cannot create load board shipments" },
+				{ status: 403 },
+			);
 		}
 
 		const body = await request.json();

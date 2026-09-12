@@ -32,6 +32,7 @@ import {
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
+import { canSendChatMessages } from "@/utils/roleAccess";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
 
 interface ChatBoxProps {
@@ -415,7 +416,9 @@ export default function ChatBox({
 	const showAcceptShipmentTermsBar =
 		needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat;
 	const hideComposer =
-		isLoadArchivedReadOnlyChat || needsLoadDispatchTermsAcceptance;
+		isLoadArchivedReadOnlyChat ||
+		needsLoadDispatchTermsAcceptance ||
+		!canSendChatMessages(currentUser?.role);
 
 	const chatUserNameLookup = React.useMemo(
 		() => buildChatUserNameLookup(chatParticipants, uniqueMessages),

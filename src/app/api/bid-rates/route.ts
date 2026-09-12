@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
-import { canAccessBidRates } from "@/utils/roleAccess";
+import { canAccessBidRates, canModifyBidRates } from "@/utils/roleAccess";
 
 /**
  * GET /api/bid-rates
@@ -67,6 +67,12 @@ export async function POST(request: NextRequest) {
 		const userData = serverAuth.getUserData(request);
 		if (!canAccessBidRates(userData?.role)) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		}
+		if (!canModifyBidRates(userData?.role)) {
+			return NextResponse.json(
+				{ error: "Guests cannot create bid rates" },
+				{ status: 403 },
+			);
 		}
 
 		const body = await request.json();

@@ -12,6 +12,8 @@ import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { EditLoadedMilesIcon } from "@/icons";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateBidRates } from "@/utils/roleAccess";
 import { isValidLocationFormat } from "@/utils/offerLocationFormat";
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
@@ -39,6 +41,8 @@ const EMPTY_FORM: LeaveBidForm = {
 };
 
 export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
+	const currentUser = useCurrentUser();
+	const canSubmitBid = canCreateBidRates(currentUser?.role);
 	const [form, setForm] = useState<LeaveBidForm>(EMPTY_FORM);
 	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
 	const [routeError, setRouteError] = useState<string | null>(null);
@@ -140,6 +144,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
+		if (!canSubmitBid) return;
 		setError(null);
 		setRouteError(null);
 
@@ -340,6 +345,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 							variant="primary"
 							size="sm"
 							disabled={
+								!canSubmitBid ||
 								submitting ||
 								isCalculatingRoute ||
 								distance == null ||

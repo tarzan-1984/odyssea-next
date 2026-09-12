@@ -153,6 +153,7 @@ export const BID_RATES_ALLOWED_ROLES = [
 ] as const;
 
 export function canAccessBidRates(role: string | undefined | null): boolean {
+	if (isGastRole(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (BID_RATES_ALLOWED_ROLES as readonly string[]).includes(normalized);
@@ -188,6 +189,7 @@ export function canModifyAppSettings(role: string | undefined | null): boolean {
 export const APP_LOGS_ALLOWED_ROLES = ["ADMINISTRATOR", "TRACKING_TL"] as const;
 
 export function canAccessAppLogs(role: string | undefined | null): boolean {
+	if (isGastRole(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (APP_LOGS_ALLOWED_ROLES as readonly string[]).includes(normalized);
@@ -201,6 +203,7 @@ export const NEWS_UPDATES_ALLOWED_ROLES = [
 ] as const;
 
 export function canAccessNewsUpdates(role: string | undefined | null): boolean {
+	if (isGastRole(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (NEWS_UPDATES_ALLOWED_ROLES as readonly string[]).includes(normalized);
@@ -219,6 +222,7 @@ export const LOAD_BOARD_ALLOWED_ROLES = [
 ] as const;
 
 export function canAccessLoadBoard(role: string | undefined | null): boolean {
+	if (isGastRole(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (LOAD_BOARD_ALLOWED_ROLES as readonly string[]).includes(normalized);
@@ -248,6 +252,35 @@ export function canCreateOffers(role: string | undefined | null): boolean {
 
 /** Alias: all offer write actions (create, deactivate, drivers, accept, push, etc.). */
 export const canModifyOffers = canCreateOffers;
+
+/** True if role may create bid rates / Leave bid (GAST may view page but not create). */
+export function canCreateBidRates(role: string | undefined | null): boolean {
+	return !isGastRole(role);
+}
+
+/** Alias: bid rate write actions (create, etc.). */
+export const canModifyBidRates = canCreateBidRates;
+
+/** True if role may create/edit load board shipments (GAST may view but not post). */
+export function canCreateLoadBoardShipments(role: string | undefined | null): boolean {
+	return !isGastRole(role);
+}
+
+/** Alias: load board write actions (create, edit, post/unpost, delete). */
+export const canModifyLoadBoardShipments = canCreateLoadBoardShipments;
+
+/** True if role may create/edit/delete news (GAST may view but not create). */
+export function canCreateNews(role: string | undefined | null): boolean {
+	return !isGastRole(role);
+}
+
+/** Alias: news write actions (create, update, delete). */
+export const canModifyNews = canCreateNews;
+
+/** True if role may send chat messages (GAST is view-only). */
+export function canSendChatMessages(role: string | undefined | null): boolean {
+	return !isGastRole(role);
+}
 
 /** My Loads secondary chat tab (TMS teams without subordinates). */
 export const MY_LOADS_CHAT_TAB_ROLES = [

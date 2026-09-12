@@ -7,6 +7,8 @@ import Input from "@/components/form/input/InputField";
 import Button from "@/components/ui/button/Button";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { createNews, updateNews, type NewsArticle } from "@/app-api/news";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateNews } from "@/utils/roleAccess";
 import NewsRichTextEditor, { type NewsRichTextEditorHandle } from "./NewsRichTextEditor";
 import {
 	cleanupNewsArticleMediaInBackground,
@@ -30,6 +32,8 @@ export default function CreateNewsModal({
 	onUpdated,
 	article = null,
 }: CreateNewsModalProps) {
+	const currentUser = useCurrentUser();
+	const canSubmitNews = canCreateNews(currentUser?.role);
 	const isEdit = article != null;
 	const editorRef = useRef<NewsRichTextEditorHandle>(null);
 	const [title, setTitle] = useState("");
@@ -110,7 +114,7 @@ export default function CreateNewsModal({
 
 	const onSubmit = async (event: FormEvent) => {
 		event.preventDefault();
-		if (submitting || isEditorUploading) {
+		if (!canSubmitNews || submitting || isEditorUploading) {
 			return;
 		}
 
@@ -235,6 +239,7 @@ export default function CreateNewsModal({
 						variant="primary"
 						size="sm"
 						disabled={
+							!canSubmitNews ||
 							!contentText.trim() ||
 							submitting ||
 							isEditorUploading ||
