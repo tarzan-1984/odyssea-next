@@ -124,11 +124,16 @@ type LoadDriver = {
 /** Load statuses where live driver marker must not be shown. */
 const LOAD_STATUSES_HIDE_DRIVER_MARKER = new Set(["delivered", "tonu", "cancelled", "canceled"]);
 
-/** Load statuses where stale-location map hide applies (at / before pickup). */
+/** Load statuses where a stale-location warning banner applies (at / before pickup). */
 const LOAD_STATUSES_STALE_TRACKING = new Set(["waiting_on_pu_date", "at_pu"]);
 
 /** Load statuses where live driver location is appended to history list. */
-const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set(["loaded_enroute", "at_del", "waiting_on_pu_date"]);
+const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set([
+	"loaded_enroute",
+	"at_del",
+	"waiting_on_pu_date",
+	"at_pu",
+]);
 
 type LoadTrackingPoint = {
 	id?: string | null;
@@ -888,7 +893,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 
 	const driverStatusLabel = getStatusLabelForFilter(currentTrackingDriver?.driverStatus ?? null);
 
-	const mapUiMode: "map" | "no_app" | "driver_not_loaded_enroute" | "stale_location" = (() => {
+	const mapUiMode: "map" | "no_app" | "driver_not_loaded_enroute" = (() => {
 		if (currentTrackingDriver && !driverUsesMobileApp) return "no_app";
 		if (
 			currentTrackingDriver &&
@@ -898,7 +903,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		) {
 			return "driver_not_loaded_enroute";
 		}
-		if (showStaleLocationMessage) return "stale_location";
 		return "map";
 	})();
 
@@ -906,8 +910,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const showLoadHistoryPanel = Boolean(
 		isAuthenticated &&
 		showMapAndTrackingTools &&
-		(isDriverLoadedEnroute || isLoadDelivered) &&
-		(normalizedLoadStatus !== "at_pu")
+		(isDriverLoadedEnroute || isLoadDelivered)
 	);
 	const showCurrentLocationHistoryCard = Boolean(
 		showLoadHistoryPanel &&
@@ -929,9 +932,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const reserveTopBannerRightLane = isAuthenticated && showMapAndTrackingTools;
 	const showBackButton =
 		isAuthenticated &&
-		(mapUiMode === "map" ||
-			mapUiMode === "stale_location" ||
-			mapUiMode === "driver_not_loaded_enroute");
+		(mapUiMode === "map" || mapUiMode === "driver_not_loaded_enroute");
 
 	const pickupGeocode = routeGeocodeFromApi?.pickup ?? null;
 	const hasFreshLastLocationUpdate =
@@ -1000,9 +1001,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	);
 	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
 
-	const driverStaleLocationBanner = showStaleLocationMessage
-		? { thresholdLabel: formatStaleThresholdLabel(), hidesMap: true }
-		: showLoadedEnrouteStaleBanner
+	const driverStaleLocationBanner =
+		showStaleLocationMessage || showLoadedEnrouteStaleBanner
 			? { thresholdLabel: formatStaleThresholdLabel(), hidesMap: false }
 			: null;
 
@@ -1076,9 +1076,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							driverStatusLabel={driverStatusLabel}
 							driverExternalId={currentTrackingDriver?.externalId}
 						/>
-					)}
-					{mapUiMode === "stale_location" && (
-						<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950" />
 					)}
 					{showMapAndTrackingTools && (
 						<>
