@@ -28,6 +28,17 @@ export function trackingTeamsQueryKey(scope: TrackingTeamsScope) {
 	return [TRACKING_TEAMS_QUERY_KEY, scope] as const;
 }
 
+/** Cache only non-empty TMS lists; empty results stay stale so the next visit refetches. */
+export function trackingTeamsQueryCacheMs(query: {
+	state: { data: unknown };
+}): number {
+	const data = query.state.data;
+	if (Array.isArray(data) && data.length > 0) {
+		return TRACKING_TEAMS_STALE_TIME_MS;
+	}
+	return 0;
+}
+
 function normalizeLoadIds(raw: unknown): string[] {
 	if (!Array.isArray(raw)) return [];
 	return raw.map(id => String(id ?? "").trim()).filter(Boolean);

@@ -26,7 +26,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
 	fetchTrackingTeamsLoadIds,
-	TRACKING_TEAMS_STALE_TIME_MS,
+	trackingTeamsQueryCacheMs,
 	trackingTeamsQueryKey,
 } from "@/app-api/trackingTeams";
 // WebSocket functionality is now passed via props
@@ -146,20 +146,20 @@ export default function ChatList({
 		queryKey: trackingTeamsQueryKey("mine"),
 		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
 		enabled: showMyLoadsTab,
-		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
-		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		staleTime: trackingTeamsQueryCacheMs,
+		gcTime: trackingTeamsQueryCacheMs,
 		refetchOnWindowFocus: false,
-		refetchOnReconnect: false,
+		refetchOnReconnect: true,
 	});
 
 	const { data: myTeamIds = [], isFetching: isFetchingMyTeam } = useQuery({
 		queryKey: trackingTeamsQueryKey("team"),
 		queryFn: () => fetchTrackingTeamsLoadIds("team"),
 		enabled: showMyTeamTab,
-		staleTime: TRACKING_TEAMS_STALE_TIME_MS,
-		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
+		staleTime: trackingTeamsQueryCacheMs,
+		gcTime: trackingTeamsQueryCacheMs,
 		refetchOnWindowFocus: false,
-		refetchOnReconnect: false,
+		refetchOnReconnect: true,
 	});
 
 	const myLoadsIdSet = useMemo(() => new Set(myLoadsIds), [myLoadsIds]);
