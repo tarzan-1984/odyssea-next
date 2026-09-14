@@ -28,7 +28,7 @@ import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
 import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
 import {
-	driverNeedsLoadDispatchTermsAcceptance,
+	getLoadDispatchTermsUiState,
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
@@ -403,21 +403,24 @@ export default function ChatBox({
 		);
 	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id]);
 
-	const needsLoadDispatchTermsAcceptance = driverNeedsLoadDispatchTermsAcceptance({
+	const loadDispatchTermsUi = getLoadDispatchTermsUiState({
 		isDriver: currentUser?.role?.trim().toUpperCase() === "DRIVER",
 		chatType: selectedChatRoom?.type,
 		currentUserId: currentUser?.id,
+		skipAppVersionCheck: true,
 		messages: [
 			...uniqueMessages,
 			...(selectedChatRoom?.lastMessage ? [selectedChatRoom.lastMessage] : []),
 		],
 		hasMoreMessages,
+		messagesReady,
 	});
+	const needsLoadDispatchTermsAcceptance = loadDispatchTermsUi.showAcceptButton;
 	const showAcceptShipmentTermsBar =
 		needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat;
 	const hideComposer =
 		isLoadArchivedReadOnlyChat ||
-		needsLoadDispatchTermsAcceptance ||
+		loadDispatchTermsUi.hideComposer ||
 		!canSendChatMessages(currentUser?.role);
 
 	const chatUserNameLookup = React.useMemo(
@@ -700,7 +703,7 @@ export default function ChatBox({
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number }[];
 		replyData?: Message["replyData"];
 	}) => {
-		if (!selectedChatRoom || needsLoadDispatchTermsAcceptance) return;
+		if (!selectedChatRoom || loadDispatchTermsUi.hideComposer) return;
 
 		try {
 			sendTyping(false);
