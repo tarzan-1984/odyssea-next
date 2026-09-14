@@ -28,11 +28,8 @@ export function trackingTeamsQueryKey(scope: TrackingTeamsScope) {
 	return [TRACKING_TEAMS_QUERY_KEY, scope] as const;
 }
 
-/** Cache only non-empty TMS lists; empty results stay stale so the next visit refetches. */
-export function trackingTeamsQueryCacheMs(query: {
-	state: { data: unknown };
-}): number {
-	const data = query.state.data;
+/** Cache only non-empty TMS lists; empty/error results stay stale so the next visit refetches. */
+export function trackingTeamsStaleTimeMs(data: unknown): number {
 	if (Array.isArray(data) && data.length > 0) {
 		return TRACKING_TEAMS_STALE_TIME_MS;
 	}

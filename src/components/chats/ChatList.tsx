@@ -26,7 +26,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
 	fetchTrackingTeamsLoadIds,
-	trackingTeamsQueryCacheMs,
+	TRACKING_TEAMS_STALE_TIME_MS,
+	trackingTeamsStaleTimeMs,
 	trackingTeamsQueryKey,
 } from "@/app-api/trackingTeams";
 // WebSocket functionality is now passed via props
@@ -146,8 +147,8 @@ export default function ChatList({
 		queryKey: trackingTeamsQueryKey("mine"),
 		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
 		enabled: showMyLoadsTab,
-		staleTime: trackingTeamsQueryCacheMs,
-		gcTime: trackingTeamsQueryCacheMs,
+		staleTime: query => trackingTeamsStaleTimeMs(query.state.data),
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: true,
 	});
@@ -156,8 +157,8 @@ export default function ChatList({
 		queryKey: trackingTeamsQueryKey("team"),
 		queryFn: () => fetchTrackingTeamsLoadIds("team"),
 		enabled: showMyTeamTab,
-		staleTime: trackingTeamsQueryCacheMs,
-		gcTime: trackingTeamsQueryCacheMs,
+		staleTime: query => trackingTeamsStaleTimeMs(query.state.data),
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: true,
 	});

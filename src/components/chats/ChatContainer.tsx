@@ -29,7 +29,8 @@ import {
 } from "@/utils/roleAccess";
 import {
 	fetchTrackingTeamsLoadIds,
-	trackingTeamsQueryCacheMs,
+	TRACKING_TEAMS_STALE_TIME_MS,
+	trackingTeamsStaleTimeMs,
 	trackingTeamsQueryKey,
 } from "@/app-api/trackingTeams";
 
@@ -52,8 +53,8 @@ export default function ChatContainer() {
 		queryKey: trackingTeamsQueryKey("mine"),
 		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
 		enabled: showMyLoadsTab,
-		staleTime: trackingTeamsQueryCacheMs,
-		gcTime: trackingTeamsQueryCacheMs,
+		staleTime: query => trackingTeamsStaleTimeMs(query.state.data),
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: true,
 	});
@@ -61,8 +62,8 @@ export default function ChatContainer() {
 		queryKey: trackingTeamsQueryKey("team"),
 		queryFn: () => fetchTrackingTeamsLoadIds("team"),
 		enabled: showMyTeamTab,
-		staleTime: trackingTeamsQueryCacheMs,
-		gcTime: trackingTeamsQueryCacheMs,
+		staleTime: query => trackingTeamsStaleTimeMs(query.state.data),
+		gcTime: TRACKING_TEAMS_STALE_TIME_MS,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: true,
 	});
