@@ -55,6 +55,12 @@ type MinimumAppVersionPayload = {
 	updatedAt?: string;
 };
 
+type MapTilerAppSettingsPayload = {
+	id: string;
+	mapTilerApiKey: string;
+	updatedAt?: string;
+};
+
 type AccountDeletionRequestSettingsPayload = {
 	id: string;
 	accountDeletionRequestEmail: string;
@@ -208,6 +214,19 @@ function parseMinimumAppVersionSettings(json: unknown): MinimumAppVersionPayload
 	return raw;
 }
 
+function parseMapTilerAppSettings(json: unknown): MapTilerAppSettingsPayload | null {
+	if (!json || typeof json !== "object") return null;
+	const root = json as ApiEnvelope<MapTilerAppSettingsPayload> & MapTilerAppSettingsPayload;
+	const raw =
+		root.data && typeof root.data === "object" && "mapTilerApiKey" in root.data
+			? root.data
+			: "mapTilerApiKey" in root
+				? (root as MapTilerAppSettingsPayload)
+				: null;
+	if (!raw || typeof raw.mapTilerApiKey !== "string") return null;
+	return raw;
+}
+
 function parseOffersAppSettings(json: unknown): OffersAppSettingsPayload | null {
 	if (!json || typeof json !== "object") return null;
 	const root = json as ApiEnvelope<OffersAppSettingsPayload> & OffersAppSettingsPayload;
@@ -261,6 +280,7 @@ export default function AppSettingsPage() {
 	const [locationTestDriverExternalId, setLocationTestDriverExternalId] = useState("3343");
 	const [maxOpenOfferParticipationsInput, setMaxOpenOfferParticipationsInput] = useState("2");
 	const [minimumAppVersionInput, setMinimumAppVersionInput] = useState("");
+	const [mapTilerApiKeyInput, setMapTilerApiKeyInput] = useState("");
 	const [accountDeletionRequestEmail, setAccountDeletionRequestEmail] = useState("");
 
 	const [loadingMobile, setLoadingMobile] = useState(true);
@@ -269,6 +289,7 @@ export default function AppSettingsPage() {
 	const [loadingEnv, setLoadingEnv] = useState(true);
 	const [loadingOffers, setLoadingOffers] = useState(true);
 	const [loadingMinimumVersion, setLoadingMinimumVersion] = useState(true);
+	const [loadingMapTiler, setLoadingMapTiler] = useState(true);
 	const [loadingDeletion, setLoadingDeletion] = useState(true);
 	const [savingMobile, setSavingMobile] = useState(false);
 	const [savingTms, setSavingTms] = useState(false);
@@ -276,6 +297,7 @@ export default function AppSettingsPage() {
 	const [savingEnv, setSavingEnv] = useState(false);
 	const [savingOffers, setSavingOffers] = useState(false);
 	const [savingMinimumVersion, setSavingMinimumVersion] = useState(false);
+	const [savingMapTiler, setSavingMapTiler] = useState(false);
 	const [savingDeletion, setSavingDeletion] = useState(false);
 	const [errorMobile, setErrorMobile] = useState<string | null>(null);
 	const [errorTms, setErrorTms] = useState<string | null>(null);
@@ -283,6 +305,7 @@ export default function AppSettingsPage() {
 	const [errorEnv, setErrorEnv] = useState<string | null>(null);
 	const [errorOffers, setErrorOffers] = useState<string | null>(null);
 	const [errorMinimumVersion, setErrorMinimumVersion] = useState<string | null>(null);
+	const [errorMapTiler, setErrorMapTiler] = useState<string | null>(null);
 	const [errorDeletion, setErrorDeletion] = useState<string | null>(null);
 	const [successMobile, setSuccessMobile] = useState<string | null>(null);
 	const [successTms, setSuccessTms] = useState<string | null>(null);
@@ -290,6 +313,7 @@ export default function AppSettingsPage() {
 	const [successEnv, setSuccessEnv] = useState<string | null>(null);
 	const [successOffers, setSuccessOffers] = useState<string | null>(null);
 	const [successMinimumVersion, setSuccessMinimumVersion] = useState<string | null>(null);
+	const [successMapTiler, setSuccessMapTiler] = useState<string | null>(null);
 	const [successDeletion, setSuccessDeletion] = useState<string | null>(null);
 
 	// Usage stats (admin) section
@@ -597,6 +621,31 @@ export default function AppSettingsPage() {
 		}
 	}, []);
 
+	const loadMapTiler = useCallback(async () => {
+		setLoadingMapTiler(true);
+		setErrorMapTiler(null);
+		try {
+			const res = await fetch("/api/app-settings/maptiler", { method: "GET" });
+			const json = await res.json();
+			if (!res.ok) {
+				setErrorMapTiler(
+					typeof json.error === "string" ? json.error : "Failed to load MapTiler settings"
+				);
+				return;
+			}
+			const s = parseMapTilerAppSettings(json);
+			if (!s) {
+				setErrorMapTiler("Unexpected response from server");
+				return;
+			}
+			setMapTilerApiKeyInput(s.mapTilerApiKey ?? "");
+		} catch {
+			setErrorMapTiler("Network error while loading MapTiler settings");
+		} finally {
+			setLoadingMapTiler(false);
+		}
+	}, []);
+
 	const loadOffers = useCallback(async () => {
 		setLoadingOffers(true);
 		setErrorOffers(null);
@@ -660,6 +709,7 @@ export default function AppSettingsPage() {
 			loadEnv(),
 			loadOffers(),
 			loadMinimumVersion(),
+			loadMapTiler(),
 			loadDeletion(),
 		]).catch(() => {
 			/* errors surfaced via per-loader setError* */
@@ -672,6 +722,7 @@ export default function AppSettingsPage() {
 		loadEnv,
 		loadOffers,
 		loadMinimumVersion,
+		loadMapTiler,
 		loadDeletion,
 	]);
 
@@ -769,6 +820,55 @@ export default function AppSettingsPage() {
 			setErrorMinimumVersion("Network error while saving");
 		} finally {
 			setSavingMinimumVersion(false);
+		}
+	}
+
+	async function onSubmitMapTiler(e: FormEvent) {
+		e.preventDefault();
+		if (!canSaveAppSettings) return;
+		setSavingMapTiler(true);
+		setErrorMapTiler(null);
+		setSuccessMapTiler(null);
+
+		const mapTilerApiKey = mapTilerApiKeyInput.trim();
+		if (mapTilerApiKey !== "" && !/^[A-Za-z0-9_-]{8,128}$/.test(mapTilerApiKey)) {
+			setErrorMapTiler("Enter a MapTiler key (8–128 letters, digits, _ or -) or leave empty.");
+			setSavingMapTiler(false);
+			return;
+		}
+
+		try {
+			const res = await fetch("/api/app-settings/maptiler", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ mapTilerApiKey }),
+			});
+			const json = await res.json();
+			if (!res.ok) {
+				const msg =
+					typeof json.error === "string"
+						? json.error
+						: typeof json.message === "string"
+							? json.message
+							: Array.isArray(json.message)
+								? json.message.join(", ")
+								: "Failed to save MapTiler settings";
+				setErrorMapTiler(msg);
+				return;
+			}
+			const s = parseMapTilerAppSettings(json);
+			if (s) {
+				setMapTilerApiKeyInput(s.mapTilerApiKey ?? "");
+			}
+			setSuccessMapTiler(
+				mapTilerApiKey
+					? "Saved. Apps 2.4.4+ pick this key up from GET /v1/app-settings without a rebuild."
+					: "Saved. Mobile apps will use the key baked into the binary."
+			);
+		} catch {
+			setErrorMapTiler("Network error while saving");
+		} finally {
+			setSavingMapTiler(false);
 		}
 	}
 
@@ -1066,7 +1166,8 @@ export default function AppSettingsPage() {
 		loadingLoadChat ||
 		loadingEnv ||
 		loadingOffers ||
-		loadingMinimumVersion;
+		loadingMinimumVersion ||
+		loadingMapTiler;
 
 	return (
 		<div>
@@ -1607,6 +1708,69 @@ export default function AppSettingsPage() {
 							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{savingMinimumVersion ? "Saving…" : "Save minimum version"}
+						</button>
+					</div>
+				</form>
+
+				<form
+					onSubmit={onSubmitMapTiler}
+					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+						MapTiler map key
+					</h2>
+					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+						Paid MapTiler Cloud key for in-app maps (home, load, tracking). Apps 2.4.4+
+						read this from GET /v1/app-settings and via WebSocket{" "}
+						<code className="text-xs">appLocationSettingsUpdated</code>. Changing the
+						key does not require an App Store rebuild. Leave empty to use the fallback
+						key baked into the binary.
+					</p>
+
+					{loadingMapTiler ? (
+						<div className="flex min-h-[80px] items-center justify-center text-sm text-gray-500">
+							Loading…
+						</div>
+					) : (
+						<div className="max-w-xl">
+							<Label htmlFor="mapTilerApiKey" className="mb-1">
+								MapTiler API key
+							</Label>
+							<Input
+								id="mapTilerApiKey"
+								name="mapTilerApiKey"
+								type="text"
+								autoComplete="off"
+								value={mapTilerApiKeyInput}
+								onChange={e => setMapTilerApiKeyInput(e.target.value)}
+								placeholder="MapTiler Cloud key (empty = app fallback)"
+								className="!h-9 !min-h-0 !py-1.5"
+							/>
+							<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+								Same key as Next production maps. Invalid keys show OSM fallback on
+								2.4.4+ instead of “Invalid key” watermarks.
+							</p>
+						</div>
+					)}
+
+					{errorMapTiler ? (
+						<p className="mt-4 text-sm text-red-600 dark:text-red-400" role="alert">
+							{errorMapTiler}
+						</p>
+					) : null}
+					{successMapTiler ? (
+						<p className="mt-4 text-sm text-green-600 dark:text-green-400">
+							{successMapTiler}
+						</p>
+					) : null}
+
+					<div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
+						<button
+							type="submit"
+							disabled={!canSaveAppSettings || pageLoading || savingMapTiler}
+							className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-6 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{savingMapTiler ? "Saving…" : "Save MapTiler key"}
 						</button>
 					</div>
 				</form>
