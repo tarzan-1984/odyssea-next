@@ -1247,10 +1247,11 @@ export default function TrackingDeliveryMap({
 							},
 						];
 					}
-					stopRows = [
+					const fallbackStopRows: StopBuildRow[] = [
 						{ kind: "pickup", candidates: [], title: "Pick up", addressId: null },
 						{ kind: "delivery", candidates: [], title: "Delivery", addressId: null },
-					].slice(0, chain.length);
+					];
+					stopRows = fallbackStopRows.slice(0, chain.length);
 				}
 
 				if (cancelled) return;
