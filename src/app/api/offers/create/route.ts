@@ -39,7 +39,10 @@ export async function POST(request: NextRequest) {
 		const data = await response.json();
 
 		if (!response.ok) {
-			const errorMessage = data.message ?? data.error ?? "Failed to create offer";
+			const errorMessage =
+				response.status >= 500
+					? "Could not create the offer. Please try again."
+					: data.message ?? data.error ?? "Failed to create offer";
 			const errors = Array.isArray(data.errors) ? data.errors : [];
 			return NextResponse.json(
 				{ error: errorMessage, errors },
@@ -50,6 +53,9 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
 		console.error("Error during offer creation:", error);
-		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Could not create the offer. Please try again." },
+			{ status: 500 }
+		);
 	}
 }

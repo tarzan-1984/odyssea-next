@@ -12,12 +12,15 @@ type TrackingTeamsApiPayload = {
 	success?: boolean;
 	loadIds?: Array<string | number>;
 	load_ids?: Array<string | number>;
-	data?: {
-		load_ids?: Array<string | number>;
-		loadIds?: Array<string | number>;
-	};
+	data?: unknown;
 	error?: string;
 	message?: string;
+	tmsStatus?: number | string | null;
+	tmsUrl?: string | null;
+	tmsBody?: unknown;
+	detail?: unknown;
+	nestStatus?: number;
+	nestBody?: unknown;
 };
 
 export const TRACKING_TEAMS_QUERY_KEY = "tracking-teams" as const;
@@ -42,20 +45,31 @@ function normalizeLoadIds(raw: unknown): string[] {
 }
 
 /**
- * Prefer Nest `{ loadIds }`; also accept TMS-shaped `{ data: { load_ids } }` / `{ load_ids }`.
+ * Nest TransformInterceptor wraps as `{ data: payload }`.
+ * Next may unwrap once, or the client may still see `{ data: { data: { loadIds } } }`.
+ * Walk nested `data` until loadIds / load_ids (or a raw id array) is found.
  */
-export function extractTrackingTeamsLoadIds(payload: TrackingTeamsApiPayload): string[] {
-	if (Array.isArray(payload?.loadIds)) {
-		return normalizeLoadIds(payload.loadIds);
-	}
-	if (Array.isArray(payload?.load_ids)) {
-		return normalizeLoadIds(payload.load_ids);
-	}
-	if (Array.isArray(payload?.data?.load_ids)) {
-		return normalizeLoadIds(payload.data.load_ids);
-	}
-	if (Array.isArray(payload?.data?.loadIds)) {
-		return normalizeLoadIds(payload.data.loadIds);
+export function extractTrackingTeamsLoadIds(payload: unknown): string[] {
+	let current: unknown = payload;
+	for (let depth = 0; depth < 5; depth++) {
+		if (Array.isArray(current)) {
+			return normalizeLoadIds(current);
+		}
+		if (!current || typeof current !== "object") {
+			return [];
+		}
+		const obj = current as TrackingTeamsApiPayload;
+		if (Array.isArray(obj.loadIds)) {
+			return normalizeLoadIds(obj.loadIds);
+		}
+		if (Array.isArray(obj.load_ids)) {
+			return normalizeLoadIds(obj.load_ids);
+		}
+		if ("data" in obj) {
+			current = obj.data;
+			continue;
+		}
+		return [];
 	}
 	return [];
 }
@@ -84,8 +98,29 @@ export async function fetchTrackingTeamsLoadIds(
 	const data = (await response.json()) as TrackingTeamsApiPayload;
 
 	if (!response.ok) {
-		throw new Error(data.error || data.message || "Failed to load tracking teams");
+		throw new Error(formatTrackingTeamsRequestError(data, response.status));
 	}
 
 	return extractTrackingTeamsLoadIds(data);
+}
+
+export function formatTrackingTeamsRequestError(
+	payload: TrackingTeamsApiPayload,
+	httpStatus: number,
+): string {
+	const tmsBody =
+		payload.tmsBody == null
+			? null
+			: typeof payload.tmsBody === "string"
+				? payload.tmsBody
+				: JSON.stringify(payload.tmsBody, null, 2);
+	return [
+		payload.error || payload.message || `Failed to load tracking teams (${httpStatus})`,
+		payload.tmsStatus != null ? `tmsStatus: ${payload.tmsStatus}` : null,
+		payload.tmsUrl ? `tmsUrl: ${payload.tmsUrl}` : null,
+		payload.detail != null ? `detail: ${String(payload.detail)}` : null,
+		tmsBody ? `tmsBody: ${tmsBody}` : null,
+	]
+		.filter(Boolean)
+		.join("\n");
 }

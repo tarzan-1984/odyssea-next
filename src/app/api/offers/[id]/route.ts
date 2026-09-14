@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 
+async function readJsonBody(response: Response): Promise<{
+	error?: string;
+	message?: string;
+	errors?: string[];
+	[key: string]: unknown;
+}> {
+	try {
+		return (await response.json()) as {
+			error?: string;
+			message?: string;
+			errors?: string[];
+		};
+	} catch {
+		return {};
+	}
+}
+
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
@@ -23,19 +40,23 @@ export async function GET(
 				headers: { Authorization: `Bearer ${accessToken}` },
 			}
 		);
-		const data = await response.json();
+		const data = await readJsonBody(response);
 
 		if (!response.ok) {
-			return NextResponse.json(
-				{ error: data.message ?? data.error ?? "Failed to fetch offer" },
-				{ status: response.status }
-			);
+			const error =
+				response.status >= 500
+					? "Could not load the offer. Please try again."
+					: data.message ?? data.error ?? "Failed to fetch offer";
+			return NextResponse.json({ error }, { status: response.status });
 		}
 
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
 		console.error("Error fetching offer:", error);
-		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Could not load the offer. Please try again." },
+			{ status: 500 }
+		);
 	}
 }
 
@@ -83,10 +104,13 @@ export async function PATCH(
 			body: JSON.stringify(body),
 		});
 
-		const data = await response.json();
+		const data = await readJsonBody(response);
 
 		if (!response.ok) {
-			const errorMessage = data.message ?? data.error ?? "Failed to update offer";
+			const errorMessage =
+				response.status >= 500
+					? "Could not save the offer. Please try again."
+					: data.message ?? data.error ?? "Failed to update offer";
 			const errors = Array.isArray(data.errors) ? data.errors : [];
 			return NextResponse.json(
 				{ error: errorMessage, errors },
@@ -97,6 +121,9 @@ export async function PATCH(
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
 		console.error("Error during offer update:", error);
-		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Could not save the offer. Please try again." },
+			{ status: 500 }
+		);
 	}
 }

@@ -35,15 +35,19 @@ export async function GET(request: NextRequest) {
 		const data = await response.json();
 
 		if (!response.ok) {
-			return NextResponse.json(
-				{ error: data.message ?? data.error ?? "Failed to fetch offers" },
-				{ status: response.status }
-			);
+			const error =
+				response.status >= 500
+					? "Could not load offers. Please try again."
+					: data.message ?? data.error ?? "Failed to fetch offers";
+			return NextResponse.json({ error }, { status: response.status });
 		}
 
 		return NextResponse.json(data, { status: 200 });
 	} catch (error) {
 		console.error("Error fetching offers:", error);
-		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Could not load offers. Please try again." },
+			{ status: 500 }
+		);
 	}
 }

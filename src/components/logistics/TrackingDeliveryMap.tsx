@@ -66,6 +66,8 @@ const MIN_HISTORY_MARKER_RADIUS = 6;
 const MAX_HISTORY_MARKER_RADIUS = 15;
 const SELECTED_HISTORY_POINT_ZOOM = 8;
 const DRIVER_WAYPOINT_LABEL = "Current driver location";
+/** Pixel shift so stacked PU/DEL pins stay visible at city zoom (lat/lng jitter is sub-pixel). */
+const OVERLAPPING_STOP_MARKER_OFFSET_PX = 26;
 
 function getHistoryMarkerRadiusByZoom(zoom: number): number {
 	const minZoom = 10;
@@ -658,18 +660,51 @@ function toRoutePoint(value: [number, number], address: string): RoutePoint | nu
 }
 
 function uniqueSequentialRoutePoints(points: RoutePoint[]): RoutePoint[] {
-	return points.reduce<RoutePoint[]>((acc, point, index) => {
+	return points.reduce<RoutePoint[]>((acc, point) => {
 		const prev = acc[acc.length - 1];
-		const isLast = index === points.length - 1;
 		if (!prev || !areRoutePointsClose(prev, point)) {
-			acc.push(point);
-		} else if (points.length === 2 && isLast) {
-			// Pickup and delivery can legally share the same coordinates (same yard / TMS duplicate);
-			// keep both so the chain stays length 2 and routing + stop markers still work.
 			acc.push(point);
 		}
 		return acc;
 	}, []);
+}
+
+function isDegenerateLatLngPath(path: [number, number][]): boolean {
+	if (path.length < 2) return true;
+	const [lat0, lng0] = path[0];
+	return path.every(
+		([lat, lng]) => Math.abs(lat - lat0) < 0.0001 && Math.abs(lng - lng0) < 0.0001
+	);
+}
+
+/** Horizontal pixel offset so overlapping stop pins (same yard) sit side by side. */
+function overlappingStopMarkerOffsetX(markers: LoadStopMarker[], index: number): number {
+	const cluster = markers
+		.map((marker, markerIndex) => ({ marker, markerIndex }))
+		.filter(({ marker }) => areRoutePointsClose(marker.point, markers[index].point));
+	if (cluster.length <= 1) return 0;
+	const positionInCluster = cluster.findIndex(entry => entry.markerIndex === index);
+	if (positionInCluster < 0) return 0;
+	const n = cluster.length;
+	if (n === 2) {
+		return positionInCluster === 0
+			? -OVERLAPPING_STOP_MARKER_OFFSET_PX
+			: OVERLAPPING_STOP_MARKER_OFFSET_PX;
+	}
+	return (positionInCluster - (n - 1) / 2) * OVERLAPPING_STOP_MARKER_OFFSET_PX;
+}
+
+function createStopDivIcon(kind: StopKind, offsetX: number): L.DivIcon {
+	const isPickup = kind === "pickup";
+	return L.divIcon({
+		className: isPickup
+			? "tracking-pickup-stop-marker-icon"
+			: "tracking-delivery-stop-marker-icon",
+		html: `<img src="${isPickup ? "/images/pickUp.png" : "/images/deliveryMarcer.png"}" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
+		iconSize: [52, 72],
+		iconAnchor: [26 - offsetX, 72],
+		popupAnchor: [offsetX, -64],
+	});
 }
 
 function clampSplitIndex(splitIdx: number, pathLen: number): number {
@@ -1007,32 +1042,6 @@ export default function TrackingDeliveryMap({
 		[historyMarkerRadius]
 	);
 
-	/** Pickup / load pin — matches driver marker pattern (divIcon + img) for reliable Leaflet + RHL v5. */
-	const pickupStopIcon = useMemo(
-		() =>
-			L.divIcon({
-				className: "tracking-pickup-stop-marker-icon",
-				html: `<img src="/images/pickUp.png" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
-				iconSize: [52, 72],
-				iconAnchor: [26, 72],
-				popupAnchor: [0, -64],
-			}),
-		[]
-	);
-
-	/** Delivery / unload pin — same divIcon pattern as pickup (filename: deliveryMarcer.png). */
-	const deliveryStopIcon = useMemo(
-		() =>
-			L.divIcon({
-				className: "tracking-delivery-stop-marker-icon",
-				html: `<img src="/images/deliveryMarcer.png" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
-				iconSize: [52, 72],
-				iconAnchor: [26, 72],
-				popupAnchor: [0, -64],
-			}),
-		[]
-	);
-
 	const handleZoomChange = useCallback((zoom: number) => {
 		setDriverMarkerSize(getDriverMarkerSizeByZoom(zoom));
 		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
@@ -1117,6 +1126,45 @@ export default function TrackingDeliveryMap({
 		return formatNyWallClockForDisplay(dateString);
 	}, []);
 
+	/** Stable unless PU/DEL collapse to one place — then bucket live driver so OSRM is not rebuilt on every ping. */
+	const coincidentRouteOriginKey = useMemo(() => {
+		const pickup = driverData?.routeGeocode?.pickup ?? null;
+		const delivery = driverData?.routeGeocode?.delivery ?? null;
+		const coordsClose = Boolean(
+			pickup &&
+				delivery &&
+				Math.abs(pickup.lat - delivery.lat) < 0.0001 &&
+				Math.abs(pickup.lng - delivery.lng) < 0.0001
+		);
+		const sameAddress = Boolean(
+			pickupAddressCandidates[0] &&
+				deliveryAddressCandidates[0] &&
+				pickupAddressCandidates[0] === deliveryAddressCandidates[0]
+		);
+		if (!coordsClose && !sameAddress) return "distinct";
+		if (historyMarkerPositions.length > 0) return "history";
+		if (!markerPosition) return "no-origin";
+		return `${markerPosition[0].toFixed(3)},${markerPosition[1].toFixed(3)}`;
+	}, [
+		deliveryAddressCandidates,
+		driverData?.routeGeocode,
+		historyMarkerPositions,
+		markerPosition,
+		pickupAddressCandidates,
+	]);
+
+	const renderedStopMarkers = useMemo(() => {
+		if (!loadRoute) return [];
+		return loadRoute.stopMarkers.map((stop, index) => {
+			const offsetX = overlappingStopMarkerOffsetX(loadRoute.stopMarkers, index);
+			return {
+				stop,
+				offsetX,
+				icon: createStopDivIcon(stop.kind, offsetX),
+			};
+		});
+	}, [loadRoute]);
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -1152,7 +1200,6 @@ export default function TrackingDeliveryMap({
 					chain = isSinglePickupSingleDeliveryRoute(rows)
 						? applyServerEndpointsToChain(geoChain, serverPickup, serverDelivery)
 						: geoChain;
-					chain = uniqueSequentialRoutePoints(chain);
 				}
 
 				if (chain.length < 2) {
@@ -1161,7 +1208,7 @@ export default function TrackingDeliveryMap({
 							geocodeAddressCandidates(pickupAddressCandidates),
 							geocodeAddressCandidates(deliveryAddressCandidates),
 						]);
-						if (!pickupGeo || !deliveryGeo) {
+						if (!pickupGeo && !deliveryGeo) {
 							console.warn(
 								"[TrackingDeliveryMap] Pickup or delivery geocoding failed",
 								{
@@ -1173,12 +1220,21 @@ export default function TrackingDeliveryMap({
 							setLoadRoute(null);
 							return;
 						}
-						chain = uniqueSequentialRoutePoints([
-							{ ...pickupGeo, address: `Pick up: ${pickupGeo.address}` },
-							{ ...deliveryGeo, address: `Delivery: ${deliveryGeo.address}` },
-						]);
+						chain = [
+							...(pickupGeo
+								? [{ ...pickupGeo, address: `Pick up: ${pickupGeo.address}` }]
+								: []),
+							...(deliveryGeo
+								? [
+										{
+											...deliveryGeo,
+											address: `Delivery: ${deliveryGeo.address}`,
+										},
+									]
+								: []),
+						];
 					} else {
-						chain = uniqueSequentialRoutePoints([
+						chain = [
 							{
 								lat: serverPickup.lat,
 								lng: serverPickup.lng,
@@ -1189,17 +1245,17 @@ export default function TrackingDeliveryMap({
 								lng: serverDelivery.lng,
 								address: `Delivery: ${serverDelivery.addressLabel}`,
 							},
-						]);
+						];
 					}
 					stopRows = [
 						{ kind: "pickup", candidates: [], title: "Pick up", addressId: null },
 						{ kind: "delivery", candidates: [], title: "Delivery", addressId: null },
-					];
+					].slice(0, chain.length);
 				}
 
 				if (cancelled) return;
 
-				if (chain.length < 2) {
+				if (chain.length < 1) {
 					setLoadRoute(null);
 					return;
 				}
@@ -1212,15 +1268,36 @@ export default function TrackingDeliveryMap({
 					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
 					.filter((point): point is RoutePoint => point !== null);
 
-				// Do not include the live driver point in OSRM — location pings must not
-				// rebuild the paid/ basemap-adjacent route request.
-				const osrmSeq = buildOsrmWaypointSequence(chain, historyPoints, null);
+				const uniqueChain = uniqueSequentialRoutePoints(chain);
+				let osrmSeq: RoutePoint[] = [];
+				if (uniqueChain.length >= 2) {
+					// Do not include the live driver point in OSRM — location pings must not
+					// rebuild the paid/ basemap-adjacent route request.
+					osrmSeq = buildOsrmWaypointSequence(chain, historyPoints, null);
+				} else {
+					// Same yard / duplicate TMS coords: PU→DEL is a zero-length route.
+					// Draw driving path from last progress (history, else live driver) to the stop.
+					const stop = uniqueChain[0] ?? chain[0];
+					const origin =
+						historyPoints.length > 0
+							? historyPoints[historyPoints.length - 1]
+							: markerPosition
+								? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
+								: null;
+					if (origin && stop && !areRoutePointsClose(origin, stop)) {
+						osrmSeq = [origin, stop];
+					}
+				}
 
 				const osrmResult = await fetchOsrmDrivingRoute(osrmSeq);
 				if (cancelled) return;
 
 				const fullPath =
-					osrmResult && osrmResult.path.length >= 2 ? osrmResult.path : [];
+					osrmResult &&
+					osrmResult.path.length >= 2 &&
+					!isDegenerateLatLngPath(osrmResult.path)
+						? osrmResult.path
+						: [];
 				const splitTarget = markerPosition
 					? toRoutePoint(markerPosition, DRIVER_WAYPOINT_LABEL)
 					: historyPoints.length > 0
@@ -1267,6 +1344,7 @@ export default function TrackingDeliveryMap({
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
 		historyMarkerPositions,
+		coincidentRouteOriginKey,
 	]);
 
 	useEffect(() => {
@@ -1538,13 +1616,12 @@ export default function TrackingDeliveryMap({
 								}}
 							/>
 						)}
-						{loadRoute.stopMarkers.map((stop, index) => (
+						{renderedStopMarkers.map(({ stop, offsetX, icon }, index) => (
 							<Marker
-								key={`load-stop-${index}-${stop.point.lat}-${stop.point.lng}`}
+								key={`load-stop-${index}-${stop.kind}-${stop.point.lat}-${stop.point.lng}-${offsetX}`}
 								position={[stop.point.lat, stop.point.lng]}
-								{...(stop.kind === "pickup"
-									? { icon: pickupStopIcon }
-									: { icon: deliveryStopIcon })}
+								icon={icon}
+								zIndexOffset={stop.kind === "pickup" ? 420 : 410}
 								eventHandlers={{ click: stopMapClickBubbling }}
 							>
 								<Popup>

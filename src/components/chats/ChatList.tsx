@@ -143,7 +143,12 @@ export default function ChatList({
 	// Always "chats" on first render (SSR + hydration); restore tab after mount.
 	const [activeTab, setActiveTab] = useState<ChatTab>("chats");
 
-	const { data: myLoadsIds = [], isFetching: isFetchingMyLoads } = useQuery({
+	const {
+		data: myLoadsIds = [],
+		isFetching: isFetchingMyLoads,
+		isError: isMyLoadsError,
+		error: myLoadsError,
+	} = useQuery({
 		queryKey: trackingTeamsQueryKey("mine"),
 		queryFn: () => fetchTrackingTeamsLoadIds("mine"),
 		enabled: showMyLoadsTab,
@@ -153,7 +158,12 @@ export default function ChatList({
 		refetchOnReconnect: true,
 	});
 
-	const { data: myTeamIds = [], isFetching: isFetchingMyTeam } = useQuery({
+	const {
+		data: myTeamIds = [],
+		isFetching: isFetchingMyTeam,
+		isError: isMyTeamError,
+		error: myTeamError,
+	} = useQuery({
 		queryKey: trackingTeamsQueryKey("team"),
 		queryFn: () => fetchTrackingTeamsLoadIds("team"),
 		enabled: showMyTeamTab,
@@ -905,6 +915,20 @@ export default function ChatList({
 								  (activeTab === "my-team" && isFetchingMyTeam) ? (
 									<>
 										<p>Loading loads…</p>
+									</>
+								) : (activeTab === "my-loads" && isMyLoadsError) ||
+								  (activeTab === "my-team" && isMyTeamError) ? (
+									<>
+										<p className="text-red-600">TMS tracking/teams error</p>
+										<pre className="mt-2 max-h-72 max-w-full overflow-auto whitespace-pre-wrap break-all px-3 text-left text-xs text-red-700">
+											{activeTab === "my-loads"
+												? myLoadsError instanceof Error
+													? myLoadsError.message
+													: String(myLoadsError)
+												: myTeamError instanceof Error
+													? myTeamError.message
+													: String(myTeamError)}
+										</pre>
 									</>
 								) : activeTab === "my-loads" || activeTab === "my-team" ? (
 									<>
