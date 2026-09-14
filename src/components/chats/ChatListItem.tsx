@@ -21,6 +21,7 @@ import {
 import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
 import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass } from "@/utils/loadStatusLabel";
+import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -78,7 +79,13 @@ export default function ChatListItem({
 	};
 
 	const getChatLastMessage = (chatRoom: ChatRoom): string => {
-		if (chatRoom.lastMessage) {
+		if (
+			chatRoom.lastMessage &&
+			isSystemMessageVisibleToRole(
+				chatRoom.lastMessage.systemMessageKind,
+				currentUser?.role,
+			)
+		) {
 			const multi = getMessageMultiAttachments(chatRoom.lastMessage);
 			if (multi) {
 				return `📎 ${multi.length} files`;
@@ -95,7 +102,13 @@ export default function ChatListItem({
 	};
 
 	const getChatLastMessageTime = (chatRoom: ChatRoom): string => {
-		if (chatRoom.lastMessage) {
+		if (
+			chatRoom.lastMessage &&
+			isSystemMessageVisibleToRole(
+				chatRoom.lastMessage.systemMessageKind,
+				currentUser?.role,
+			)
+		) {
 			return formatChatRelativeTimeNy(chatRoom.lastMessage.createdAt);
 		}
 		return "";

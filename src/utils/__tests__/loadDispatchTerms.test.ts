@@ -34,8 +34,14 @@ describe("isLoadDispatchTermsSystemMessage", () => {
 		).toBe(true);
 	});
 
-	it("ignores proximity and ordinary chat messages", () => {
+	it("ignores proximity, stale-location, and ordinary chat messages", () => {
 		expect(isLoadDispatchTermsSystemMessage(proximityMessage)).toBe(false);
+		expect(
+			isLoadDispatchTermsSystemMessage({
+				isSystemMessage: true,
+				systemMessageKind: "load_stale_location",
+			})
+		).toBe(false);
 		expect(
 			isLoadDispatchTermsSystemMessage({
 				senderId: driverId,

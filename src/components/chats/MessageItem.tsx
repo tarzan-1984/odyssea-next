@@ -26,7 +26,7 @@ import {
 import {
 	isLoadDispatchTermsAcceptedMessage,
 } from "@/utils/loadDispatchTerms";
-import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage } from "@/utils/systemMessageKind";
+import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 
 interface MessageItemProps {
@@ -90,12 +90,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isTermsAccepted = isLoadDispatchTermsAcceptedMessage(message.content);
 	const isProximityMessage = isLoadProximitySystemMessage(message.systemMessageKind);
 	const isDispatchMessage = isLoadDispatchSystemMessage(message.systemMessageKind);
+	const isStaleLocationMessage = isLoadStaleLocationSystemMessage(message.systemMessageKind);
 	const useGreenSystemBubble =
 		isTermsAccepted || isProximityMessage || isDispatchMessage;
+	const useRedSystemBubble = isStaleLocationMessage;
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
 		? "px-3 py-2 rounded-lg bg-amber-400 text-gray-900 dark:bg-amber-400 dark:text-gray-900"
-		: isBidOfferRejected
+		: isBidOfferRejected || useRedSystemBubble
 			? "px-3 py-2 rounded-lg bg-red-500 text-white dark:bg-red-500"
 			: isBidRateChanged || isBidOfferConfirmed || useGreenSystemBubble
 				? "px-3 py-2 rounded-lg bg-green-500 text-white dark:bg-green-500"
@@ -107,9 +109,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		isBidRateChanged ||
 		isBidOfferConfirmed ||
 		isBidOfferRejected ||
-		useGreenSystemBubble;
+		useGreenSystemBubble ||
+		useRedSystemBubble;
 	const isSpecialColoredBubble =
-		isBidPriceUpdate || useGreenSystemBubble;
+		isBidPriceUpdate || useGreenSystemBubble || useRedSystemBubble;
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;

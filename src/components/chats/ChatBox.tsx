@@ -33,6 +33,7 @@ import {
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
 import { canSendChatMessages } from "@/utils/roleAccess";
+import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
 
 interface ChatBoxProps {
@@ -393,15 +394,29 @@ export default function ChatBox({
 		);
 
 		if (activeOptimistic.length === 0) {
-			return serverList.sort(
-				(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-			);
+			return serverList
+				.filter((message) =>
+					isSystemMessageVisibleToRole(
+						message.systemMessageKind,
+						currentUser?.role,
+					),
+				)
+				.sort(
+					(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+				);
 		}
 
-		return [...serverList, ...activeOptimistic].sort(
-			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-		);
-	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id]);
+		return [...serverList, ...activeOptimistic]
+			.filter((message) =>
+				isSystemMessageVisibleToRole(
+					message.systemMessageKind,
+					currentUser?.role,
+				),
+			)
+			.sort(
+				(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+			);
+	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id, currentUser?.role]);
 
 	const loadDispatchTermsUi = getLoadDispatchTermsUiState({
 		isDriver: currentUser?.role?.trim().toUpperCase() === "DRIVER",

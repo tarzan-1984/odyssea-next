@@ -39,6 +39,7 @@ import {
 	canAccessMyTeamChatTab,
 } from "@/utils/roleAccess";
 import { formatWebSocketError, logWebSocketError } from "@/utils/websocketError";
+import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import offersApi, { type GetOffersResponse, type OfferRow } from "@/app-api/offers";
 
 function invalidateTrackingTeamsOnLoadChatEvent(
@@ -650,6 +651,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 			// Add message to store if it's for the current chat room
 			if (messageData && messageData.chatRoomId && messageData.message) {
+				if (
+					!isSystemMessageVisibleToRole(
+						messageData.message.systemMessageKind,
+						currentUser?.role,
+					)
+				) {
+					return;
+				}
 				// Update chat room's lastMessage for ALL chats (not just current one)
 				const state = useChatStore.getState();
 				let chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
