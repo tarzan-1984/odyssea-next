@@ -20,6 +20,7 @@ import {
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
+import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -122,8 +123,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 	return (
 		<>
-			<div className="sticky flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 xl:px-6">
-				<div className="flex items-center gap-3">
+			<div className="sticky top-0 z-10 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+			<div className="flex items-center justify-between px-5 py-4 xl:px-6">
+				<div className="flex items-start gap-3 min-w-0">
 					<div className="relative h-12 w-full max-w-[48px] rounded-full">
 						{(() => {
 							if (!chatRoom) {
@@ -210,6 +212,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							})()}
 					</div>
 
+					<div className="min-w-0">
 					<button
 						onClick={() => setIsParticipantsModalOpen(true)}
 						className={`text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer z-10 relative text-left ${
@@ -219,6 +222,13 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					>
 						{getChatDisplayName()}
 					</button>
+					{chatRoom?.staleLocationAlert &&
+					canSeeLoadStaleLocationSystemMessage(currentUser?.role) ? (
+						<div className="mt-1 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">
+							{chatRoom.staleLocationAlert}
+						</div>
+					) : null}
+					</div>
 				</div>
 
 				<div className="flex items-center gap-3">
@@ -309,6 +319,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 						</div>
 					) : null}
 				</div>
+			</div>
 			</div>
 
 			{/* Participants Modal */}

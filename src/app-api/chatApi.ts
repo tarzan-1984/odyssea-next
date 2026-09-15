@@ -66,6 +66,10 @@ export interface ChatRoom {
 	isLoadArchived?: boolean;
 	/** Current loads.status for LOAD chats (from loads table). */
 	loadStatus?: string | null;
+	/** Staff-only: driver location is stale; paint the list row red. */
+	isLocationStale?: boolean;
+	/** Staff-only header banner text when isLocationStale. */
+	staleLocationAlert?: string | null;
 	createdAt: string;
 	updatedAt: string;
 	participants: ChatRoomParticipant[];
