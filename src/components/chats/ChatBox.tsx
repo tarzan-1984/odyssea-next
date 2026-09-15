@@ -288,6 +288,8 @@ export default function ChatBox({
 			"image/jpeg": "jpg",
 			"image/gif": "gif",
 			"image/webp": "webp",
+			"image/heic": "heic",
+			"image/heif": "heif",
 			"application/pdf": "pdf",
 			"text/plain": "txt",
 		};
@@ -359,6 +361,7 @@ export default function ChatBox({
 		if (files.length === 0) return;
 
 		e.preventDefault();
+		e.stopPropagation();
 		await sendFormRef.current?.addFiles(files);
 	};
 

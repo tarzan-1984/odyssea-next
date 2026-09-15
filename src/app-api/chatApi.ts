@@ -553,7 +553,8 @@ class ChatApiClient {
 	// File Upload
 	getPresignedUrl(
 		filename: string,
-		contentType: string
+		contentType: string,
+		signal?: AbortSignal
 	): Promise<{
 		uploadUrl: string;
 		fileUrl: string;
@@ -566,6 +567,7 @@ class ChatApiClient {
 		}>("/storage/presign", {
 			method: "POST",
 			body: JSON.stringify({ filename, contentType }),
+			signal,
 		});
 	}
 

@@ -17,12 +17,36 @@ export type S3UploadProgress = {
 	putMs?: number;
 };
 
+const PRESIGN_TIMEOUT_MS = 20_000;
+const CONVERT_HEIC_TIMEOUT_MS = 60_000;
+const PUT_TIMEOUT_MS = 60_000;
+
 export class S3Uploader {
 	constructor(
 		private presignEndpoint?: string,
 		private extraHeaders: Record<string, string> = {},
 		private onProgress?: (progress: S3UploadProgress) => void,
 	) {}
+
+	private async fetchWithTimeout(
+		input: RequestInfo | URL,
+		init: RequestInit,
+		timeoutMs: number,
+		timeoutMessage: string,
+	): Promise<Response> {
+		const controller = new AbortController();
+		const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(input, { ...init, signal: controller.signal });
+		} catch (error) {
+			if (error instanceof Error && error.name === "AbortError") {
+				throw new Error(timeoutMessage);
+			}
+			throw error;
+		} finally {
+			window.clearTimeout(timeoutId);
+		}
+	}
 
 	private isHeicFile(file: File, filename: string): boolean {
 		const lowerName = filename.toLowerCase();
@@ -46,11 +70,16 @@ export class S3Uploader {
 		const formData = new FormData();
 		formData.append("file", file, filename);
 
-		const response = await fetch("/api/storage/convert-heic", {
-			method: "POST",
-			body: formData,
-			credentials: "include",
-		});
+		const response = await this.fetchWithTimeout(
+			"/api/storage/convert-heic",
+			{
+				method: "POST",
+				body: formData,
+				credentials: "include",
+			},
+			CONVERT_HEIC_TIMEOUT_MS,
+			"HEIC conversion timed out",
+		);
 
 		if (!response.ok) {
 			const data = await response.json().catch(() => null);
@@ -129,16 +158,21 @@ export class S3Uploader {
 
 			if (this.presignEndpoint) {
 				// Use direct endpoint (legacy mode)
-				const presignRes = await fetch(this.presignEndpoint, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						...this.extraHeaders,
+				const presignRes = await this.fetchWithTimeout(
+					this.presignEndpoint,
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							...this.extraHeaders,
+						},
+						body: JSON.stringify({ filename, contentType }),
+						cache: "no-store",
+						credentials: "include",
 					},
-					body: JSON.stringify({ filename, contentType }),
-					cache: "no-store",
-					credentials: "include",
-				});
+					PRESIGN_TIMEOUT_MS,
+					"Presign request timed out",
+				);
 
 				if (!presignRes.ok) {
 					const errorText = await presignRes.text().catch(() => "Unknown error");
@@ -152,8 +186,25 @@ export class S3Uploader {
 				};
 				presignData = raw.data ?? raw;
 			} else {
-				// Use chatApi client
-				presignData = await chatApi.getPresignedUrl(filename, contentType);
+				const presignController = new AbortController();
+				const presignTimeoutId = window.setTimeout(
+					() => presignController.abort(),
+					PRESIGN_TIMEOUT_MS,
+				);
+				try {
+					presignData = await chatApi.getPresignedUrl(
+						filename,
+						contentType,
+						presignController.signal,
+					);
+				} catch (error) {
+					if (error instanceof Error && error.name === "AbortError") {
+						throw new Error("Presign request timed out");
+					}
+					throw error;
+				} finally {
+					window.clearTimeout(presignTimeoutId);
+				}
 			}
 
 			const { uploadUrl, fileUrl, key } = presignData;
@@ -167,11 +218,16 @@ export class S3Uploader {
 			// 2) PUT upload to Wasabi
 			const putStartedAt = performance.now();
 			this.onProgress?.({ stage: "upload", sizeBytes: uploadFile.size, presignMs });
-			const putRes = await fetch(uploadUrl, {
-				method: "PUT",
-				headers: { "Content-Type": contentType },
-				body: uploadFile,
-			});
+			const putRes = await this.fetchWithTimeout(
+				uploadUrl,
+				{
+					method: "PUT",
+					headers: { "Content-Type": contentType },
+					body: uploadFile,
+				},
+				PUT_TIMEOUT_MS,
+				"Storage upload timed out",
+			);
 			const putMs = Math.round(performance.now() - putStartedAt);
 
 			if (!putRes.ok) {

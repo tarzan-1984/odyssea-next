@@ -303,6 +303,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		);
 
 		const handleSendMessage = async () => {
+			if (isUploadingAttachments) return;
 			if (!message.trim() && attachedFiles.length === 0) return;
 
 			try {
@@ -392,7 +393,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			if (e.key !== "Enter" || e.shiftKey) {
 				return;
 			}
-			if (e.nativeEvent.isComposing) {
+			if (e.nativeEvent.isComposing || isUploadingAttachments) {
 				return;
 			}
 			e.preventDefault();
@@ -408,6 +409,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				const errors: string[] = [];
 
 				for (const file of picked) {
+					if (file.size <= 0) {
+						errors.push(`${file.name || "file"}: empty file`);
+						continue;
+					}
 					if (file.size > maxSize) {
 						errors.push(`${file.name}: max 10MB`);
 						continue;
@@ -488,6 +493,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				"image/jpeg": "jpg",
 				"image/gif": "gif",
 				"image/webp": "webp",
+				"image/heic": "heic",
+				"image/heif": "heif",
 				"application/pdf": "pdf",
 				"text/plain": "txt",
 			};
@@ -1047,7 +1054,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								onContentChange={handleContentChange}
 								onKeyDown={handleKeyDown}
 								onPaste={handlePaste}
-								disabled={disabled || isSending || isUploadingAttachments}
+								disabled={disabled || isSending}
 								leadingIcons={showBidPlusOne ? "compact" : "default"}
 							/>
 						</div>
