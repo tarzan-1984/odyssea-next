@@ -104,6 +104,22 @@ export function formatNyWallClockForDisplay(
 	}).format(date);
 }
 
+/** Compact last-location stamp for LOAD chat header (NY wall-clock). */
+export function formatChatHeaderLastLocation(
+	value: string | null | undefined
+): string {
+	const date = parseNaiveNyDateTime(value);
+	if (!date) return "";
+	return new Intl.DateTimeFormat("en-US", {
+		timeZone: "UTC",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: true,
+	}).format(date);
+}
+
 /** Offer card creation time in NY wall-clock: M/D/YYYY H:MM AM/PM EST */
 export function formatOfferCreateTimeEst(value: string | null | undefined): string {
 	const date = parseNaiveNyDateTime(value);

@@ -21,6 +21,8 @@ import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
+import { formatChatHeaderLastLocation } from "@/utils/nyWallClock";
+import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -34,6 +36,18 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
 	const currentUser = useCurrentUser();
+	const showLoadTrackingHeader =
+		chatRoom?.type === "LOAD" &&
+		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
+	const lastLocationLabel = showLoadTrackingHeader
+		? formatChatHeaderLastLocation(chatRoom?.lastLocationUpdateAt)
+		: "";
+	const roadEtaLabel =
+		showLoadTrackingHeader &&
+		!chatRoom?.isLocationStale &&
+		chatRoom?.roadEta?.arrivalLabel
+			? `ETA ${chatRoom.roadEta.arrivalLabel} · ${roadEtaHeaderKindLabel(chatRoom.roadEta.kind)}`
+			: "";
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -222,6 +236,18 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					>
 						{getChatDisplayName()}
 					</button>
+					{roadEtaLabel || lastLocationLabel ? (
+						<div className="mt-1 space-y-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+							{roadEtaLabel ? (
+								<p className="font-medium text-brand-600 dark:text-brand-400">
+									{roadEtaLabel}
+								</p>
+							) : null}
+							{lastLocationLabel ? (
+								<p>Last location {lastLocationLabel}</p>
+							) : null}
+						</div>
+					) : null}
 					{chatRoom?.staleLocationAlert &&
 					canSeeLoadStaleLocationSystemMessage(currentUser?.role) ? (
 						<div className="mt-1 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">

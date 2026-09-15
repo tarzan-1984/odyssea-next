@@ -316,6 +316,12 @@ export const useChatStore = create<ChatState>()(
 						if (matchingRoom) {
 							nextCurrentChatRoom = {
 								...currentChatRoom,
+								loadStatus: matchingRoom.loadStatus,
+								roadEta: matchingRoom.roadEta,
+								lastLocationUpdateAt: matchingRoom.lastLocationUpdateAt,
+								isLocationStale: matchingRoom.isLocationStale,
+								staleLocationAlert: matchingRoom.staleLocationAlert,
+								isLoadArchived: matchingRoom.isLoadArchived,
 								participants: mergeChatRoomParticipants(
 									matchingRoom.participants,
 									currentChatRoom.participants

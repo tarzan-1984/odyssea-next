@@ -103,3 +103,9 @@ export function roadEtaBannerCopy(kind: RoadEtaStopKind): {
 		loading: "Calculating estimated arrival at delivery…",
 	};
 }
+
+export function roadEtaHeaderKindLabel(kind: RoadEtaStopKind): string {
+	if (kind === "first_pickup") return "first pickup";
+	if (kind === "pickup") return "next pickup";
+	return "delivery";
+}

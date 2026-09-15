@@ -66,6 +66,13 @@ export interface ChatRoom {
 	isLoadArchived?: boolean;
 	/** Current loads.status for LOAD chats (from loads table). */
 	loadStatus?: string | null;
+	/** Staff-only: stored road ETA for the next pickup/delivery. */
+	roadEta?: {
+		kind: "first_pickup" | "pickup" | "delivery";
+		arrivalLabel: string;
+	} | null;
+	/** Staff-only: driver lastLocationUpdateAt copied onto the load. */
+	lastLocationUpdateAt?: string | null;
 	/** Staff-only: driver location is stale; paint the list row red. */
 	isLocationStale?: boolean;
 	/** Staff-only header banner text when isLocationStale. */

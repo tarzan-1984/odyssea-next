@@ -16,6 +16,7 @@ import { canModifyAppSettings, canSendCheckListMessages } from "@/utils/roleAcce
 type MobileAppSettingsPayload = {
 	id: string;
 	locationMinIntervalMs: number;
+	locationMaxAgeMs: number;
 	locationMinDistanceM: number;
 	reverseGeocodeMinDistanceM: number;
 	driverTrackingPointMinIntervalMs: number;
@@ -134,6 +135,8 @@ function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 	}
 	return {
 		...raw,
+		locationMaxAgeMs:
+			typeof raw.locationMaxAgeMs === "number" ? raw.locationMaxAgeMs : 15 * MS_PER_MINUTE,
 		reverseGeocodeMinDistanceM:
 			typeof raw.reverseGeocodeMinDistanceM === "number"
 				? raw.reverseGeocodeMinDistanceM
@@ -270,6 +273,7 @@ export default function AppSettingsPage() {
 	const canSaveAppSettings = canModifyAppSettings(currentUser?.role);
 	const canSendPush = canSendCheckListMessages(currentUser?.role);
 	const [intervalMin, setIntervalMin] = useState("");
+	const [maxLocationAgeMin, setMaxLocationAgeMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
 	const [driverTrackingIntervalMin, setDriverTrackingIntervalMin] = useState("");
@@ -466,7 +470,7 @@ export default function AppSettingsPage() {
 				setPushSuccess("Sent to the selected user.");
 			} else if (queued && typeof usersCount === "number") {
 				setPushSuccess(
-					`Push notifications are being sent to ${usersCount} users in the background.`,
+					`Push notifications are being sent to ${usersCount} users in the background.`
 				);
 			} else if (typeof usersCount === "number") {
 				setPushSuccess(`Sent to ${usersCount} users.`);
@@ -499,6 +503,7 @@ export default function AppSettingsPage() {
 				return;
 			}
 			setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
+			setMaxLocationAgeMin(String(Math.round(s.locationMaxAgeMs / MS_PER_MINUTE)));
 			setDistanceM(String(s.locationMinDistanceM));
 			setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
 			setDriverTrackingIntervalMin(
@@ -779,11 +784,8 @@ export default function AppSettingsPage() {
 		setSuccessMinimumVersion(null);
 
 		const minimumAppVersion = minimumAppVersionInput.trim();
-		if (
-			minimumAppVersion !== "" &&
-			!/^\d+(?:\.\d+)+(?:[-\w.]*)?$/u.test(minimumAppVersion)
-		) {
-			setErrorMinimumVersion('Enter a version like 2.1.4 or leave empty to disable.');
+		if (minimumAppVersion !== "" && !/^\d+(?:\.\d+)+(?:[-\w.]*)?$/u.test(minimumAppVersion)) {
+			setErrorMinimumVersion("Enter a version like 2.1.4 or leave empty to disable.");
 			setSavingMinimumVersion(false);
 			return;
 		}
@@ -832,7 +834,9 @@ export default function AppSettingsPage() {
 
 		const mapTilerApiKey = mapTilerApiKeyInput.trim();
 		if (mapTilerApiKey !== "" && !/^[A-Za-z0-9_-]{8,128}$/.test(mapTilerApiKey)) {
-			setErrorMapTiler("Enter a MapTiler key (8–128 letters, digits, _ or -) or leave empty.");
+			setErrorMapTiler(
+				"Enter a MapTiler key (8–128 letters, digits, _ or -) or leave empty."
+			);
 			setSavingMapTiler(false);
 			return;
 		}
@@ -928,6 +932,8 @@ export default function AppSettingsPage() {
 
 		const intervalMinutes = Number.parseInt(intervalMin, 10);
 		const locationMinIntervalMs = intervalMinutes * MS_PER_MINUTE;
+		const maxLocationAgeMinutes = Number.parseInt(maxLocationAgeMin, 10);
+		const locationMaxAgeMs = maxLocationAgeMinutes * MS_PER_MINUTE;
 		const locationMinDistanceM = Number.parseInt(distanceM, 10);
 		const reverseGeocodeMinDistanceM = Number.parseInt(reverseGeocodeM, 10);
 		const driverTrackingIntervalMinutes = Number.parseInt(driverTrackingIntervalMin, 10);
@@ -936,12 +942,16 @@ export default function AppSettingsPage() {
 		if (
 			!Number.isFinite(intervalMinutes) ||
 			!Number.isFinite(locationMinIntervalMs) ||
+			!Number.isFinite(maxLocationAgeMinutes) ||
+			!Number.isFinite(locationMaxAgeMs) ||
 			!Number.isFinite(locationMinDistanceM) ||
 			!Number.isFinite(reverseGeocodeMinDistanceM) ||
 			!Number.isFinite(driverTrackingIntervalMinutes) ||
 			!Number.isFinite(driverTrackingPointMinIntervalMs) ||
 			intervalMinutes < 0 ||
 			intervalMinutes > LOCATION_INTERVAL_MAX_MINUTES ||
+			maxLocationAgeMinutes < 0 ||
+			maxLocationAgeMinutes > LOCATION_INTERVAL_MAX_MINUTES ||
 			locationMinDistanceM < 0 ||
 			reverseGeocodeMinDistanceM < 100 ||
 			reverseGeocodeMinDistanceM > 500_000 ||
@@ -949,7 +959,7 @@ export default function AppSettingsPage() {
 			driverTrackingIntervalMinutes > LOCATION_INTERVAL_MAX_MINUTES
 		) {
 			setErrorMobile(
-				`Valid values: location interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 = no time gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; tracking history interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min.`
+				`Valid values: location interval and maximum age 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 disables that gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; tracking history interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min.`
 			);
 			setSavingMobile(false);
 			return;
@@ -961,6 +971,7 @@ export default function AppSettingsPage() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					locationMinIntervalMs,
+					locationMaxAgeMs,
 					locationMinDistanceM,
 					reverseGeocodeMinDistanceM,
 					driverTrackingPointMinIntervalMs,
@@ -982,6 +993,7 @@ export default function AppSettingsPage() {
 			const s = parseMobileSettings(json);
 			if (s) {
 				setIntervalMin(String(Math.round(s.locationMinIntervalMs / MS_PER_MINUTE)));
+				setMaxLocationAgeMin(String(Math.round(s.locationMaxAgeMs / MS_PER_MINUTE)));
 				setDistanceM(String(s.locationMinDistanceM));
 				setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
 				setDriverTrackingIntervalMin(
@@ -1180,8 +1192,9 @@ export default function AppSettingsPage() {
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
 						Counts are based on <code className="text-xs">users.status=ACTIVE</code>,
-						presence of at least one row in <code className="text-xs">user_devices</code>{" "}
-						(multiple physical devices per account allowed; counts dedupe by{" "}
+						presence of at least one row in{" "}
+						<code className="text-xs">user_devices</code> (multiple physical devices per
+						account allowed; counts dedupe by{" "}
 						<code className="text-xs">externalId</code> per platform), and drivers with{" "}
 						<code className="text-xs">driverStatus</code>{" "}
 						<code className="text-xs">blocked</code> or{" "}
@@ -1505,10 +1518,10 @@ export default function AppSettingsPage() {
 						Mobile app — location throttling
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
-						Shared settings for the driver app (one row in the database). Interval and
-						distance control how often location is sent; reverse geocode distance
-						controls how far a driver must move from the last successful address lookup
-						before ZIP/city/state are resolved again.
+						Shared settings for the iOS and Android driver apps. Interval and distance
+						control movement sends; maximum age enables a freshness heartbeat;
+						reverse geocode distance controls how far a driver must move from the last
+						successful address lookup before ZIP/city/state are resolved again.
 					</p>
 
 					{loadingMobile ? (
@@ -1564,6 +1577,30 @@ export default function AppSettingsPage() {
 										displacement required before a send (together with
 										interval). Mobile OS may still use at least 1 m for native
 										callbacks.
+									</p>
+								</div>
+
+								<div className="min-w-0 flex-1">
+									<Label htmlFor="locationMaxAgeMinutes" className="mb-1">
+										Maximum location age (minutes)
+									</Label>
+									<Input
+										id="locationMaxAgeMinutes"
+										name="locationMaxAgeMinutes"
+										type="number"
+										min="0"
+										max={String(LOCATION_INTERVAL_MAX_MINUTES)}
+										step={1}
+										value={maxLocationAgeMin}
+										onChange={e => setMaxLocationAgeMin(e.target.value)}
+										placeholder="15"
+										required
+										className="!h-9 !min-h-0 !py-1.5"
+									/>
+									<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+										After this age, iOS and Android allow a heartbeat even if the
+										driver has not moved; the active-app watchdog sends it immediately.
+										0 disables the heartbeat.
 									</p>
 								</div>
 							</div>
