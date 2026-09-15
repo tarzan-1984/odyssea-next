@@ -7,14 +7,21 @@ type PickupRoadEtaBannerProps = {
 	status: "idle" | "loading" | "ready" | "error";
 	eta: PickupRoadEtaResult | null;
 	pickupAddressLabel?: string | null;
+	title?: string;
+	loadingLabel?: string;
 	/** Leave top-right lane clear for Load history panel (25vw + offset). */
 	reserveRightForHistory?: boolean;
 };
+
+const DEFAULT_TITLE = "Estimated arrival at first pickup";
+const DEFAULT_LOADING = "Calculating estimated arrival at pickup…";
 
 export default function PickupRoadEtaBanner({
 	status,
 	eta,
 	pickupAddressLabel,
+	title = DEFAULT_TITLE,
+	loadingLabel = DEFAULT_LOADING,
 	reserveRightForHistory = false,
 }: PickupRoadEtaBannerProps) {
 	if (status === "idle") return null;
@@ -24,7 +31,7 @@ export default function PickupRoadEtaBanner({
 			<div className="w-full max-w-xl rounded-lg border border-brand-200 bg-white/95 px-3.5 py-2.5 text-left shadow-md backdrop-blur-sm dark:border-brand-800/60 dark:bg-gray-900/95 [overflow-wrap:anywhere]">
 				{status === "loading" && (
 					<p className="text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-						Calculating estimated arrival at pickup…
+						{loadingLabel}
 					</p>
 				)}
 				{status === "error" && (
@@ -35,7 +42,7 @@ export default function PickupRoadEtaBanner({
 				{status === "ready" && eta && eta.source === "google" ? (
 					<>
 						<p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-							Estimated arrival at first pickup
+							{title}
 						</p>
 						<p className="mt-0.5 text-base font-semibold text-brand-600 dark:text-brand-400">
 							{eta.arrivalLabel}
@@ -78,7 +85,7 @@ export default function PickupRoadEtaBanner({
 				{status === "ready" && eta && eta.source !== "google" ? (
 					<>
 						<p className="text-center text-sm font-semibold text-gray-900 dark:text-white">
-							Estimated arrival at first pickup
+							{title}
 						</p>
 						<p className="mt-1 text-center text-base font-semibold text-brand-600 dark:text-brand-400">
 							{eta.arrivalLabel}

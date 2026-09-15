@@ -15,6 +15,12 @@ import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
+import {
+	findNextUnpassedRoutePoint,
+	parseLoadRoutePoints,
+	roadEtaBannerCopy,
+	type RoadEtaStop,
+} from "@/utils/loadRouteEta";
 import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import {
 	normalizeDriverExternalId,
@@ -68,6 +74,7 @@ type LoadDetailsResponse = {
 				pickup: RouteGeocodeMarker | null;
 				delivery: RouteGeocodeMarker | null;
 			};
+			loadRoute?: unknown;
 			shippers?: Array<{
 				address_id?: string | number;
 				id?: string;
@@ -91,6 +98,7 @@ type LoadDetailsResponse = {
 			pickup: RouteGeocodeMarker | null;
 			delivery: RouteGeocodeMarker | null;
 		};
+		loadRoute?: unknown;
 		shippers?: Array<{
 			address_id?: string | number;
 			id?: string;
@@ -935,22 +943,62 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		(mapUiMode === "map" || mapUiMode === "driver_not_loaded_enroute");
 
 	const pickupGeocode = routeGeocodeFromApi?.pickup ?? null;
+	const deliveryGeocode = routeGeocodeFromApi?.delivery ?? null;
+	const loadRoutePoints = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return parseLoadRoutePoints(
+			details?.data?.data?.loadRoute ?? details?.data?.loadRoute ?? []
+		);
+	}, [loadDetails]);
 	const hasFreshLastLocationUpdate =
 		hasLastLocationUpdate &&
 		!isLastLocationOlderThanNy(
 			currentTrackingDriver?.lastLocationUpdateAt,
 			STALE_LOCATION_THRESHOLD
 		);
+	const roadEtaStop = useMemo((): RoadEtaStop | null => {
+		if (!showMapAndTrackingTools || !isDriverLoadedEnroute) return null;
+		if (normalizedLoadStatus === "waiting_on_pu_date") {
+			if (!pickupGeocode) return null;
+			const lat = Number(pickupGeocode.lat);
+			const lng = Number(pickupGeocode.lng);
+			if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+			return {
+				kind: "first_pickup",
+				lat,
+				lng,
+				addressLabel: pickupGeocode.addressLabel?.trim() || `${lat}, ${lng}`,
+			};
+		}
+		if (normalizedLoadStatus === "loaded_enroute") {
+			const next = findNextUnpassedRoutePoint(loadRoutePoints, {
+				skipFirstPickup: true,
+			});
+			if (next) return next;
+			if (!deliveryGeocode) return null;
+			const lat = Number(deliveryGeocode.lat);
+			const lng = Number(deliveryGeocode.lng);
+			if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+			return {
+				kind: "delivery",
+				lat,
+				lng,
+				addressLabel: deliveryGeocode.addressLabel?.trim() || `${lat}, ${lng}`,
+			};
+		}
+		return null;
+	}, [
+		deliveryGeocode,
+		isDriverLoadedEnroute,
+		loadRoutePoints,
+		normalizedLoadStatus,
+		pickupGeocode,
+		showMapAndTrackingTools,
+	]);
 	const showPickupRoadEta = Boolean(
-		showMapAndTrackingTools &&
-		isDriverLoadedEnroute &&
-		normalizedLoadStatus === "waiting_on_pu_date" &&
-		hasCurrentDriverCoordinates &&
-		hasFreshLastLocationUpdate &&
-		pickupGeocode &&
-		Number.isFinite(Number(pickupGeocode.lat)) &&
-		Number.isFinite(Number(pickupGeocode.lng))
+		roadEtaStop && hasCurrentDriverCoordinates && hasFreshLastLocationUpdate
 	);
+	const roadEtaCopy = roadEtaBannerCopy(roadEtaStop?.kind ?? "first_pickup");
 
 	const pickupEtaDriver = useMemo((): { lat: number; lng: number } | null => {
 		if (!showPickupRoadEta || !hasCurrentDriverCoordinates) return null;
@@ -963,21 +1011,18 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	]);
 
 	const pickupEtaPickup = useMemo((): { lat: number; lng: number } | null => {
-		if (!showPickupRoadEta || !pickupGeocode) return null;
-		const lat = Number(pickupGeocode.lat);
-		const lng = Number(pickupGeocode.lng);
-		if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-		return { lat, lng };
-	}, [showPickupRoadEta, pickupGeocode?.lat, pickupGeocode?.lng]);
+		if (!showPickupRoadEta || !roadEtaStop) return null;
+		return { lat: roadEtaStop.lat, lng: roadEtaStop.lng };
+	}, [showPickupRoadEta, roadEtaStop]);
 
 	const pickupEtaDestination = useMemo(() => {
-		const fromGeocode = pickupGeocode?.addressLabel?.trim() ?? "";
-		if (fromGeocode) return fromGeocode;
+		const fromStop = roadEtaStop?.addressLabel?.trim() ?? "";
+		if (fromStop) return fromStop;
 		if (pickupEtaPickup) {
 			return `${pickupEtaPickup.lat}, ${pickupEtaPickup.lng}`;
 		}
 		return "";
-	}, [pickupEtaPickup, pickupGeocode?.addressLabel]);
+	}, [pickupEtaPickup, roadEtaStop?.addressLabel]);
 
 	const pickupRoadEta = usePickupRoadEta({
 		enabled: showPickupRoadEta,
@@ -1083,7 +1128,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								<PickupRoadEtaBanner
 									status={pickupRoadEta.status}
 									eta={pickupRoadEta.eta}
-									pickupAddressLabel={pickupGeocode?.addressLabel}
+									pickupAddressLabel={roadEtaStop?.addressLabel}
+									title={roadEtaCopy.title}
+									loadingLabel={roadEtaCopy.loading}
 									reserveRightForHistory={reserveTopBannerRightLane}
 								/>
 							) : showDeliveredLoadBanner ? (

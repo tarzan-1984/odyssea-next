@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 
-// POST /api/tms/load/[loadId]/enrichment — DB drivers, tracking, route geocode (Nest).
+// POST /api/tms/load/[loadId]/enrichment — DB drivers, tracking, route geocode, load route (Nest).
 export async function POST(
 	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string }> }
