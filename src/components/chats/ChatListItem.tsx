@@ -120,11 +120,10 @@ export default function ChatListItem({
 		chatRoom.isLocationStale === true ||
 		Boolean(chatRoom.staleLocationAlert);
 	const loadStatusBgClass = isStaleLocationChat
-		? "bg-red-500 dark:bg-red-600"
+		? "bg-[#ffdcdc] dark:bg-[#F5A0A0]"
 		: chatRoom.type === "LOAD"
 			? loadChatStatusBackgroundClass(chatRoom.loadStatus)
 			: null;
-	const onStaleRedBg = isStaleLocationChat;
 
 	const toggleDropdown = () => {
 		if (onMenuToggle) {
@@ -343,9 +342,7 @@ export default function ChatListItem({
 				<div className="flex items-center justify-between gap-2">
 					<h3
 						className={`font-medium truncate flex-shrink min-w-0 ${
-							onStaleRedBg
-								? "text-white"
-								: loadStatusBgClass
+							loadStatusBgClass
 								? "text-gray-900"
 								: "text-gray-900 dark:text-white"
 						} ${chatRoom.type === "OFFER" ? "text-sm" : "text-base"}`}
@@ -354,9 +351,7 @@ export default function ChatListItem({
 					</h3>
 					<span
 						className={`text-xs flex-shrink-0 ${
-							onStaleRedBg
-								? "text-white/80"
-								: loadStatusBgClass
+							loadStatusBgClass
 								? "text-gray-500"
 								: "text-gray-500 dark:text-gray-400"
 						}`}
@@ -367,9 +362,7 @@ export default function ChatListItem({
 				<div className="flex items-center gap-1">
 					<p
 						className={`chat-msg-body truncate flex-1 ${
-							onStaleRedBg
-								? "text-white/80"
-								: loadStatusBgClass
+							loadStatusBgClass
 								? "text-gray-500"
 								: "text-gray-500 dark:text-gray-400"
 						}`}
@@ -379,9 +372,7 @@ export default function ChatListItem({
 					{isPinned && (
 						<PushPinIcon
 							className={`w-3 h-3 flex-shrink-0 ${
-								onStaleRedBg
-									? "text-white/80"
-									: loadStatusBgClass
+								loadStatusBgClass
 									? "text-gray-400"
 									: "text-gray-400 dark:text-gray-500"
 							}`}
@@ -390,9 +381,7 @@ export default function ChatListItem({
 					{isMuted && (
 						<SoundOffIcon
 							className={`w-3 h-3 flex-shrink-0 ${
-								onStaleRedBg
-									? "text-white/80"
-									: loadStatusBgClass
+								loadStatusBgClass
 									? "text-gray-400"
 									: "text-gray-400 dark:text-gray-500"
 							}`}
@@ -402,9 +391,7 @@ export default function ChatListItem({
 				{loadStatusLabel && (
 					<p
 						className={`text-xs truncate mt-0.5 ${
-							onStaleRedBg
-								? "text-white/80"
-								: loadStatusBgClass
+							loadStatusBgClass
 								? "text-gray-500"
 								: "text-gray-400 dark:text-gray-500"
 						}`}
