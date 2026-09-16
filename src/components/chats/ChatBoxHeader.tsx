@@ -366,7 +366,7 @@ export default function ChatBoxHeader({
 										<button
 											type="button"
 											onClick={() => {
-												void handleCopyLocationUpdate();
+												handleCopyLocationUpdate().catch(() => undefined);
 											}}
 											className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-white/5"
 											aria-label="Copy Location Update"
