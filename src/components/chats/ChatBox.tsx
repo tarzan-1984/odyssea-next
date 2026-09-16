@@ -982,13 +982,7 @@ export default function ChatBox({
 					</div>
 				)}
 				{/* Header */}
-				<ChatBoxHeader
-					chatRoom={selectedChatRoom}
-					isUserOnline={isUserOnline}
-					onPrefillCompose={text => {
-						sendFormRef.current?.prefillMessage(text);
-					}}
-				/>
+				<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
 				{/* Messages */}
 				<div className="relative min-h-0 flex-1">

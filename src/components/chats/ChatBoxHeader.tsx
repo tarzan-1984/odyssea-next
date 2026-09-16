@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Link from "next/link";
@@ -45,44 +45,30 @@ import type { SystemToastData } from "@/components/notifications/SystemToastNoti
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
 	isUserOnline?: (userId: string) => boolean;
-	/** Prefill chat compose with location-update text (active LOAD chats). */
-	onPrefillCompose?: (text: string) => void;
 }
 
-function showLocationUpdateCopiedToast(copied: boolean, composed: boolean): void {
+function showLocationUpdateCopiedToast(): void {
 	const addSystemToast = (
 		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
 	).addSystemToastNotification;
 	if (typeof addSystemToast !== "function") return;
 
-	let message = "Location update message ready.";
-	if (copied && composed) {
-		message = "Location update copied and filled in the message box.";
-	} else if (copied) {
-		message = "Location update copied to clipboard.";
-	} else if (composed) {
-		message = "Location update filled in the message box.";
-	}
-
 	addSystemToast({
 		id: `location-update-${Date.now()}`,
 		title: "Location update",
-		message,
+		message: "Location update copied to clipboard.",
 		variant: "success",
 	});
 }
 
-export default function ChatBoxHeader({
-	chatRoom,
-	isUserOnline,
-	onPrefillCompose,
-}: ChatBoxHeaderProps) {
+export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
 	const currentUser = useCurrentUser();
 	const showLoadTrackingHeader =
 		chatRoom?.type === "LOAD" &&
@@ -142,6 +128,10 @@ export default function ChatBoxHeader({
 		!isLoadChatArchived &&
 		!isLoadDelivered;
 
+	useEffect(() => {
+		setLocationUpdateCopied(false);
+	}, [chatRoom?.id]);
+
 	const handleCopyLocationUpdate = async () => {
 		const location = formatCurrentLocationForUpdate(chatRoom?.lastLocationLabel);
 		const miles = formatMilesLeftForLocationUpdate(
@@ -149,21 +139,13 @@ export default function ChatBoxHeader({
 		);
 		const text = buildLoadLocationUpdateMessage(location, miles);
 
-		let copied = false;
 		try {
 			await navigator.clipboard.writeText(text);
-			copied = true;
+			setLocationUpdateCopied(true);
+			showLocationUpdateCopiedToast();
 		} catch {
-			copied = false;
+			setLocationUpdateCopied(false);
 		}
-
-		let composed = false;
-		if (onPrefillCompose) {
-			onPrefillCompose(text);
-			composed = true;
-		}
-
-		showLocationUpdateCopiedToast(copied, composed);
 	};
 
 	function toggleDropdown() {
@@ -372,7 +354,9 @@ export default function ChatBoxHeader({
 											aria-label="Copy Location Update"
 											title="Copy Location Update"
 										>
-											<CopyLocationUpdateIcon className="h-4 w-4 shrink-0" />
+											{locationUpdateCopied ? (
+												<CopyLocationUpdateIcon className="h-4 w-4 shrink-0" />
+											) : null}
 											<span>Copy Location Update</span>
 										</button>
 									) : null}
