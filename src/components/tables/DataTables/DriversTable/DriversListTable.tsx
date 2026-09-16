@@ -1388,6 +1388,27 @@ export default function DriversListTable({
 																	className="h-4 w-4 shrink-0"
 																/>
 															</p>
+															{(item?.meta_data?.city ||
+																item?.meta_data?.home_location) && (
+																<p
+																	className="break-words text-[10px] leading-tight text-gray-500 dark:text-gray-500"
+																	title={[
+																		item?.meta_data?.city,
+																		item?.meta_data
+																			?.home_location,
+																	]
+																		.filter(Boolean)
+																		.join(" ")}
+																>
+																	{[
+																		item?.meta_data?.city,
+																		item?.meta_data
+																			?.home_location,
+																	]
+																		.filter(Boolean)
+																		.join(" ")}
+																</p>
+															)}
 															<p
 																className="break-words"
 																title={
