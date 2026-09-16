@@ -1,10 +1,17 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { MoreDotIcon, TrashDeleteIcon, EditIcon, AttachmentIcon, LoadTrackingChatIcon } from "@/icons";
+import {
+	MoreDotIcon,
+	TrashDeleteIcon,
+	EditIcon,
+	AttachmentIcon,
+	LoadTrackingChatIcon,
+	MobileMessageNotificationIcon,
+} from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
 import { renderAvatar } from "@/helpers";
@@ -12,6 +19,8 @@ import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
+import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
+import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import {
 	CHAT_HEADER_AVATAR_CLASS,
 	getOtherChatParticipant,
@@ -21,6 +30,7 @@ import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
+import { canSendCheckListMessages } from "@/utils/roleAccess";
 import { formatLoadChatLastLocationLine } from "@/utils/nyWallClock";
 import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
 
@@ -35,6 +45,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
+	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const currentUser = useCurrentUser();
 	const showLoadTrackingHeader =
 		chatRoom?.type === "LOAD" &&
@@ -50,6 +61,32 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		showLoadTrackingHeader && chatRoom?.roadEta?.arrivalLabel
 			? `ETA ${chatRoom.roadEta.arrivalLabel} · ${roadEtaHeaderKindLabel(chatRoom.roadEta.kind)}`
 			: "";
+
+	const pushModalDriver = useMemo((): CheckListDriver | null => {
+		if (!chatRoom || chatRoom.type !== "LOAD") return null;
+		const driverParticipant = chatRoom.participants.find(
+			(participant) => participant.user.role === "DRIVER"
+		);
+		if (!driverParticipant) return null;
+		const user = driverParticipant.user;
+		const id = user.id?.trim();
+		if (!id) return null;
+		return {
+			id,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			email: "",
+			externalId: user.externalId?.trim() || null,
+			phone: user.phone?.trim() || "",
+			driverStatus: null,
+			lastActiveApp: null,
+			lastLocationUpdateAt: chatRoom.lastLocationUpdateAt ?? null,
+			trackingLoadId: chatRoom.loadId?.trim() || null,
+		};
+	}, [chatRoom]);
+
+	const canShowStalePushButton =
+		Boolean(pushModalDriver) && canSendCheckListMessages(currentUser?.role);
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -252,8 +289,21 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					) : null}
 					{chatRoom?.staleLocationAlert &&
 					canSeeLoadStaleLocationSystemMessage(currentUser?.role) ? (
-						<div className="mt-1 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">
-							{chatRoom.staleLocationAlert}
+						<div className="mt-1 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">
+							<span className="min-w-0 [overflow-wrap:anywhere]">
+								{chatRoom.staleLocationAlert}
+							</span>
+							{canShowStalePushButton ? (
+								<button
+									type="button"
+									onClick={() => setIsPushModalOpen(true)}
+									className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+									aria-label="Send push to driver"
+									title="Send push"
+								>
+									<MobileMessageNotificationIcon className="h-5 w-auto" />
+								</button>
+							) : null}
 						</div>
 					) : null}
 					</div>
@@ -374,6 +424,11 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					chatRoom={chatRoom}
 				/>
 			)}
+			<CheckListPushModal
+				isOpen={isPushModalOpen}
+				onClose={() => setIsPushModalOpen(false)}
+				drivers={isPushModalOpen && pushModalDriver ? [pushModalDriver] : null}
+			/>
 		</>
 	);
 }

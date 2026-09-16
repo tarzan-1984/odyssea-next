@@ -64,6 +64,7 @@ type LoadDetailsResponse = {
 				delivery_location?: string | null;
 				load_status?: string | null;
 				reference_number?: string | null;
+				all_miles?: string | number | null;
 				attached_driver?: string | null;
 				attached_second_driver?: string | null;
 				attached_third_driver?: string | null;
@@ -88,6 +89,7 @@ type LoadDetailsResponse = {
 			delivery_location?: string | null;
 			load_status?: string | null;
 			reference_number?: string | null;
+			all_miles?: string | number | null;
 			attached_driver?: string | null;
 			attached_second_driver?: string | null;
 			attached_third_driver?: string | null;
@@ -436,6 +438,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			),
 		[loadMetaData?.pick_up_location, loadMetaData?.delivery_location]
 	);
+	const loadRouteTotalMiles = useMemo(() => {
+		const raw = loadMetaData?.all_miles;
+		if (raw == null) return null;
+		const text = String(raw).replace(/,/g, "").trim();
+		if (!text) return null;
+		const value = Number(text);
+		if (!Number.isFinite(value)) return text;
+		return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+	}, [loadMetaData?.all_miles]);
 	const loadStatusAllowsDriverMarker =
 		!LOAD_STATUSES_HIDE_DRIVER_MARKER.has(normalizedLoadStatus);
 
@@ -1502,8 +1513,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					{isAuthenticated && currentTrackingDriver && !isLoadDelivered && (
 						<div
 							className={`absolute bottom-[50px] z-[1000] flex justify-center ${
-								loadRouteDetails.trim() ? "left-4 right-4" : "left-1/2 -translate-x-1/2"
-							} ${loadRouteDetails.trim() ? "" : getDriverInfoCardWidthClass(false)}`}
+								loadRouteDetails.trim()
+									? "left-4 right-4"
+									: "left-1/2 -translate-x-1/2"
+							} ${
+								loadRouteDetails.trim()
+									? ""
+									: getDriverInfoCardWidthClass(false)
+							}`}
 						>
 							<DriverInfo
 								driverData={driverCardData}
@@ -1511,6 +1528,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								loadNumber={loadReferenceNumber}
 								loadStatusLabel={loadStatusLabel}
 								routeDetails={loadRouteDetails}
+								routeTotalMiles={loadRouteTotalMiles}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
 								staleLocationBanner={driverStaleLocationBanner}
 							/>

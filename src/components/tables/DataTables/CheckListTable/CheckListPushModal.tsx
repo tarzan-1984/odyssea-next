@@ -91,6 +91,28 @@ function driverShortLabel(driver: CheckListDriver): string {
 	return formatDriverShortLabel(driver);
 }
 
+function showPushSentToast(message: string): void {
+	const addSystemToast = (
+		window as unknown as {
+			addSystemToastNotification?: (n: {
+				id: string;
+				title: string;
+				message: string;
+				variant?: "success" | "error" | "default";
+			}) => void;
+		}
+	).addSystemToastNotification;
+
+	if (typeof addSystemToast !== "function") return;
+
+	addSystemToast({
+		id: `check-list-push-sent-${Date.now()}`,
+		title: "Push notification",
+		message,
+		variant: "success",
+	});
+}
+
 type CheckListPushModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
@@ -214,6 +236,11 @@ export default function CheckListPushModal({
 				}
 
 				await onSent?.();
+				showPushSentToast(
+					targets.length === 1
+						? `Push sent to ${driverShortLabel(targets[0])}.`
+						: `Push sent to ${targets.length} drivers.`,
+				);
 				onClose();
 				return;
 			}
@@ -240,10 +267,8 @@ export default function CheckListPushModal({
 			}
 
 			await onSent?.();
-			setSuccess("Push sent.");
-			window.setTimeout(() => {
-				onClose();
-			}, 800);
+			showPushSentToast(`Push sent to ${driverShortLabel(driver)}.`);
+			onClose();
 		} catch {
 			setError("Network error while sending push.");
 		} finally {

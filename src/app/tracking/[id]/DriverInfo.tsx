@@ -52,6 +52,8 @@ interface DriverInfoProps {
 	loadStatusLabel?: string | null;
 	/** Multiline route details (pick up / delivery, address, time). */
 	routeDetails?: string | null;
+	/** Total loaded miles for the load route (TMS meta_data.all_miles). */
+	routeTotalMiles?: string | null;
 	/** Load tracking page: hide chat/TMS/push only when driver has no mobile app. */
 	showLoadTrackingActions?: boolean;
 	/** Full-width stale location warning at the top of the card. */
@@ -67,6 +69,7 @@ export default function DriverInfo({
 	loadNumber,
 	loadStatusLabel,
 	routeDetails,
+	routeTotalMiles,
 	showLoadTrackingActions = true,
 	staleLocationBanner = null,
 }: DriverInfoProps) {
@@ -140,6 +143,7 @@ export default function DriverInfo({
 	const showSendPushButton = usesMobileAppForUi && pushModalDriver !== null;
 	const showChatAndTmsButtons =
 		usesMobileAppForUi && Boolean(openChatUrl || tmsLoadPageUrl);
+	const routeMilesDisplay = routeTotalMiles?.trim() || "";
 	const hasRoute = Boolean(routeDetails?.trim());
 
 	const staleThresholdLabel = staleLocationBanner?.thresholdLabel?.trim() || "";
@@ -308,6 +312,16 @@ export default function DriverInfo({
 								{formatLastUpdate(driverData.lastLocationUpdateAt)}
 							</p>
 						</div>
+						{routeMilesDisplay ? (
+							<div className="min-w-0">
+								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
+									Total miles
+								</p>
+								<p className="text-sm font-medium text-slate-900 dark:text-white">
+									{routeMilesDisplay}
+								</p>
+							</div>
+						) : null}
 						{showChatAndTmsButtons && (
 							<div className="flex min-w-0 flex-col gap-2">
 								{openChatUrl && (
