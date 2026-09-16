@@ -70,9 +70,12 @@ export interface ChatRoom {
 	roadEta?: {
 		kind: "first_pickup" | "pickup" | "delivery";
 		arrivalLabel: string;
+		remainingMiles?: number | null;
 	} | null;
 	/** Staff-only: driver lastLocationUpdateAt copied onto the load. */
 	lastLocationUpdateAt?: string | null;
+	/** Staff-only: city/ST/ZIP from the last driver location ping. */
+	lastLocationLabel?: string | null;
 	/** Staff-only: driver location is stale; paint the list row red. */
 	isLocationStale?: boolean;
 	/** Staff-only header banner text when isLocationStale. */

@@ -319,6 +319,7 @@ export const useChatStore = create<ChatState>()(
 								loadStatus: matchingRoom.loadStatus,
 								roadEta: matchingRoom.roadEta,
 								lastLocationUpdateAt: matchingRoom.lastLocationUpdateAt,
+								lastLocationLabel: matchingRoom.lastLocationLabel,
 								isLocationStale: matchingRoom.isLocationStale,
 								staleLocationAlert: matchingRoom.staleLocationAlert,
 								isLoadArchived: matchingRoom.isLoadArchived,

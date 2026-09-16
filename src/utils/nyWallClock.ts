@@ -120,6 +120,23 @@ export function formatChatHeaderLastLocation(
 	}).format(date);
 }
 
+export function formatLoadChatLastLocationLine(params: {
+	locationLabel?: string | null;
+	remainingMiles?: number | null;
+	updatedAt?: string | null;
+}): string {
+	const parts: string[] = [];
+	const location = params.locationLabel?.trim();
+	if (location) parts.push(location);
+	if (params.remainingMiles != null && Number.isFinite(params.remainingMiles)) {
+		parts.push(`${params.remainingMiles} mi`);
+	}
+	const time = formatChatHeaderLastLocation(params.updatedAt);
+	if (time) parts.push(time);
+	if (parts.length === 0) return "";
+	return `Last location ${parts.join(" · ")}`;
+}
+
 /** Offer card creation time in NY wall-clock: M/D/YYYY H:MM AM/PM EST */
 export function formatOfferCreateTimeEst(value: string | null | undefined): string {
 	const date = parseNaiveNyDateTime(value);

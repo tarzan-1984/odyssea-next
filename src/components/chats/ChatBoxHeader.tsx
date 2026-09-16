@@ -21,7 +21,7 @@ import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
-import { formatChatHeaderLastLocation } from "@/utils/nyWallClock";
+import { formatLoadChatLastLocationLine } from "@/utils/nyWallClock";
 import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
 
 interface ChatBoxHeaderProps {
@@ -40,12 +40,14 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		chatRoom?.type === "LOAD" &&
 		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
 	const lastLocationLabel = showLoadTrackingHeader
-		? formatChatHeaderLastLocation(chatRoom?.lastLocationUpdateAt)
+		? formatLoadChatLastLocationLine({
+				locationLabel: chatRoom?.lastLocationLabel,
+				remainingMiles: chatRoom?.roadEta?.remainingMiles,
+				updatedAt: chatRoom?.lastLocationUpdateAt,
+			})
 		: "";
 	const roadEtaLabel =
-		showLoadTrackingHeader &&
-		!chatRoom?.isLocationStale &&
-		chatRoom?.roadEta?.arrivalLabel
+		showLoadTrackingHeader && chatRoom?.roadEta?.arrivalLabel
 			? `ETA ${chatRoom.roadEta.arrivalLabel} · ${roadEtaHeaderKindLabel(chatRoom.roadEta.kind)}`
 			: "";
 
@@ -244,7 +246,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								</p>
 							) : null}
 							{lastLocationLabel ? (
-								<p>Last location {lastLocationLabel}</p>
+								<p className="[overflow-wrap:anywhere]">{lastLocationLabel}</p>
 							) : null}
 						</div>
 					) : null}
