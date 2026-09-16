@@ -11,6 +11,7 @@ import {
 	AttachmentIcon,
 	LoadTrackingChatIcon,
 	MobileMessageNotificationIcon,
+	CopyLocationUpdateIcon,
 } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
@@ -33,13 +34,49 @@ import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind"
 import { canSendCheckListMessages } from "@/utils/roleAccess";
 import { formatLoadChatLastLocationLine } from "@/utils/nyWallClock";
 import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
+import { normalizeLoadChatStatus } from "@/utils/loadStatusLabel";
+import {
+	buildLoadLocationUpdateMessage,
+	formatCurrentLocationForUpdate,
+	formatMilesLeftForLocationUpdate,
+} from "@/utils/loadLocationUpdateMessage";
+import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
 	isUserOnline?: (userId: string) => boolean;
+	/** Prefill chat compose with location-update text (active LOAD chats). */
+	onPrefillCompose?: (text: string) => void;
 }
 
-export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderProps) {
+function showLocationUpdateCopiedToast(copied: boolean, composed: boolean): void {
+	const addSystemToast = (
+		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
+	).addSystemToastNotification;
+	if (typeof addSystemToast !== "function") return;
+
+	let message = "Location update message ready.";
+	if (copied && composed) {
+		message = "Location update copied and filled in the message box.";
+	} else if (copied) {
+		message = "Location update copied to clipboard.";
+	} else if (composed) {
+		message = "Location update filled in the message box.";
+	}
+
+	addSystemToast({
+		id: `location-update-${Date.now()}`,
+		title: "Location update",
+		message,
+		variant: "success",
+	});
+}
+
+export default function ChatBoxHeader({
+	chatRoom,
+	isUserOnline,
+	onPrefillCompose,
+}: ChatBoxHeaderProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
@@ -87,6 +124,47 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 	const canShowStalePushButton =
 		Boolean(pushModalDriver) && canSendCheckListMessages(currentUser?.role);
+
+	const canSeeLoadHeaderAlerts = canSeeLoadStaleLocationSystemMessage(
+		currentUser?.role,
+	);
+	const showStaleLocationAlert =
+		Boolean(chatRoom?.staleLocationAlert?.trim()) && canSeeLoadHeaderAlerts;
+	const isLoadChatArchived = Boolean(
+		chatRoom?.isLoadArchived || chatRoom?.isArchived,
+	);
+	const isLoadDelivered =
+		normalizeLoadChatStatus(chatRoom?.loadStatus) === "delivered";
+	const showCopyLocationUpdateButton =
+		chatRoom?.type === "LOAD" &&
+		canSeeLoadHeaderAlerts &&
+		!showStaleLocationAlert &&
+		!isLoadChatArchived &&
+		!isLoadDelivered;
+
+	const handleCopyLocationUpdate = async () => {
+		const location = formatCurrentLocationForUpdate(chatRoom?.lastLocationLabel);
+		const miles = formatMilesLeftForLocationUpdate(
+			chatRoom?.roadEta?.remainingMiles,
+		);
+		const text = buildLoadLocationUpdateMessage(location, miles);
+
+		let copied = false;
+		try {
+			await navigator.clipboard.writeText(text);
+			copied = true;
+		} catch {
+			copied = false;
+		}
+
+		let composed = false;
+		if (onPrefillCompose) {
+			onPrefillCompose(text);
+			composed = true;
+		}
+
+		showLocationUpdateCopiedToast(copied, composed);
+	};
 
 	function toggleDropdown() {
 		setIsOpen(!isOpen);
@@ -275,23 +353,40 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					>
 						{getChatDisplayName()}
 					</button>
-					{roadEtaLabel || lastLocationLabel ? (
+					{roadEtaLabel || lastLocationLabel || showCopyLocationUpdateButton ? (
 						<div className="mt-1 space-y-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
-							{roadEtaLabel ? (
-								<p className="font-medium text-brand-600 dark:text-brand-400">
-									{roadEtaLabel}
-								</p>
+							{roadEtaLabel || showCopyLocationUpdateButton ? (
+								<div className="flex max-w-full flex-wrap items-center gap-2">
+									{roadEtaLabel ? (
+										<p className="font-medium text-brand-600 dark:text-brand-400">
+											{roadEtaLabel}
+										</p>
+									) : null}
+									{showCopyLocationUpdateButton ? (
+										<button
+											type="button"
+											onClick={() => {
+												void handleCopyLocationUpdate();
+											}}
+											className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-white/5"
+											aria-label="Copy Location Update"
+											title="Copy Location Update"
+										>
+											<CopyLocationUpdateIcon className="h-4 w-4 shrink-0" />
+											<span>Copy Location Update</span>
+										</button>
+									) : null}
+								</div>
 							) : null}
 							{lastLocationLabel ? (
 								<p className="[overflow-wrap:anywhere]">{lastLocationLabel}</p>
 							) : null}
 						</div>
 					) : null}
-					{chatRoom?.staleLocationAlert &&
-					canSeeLoadStaleLocationSystemMessage(currentUser?.role) ? (
+					{showStaleLocationAlert ? (
 						<div className="mt-1 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">
 							<span className="min-w-0 [overflow-wrap:anywhere]">
-								{chatRoom.staleLocationAlert}
+								{chatRoom?.staleLocationAlert}
 							</span>
 							{canShowStalePushButton ? (
 								<button

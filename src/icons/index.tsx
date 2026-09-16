@@ -69,6 +69,7 @@ import WorldMapIcon from "./world-map-icon.svg";
 import MapSearchIcon from "./map-search-icon.svg";
 import LoadTrackingChatIcon from "./load-tracking-chat.svg";
 import MobileMessageNotificationIcon from "./mobile-message-notification.svg";
+import CopyLocationUpdateIcon from "./copy-location-update.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
@@ -176,6 +177,7 @@ export {
 	DriverListIcon,
 	LoadTrackingChatIcon,
 	MobileMessageNotificationIcon,
+	CopyLocationUpdateIcon,
 	OffersIcon,
 	WorkstationIcon,
 	CheckListIcon,

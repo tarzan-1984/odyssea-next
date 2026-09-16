@@ -42,7 +42,10 @@ import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import {
 	applyEditorFormat,
+	clearEditor,
+	COMPOSE_EDITOR_MIN_HEIGHT_PX,
 	formatActionToCommand,
+	getComposeEditorMaxHeightPx,
 	getEditorPlainText,
 	htmlToMarkdown,
 	insertTextAtSelection,
@@ -81,6 +84,8 @@ interface ChatBoxSendFormProps {
 
 export type ChatBoxSendFormHandle = {
 	addFiles: (files: File[] | FileList) => Promise<void>;
+	/** Replace compose draft with plain text (e.g. location update template). */
+	prefillMessage: (text: string) => void;
 };
 
 const PICKER_WIDTH = 320;
@@ -469,8 +474,40 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					const list = Array.isArray(files) ? files : Array.from(files);
 					await uploadFiles(list);
 				},
+				prefillMessage: (text: string) => {
+					const next = text.replace(/\r\n/g, "\n").trimEnd();
+					const el = editorRef.current;
+					if (el) {
+						el.focus();
+						clearEditor(el);
+						insertTextAtSelection(el, next);
+						requestAnimationFrame(() => {
+							const node = editorRef.current;
+							if (!node) return;
+							const selection = window.getSelection();
+							const range = document.createRange();
+							range.selectNodeContents(node);
+							range.collapse(false);
+							selection?.removeAllRanges();
+							selection?.addRange(range);
+							const chatBox = node.closest("[data-chat-box]") as HTMLElement | null;
+							const max = getComposeEditorMaxHeightPx(chatBox);
+							node.style.height = "auto";
+							node.style.height = `${Math.min(
+								Math.max(node.scrollHeight, COMPOSE_EDITOR_MIN_HEIGHT_PX),
+								max,
+							)}px`;
+							syncEditorContent();
+						});
+					} else {
+						setMessage(next);
+						if (onTyping) {
+							onTyping(next.trim().length > 0);
+						}
+					}
+				},
 			}),
-			[uploadFiles]
+			[uploadFiles, onTyping, syncEditorContent]
 		);
 
 		const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
