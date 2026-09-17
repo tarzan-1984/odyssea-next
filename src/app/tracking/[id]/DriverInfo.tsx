@@ -1,20 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
 import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
+import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 import { formatDriverLocationLine } from "@/utils/formatDriverLocation";
 import DriverMobileAppIcon from "@/components/tables/DataTables/DriversTable/DriverMobileAppIcon";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
+import { useCurrentUser } from "@/stores/userStore";
+import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
+import {
+	buildLoadLocationUpdateMessage,
+	formatCurrentLocationForUpdate,
+	formatMilesLeftForLocationUpdate,
+} from "@/utils/loadLocationUpdateMessage";
 
 const tmsCardButtonClass =
 	"inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors";
 
 export function getDriverInfoCardWidthClass(hasRoute: boolean): string {
 	return hasRoute ? "w-fit max-w-full" : "w-[min(calc(100vw-3rem),56rem)]";
+}
+
+function showLocationUpdateCopiedToast(): void {
+	const addSystemToast = (
+		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
+	).addSystemToastNotification;
+	if (typeof addSystemToast !== "function") return;
+
+	addSystemToast({
+		id: `location-update-${Date.now()}`,
+		title: "Location update",
+		message: "Location update copied to clipboard.",
+		variant: "success",
+	});
 }
 
 interface DriverData {
@@ -54,6 +76,8 @@ interface DriverInfoProps {
 	routeDetails?: string | null;
 	/** Total loaded miles for the load route (TMS meta_data.all_miles). */
 	routeTotalMiles?: string | null;
+	/** Remaining road miles to next stop (same snapshot as LOAD chat). */
+	remainingMiles?: number | null;
 	/** Load tracking page: hide chat/TMS/push only when driver has no mobile app. */
 	showLoadTrackingActions?: boolean;
 	/** Full-width stale location warning at the top of the card. */
@@ -70,10 +94,13 @@ export default function DriverInfo({
 	loadStatusLabel,
 	routeDetails,
 	routeTotalMiles,
+	remainingMiles = null,
 	showLoadTrackingActions = true,
 	staleLocationBanner = null,
 }: DriverInfoProps) {
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
+	const currentUser = useCurrentUser();
 	const { resolvedLastActiveApp, usesMobileApp } = useResolvedDriverLastActiveApp(
 		driverData?.externalId,
 		driverData?.lastActiveApp
@@ -96,6 +123,10 @@ export default function DriverInfo({
 			trackingLoadId: loadId?.trim() ?? null,
 		};
 	}, [driverData, loadId]);
+
+	useEffect(() => {
+		setLocationUpdateCopied(false);
+	}, [loadId, driverData?.id, driverData?.lastLocationUpdateAt]);
 
 	if (!driverData) {
 		return null;
@@ -148,6 +179,29 @@ export default function DriverInfo({
 
 	const staleThresholdLabel = staleLocationBanner?.thresholdLabel?.trim() || "";
 	const showStaleLocationBanner = Boolean(staleThresholdLabel);
+	const showCopyLocationUpdateButton =
+		Boolean(loadId?.trim()) &&
+		canSeeLoadStaleLocationSystemMessage(currentUser?.role) &&
+		!showStaleLocationBanner;
+
+	const handleCopyLocationUpdate = async () => {
+		const locationParts = [driverData.city, driverData.state, driverData.zip]
+			.map((value) => value?.trim() ?? "")
+			.filter(Boolean);
+		const location = formatCurrentLocationForUpdate(
+			locationParts.length > 0 ? locationParts.join(", ") : null
+		);
+		const miles = formatMilesLeftForLocationUpdate(remainingMiles);
+		const text = buildLoadLocationUpdateMessage(location, miles);
+
+		try {
+			await navigator.clipboard.writeText(text);
+			setLocationUpdateCopied(true);
+			showLocationUpdateCopiedToast();
+		} catch {
+			setLocationUpdateCopied(false);
+		}
+	};
 
 	return (
 		<div
@@ -299,6 +353,23 @@ export default function DriverInfo({
 								</p>
 							</div>
 						)}
+						{showCopyLocationUpdateButton ? (
+							<button
+								type="button"
+								onClick={() => {
+									handleCopyLocationUpdate().catch(() => undefined);
+								}}
+								className={`w-fit max-w-full shrink-0 self-start whitespace-nowrap rounded-lg border px-2 py-1 text-[10px] font-medium leading-tight transition-colors ${
+									locationUpdateCopied
+										? "border-success-500 bg-success-500 text-white hover:bg-success-600 dark:border-success-500 dark:bg-success-500 dark:hover:bg-success-600"
+										: "border-brand-500 text-brand-500 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-500/10"
+								}`}
+								aria-label="Copy Location Update"
+								title="Copy Location Update"
+							>
+								Copy Location Update
+							</button>
+						) : null}
 					</div>
 
 					<div

@@ -1544,6 +1544,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								loadStatusLabel={loadStatusLabel}
 								routeDetails={loadRouteDetails}
 								routeTotalMiles={loadRouteTotalMiles}
+								remainingMiles={storedRoadEta?.remainingMiles ?? null}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
 								staleLocationBanner={driverStaleLocationBanner}
 							/>
