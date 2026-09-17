@@ -705,25 +705,29 @@ const OffersList = () => {
 						}}
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
-					<Button
-						size="sm"
-						variant="primary"
-						disabled={visibleOfferIds.length === 0 || isPending}
-						onClick={toggleAllVisible}
-						className="ml-2 h-9"
-					>
-						{allVisibleSelected ? "Deselect all" : "Select all"}
-					</Button>
-					{selectedOfferIds.length > 0 && (
-						<button
-							type="button"
-							disabled={!canModifyOffersByRole || isBulkDeactivating}
-							onClick={() => setShowBulkDeactivateConfirm(true)}
-							className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-						>
-							Deactivate offers
-							<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
-						</button>
+					{statusFilter === "active" && (
+						<>
+							<Button
+								size="sm"
+								variant="primary"
+								disabled={visibleOfferIds.length === 0 || isPending}
+								onClick={toggleAllVisible}
+								className="ml-2 h-9"
+							>
+								{allVisibleSelected ? "Deselect all" : "Select all"}
+							</Button>
+							{selectedOfferIds.length > 0 && (
+								<button
+									type="button"
+									disabled={!canModifyOffersByRole || isBulkDeactivating}
+									onClick={() => setShowBulkDeactivateConfirm(true)}
+									className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+								>
+									Deactivate offers
+									<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
+								</button>
+							)}
+						</>
 					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
@@ -747,8 +751,12 @@ const OffersList = () => {
 						]}
 						value={statusFilter}
 						onChangeAction={(val) => {
-							setStatusFilter(val as "active" | "inactive");
+							const nextStatus = val as "active" | "inactive";
+							setStatusFilter(nextStatus);
 							setCurrentPage(1);
+							if (nextStatus === "inactive") {
+								setSelectedOfferIds([]);
+							}
 						}}
 					/>
 				</div>
@@ -791,14 +799,16 @@ const OffersList = () => {
 								>
 									<div className="flex items-start justify-between gap-3">
 										<div className="flex min-w-0 flex-1 items-center gap-2">
-											<input
-												type="checkbox"
-												className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
-												checked={selectedOfferIds.includes(row.id)}
-												onChange={() => toggleOfferSelected(row.id)}
-												onClick={(e) => e.stopPropagation()}
-												aria-label={`Select offer ${row.id}`}
-											/>
+											{statusFilter === "active" && (
+												<input
+													type="checkbox"
+													className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+													checked={selectedOfferIds.includes(row.id)}
+													onChange={() => toggleOfferSelected(row.id)}
+													onClick={(e) => e.stopPropagation()}
+													aria-label={`Select offer ${row.id}`}
+												/>
+											)}
 											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
 												{routeSummary(row.route) ||
 													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}
