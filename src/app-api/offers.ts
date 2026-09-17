@@ -22,6 +22,7 @@ export interface OfferDriver {
 	driver_eta?: string | null;
 	driver_rating?: number | null;
 	has_offer_chat?: boolean;
+
 }
 
 export interface OfferRoutePoint {
