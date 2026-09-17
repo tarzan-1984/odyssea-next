@@ -359,10 +359,10 @@ export default function DriverInfo({
 								onClick={() => {
 									handleCopyLocationUpdate().catch(() => undefined);
 								}}
-								className={`w-fit max-w-full shrink-0 self-start whitespace-nowrap rounded-lg border px-2 py-1 text-[10px] font-medium leading-tight transition-colors ${
+								className={`inline-flex w-fit max-w-full shrink-0 items-center justify-center self-start whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
 									locationUpdateCopied
 										? "border-success-500 bg-success-500 text-white hover:bg-success-600 dark:border-success-500 dark:bg-success-500 dark:hover:bg-success-600"
-										: "border-brand-500 text-brand-500 hover:bg-brand-50 dark:border-brand-400 dark:text-brand-400 dark:hover:bg-brand-500/10"
+										: "border-brand-500 bg-brand-500 text-white hover:bg-brand-600 dark:border-brand-400 dark:bg-brand-400 dark:hover:bg-brand-500"
 								}`}
 								aria-label="Copy Location Update"
 								title="Copy Location Update"
