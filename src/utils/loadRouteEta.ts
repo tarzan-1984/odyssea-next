@@ -109,3 +109,31 @@ export function roadEtaHeaderKindLabel(kind: RoadEtaStopKind): string {
 	if (kind === "pickup") return "next pickup";
 	return "delivery";
 }
+
+export type StoredRoadEta = {
+	kind: RoadEtaStopKind;
+	arrivalLabel: string;
+	remainingMiles: number | null;
+	durationSeconds: number | null;
+	distanceMeters: number | null;
+};
+
+/** Parse load enrichment `roadEta` (same snapshot as the LOAD chat header). */
+export function parseStoredRoadEta(value: unknown): StoredRoadEta | null {
+	const rec = asRecord(value);
+	if (!rec) return null;
+	const kindRaw = String(rec.kind ?? "").trim();
+	const kind: RoadEtaStopKind | null =
+		kindRaw === "first_pickup" || kindRaw === "pickup" || kindRaw === "delivery"
+			? kindRaw
+			: null;
+	const arrivalLabel = String(rec.arrivalLabel ?? "").trim();
+	if (!kind || !arrivalLabel) return null;
+	return {
+		kind,
+		arrivalLabel,
+		remainingMiles: parseFiniteNumber(rec.remainingMiles),
+		durationSeconds: parseFiniteNumber(rec.durationSeconds),
+		distanceMeters: parseFiniteNumber(rec.distanceMeters),
+	};
+}

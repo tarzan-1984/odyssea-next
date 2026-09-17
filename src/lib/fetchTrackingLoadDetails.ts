@@ -14,6 +14,7 @@ type LoadEnrichment = {
 	trackingPoints?: unknown[];
 	routeGeocode?: unknown;
 	loadRoute?: unknown;
+	roadEta?: unknown;
 };
 
 function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
@@ -22,11 +23,23 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 	const inner = root.data;
 	if (inner && typeof inner === "object" && !Array.isArray(inner)) {
 		const payload = inner as Record<string, unknown>;
-		if ("drivers" in payload || "trackingPoints" in payload || "routeGeocode" in payload || "loadRoute" in payload) {
+		if (
+			"drivers" in payload ||
+			"trackingPoints" in payload ||
+			"routeGeocode" in payload ||
+			"loadRoute" in payload ||
+			"roadEta" in payload
+		) {
 			return inner as LoadEnrichment;
 		}
 	}
-	if ("drivers" in root || "trackingPoints" in root || "routeGeocode" in root || "loadRoute" in root) {
+	if (
+		"drivers" in root ||
+		"trackingPoints" in root ||
+		"routeGeocode" in root ||
+		"loadRoute" in root ||
+		"roadEta" in root
+	) {
 		return root as LoadEnrichment;
 	}
 	return {};
@@ -158,6 +171,7 @@ export async function fetchTrackingLoadDetails(
 				trackingPoints: enrichment.trackingPoints ?? [],
 				routeGeocode: enrichment.routeGeocode ?? null,
 				loadRoute: enrichment.loadRoute ?? [],
+				roadEta: enrichment.roadEta ?? null,
 			},
 		},
 	};

@@ -23,15 +23,47 @@ export type PickupRoadEtaResult = {
 	avoidsTraffic: boolean;
 };
 
+/** Same stored Google ETA as the LOAD chat header. */
+export type CanonicalPickupRoadEta = {
+	arrivalLabel: string;
+	durationSeconds?: number | null;
+	distanceMeters?: number | null;
+};
+
 type UsePickupRoadEtaParams = {
 	enabled: boolean;
 	driver: LatLng | null;
 	pickup: LatLng | null;
 	destination?: string | null;
+	canonicalEta?: CanonicalPickupRoadEta | null;
 };
 
 function routeKeyFromPoints(driver: LatLng, pickup: LatLng, destination: string): string {
 	return `${driver.lat.toFixed(6)},${driver.lng.toFixed(6)};${pickup.lat.toFixed(6)},${pickup.lng.toFixed(6)};${destination}`;
+}
+
+function etaFromStored(canonical: CanonicalPickupRoadEta): PickupRoadEtaResult {
+	const durationSeconds =
+		canonical.durationSeconds != null && canonical.durationSeconds > 0
+			? canonical.durationSeconds
+			: 0;
+	const distanceMeters =
+		canonical.distanceMeters != null && canonical.distanceMeters >= 0
+			? canonical.distanceMeters
+			: 0;
+	return {
+		durationSeconds,
+		distanceMeters,
+		drivingLabel: durationSeconds > 0 ? formatDrivingDuration(durationSeconds) : "",
+		arrivalLabel: canonical.arrivalLabel,
+		source: "google",
+		routeLabel: null,
+		distanceLabel: distanceMeters > 0 ? `${(distanceMeters / 1609.34).toFixed(1)} miles` : null,
+		trafficNotice: null,
+		tollNotice: null,
+		hasTolls: false,
+		avoidsTraffic: false,
+	};
 }
 
 export function usePickupRoadEta({
@@ -39,6 +71,7 @@ export function usePickupRoadEta({
 	driver,
 	pickup,
 	destination,
+	canonicalEta,
 }: UsePickupRoadEtaParams) {
 	const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
 	const [eta, setEta] = useState<PickupRoadEtaResult | null>(null);
@@ -49,8 +82,24 @@ export function usePickupRoadEta({
 	const pickupLat = pickup?.lat;
 	const pickupLng = pickup?.lng;
 	const destinationLabel = destination?.trim() ?? "";
+	const canonicalArrival = canonicalEta?.arrivalLabel?.trim() ?? "";
+	const canonicalDuration = canonicalEta?.durationSeconds;
+	const canonicalDistance = canonicalEta?.distanceMeters;
 
 	useEffect(() => {
+		if (canonicalArrival) {
+			lastCompletedRouteKeyRef.current = `stored:${canonicalArrival}`;
+			setEta(
+				etaFromStored({
+					arrivalLabel: canonicalArrival,
+					durationSeconds: canonicalDuration,
+					distanceMeters: canonicalDistance,
+				})
+			);
+			setStatus("ready");
+			return;
+		}
+
 		const hasCoords =
 			Number.isFinite(driverLat) &&
 			Number.isFinite(driverLng) &&
@@ -148,7 +197,17 @@ export function usePickupRoadEta({
 		})();
 
 		return () => controller.abort();
-	}, [destinationLabel, driverLat, driverLng, enabled, pickupLat, pickupLng]);
+	}, [
+		canonicalArrival,
+		canonicalDistance,
+		canonicalDuration,
+		destinationLabel,
+		driverLat,
+		driverLng,
+		enabled,
+		pickupLat,
+		pickupLng,
+	]);
 
 	return { status, eta };
 }

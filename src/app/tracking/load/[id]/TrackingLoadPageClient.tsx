@@ -18,6 +18,7 @@ import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
 	findNextUnpassedRoutePoint,
 	parseLoadRoutePoints,
+	parseStoredRoadEta,
 	roadEtaBannerCopy,
 	type RoadEtaStop,
 } from "@/utils/loadRouteEta";
@@ -76,6 +77,7 @@ type LoadDetailsResponse = {
 				delivery: RouteGeocodeMarker | null;
 			};
 			loadRoute?: unknown;
+			roadEta?: unknown;
 			shippers?: Array<{
 				address_id?: string | number;
 				id?: string;
@@ -101,6 +103,7 @@ type LoadDetailsResponse = {
 			delivery: RouteGeocodeMarker | null;
 		};
 		loadRoute?: unknown;
+		roadEta?: unknown;
 		shippers?: Array<{
 			address_id?: string | number;
 			id?: string;
@@ -1035,11 +1038,23 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return "";
 	}, [pickupEtaPickup, roadEtaStop?.addressLabel]);
 
+	const storedRoadEta = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return parseStoredRoadEta(
+			details?.data?.data?.roadEta ?? details?.data?.roadEta ?? null
+		);
+	}, [loadDetails]);
+	const canonicalPickupEta =
+		showPickupRoadEta && storedRoadEta && storedRoadEta.kind === roadEtaStop?.kind
+			? storedRoadEta
+			: null;
+
 	const pickupRoadEta = usePickupRoadEta({
 		enabled: showPickupRoadEta,
 		driver: pickupEtaDriver,
 		pickup: pickupEtaPickup,
 		destination: pickupEtaDestination,
+		canonicalEta: canonicalPickupEta,
 	});
 
 	const showLoadedEnrouteStaleBanner = Boolean(
