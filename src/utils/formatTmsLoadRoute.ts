@@ -94,6 +94,13 @@ function appointmentStartMs(loc: TmsLoadLocationPoint): number | null {
 	return null;
 }
 
+function calendarDayKey(loc: TmsLoadLocationPoint): string | null {
+	const match = String(loc.date ?? "")
+		.trim()
+		.match(/^(\d{4}-\d{2}-\d{2})/);
+	return match ? match[1] : null;
+}
+
 function compareOrderedStops(
 	a: OrderedTmsLoadStop & { index: number },
 	b: OrderedTmsLoadStop & { index: number }
@@ -124,6 +131,25 @@ function compareOrderedStops(
 }
 
 /**
+ * Single PU + single DEL: a same-day delivery window (e.g. 08:00–16:00) often
+ * opens earlier than the pickup appointment. That is not visit order.
+ */
+function compareSimplePickupDeliveryStops(
+	a: OrderedTmsLoadStop & { index: number },
+	b: OrderedTmsLoadStop & { index: number }
+): number {
+	const dayA = calendarDayKey(a.loc);
+	const dayB = calendarDayKey(b.loc);
+	if (dayA && dayB && dayA !== dayB) {
+		return dayA < dayB ? -1 : 1;
+	}
+	if (a.type !== b.type) {
+		return a.type === "pick_up_location" ? -1 : 1;
+	}
+	return compareOrderedStops(a, b);
+}
+
+/**
  * Merge pickup + delivery stops and sort by appointment start (`date` + `time_start`)
  * so mixed PU/DEL itineraries stay sequential instead of grouped by type.
  */
@@ -142,9 +168,15 @@ export function collectOrderedTmsLoadStops(
 		index: pickups.length + index,
 	}));
 
-	return [...pickups, ...deliveries]
-		.sort(compareOrderedStops)
-		.map(({ type, loc }) => ({ type, loc }));
+	const combined = [...pickups, ...deliveries];
+	const pickupCount = combined.filter(stop => stop.type === "pick_up_location").length;
+	const deliveryCount = combined.filter(stop => stop.type === "delivery_location").length;
+	const compare =
+		pickupCount === 1 && deliveryCount === 1
+			? compareSimplePickupDeliveryStops
+			: compareOrderedStops;
+
+	return combined.sort(compare).map(({ type, loc }) => ({ type, loc }));
 }
 
 function locationLabel(loc: TmsLoadLocationPoint): string {

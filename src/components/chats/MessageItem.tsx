@@ -28,6 +28,7 @@ import {
 } from "@/utils/loadDispatchTerms";
 import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
+import { mentionNamesFromCandidates, buildMentionCandidates } from "@/utils/chatMentions";
 
 interface MessageItemProps {
 	message: Message;
@@ -68,6 +69,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	>(null);
 	const { isUserOnline } = useOnlineStatus();
 	const bidAuction = useBidChatAuctionOptional();
+	const mentionNames = React.useMemo(
+		() => mentionNamesFromCandidates(buildMentionCandidates(chatParticipants)),
+		[chatParticipants]
+	);
 	const isSender = message.senderId === currentUser?.id;
 	const canManageBidTimer = Boolean(
 		currentUser?.id &&
@@ -265,6 +270,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									<ChatMessageContent
 										content={message.content}
 										isOutgoing
+										mentionNames={mentionNames}
 										{...plusOneContentProps}
 									/>
 								) : null}
@@ -286,6 +292,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										{message.content?.trim() ? (
 											<ChatMessageContent
 												content={message.content}
+												mentionNames={mentionNames}
 												{...plusOneContentProps}
 											/>
 										) : null}
@@ -569,6 +576,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								<ChatMessageContent
 									content={message.content}
 									isOutgoing={!isBidNewOffer}
+									mentionNames={mentionNames}
 									className={
 										isBidNewOffer
 											? bidNewOfferTextClass
@@ -602,6 +610,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										<ChatMessageContent
 											content={message.content}
 											isOutgoing={usesWhiteBidText}
+											mentionNames={mentionNames}
 											className={
 												isBidNewOffer
 													? bidNewOfferTextClass

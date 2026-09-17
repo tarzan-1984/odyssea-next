@@ -1305,6 +1305,26 @@ pre[class*="language-"] {
 	color: var(--color-brand-400, #7592ff);
 }
 
+.chat-compose-editor .chat-mention,
+.chat-markdown .chat-mention {
+	color: var(--color-brand-600, #465fff);
+}
+
+.chat-markdown .chat-mention {
+	font-weight: 600;
+}
+
+.dark .chat-compose-editor .chat-mention,
+.dark .chat-markdown .chat-mention {
+	color: var(--color-brand-400, #7592ff);
+}
+
+.chat-markdown.chat-markdown--outgoing .chat-mention,
+.dark .chat-markdown.chat-markdown--outgoing .chat-mention {
+	color: #bfdbfe;
+	font-weight: 600;
+}
+
 /* Outgoing bubble: beat .dark .chat-msg-link (higher specificity + fallback). */
 .chat-markdown.chat-markdown--outgoing a.chat-msg-link,
 .dark .chat-markdown.chat-markdown--outgoing a.chat-msg-link,

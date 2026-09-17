@@ -5,6 +5,7 @@ import React, {
 	useRef,
 	useEffect,
 	useCallback,
+	useMemo,
 	forwardRef,
 	useImperativeHandle,
 } from "react";
@@ -40,6 +41,7 @@ import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import BidComposePlusOneTimer from "./BidComposePlusOneTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
+import { buildMentionCandidates } from "@/utils/chatMentions";
 import {
 	applyEditorFormat,
 	formatActionToCommand,
@@ -167,6 +169,17 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				(state.currentChatRoom?.id === chatRoomId ? state.currentChatRoom : null);
 			return room?.adminId ?? null;
 		});
+		const chatRoomParticipants = useChatStore(state => {
+			if (!chatRoomId) return [];
+			const room =
+				state.chatRooms.find(r => r.id === chatRoomId) ??
+				(state.currentChatRoom?.id === chatRoomId ? state.currentChatRoom : null);
+			return room?.participants ?? [];
+		});
+		const mentionCandidates = useMemo(
+			() => buildMentionCandidates(chatRoomParticipants),
+			[chatRoomParticipants]
+		);
 		// Prefer explicit prop (bid card), then auction, then chat adminId
 		const bidOwnerId =
 			bidOwnerIdProp ?? bidAuction?.ownerId ?? chatRoomAdminId ?? null;
@@ -1056,6 +1069,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								onPaste={handlePaste}
 								disabled={disabled || isSending}
 								leadingIcons={showBidPlusOne ? "compact" : "default"}
+								mentionCandidates={mentionCandidates}
 							/>
 						</div>
 					</div>

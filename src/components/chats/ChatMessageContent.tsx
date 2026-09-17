@@ -16,11 +16,12 @@ import {
 	formatBidPriceUpdateMarkdown,
 	isBidPriceUpdateMessage,
 } from "@/utils/bidPriceUpdateMessage";
+import { wrapChatMentionsInMarkdown } from "@/utils/chatMentions";
 import BidPlusOneTimer from "./BidPlusOneTimer";
 
 const chatMarkdownSanitizeSchema: Schema = {
 	...defaultSchema,
-	tagNames: ["p", "br", "strong", "em", "del", "u", "a"],
+	tagNames: ["p", "br", "strong", "em", "del", "u", "a", "span"],
 	attributes: {
 		...defaultSchema.attributes,
 		a: [
@@ -28,6 +29,11 @@ const chatMarkdownSanitizeSchema: Schema = {
 			"href",
 			"target",
 			"rel",
+		],
+		span: [
+			...(Array.isArray(defaultSchema.attributes?.span) ? defaultSchema.attributes.span : []),
+			"className",
+			"class",
 		],
 	},
 };
@@ -43,6 +49,8 @@ type ChatMessageContentProps = {
 	canManageBidTimer?: boolean;
 	/** Only the newest +1 from this sender shows a live timer. */
 	isLatestBidPlusOne?: boolean;
+	/** Participant names used to highlight @mentions. */
+	mentionNames?: string[];
 };
 
 function MarkdownParagraph({ children }: { children?: React.ReactNode }) {
@@ -74,6 +82,7 @@ function ChatMessageContent({
 	senderUserId,
 	canManageBidTimer = false,
 	isLatestBidPlusOne = true,
+	mentionNames = [],
 }: ChatMessageContentProps) {
 	const isBidPriceUpdate = isBidPriceUpdateMessage(content);
 	const markdownComponents = useMemo<Components>(
@@ -112,6 +121,12 @@ function ChatMessageContent({
 			em: MarkdownEm,
 			del: MarkdownDel,
 			u: MarkdownUnderline,
+			span: ({ className, children }) => {
+				if (className === "chat-mention") {
+					return <span className="chat-mention">{children}</span>;
+				}
+				return <span className={className}>{children}</span>;
+			},
 		}),
 		[isBidPriceUpdate, isOutgoing],
 	);
@@ -139,10 +154,13 @@ function ChatMessageContent({
 		);
 	}
 
-	const renderContent = escapeChatListSyntax(
-		preprocessChatMessageLinks(
-			isBidPriceUpdate ? formatBidPriceUpdateMarkdown(content) : content,
+	const renderContent = wrapChatMentionsInMarkdown(
+		escapeChatListSyntax(
+			preprocessChatMessageLinks(
+				isBidPriceUpdate ? formatBidPriceUpdateMarkdown(content) : content,
+			),
 		),
+		mentionNames,
 	);
 
 	const rootClass = [

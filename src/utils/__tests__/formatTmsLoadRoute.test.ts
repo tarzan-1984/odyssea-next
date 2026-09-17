@@ -80,6 +80,37 @@ describe("collectOrderedTmsLoadStops", () => {
 		]);
 	});
 
+	it("keeps same-day pickup before a delivery window that opens earlier", () => {
+		const pickups = [
+			{
+				type: "pick_up_location",
+				address: "East 68th ave 26100 suite 170, Aurora, CO 80019",
+				date: "2026-09-17 08:30:00",
+				time_start: "08:30",
+			},
+		];
+		const deliveries = [
+			{
+				type: "delivery_location",
+				address: "14255 E US 160 Hwy, Satanta, KS 67870",
+				date: "2026-09-17 08:00:00",
+				time_start: "08:00",
+				time_end: "16:00",
+			},
+		];
+
+		const ordered = collectOrderedTmsLoadStops(pickups, deliveries);
+
+		expect(ordered.map(stop => stop.type)).toEqual([
+			"pick_up_location",
+			"delivery_location",
+		]);
+		expect(ordered.map(stop => stop.loc.address)).toEqual([
+			"East 68th ave 26100 suite 170, Aurora, CO 80019",
+			"14255 E US 160 Hwy, Satanta, KS 67870",
+		]);
+	});
+
 	it("keeps pickups before deliveries when appointment times are missing", () => {
 		const pickups = [{ type: "pick_up_location", address: "PU, St Louis, MO" }];
 		const deliveries = [
