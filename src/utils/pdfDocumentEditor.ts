@@ -25,7 +25,7 @@ export async function loadChatPdfBytes(fileUrl: string, fileName: string): Promi
 
 export async function openPdfDocument(data: ArrayBuffer): Promise<PDFDocumentProxy> {
 	configurePdfWorker();
-	return getDocument({ data }).promise;
+	return await getDocument({ data }).promise;
 }
 
 export async function renderPdfPageToCanvas(

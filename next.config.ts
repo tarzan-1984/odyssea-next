@@ -1,7 +1,11 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	/* config options here */
+	// Parent repo has an empty package-lock.json; without this Next traces from
+	// /htdocs/odyssea2 and `next build` fails with ENOENT for some app pages.
+	outputFileTracingRoot: path.join(__dirname),
 	images: {
 		remotePatterns: [
 			{
