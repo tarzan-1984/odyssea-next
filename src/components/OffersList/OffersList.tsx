@@ -33,6 +33,7 @@ import DriverRatingModal from "@/components/tables/DataTables/DriversTable/Drive
 import CounterOfferModal, {
 	type CounterOfferModalState,
 } from "./CounterOfferModal";
+import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 
 const DRIVER_ACCEPTED_MESSAGE =
 	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
@@ -425,6 +426,27 @@ function getOfferTitle(offer: OfferRow): string {
 	return pickUp || delivery || "";
 }
 
+function getVisibleOfferTitle(offer: OfferRow, includeId: boolean): string {
+	const title =
+		routeSummary(offer.route) ||
+		`${abbreviateStateInLocationString(offer.pick_up_location ?? "")} - ${abbreviateStateInLocationString(offer.delivery_location ?? "")}`;
+	return includeId ? `${title} (id: ${offer.id})` : title;
+}
+
+function showOfferTitleCopiedToast(): void {
+	const addSystemToast = (
+		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
+	).addSystemToastNotification;
+	if (typeof addSystemToast !== "function") return;
+
+	addSystemToast({
+		id: `offer-title-copy-${Date.now()}`,
+		title: "Offers",
+		message: "Offer title copied to clipboard.",
+		variant: "success",
+	});
+}
+
 const OFFER_UNAVAILABLE_PUSH_BODY =
 	"Unfortunately, this offer is no longer available. However, we are continuing to search for new load opportunities for you.\n\nWe apologize for the inconvenience and appreciate your understanding.";
 
@@ -534,6 +556,16 @@ const OffersList = () => {
 			drivers: [driver],
 			defaultMessage: buildExtendBidTimePushMessage(offer),
 		});
+	}, []);
+
+	const handleCopyOfferTitle = useCallback(async (text: string) => {
+		if (!text) return;
+		try {
+			await navigator.clipboard.writeText(text);
+			showOfferTitleCopiedToast();
+		} catch {
+			// Clipboard may be unavailable in this context.
+		}
 	}, []);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
@@ -782,6 +814,7 @@ const OffersList = () => {
 								(row.drivers?.length ?? 0) > 0 &&
 								row.drivers!.every((d) => d.active === false);
 							const headerHighlightRed = row.active === false || allDriversInactive;
+							const offerTitle = getVisibleOfferTitle(row, showOfferId);
 							return (
 								<div
 									key={row.id}
@@ -809,11 +842,17 @@ const OffersList = () => {
 													aria-label={`Select offer ${row.id}`}
 												/>
 											)}
-											<p className="text-base font-medium text-gray-900 dark:text-white truncate">
-												{routeSummary(row.route) ||
-													`${abbreviateStateInLocationString(row.pick_up_location ?? "")} - ${abbreviateStateInLocationString(row.delivery_location ?? "")}`}
-												{showOfferId && <> (id: {row.id})</>}
-											</p>
+											<button
+												type="button"
+												className="min-w-0 max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-base font-medium text-gray-900 hover:text-brand-600 dark:text-white dark:hover:text-brand-300"
+												title="Click to copy"
+												onClick={(e) => {
+													e.stopPropagation();
+													void handleCopyOfferTitle(offerTitle);
+												}}
+											>
+												{offerTitle}
+											</button>
 											{hasHazmat(row.special_requirements) && (
 												<Image
 													src="/images/hazmat.png"
