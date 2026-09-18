@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
-import { geocodeOfferAddressCoordinates } from "@/utils/offerLocationGeocode";
 import {
 	buildGoogleDirectionsQuery,
 	parseGoogleDirectionsBody,
@@ -10,23 +9,15 @@ export const maxDuration = 180;
 
 const METERS_TO_MILES = 1 / 1609.344;
 const MAX_GOOGLE_DESTINATIONS = 9;
-const NOMINATIM_DELAY_MS = 1100;
-
-function sleep(ms: number): Promise<void> {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 async function googleDistanceMeters(
-	origin: { lat: number; lon: number },
+	origin: string,
 	destinations: string[]
 ): Promise<number | null> {
 	const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
 	if (!backendBase) return null;
 
-	const qs = buildGoogleDirectionsQuery(
-		{ lat: origin.lat, lng: origin.lon },
-		destinations
-	);
+	const qs = buildGoogleDirectionsQuery(origin, destinations);
 	const response = await fetch(`${backendBase}/v1/geocoding/google/directions?${qs.toString()}`, {
 		method: "GET",
 		cache: "no-store",
@@ -65,24 +56,13 @@ export async function POST(request: NextRequest) {
 
 		let totalMeters = 0;
 		let originIndex = 0;
-		let geocodeCount = 0;
 
 		while (originIndex < locations.length - 1) {
-			if (geocodeCount > 0) await sleep(NOMINATIM_DELAY_MS);
-			const origin = await geocodeOfferAddressCoordinates(locations[originIndex]);
-			geocodeCount += 1;
-			if (!origin) {
-				return NextResponse.json(
-					{ error: `Could not geocode address: ${locations[originIndex].slice(0, 80)}` },
-					{ status: 400 }
-				);
-			}
-
 			const destinations = locations.slice(
 				originIndex + 1,
 				originIndex + 1 + MAX_GOOGLE_DESTINATIONS
 			);
-			const dist = await googleDistanceMeters(origin, destinations);
+			const dist = await googleDistanceMeters(locations[originIndex], destinations);
 			if (dist == null) {
 				return NextResponse.json(
 					{ error: "Could not calculate route between addresses" },

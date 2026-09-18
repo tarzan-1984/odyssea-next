@@ -56,14 +56,19 @@ export function parseGoogleDirectionsBody(body: unknown): GooglePickupRoute | nu
 	return unwrapDirectionsPayload(body);
 }
 
+export type GoogleDirectionsOrigin = { lat: number; lng: number } | string;
+
 export function buildGoogleDirectionsQuery(
-	origin: { lat: number; lng: number },
+	origin: GoogleDirectionsOrigin,
 	destinations: string[]
 ): URLSearchParams {
-	const qs = new URLSearchParams({
-		originLat: String(origin.lat),
-		originLng: String(origin.lng),
-	});
+	const qs =
+		typeof origin === "string"
+			? new URLSearchParams({ origin: origin.trim() })
+			: new URLSearchParams({
+					originLat: String(origin.lat),
+					originLng: String(origin.lng),
+				});
 	const cleaned = destinations.map(item => item.trim()).filter(item => item.length >= 3);
 	if (cleaned.length === 1) {
 		qs.set("destination", cleaned[0]);
@@ -76,7 +81,7 @@ export function buildGoogleDirectionsQuery(
 }
 
 export async function fetchGooglePickupDirections(
-	origin: { lat: number; lng: number },
+	origin: GoogleDirectionsOrigin,
 	destination: string | string[],
 	signal?: AbortSignal
 ): Promise<GooglePickupRoute | null> {

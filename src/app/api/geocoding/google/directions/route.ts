@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
+	const origin = request.nextUrl.searchParams.get("origin")?.trim() ?? "";
 	const originLat = request.nextUrl.searchParams.get("originLat")?.trim() ?? "";
 	const originLng = request.nextUrl.searchParams.get("originLng")?.trim() ?? "";
 	const destination = request.nextUrl.searchParams.get("destination")?.trim() ?? "";
@@ -11,9 +12,12 @@ export async function GET(request: NextRequest) {
 		.map(item => item.trim())
 		.filter(item => item.length >= 3);
 
-	if (!originLat || !originLng || (destination.length < 3 && destinations.length === 0)) {
+	if (
+		(!origin && (!originLat || !originLng)) ||
+		(destination.length < 3 && destinations.length === 0)
+	) {
 		return NextResponse.json(
-			{ error: "originLat, originLng and destination or destinations are required" },
+			{ error: "origin or originLat/originLng and destination or destinations are required" },
 			{ status: 400 }
 		);
 	}
@@ -23,10 +27,13 @@ export async function GET(request: NextRequest) {
 		return NextResponse.json({ error: "Backend URL is not configured" }, { status: 500 });
 	}
 
-	const qs = new URLSearchParams({
-		originLat,
-		originLng,
-	});
+	const qs = new URLSearchParams();
+	if (origin) {
+		qs.set("origin", origin);
+	} else {
+		qs.set("originLat", originLat);
+		qs.set("originLng", originLng);
+	}
 	if (destinations.length > 0) {
 		for (const item of destinations) {
 			qs.append("destinations", item);
