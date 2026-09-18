@@ -438,6 +438,7 @@ export default function DriversListTable({
 			? { dimensionsFilter }
 			: {}),
 		role: currentUser?.role?.toLowerCase() ?? "",
+		excludeAtOpenBidLimit: true,
 	};
 
 	const {

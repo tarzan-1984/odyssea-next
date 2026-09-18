@@ -19,6 +19,8 @@ export interface DriversListQueryParams {
 	statusAutoAppliedByAddress?: boolean;
 	dimensionsFilter?: DimensionsFilterValues;
 	role: string;
+	/** Hide drivers at max concurrent open bids (drivers-list / add-drivers, not map). */
+	excludeAtOpenBidLimit?: boolean;
 }
 
 const STALE_TIME_MS = 10 * 60 * 1000;
@@ -54,6 +56,7 @@ export async function fetchDriversPage(
 		statusFilter,
 		dimensionsFilter,
 		role,
+		excludeAtOpenBidLimit = false,
 	} = params;
 
 	const searchParams = new URLSearchParams();
@@ -102,6 +105,9 @@ export async function fetchDriversPage(
 	if (activeDimensions.dim_min_3) {
 		searchParams.set("dim_min_3", activeDimensions.dim_min_3);
 	}
+	if (excludeAtOpenBidLimit) {
+		searchParams.set("exclude_at_open_bid_limit", "1");
+	}
 
 	try {
 		const { data } = await axios.get<DriversPage>(
@@ -139,6 +145,7 @@ export function driversListQueryKey(params: DriversListQueryParams) {
 			statusFilter: effectiveStatusFilter,
 			dimensionsFilter: getActiveDimensionsQueryParams(params.dimensionsFilter),
 			role: params.role,
+			excludeAtOpenBidLimit: params.excludeAtOpenBidLimit === true,
 		},
 	] as const;
 }
