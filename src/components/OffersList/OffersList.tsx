@@ -848,7 +848,7 @@ const OffersList = () => {
 												title="Click to copy"
 												onClick={(e) => {
 													e.stopPropagation();
-													void handleCopyOfferTitle(offerTitle);
+													handleCopyOfferTitle(offerTitle);
 												}}
 											>
 												{offerTitle}
