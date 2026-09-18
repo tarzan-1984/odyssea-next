@@ -33,6 +33,7 @@ import {
 	isValidLocationFormat,
 	LOCATION_COORDINATES_ERROR,
 	LOCATION_FORMAT_ERROR,
+	LOCATION_GEOCODE_ERROR,
 	normalizeLocationForGeocode,
 	needsLocationGeocode,
 } from "@/utils/offerLocationFormat";
@@ -180,6 +181,22 @@ function buildRouteRowsFromUrlPrefill(
 	}
 
 	return rows;
+}
+
+function locationFormatErrorsForRows(rows: RouteRow[]): Record<string, string> {
+	const errors: Record<string, string> = {};
+	for (const row of rows) {
+		const loc = row.location.trim();
+		if (!loc) continue;
+		if (!isValidLocationFormat(loc)) {
+			errors[row.id] = LOCATION_FORMAT_ERROR;
+		}
+	}
+	return errors;
+}
+
+function routeRowsGeocodeKey(rows: RouteRow[]): string {
+	return rows.map(row => row.id).join("|");
 }
 
 function routePointToRow(
@@ -402,7 +419,9 @@ function DraggableExtraRow({
 	return (
 		<div
 			ref={rowRef}
-			className="relative flex flex-col sm:flex-row sm:items-end gap-4 mt-2"
+			className={`relative flex flex-col sm:flex-row sm:items-end gap-4 mt-2 ${
+				locationError ? "pb-8" : ""
+			}`}
 			style={{
 				opacity: isDragging ? 0 : 1,
 				pointerEvents: isDragging ? "none" : undefined,
@@ -467,7 +486,7 @@ function DraggableExtraRow({
 					error={Boolean(locationError)}
 				/>
 				{locationError && (
-					<p className="absolute left-0 top-full mt-1 text-xs text-red-500 dark:text-red-400 whitespace-nowrap">
+					<p className="absolute left-0 top-full z-10 mt-1 text-xs text-red-500 dark:text-red-400">
 						{locationError}
 					</p>
 				)}
@@ -575,7 +594,10 @@ export default function CreateOfferModal({
 	 * only when locations actually changed, not on every focus/blur.
 	 */
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
-	const initialLocationsAppliedRef = useRef(false);
+	/** Row-id key of the latest GET/prefill route that still needs geocode on open. */
+	const pendingPrefillGeocodeKeyRef = useRef("");
+	/** Row-id key already sent through handleAddressBlur for the current open. */
+	const appliedPrefillGeocodeKeyRef = useRef("");
 	/** When true, keep URL-provided loaded miles and skip route-distance API. */
 	const preserveUrlLoadedMilesRef = useRef(false);
 	/** Previous date/time before ASAP toggle, keyed by route row id. */
@@ -584,13 +606,18 @@ export default function CreateOfferModal({
 	// Reset form and errors when modal opens
 	useEffect(() => {
 		if (!isOpen) {
-			initialLocationsAppliedRef.current = false;
+			pendingPrefillGeocodeKeyRef.current = "";
+			appliedPrefillGeocodeKeyRef.current = "";
 			preserveUrlLoadedMilesRef.current = false;
 			timeBeforeAsapRef.current = {};
 			return;
 		}
 
+		let nextLocationErrors: Record<string, string> = {};
+
 		if (editData) {
+			pendingPrefillGeocodeKeyRef.current = "";
+			appliedPrefillGeocodeKeyRef.current = "";
 			preserveUrlLoadedMilesRef.current = false;
 			setInitialEditSnapshot(snapshotFromEditData(editData));
 			setFormValues({
@@ -636,11 +663,17 @@ export default function CreateOfferModal({
 				setManualLoadedMiles(null);
 			}
 			setCommittedLocations([]);
+
+			nextLocationErrors = locationFormatErrorsForRows(rows);
+			pendingPrefillGeocodeKeyRef.current = rows.some(row => row.location.trim())
+				? routeRowsGeocodeKey(rows)
+				: "";
+			appliedPrefillGeocodeKeyRef.current = "";
 		}
 
 		setErrors({});
 		setRouteError(null);
-		setRouteRowLocationErrors({});
+		setRouteRowLocationErrors(nextLocationErrors);
 		setSubmitError("");
 		setIsEditMilesModalOpen(false);
 		setEditMilesInput("");
@@ -783,11 +816,12 @@ export default function CreateOfferModal({
 	);
 
 	const commitLocations = useCallback((rows: RouteRow[]) => {
-		// Only commit if ALL rows have a filled, valid location — so adding a new empty
-		// row does not trigger a distance request until the user fills it in.
+		// Only commit if ALL rows have a filled, valid, geocoded location — so adding
+		// a new empty row or an unresolved address does not trigger a distance request.
 		const allFilled = rows.every(r => r.location.trim() !== "");
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
-		if (!allFilled || !allValid) {
+		const allHaveCoords = rows.every(r => parseRouteCoordinates(r.coordinates));
+		if (!allFilled || !allValid || !allHaveCoords) {
 			setCommittedLocations([]);
 			if (!preserveUrlLoadedMilesRef.current) {
 				setManualLoadedMiles(null);
@@ -822,40 +856,63 @@ export default function CreateOfferModal({
 	const handleAddressBlur = useCallback(
 		async (index: number, value: string, rowId: string) => {
 			const trimmed = value.trim();
-			if (!trimmed) {
+
+			const patchRow = (patch: Partial<RouteRow>) => {
+				setRouteRows(prev => {
+					const next = [...prev];
+					const targetIndex =
+						next[index]?.id === rowId
+							? index
+							: next.findIndex(row => row.id === rowId);
+					if (targetIndex < 0) return prev;
+					next[targetIndex] = { ...next[targetIndex], ...patch };
+					return next;
+				});
+			};
+
+			const clearLocationError = () => {
 				setRouteRowLocationErrors(prev => {
+					if (!prev[rowId]) return prev;
 					const next = { ...prev };
 					delete next[rowId];
 					return next;
 				});
-				setRouteRows(prev => {
-					const next = [...prev];
-					if (next[index]) {
-						next[index] = { ...next[index], coordinates: "" };
-					}
-					return next;
-				});
+			};
+
+			const setLocationError = (message: string) => {
+				setRouteRowLocationErrors(prev => ({ ...prev, [rowId]: message }));
+				setRouteError(prev =>
+					prev === LOCATION_COORDINATES_ERROR || prev === LOCATION_FORMAT_ERROR
+						? null
+						: prev
+				);
+			};
+
+			const commitAfterPatch = () => {
+				setTimeout(() => {
+					setRouteRows(current => {
+						commitLocations(current);
+						return current;
+					});
+				}, 0);
+			};
+
+			if (!trimmed) {
+				clearLocationError();
+				patchRow({ coordinates: "" });
+				commitAfterPatch();
 				return;
 			}
 
 			// Validate format: must be ZIP or "City, State"
 			if (!isValidLocationFormat(trimmed)) {
-				setRouteRowLocationErrors(prev => ({ ...prev, [rowId]: LOCATION_FORMAT_ERROR }));
-				setRouteRows(prev => {
-					const next = [...prev];
-					if (next[index]) {
-						next[index] = { ...next[index], coordinates: "" };
-					}
-					return next;
-				});
+				setLocationError(LOCATION_FORMAT_ERROR);
+				patchRow({ coordinates: "" });
+				commitAfterPatch();
 				return;
 			}
 
-			setRouteRowLocationErrors(prev => {
-				const next = { ...prev };
-				delete next[rowId];
-				return next;
-			});
+			clearLocationError();
 
 			const geocodeAddress = normalizeLocationForGeocode(trimmed);
 			let finalAddress = trimmed;
@@ -867,108 +924,67 @@ export default function CreateOfferModal({
 						finalAddress = formatted;
 					}
 				} catch {
-					// Keep original value on error
+					// Keep original value; coordinates lookup below decides.
 				}
 			} else if (geocodeAddress !== trimmed) {
 				finalAddress = geocodeAddress;
 			}
 
 			if (finalAddress !== trimmed) {
-				setRouteRows(prev => {
-					const next = [...prev];
-					if (next[index]) {
-						next[index] = { ...next[index], location: finalAddress };
-					}
-					return next;
-				});
+				patchRow({ location: finalAddress });
 			}
 
 			try {
 				const coords = await offers.geocodeCoordinates(finalAddress);
 				if (coords) {
-					const coordinatesStr = `${coords.latitude},${coords.longitude}`;
-					setRouteRows(prev => {
-						const next = [...prev];
-						if (next[index]) {
-							next[index] = { ...next[index], coordinates: coordinatesStr };
-						}
-						return next;
+					patchRow({
+						coordinates: `${coords.latitude},${coords.longitude}`,
 					});
+					clearLocationError();
 				} else {
-					setRouteRows(prev => {
-						const next = [...prev];
-						if (next[index]) {
-							next[index] = { ...next[index], coordinates: "" };
-						}
-						return next;
-					});
+					patchRow({ coordinates: "" });
+					setLocationError(LOCATION_GEOCODE_ERROR);
+					commitAfterPatch();
+					return;
 				}
 			} catch {
-				setRouteRows(prev => {
-					const next = [...prev];
-					if (next[index]) {
-						next[index] = { ...next[index], coordinates: "" };
-					}
-					return next;
-				});
+				patchRow({ coordinates: "" });
+				setLocationError(LOCATION_GEOCODE_ERROR);
+				commitAfterPatch();
+				return;
 			}
 
 			// Commit after geocoding resolves (or immediately if no geocoding)
 			// Use a microtask so setRouteRows state is flushed before reading it
-			setTimeout(() => {
-				setRouteRows(current => {
-					commitLocations(current);
-					return current;
-				});
-			}, 0);
+			commitAfterPatch();
 		},
 		[commitLocations]
 	);
 
-	// Run geocode/zip resolution for pre-filled route locations (same as manual blur).
+	// Resolve GET/prefill addresses on open (same checks as blur) and show field errors.
 	useEffect(() => {
-		if (!isOpen || editData || initialLocationsAppliedRef.current) return;
-		if (routeRows.length === 0) return;
+		if (!isOpen || editData) return;
 
-		const expectedLocations = [
-			...(initialCreateOfferFromUrl?.route ?? [])
-				.map(s => s.location.trim())
-				.filter(Boolean),
-		];
-		if (
-			expectedLocations.length === 0 &&
-			initialPickupLocation?.trim()
-		) {
-			expectedLocations.push(initialPickupLocation.trim());
-		}
-		if (expectedLocations.length === 0) return;
+		const pendingKey = pendingPrefillGeocodeKeyRef.current;
+		if (!pendingKey) return;
 
-		const filledRows = routeRows.filter(row => row.location.trim());
-		if (filledRows.length < expectedLocations.length) return;
-		const locationsReady = expectedLocations.every(
-			(loc, index) => filledRows[index]?.location.trim() === loc
-		);
-		if (!locationsReady) return;
+		const currentKey = routeRowsGeocodeKey(routeRows);
+		if (!currentKey || currentKey !== pendingKey) return;
+		if (appliedPrefillGeocodeKeyRef.current === currentKey) return;
+		if (!routeRows.some(row => row.location.trim())) return;
 
-		initialLocationsAppliedRef.current = true;
+		appliedPrefillGeocodeKeyRef.current = currentKey;
 
+		const rowsToResolve = routeRows.map((row, index) => ({ row, index }));
 		const applyPrefillGeocode = async () => {
-			for (let i = 0; i < routeRows.length; i++) {
-				const row = routeRows[i];
+			for (const { row, index } of rowsToResolve) {
 				const loc = row.location.trim();
 				if (!loc) continue;
-				await handleAddressBlur(i, loc, row.id).catch(() => {});
+				await handleAddressBlur(index, loc, row.id).catch(() => {});
 			}
 		};
 		applyPrefillGeocode().catch(() => {});
-	}, [
-		isOpen,
-		editData,
-		initialPickupLocation,
-		initialCreateOfferFromUrl,
-		routeRows,
-		handleAddressBlur,
-	]);
+	}, [isOpen, editData, routeRows, handleAddressBlur]);
 
 	const moveExtraRow = useCallback(
 		(dragIndex: number, hoverIndex: number) => {
@@ -988,6 +1004,7 @@ export default function CreateOfferModal({
 	const validate = (): {
 		fieldErrors: Partial<Record<keyof typeof initialFormState, string>>;
 		routeError: string | null;
+		locationErrors: Record<string, string>;
 	} => {
 		const fieldErrors: Partial<Record<keyof typeof initialFormState, string>> = {};
 		for (const field of REQUIRED_FIELDS) {
@@ -999,6 +1016,7 @@ export default function CreateOfferModal({
 		}
 
 		let routeError: string | null = null;
+		const locationErrors: Record<string, string> = {};
 		const trimmedRoute = routeRows.map(row => ({
 			...row,
 			location: row.location.trim(),
@@ -1036,29 +1054,21 @@ export default function CreateOfferModal({
 				} else if (last.type !== "delivery") {
 					routeError = "The last stop in route must be Delivery";
 				} else {
-					// Validate location format for filled rows
-					const invalidLocation = trimmedRoute.some(
-						row => row.location !== "" && !isValidLocationFormat(row.location)
-					);
-					if (invalidLocation) {
-						routeError = LOCATION_FORMAT_ERROR;
-					} else {
-						const missingCoordinates = trimmedRoute.some(
-							row => !parseRouteCoordinates(row.coordinates)
-						);
-						// Manual miles already replace auto distance — coordinates are only
-						// needed to calculate that distance.
-						if (missingCoordinates && manualLoadedMiles == null) {
-							routeError = LOCATION_COORDINATES_ERROR;
-						} else {
-							routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
+					for (const row of trimmedRoute) {
+						if (row.location !== "" && !isValidLocationFormat(row.location)) {
+							locationErrors[row.id] = LOCATION_FORMAT_ERROR;
+						} else if (!parseRouteCoordinates(row.coordinates)) {
+							locationErrors[row.id] = LOCATION_GEOCODE_ERROR;
 						}
+					}
+					if (Object.keys(locationErrors).length === 0) {
+						routeError = getRouteChronologyError(trimmedRoute.map(row => row.time));
 					}
 				}
 			}
 		}
 
-		return { fieldErrors, routeError };
+		return { fieldErrors, routeError, locationErrors };
 	};
 
 	const driverIdsValue = effectiveDriverIds.join(",");
@@ -1126,8 +1136,13 @@ export default function CreateOfferModal({
 			return;
 		}
 
-		const { fieldErrors, routeError: nextRouteError } = validate();
-		if (Object.keys(fieldErrors).length > 0 || nextRouteError) {
+		const { fieldErrors, routeError: nextRouteError, locationErrors } = validate();
+		setRouteRowLocationErrors(locationErrors);
+		if (
+			Object.keys(fieldErrors).length > 0 ||
+			nextRouteError ||
+			Object.keys(locationErrors).length > 0
+		) {
 			setErrors(fieldErrors);
 			setRouteError(nextRouteError);
 			return;
@@ -1499,6 +1514,7 @@ export default function CreateOfferModal({
 							loadedMiles == null ||
 							loadedMiles === 0 ||
 							Boolean(routeError) ||
+							Object.keys(routeRowLocationErrors).length > 0 ||
 							(isEditMode && !hasEditChanges)
 						}
 					>
