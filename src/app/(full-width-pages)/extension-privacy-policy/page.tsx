@@ -34,6 +34,9 @@ export default function ExtensionPrivacyPolicyPage() {
 						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">
 							The extension may also process information required for user authentication and communication with Odysseia&apos;s authorized backend services.
 						</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">
+							The extension may process the user&apos;s verified email address when the user connects a Google account through Google OAuth. It may also process authentication information, including authentication tokens, as necessary to authenticate authorized users and maintain access to the extension&apos;s internal functionality.
+						</p>
 					</section>
 
 					<section className="mb-10">
@@ -43,6 +46,9 @@ export default function ExtensionPrivacyPolicyPage() {
 						</p>
 						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">
 							Data is not sold, used for advertising, or used to determine creditworthiness or for lending purposes.
+						</p>
+						<p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-400">
+							Authentication information and verified email addresses are used solely to authenticate authorized users, connect the intended Google account, and provide the extension&apos;s internal functionality. This information is not used for advertising, profiling, creditworthiness, or unrelated purposes.
 						</p>
 					</section>
 
