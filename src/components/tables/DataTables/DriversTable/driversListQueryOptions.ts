@@ -19,7 +19,7 @@ export interface DriversListQueryParams {
 	statusAutoAppliedByAddress?: boolean;
 	dimensionsFilter?: DimensionsFilterValues;
 	role: string;
-	/** Hide drivers at max concurrent open bids (drivers-list / add-drivers, not map). */
+	/** Include ids of drivers at max concurrent open bids (drivers-list / add-drivers, not map). */
 	excludeAtOpenBidLimit?: boolean;
 }
 

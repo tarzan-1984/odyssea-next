@@ -67,6 +67,7 @@ import UnreadIcon from "./unread.svg";
 import DriversMapIcon from "./drivers-map.svg";
 import WorldMapIcon from "./world-map-icon.svg";
 import MapSearchIcon from "./map-search-icon.svg";
+import OpenBidLimitIcon from "./open-bid-limit.svg";
 import LoadTrackingChatIcon from "./load-tracking-chat.svg";
 import MobileMessageNotificationIcon from "./mobile-message-notification.svg";
 import CopyLocationUpdateIcon from "./copy-location-update.svg";
@@ -275,6 +276,7 @@ export {
 	DriversMapIcon,
 	WorldMapIcon,
 	MapSearchIcon,
+	OpenBidLimitIcon,
 	FlagEn,
 	FlagSp,
 	FlagAr,

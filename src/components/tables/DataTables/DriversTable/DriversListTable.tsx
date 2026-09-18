@@ -34,6 +34,7 @@ import {
 	Canada,
 	Mexico,
 	MapSearchIcon,
+	OpenBidLimitIcon,
 } from "@/icons";
 import Link from "next/link";
 import PaginationWithIcon from "./PaginationWithIcon";
@@ -59,6 +60,7 @@ import DriverNotesModal from "./DriverNotesModal";
 import DriverRatingBadge from "./DriverRatingBadge";
 import DriverRatingModal from "./DriverRatingModal";
 import { driversListQueryOptions, type DriversListQueryParams } from "./driversListQueryOptions";
+import { isTmsDriverAtOpenBidLimit } from "@/utils/filterTmsDriversAtOpenBidLimit";
 import { CAPABILITIES_OPTIONS } from "./capabilitiesFilterOptions";
 import MinDimensionsModal from "./MinDimensionsModal";
 import DimensionsFilterDisplay from "./DimensionsFilterDisplay";
@@ -163,6 +165,7 @@ function isDriverStatusWithHighlightedDate(status: string | null | undefined): b
 
 /** Test driver on drivers-list — selectable and offerable without Address filter. */
 const TEST_DRIVER_EXTERNAL_ID = "3343";
+const OPEN_BID_LIMIT_TOOLTIP = "Maximum number of active bids reached";
 
 function isTestDriver(item: { id?: string | number }): boolean {
 	return String(item?.id ?? "") === TEST_DRIVER_EXTERNAL_ID;
@@ -464,6 +467,11 @@ export default function DriversListTable({
 			return status === statusFilter.toLowerCase();
 		}) ?? [];
 
+	const atOpenBidLimitIds = useMemo(() => {
+		const ids = driverList?.driverExternalIdsAtOpenBidLimit ?? [];
+		return new Set(ids.map(id => String(id).trim()).filter(Boolean));
+	}, [driverList?.driverExternalIdsAtOpenBidLimit]);
+
 	const visibleDriverIds: string[] = filteredResults.map((d: any) => String(d.id));
 	const isDriverRowSelectable = (item: {
 		id?: string | number;
@@ -473,9 +481,11 @@ export default function DriversListTable({
 		driverUsesMobileApp(item?.meta_data?.activate_application);
 	const canSelectDriverRow = (item: {
 		id?: string | number;
-		meta_data?: { activate_application?: string; driver_status?: string };
+		meta_data?: { activate_application?: string; driver_status?: string; driver_id?: string | number };
 	}) =>
-		isDriverRowSelectable(item) && (canSelectDrivers || isTestDriver(item));
+		isDriverRowSelectable(item) &&
+		(canSelectDrivers || isTestDriver(item)) &&
+		!isTmsDriverAtOpenBidLimit(item, atOpenBidLimitIds);
 	const canBulkSelectDriverRow = (item: {
 		id?: string | number;
 		meta_data?: { activate_application?: string; driver_status?: string };
@@ -520,7 +530,7 @@ export default function DriversListTable({
 			});
 			return next.length === prev.length ? prev : next;
 		});
-	}, [filteredResults, existingDriverIdsSet, canSelectDrivers]);
+	}, [filteredResults, existingDriverIdsSet, canSelectDrivers, atOpenBidLimitIds]);
 
 	useEffect(() => {
 		const handleMouseUp = () => {
@@ -538,7 +548,7 @@ export default function DriversListTable({
 		};
 		document.addEventListener("mouseup", handleMouseUp);
 		return () => document.removeEventListener("mouseup", handleMouseUp);
-	}, [filteredResults, existingDriverIdsSet, canSelectDrivers]);
+	}, [filteredResults, existingDriverIdsSet, canSelectDrivers, atOpenBidLimitIds]);
 
 	// Calculate total pages for pagination
 	const totalItems = driverList?.data?.pagination?.total_posts || 0;
@@ -1150,9 +1160,13 @@ export default function DriversListTable({
 															| undefined;
 														const statusColor = getStatusColor(status);
 														const statusLabel = getStatusLabel(status);
+														const atOpenBidLimit = isTmsDriverAtOpenBidLimit(
+															item,
+															atOpenBidLimitIds
+														);
 														return (
 															<TableCell
-																className={`relative p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
+																className={`relative overflow-visible p-2 font-normal text-gray-800 border ${cellBorder} text-xs whitespace-nowrap text-center align-middle select-none ${
 																	!canSelectThisRow
 																		? "cursor-not-allowed"
 																		: "cursor-pointer"
@@ -1234,7 +1248,16 @@ export default function DriversListTable({
 																		aria-hidden
 																	/>
 																)}
-																{statusLabel}
+																<span className="inline-flex items-center justify-center gap-1">
+																	{statusLabel}
+																	{atOpenBidLimit ? (
+																		<Tooltip content={OPEN_BID_LIMIT_TOOLTIP}>
+																			<span className="inline-flex shrink-0">
+																				<OpenBidLimitIcon className="h-4 w-5" />
+																			</span>
+																		</Tooltip>
+																	) : null}
+																</span>
 															</TableCell>
 														);
 													})()}

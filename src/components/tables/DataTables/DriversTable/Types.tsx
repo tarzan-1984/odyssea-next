@@ -226,4 +226,6 @@ export interface DriversPage {
 		/** Distance by driver externalId when has_distance_data is true. Key = externalId (driver id), value.distance = distance value */
 		id_posts?: Record<string, { distance?: string | number }>;
 	};
+	/** Drivers at max concurrent open bids — shown in the list but not selectable. */
+	driverExternalIdsAtOpenBidLimit?: string[];
 }

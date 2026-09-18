@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { serverAuth } from "@/utils/auth";
-import { filterTmsDriversSearchPayload } from "@/utils/filterTmsDriversAtOpenBidLimit";
 
 const TMS_DRIVER_SEARCH_URL = "https://www.endurance-tms.com/wp-json/tms/v1/driver/search";
 const TMS_API_KEY = process.env.TMS_API_KEY || "tms_api_key_2024_driver_access";
@@ -67,7 +66,7 @@ async function fetchDriverExternalIdsAtOpenBidLimit(
  * - capabilities: Comma-separated list (e.g. twic,lift_gate,hazmat_certificate)
  * - paged: Page number (default: 1)
  * - dim_min_1, dim_min_2, dim_min_3: Minimum cargo dimensions (length, width, height)
- * - exclude_at_open_bid_limit: if true, hide drivers at max concurrent open bids
+ * - exclude_at_open_bid_limit: if true, include driverExternalIdsAtOpenBidLimit (do not hide them)
  * Requires authentication.
  */
 export async function GET(request: NextRequest) {
@@ -122,8 +121,13 @@ export async function GET(request: NextRequest) {
 		}
 
 		const payload =
-			excludeAtOpenBidLimit && atLimitIds.length > 0
-				? filterTmsDriversSearchPayload(data, new Set(atLimitIds))
+			data && typeof data === "object" && !Array.isArray(data)
+				? {
+						...(data as Record<string, unknown>),
+						...(excludeAtOpenBidLimit
+							? { driverExternalIdsAtOpenBidLimit: atLimitIds }
+							: {}),
+					}
 				: data;
 
 		return NextResponse.json(payload, { status: 200 });
