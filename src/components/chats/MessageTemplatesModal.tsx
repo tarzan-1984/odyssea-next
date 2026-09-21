@@ -1,18 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+	useInfiniteQuery,
+	useMutation,
+	useQueryClient,
+	type InfiniteData,
+} from "@tanstack/react-query";
 import { Modal } from "@/components/ui/modal";
 import { Search, Trash2, X } from "lucide-react";
 import {
 	fetchMessageTemplatesPage,
 	upsertMessageTemplate,
 	deleteMessageTemplate,
+	toggleMessageTemplateFavorite,
+	MESSAGE_TEMPLATE_FAVORITES_QUERY_KEY,
 	type MessageTemplateDto,
 	type MessageTemplateKind,
 	type MessageTemplateGroupDto,
 	type MessageTemplateScope,
 	type AdminCompanyGroupFilter,
+	type MessageTemplatesPageDto,
 } from "@/app-api/messageTemplatesApi";
 import type { UserData } from "@/app-api/api-types";
 import { useCurrentUser } from "@/stores/userStore";
@@ -177,6 +185,67 @@ function IconEditTemplate({ className }: { className?: string }) {
 	);
 }
 
+function IconFavoriteHeart({
+	filled,
+	className,
+}: {
+	filled: boolean;
+	className?: string;
+}) {
+	if (filled) {
+		return (
+			<svg
+				className={className}
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 122.88 107.41"
+				width={16}
+				height={14}
+				aria-hidden
+			>
+				<path
+					fill="currentColor"
+					fillRule="evenodd"
+					clipRule="evenodd"
+					d="M60.83,17.19C68.84,8.84,74.45,1.62,86.79,0.21c23.17-2.66,44.48,21.06,32.78,44.41 c-3.33,6.65-10.11,14.56-17.61,22.32c-8.23,8.52-17.34,16.87-23.72,23.2l-17.4,17.26L46.46,93.56C29.16,76.9,0.95,55.93,0.02,29.95 C-0.63,11.75,13.73,0.09,30.25,0.3C45.01,0.5,51.22,7.84,60.83,17.19L60.83,17.19L60.83,17.19z"
+				/>
+			</svg>
+		);
+	}
+
+	return (
+		<svg
+			className={className}
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 122.88 107.68"
+			width={16}
+			height={14}
+			aria-hidden
+		>
+			<path
+				fill="currentColor"
+				d="M61.43,13.53C66.76,7.51,72.8,3.69,78.96,1.69c6.48-2.1,13.07-2.15,19.09-0.6c6.05,1.55,11.52,4.72,15.74,9.03 c5.58,5.7,9.09,13.36,9.09,22.02c0,13.7-6.6,26.75-17.42,39.37c-10.14,11.83-24.05,23.35-39.61,34.73 c-2.58,1.89-5.98,1.88-8.5,0.22l0,0.01l-0.03-0.02l0,0.01l-0.02-0.01l-0.21-0.15c-4.46-2.92-8.75-5.91-12.8-8.94 c-4.05-3.03-8.01-6.22-11.83-9.56C12.58,70.42,0,51.4,0,32.13c0-8.8,3.44-16.44,8.93-22.08c4.25-4.37,9.73-7.51,15.79-9.03V1.02 c5.99-1.5,12.57-1.4,19.05,0.69C49.99,3.71,56.09,7.54,61.43,13.53L61.43,13.53L61.43,13.53z M83.51,15.87 C78.02,17.65,72.51,22.02,68,29.78c-0.63,1.19-1.6,2.21-2.85,2.93c-3.56,2.05-8.11,0.82-10.15-2.74 c-4.5-7.82-10.14-12.27-15.78-14.08c-3.71-1.19-7.46-1.25-10.88-0.4l0,0l-0.02,0c-3.35,0.83-6.37,2.56-8.7,4.95 c-2.87,2.95-4.67,7-4.67,11.7c0,14.53,10.59,29.82,27.3,44.43c3.28,2.87,6.95,5.82,10.95,8.81c2.61,1.96,5.35,3.92,8.04,5.74 c13.03-9.76,24.53-19.53,32.9-29.3c8.58-10,13.8-19.92,13.8-29.68c0-4.55-1.84-8.58-4.76-11.57c-2.38-2.42-5.43-4.2-8.8-5.06 C90.98,14.63,87.23,14.67,83.51,15.87L83.51,15.87L83.51,15.87z"
+			/>
+		</svg>
+	);
+}
+
+function patchFavoriteInCache(
+	old: InfiniteData<MessageTemplatesPageDto> | undefined,
+	id: number,
+	isFavorite: boolean
+): InfiniteData<MessageTemplatesPageDto> | undefined {
+	if (!old?.pages) return old;
+	return {
+		...old,
+		pages: old.pages.map(page => ({
+			...page,
+			items: page.items.map(item =>
+				item.id === id ? { ...item, isFavorite } : item
+			),
+		})),
+	};
+}
+
 export interface MessageTemplatesModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -248,6 +317,42 @@ export default function MessageTemplatesModal({
 		mutationFn: deleteMessageTemplate,
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["message-templates"] });
+		},
+	});
+
+	const favoriteMutation = useMutation({
+		mutationFn: (tpl: MessageTemplateDto) => toggleMessageTemplateFavorite(tpl.id),
+		onMutate: async tpl => {
+			await queryClient.cancelQueries({ queryKey: ["message-templates"] });
+			const previous = queryClient.getQueriesData({ queryKey: ["message-templates"] });
+			queryClient.setQueriesData<InfiniteData<MessageTemplatesPageDto>>(
+				{ queryKey: ["message-templates"] },
+				old => patchFavoriteInCache(old, tpl.id, !tpl.isFavorite)
+			);
+			queryClient.setQueryData<MessageTemplateDto[]>(
+				MESSAGE_TEMPLATE_FAVORITES_QUERY_KEY,
+				old => {
+					if (!Array.isArray(old)) return old;
+					if (tpl.isFavorite) {
+						return old.filter(item => item.id !== tpl.id);
+					}
+					return [{ ...tpl, isFavorite: true }, ...old.filter(item => item.id !== tpl.id)];
+				}
+			);
+			return { previous };
+		},
+		onError: (err, _tpl, ctx) => {
+			ctx?.previous.forEach(([key, data]) => {
+				queryClient.setQueryData(key, data);
+			});
+			window.alert(err instanceof Error ? err.message : "Failed to update favorite");
+		},
+		onSuccess: updated => {
+			queryClient.setQueriesData<InfiniteData<MessageTemplatesPageDto>>(
+				{ queryKey: ["message-templates"] },
+				old => patchFavoriteInCache(old, updated.id, updated.isFavorite)
+			);
+			void queryClient.invalidateQueries({ queryKey: MESSAGE_TEMPLATE_FAVORITES_QUERY_KEY });
 		},
 	});
 
@@ -562,6 +667,33 @@ export default function MessageTemplatesModal({
 												</p>
 											</div>
 											<div className="flex shrink-0 items-center gap-1">
+												{tpl.type === "personal" ? (
+													<button
+														type="button"
+														className={
+															tpl.isFavorite
+																? `${templateRowActionBtnClass} text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300`
+																: templateRowActionBtnClass
+														}
+														aria-label={
+															tpl.isFavorite
+																? "Remove template from favorites"
+																: "Add template to favorites"
+														}
+														aria-pressed={tpl.isFavorite}
+														title={tpl.isFavorite ? "Unfavorite" : "Favorite"}
+														disabled={
+															favoriteMutation.isPending &&
+															favoriteMutation.variables?.id === tpl.id
+														}
+														onClick={() => favoriteMutation.mutate(tpl)}
+													>
+														<IconFavoriteHeart
+															filled={tpl.isFavorite}
+															className="block shrink-0"
+														/>
+													</button>
+												) : null}
 												<button
 													type="button"
 													className={templateRowActionBtnClass}

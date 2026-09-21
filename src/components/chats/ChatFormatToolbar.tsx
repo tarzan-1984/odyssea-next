@@ -11,6 +11,8 @@ type ChatFormatToolbarProps = {
 	disabled?: boolean;
 	activeFormats: EditorFormatState;
 	onAction: (action: ChatFormatAction) => void;
+	/** Fills remaining space after format buttons (e.g. favorite template titles). */
+	extra?: React.ReactNode;
 	/** Rendered after format buttons (e.g. bid +1 timer). */
 	trailing?: React.ReactNode;
 };
@@ -51,46 +53,50 @@ export default function ChatFormatToolbar({
 	disabled,
 	activeFormats,
 	onAction,
+	extra,
 	trailing,
 }: ChatFormatToolbarProps) {
 	return (
 		<div
-			className="flex flex-wrap items-center gap-0.5 border-b border-gray-200 px-2 py-1 dark:border-gray-700"
+			className="flex min-w-0 items-center gap-0.5 border-b border-gray-200 px-2 py-1 dark:border-gray-700"
 			onMouseDown={e => e.preventDefault()}
 		>
-			<ToolbarButton
-				label="Bold"
-				disabled={disabled}
-				active={activeFormats.bold}
-				onClick={() => onAction({ type: "wrap", kind: "bold" })}
-			>
-				<Bold className="h-4 w-4" aria-hidden />
-			</ToolbarButton>
-			<ToolbarButton
-				label="Italic"
-				disabled={disabled}
-				active={activeFormats.italic}
-				onClick={() => onAction({ type: "wrap", kind: "italic" })}
-			>
-				<Italic className="h-4 w-4" aria-hidden />
-			</ToolbarButton>
-			<ToolbarButton
-				label="Underline"
-				disabled={disabled}
-				active={activeFormats.underline}
-				onClick={() => onAction({ type: "wrap", kind: "underline" })}
-			>
-				<Underline className="h-4 w-4" aria-hidden />
-			</ToolbarButton>
-			<ToolbarButton
-				label="Strikethrough"
-				disabled={disabled}
-				active={activeFormats.strikeThrough}
-				onClick={() => onAction({ type: "wrap", kind: "strike" })}
-			>
-				<Strikethrough className="h-4 w-4" aria-hidden />
-			</ToolbarButton>
-			{trailing ? <div className="ml-1.5 flex items-center">{trailing}</div> : null}
+			<div className="flex shrink-0 items-center gap-0.5">
+				<ToolbarButton
+					label="Bold"
+					disabled={disabled}
+					active={activeFormats.bold}
+					onClick={() => onAction({ type: "wrap", kind: "bold" })}
+				>
+					<Bold className="h-4 w-4" aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					label="Italic"
+					disabled={disabled}
+					active={activeFormats.italic}
+					onClick={() => onAction({ type: "wrap", kind: "italic" })}
+				>
+					<Italic className="h-4 w-4" aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					label="Underline"
+					disabled={disabled}
+					active={activeFormats.underline}
+					onClick={() => onAction({ type: "wrap", kind: "underline" })}
+				>
+					<Underline className="h-4 w-4" aria-hidden />
+				</ToolbarButton>
+				<ToolbarButton
+					label="Strikethrough"
+					disabled={disabled}
+					active={activeFormats.strikeThrough}
+					onClick={() => onAction({ type: "wrap", kind: "strike" })}
+				>
+					<Strikethrough className="h-4 w-4" aria-hidden />
+				</ToolbarButton>
+			</div>
+			{extra}
+			{trailing ? <div className="ml-1.5 flex shrink-0 items-center">{trailing}</div> : null}
 		</div>
 	);
 }

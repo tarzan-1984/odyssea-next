@@ -24,6 +24,7 @@ import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { isChatImageThumbnailCandidate } from "@/config/chatImagePreview";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
 import ChatFormatToolbar, { type ChatFormatAction } from "./ChatFormatToolbar";
+import ChatFavoriteTemplatesStrip from "./ChatFavoriteTemplatesStrip";
 import ChatRichComposeInput from "./ChatRichComposeInput";
 import { useEditorFormatState } from "@/hooks/useEditorFormatState";
 import { BID_PLUS_ONE_MESSAGE_CONTENT } from "@/utils/bidPlusOneMessage";
@@ -48,6 +49,7 @@ import {
 	getEditorPlainText,
 	htmlToMarkdown,
 	insertTextAtSelection,
+	clearEditor,
 	type EditorFormatCommand,
 } from "@/utils/chatRichEditor";
 
@@ -304,6 +306,39 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				onTyping(plain.length > 0);
 			}
 		}, [onTyping]);
+
+		const insertTemplateContent = useCallback(
+			(text: string) => {
+				const t = text.trim();
+				if (!t) return;
+				const el = editorRef.current;
+				if (el) {
+					el.focus();
+					const existing = getEditorPlainText(el);
+					const toInsert = existing ? `\n${t}` : t;
+					insertTextAtSelection(el, toInsert);
+					syncEditorContent();
+				}
+				requestAnimationFrame(() => editorRef.current?.focus());
+			},
+			[syncEditorContent]
+		);
+
+		const replaceWithTemplateContent = useCallback(
+			(text: string) => {
+				const t = text.trim();
+				if (!t) return;
+				const el = editorRef.current;
+				if (el) {
+					el.focus();
+					clearEditor(el);
+					insertTextAtSelection(el, t);
+					syncEditorContent();
+				}
+				requestAnimationFrame(() => editorRef.current?.focus());
+			},
+			[syncEditorContent]
+		);
 
 		const handleContentChange = useCallback(
 			(markdown: string, plainText: string) => {
@@ -861,6 +896,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 								disabled={disabled || isSending || isUploadingAttachments}
 								activeFormats={formatState}
 								onAction={applyFormatAction}
+								extra={
+									!isBidChat ? (
+										<ChatFavoriteTemplatesStrip
+											disabled={disabled || isSending || isUploadingAttachments}
+											onInsert={replaceWithTemplateContent}
+										/>
+									) : null
+								}
 								trailing={showBidPlusOne ? <BidComposePlusOneTimer /> : null}
 							/>
 						<div className="relative">
@@ -1185,18 +1228,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						isOpen={templatesModalOpen}
 						onClose={() => setTemplatesModalOpen(false)}
 						onInsertContent={text => {
-							const t = text.trim();
-							if (!t) return;
-							const el = editorRef.current;
-							if (el) {
-								el.focus();
-								const existing = getEditorPlainText(el);
-								const toInsert = existing ? `\n${t}` : t;
-								insertTextAtSelection(el, toInsert);
-								syncEditorContent();
-							}
+							insertTemplateContent(text);
 							setTemplatesModalOpen(false);
-							requestAnimationFrame(() => editorRef.current?.focus());
 						}}
 					/>
 				) : null}
