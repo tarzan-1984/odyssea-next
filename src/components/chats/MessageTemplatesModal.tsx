@@ -347,12 +347,12 @@ export default function MessageTemplatesModal({
 			});
 			window.alert(err instanceof Error ? err.message : "Failed to update favorite");
 		},
-		onSuccess: updated => {
+		onSuccess: async updated => {
 			queryClient.setQueriesData<InfiniteData<MessageTemplatesPageDto>>(
 				{ queryKey: ["message-templates"] },
 				old => patchFavoriteInCache(old, updated.id, updated.isFavorite)
 			);
-			void queryClient.invalidateQueries({ queryKey: MESSAGE_TEMPLATE_FAVORITES_QUERY_KEY });
+			await queryClient.invalidateQueries({ queryKey: MESSAGE_TEMPLATE_FAVORITES_QUERY_KEY });
 		},
 	});
 
