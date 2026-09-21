@@ -13,11 +13,13 @@ import DriverInfo, { getDriverInfoCardWidthClass } from "../../[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
+import BusyOnOtherLoadBanner from "@/components/logistics/BusyOnOtherLoadBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
 	findNextUnpassedRoutePoint,
 	parseLoadRoutePoints,
+	isStoredRoadEtaFresh,
 	parseStoredRoadEta,
 	roadEtaBannerCopy,
 	type RoadEtaStop,
@@ -31,6 +33,7 @@ import {
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
 import { formatTmsLoadRoute } from "@/utils/formatTmsLoadRoute";
+import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 
 const STALE_LOCATION_THRESHOLD: { hours?: number; minutes?: number } = { minutes: 30 };
 
@@ -78,6 +81,7 @@ type LoadDetailsResponse = {
 			};
 			loadRoute?: unknown;
 			roadEta?: unknown;
+			busyOnLoad?: unknown;
 			shippers?: Array<{
 				address_id?: string | number;
 				id?: string;
@@ -104,6 +108,7 @@ type LoadDetailsResponse = {
 		};
 		loadRoute?: unknown;
 		roadEta?: unknown;
+		busyOnLoad?: unknown;
 		shippers?: Array<{
 			address_id?: string | number;
 			id?: string;
@@ -184,8 +189,77 @@ type TrackingDeviceHistoryGroup = {
 };
 
 type LocationUpdatePayload = {
+	userId?: string;
+	externalId?: string | number | null;
+	latitude?: number | null;
+	longitude?: number | null;
+	city?: string | null;
+	state?: string | null;
+	zip?: string | null;
+	lastLocationUpdateAt?: string | null;
 	trackingLoadId?: string | number | null;
 };
+
+function locationPayloadMatchesLoadDriver(
+	payload: LocationUpdatePayload,
+	loadId: string,
+	drivers: LoadDriver[]
+): boolean {
+	if (normalizeTrackingLoadId(payload.trackingLoadId) === normalizeTrackingLoadId(loadId)) {
+		return Boolean(normalizeTrackingLoadId(loadId));
+	}
+	const payloadUserId = String(payload.userId ?? "").trim();
+	const payloadExternal = normalizeDriverExternalId(payload.externalId);
+	return drivers.some(driver => {
+		if (payloadUserId && String(driver.id ?? "").trim() === payloadUserId) return true;
+		const driverExternal = normalizeDriverExternalId(driver.externalId);
+		return payloadExternal.length > 0 && payloadExternal === driverExternal;
+	});
+}
+
+function patchLoadDetailsDriverLocation(
+	details: LoadDetailsResponse,
+	payload: LocationUpdatePayload
+): LoadDetailsResponse {
+	const patchDrivers = (drivers: LoadDriver[] | undefined): LoadDriver[] | undefined => {
+		if (!Array.isArray(drivers)) return drivers;
+		return drivers.map(driver => {
+			const payloadUserId = String(payload.userId ?? "").trim();
+			const payloadExternal = normalizeDriverExternalId(payload.externalId);
+			const matches =
+				(payloadUserId && String(driver.id ?? "").trim() === payloadUserId) ||
+				(payloadExternal.length > 0 &&
+					normalizeDriverExternalId(driver.externalId) === payloadExternal);
+			if (!matches) return driver;
+			return {
+				...driver,
+				latitude: payload.latitude ?? driver.latitude,
+				longitude: payload.longitude ?? driver.longitude,
+				city: payload.city ?? driver.city,
+				state: payload.state ?? driver.state,
+				zip: payload.zip ?? driver.zip,
+				lastLocationUpdateAt: payload.lastLocationUpdateAt ?? driver.lastLocationUpdateAt,
+				trackingLoadId:
+					payload.trackingLoadId != null
+						? String(payload.trackingLoadId)
+						: driver.trackingLoadId,
+			};
+		});
+	};
+	const outer = details.data;
+	if (!outer) return details;
+	const inner = outer.data;
+	return {
+		...details,
+		data: {
+			...outer,
+			drivers: patchDrivers(outer.drivers) ?? outer.drivers,
+			data: inner
+				? { ...inner, drivers: patchDrivers(inner.drivers) ?? inner.drivers }
+				: inner,
+		},
+	};
+}
 
 type DriverTrackingPointCreatedPayload = {
 	loadId?: string | null;
@@ -481,8 +555,40 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		});
 
 		socket.on("userLocationUpdate", (payload: LocationUpdatePayload) => {
-			if (normalizeTrackingLoadId(payload.trackingLoadId) !== loadId) return;
-			refreshMapIfIntervalElapsed();
+			let matched = false;
+			let trackingLoadIdChanged = false;
+			queryClient.setQueryData(
+				trackingLoadDetailsQueryKey,
+				(current: LoadDetailsResponse | undefined) => {
+					if (!current) return current;
+					const drivers =
+						current.data?.data?.drivers ?? current.data?.drivers ?? [];
+					if (!locationPayloadMatchesLoadDriver(payload, loadId, drivers)) {
+						return current;
+					}
+					matched = true;
+					const payloadTracking = normalizeTrackingLoadId(payload.trackingLoadId);
+					trackingLoadIdChanged = drivers.some((driver) => {
+						const payloadUserId = String(payload.userId ?? "").trim();
+						const payloadExternal = normalizeDriverExternalId(payload.externalId);
+						const matches =
+							(payloadUserId && String(driver.id ?? "").trim() === payloadUserId) ||
+							(payloadExternal.length > 0 &&
+								normalizeDriverExternalId(driver.externalId) === payloadExternal);
+						if (!matches) return false;
+						return (
+							normalizeTrackingLoadId(driver.trackingLoadId) !== payloadTracking
+						);
+					});
+					return patchLoadDetailsDriverLocation(current, payload);
+				}
+			);
+			if (matched) refreshMapIfIntervalElapsed();
+			if (trackingLoadIdChanged) {
+				queryClient.invalidateQueries({ queryKey: trackingLoadDetailsQueryKey }).catch(
+					() => undefined
+				);
+			}
 		});
 
 		socket.on("driverTrackingPointCreated", (payload: DriverTrackingPointCreatedPayload) => {
@@ -493,7 +599,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return () => {
 			socket.disconnect();
 		};
-	}, [isLoadDelivered, isPageReady, loadId, refreshMapIfIntervalElapsed]);
+	}, [isLoadDelivered, isPageReady, loadId, queryClient, refreshMapIfIntervalElapsed]);
 
 	const loadDrivers = useMemo(() => {
 		const details = loadDetails as LoadDetailsResponse | undefined;
@@ -1009,8 +1115,17 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		pickupGeocode,
 		showMapAndTrackingTools,
 	]);
+	const busyOnLoad = useMemo(() => {
+		const details = loadDetails as LoadDetailsResponse | undefined;
+		return parseBusyOnOtherLoad(
+			details?.data?.data?.busyOnLoad ?? details?.data?.busyOnLoad ?? null
+		);
+	}, [loadDetails]);
 	const showPickupRoadEta = Boolean(
-		roadEtaStop && hasCurrentDriverCoordinates && hasFreshLastLocationUpdate
+		!busyOnLoad &&
+			roadEtaStop &&
+			hasCurrentDriverCoordinates &&
+			hasFreshLastLocationUpdate
 	);
 	const roadEtaCopy = roadEtaBannerCopy(roadEtaStop?.kind ?? "first_pickup");
 
@@ -1045,7 +1160,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		);
 	}, [loadDetails]);
 	const canonicalPickupEta =
-		showPickupRoadEta && storedRoadEta && storedRoadEta.kind === roadEtaStop?.kind
+		showPickupRoadEta &&
+		storedRoadEta &&
+		storedRoadEta.kind === roadEtaStop?.kind &&
+		isStoredRoadEtaFresh(storedRoadEta, currentTrackingDriver?.lastLocationUpdateAt)
 			? storedRoadEta
 			: null;
 
@@ -1071,6 +1189,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		)
 	);
 	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
+	const showBusyOnOtherLoadBanner = Boolean(
+		busyOnLoad &&
+			!isLoadDelivered &&
+			(showMapAndTrackingTools || mapUiMode === "driver_not_loaded_enroute")
+	);
 
 	const driverStaleLocationBanner =
 		showStaleLocationMessage || showLoadedEnrouteStaleBanner
@@ -1143,14 +1266,27 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						</div>
 					)}
 					{mapUiMode === "driver_not_loaded_enroute" && (
-						<DriverNotLoadedEnroutePanel
-							driverStatusLabel={driverStatusLabel}
-							driverExternalId={currentTrackingDriver?.externalId}
-						/>
+						<>
+							<DriverNotLoadedEnroutePanel
+								driverStatusLabel={driverStatusLabel}
+								driverExternalId={currentTrackingDriver?.externalId}
+							/>
+							{showBusyOnOtherLoadBanner && busyOnLoad ? (
+								<BusyOnOtherLoadBanner
+									busy={busyOnLoad}
+									reserveRightForHistory={false}
+								/>
+							) : null}
+						</>
 					)}
 					{showMapAndTrackingTools && (
 						<>
-							{showPickupRoadEta ? (
+							{showBusyOnOtherLoadBanner && busyOnLoad ? (
+								<BusyOnOtherLoadBanner
+									busy={busyOnLoad}
+									reserveRightForHistory={reserveTopBannerRightLane}
+								/>
+							) : showPickupRoadEta ? (
 								<PickupRoadEtaBanner
 									status={pickupRoadEta.status}
 									eta={pickupRoadEta.eta}
@@ -1544,7 +1680,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								loadStatusLabel={loadStatusLabel}
 								routeDetails={loadRouteDetails}
 								routeTotalMiles={loadRouteTotalMiles}
-								remainingMiles={storedRoadEta?.remainingMiles ?? null}
+								remainingMiles={busyOnLoad ? null : storedRoadEta?.remainingMiles ?? null}
+								includeLocationUpdateMiles={!busyOnLoad}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
 								staleLocationBanner={driverStaleLocationBanner}
 							/>

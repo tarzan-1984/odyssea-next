@@ -72,6 +72,11 @@ export interface ChatRoom {
 		arrivalLabel: string;
 		remainingMiles?: number | null;
 	} | null;
+	/** Staff-only: driver is working another assigned load; hide ETA. */
+	busyOnLoad?: {
+		loadId: number;
+		referenceNumber?: string | null;
+	} | null;
 	/** Staff-only: driver lastLocationUpdateAt copied onto the load. */
 	lastLocationUpdateAt?: string | null;
 	/** Staff-only: city/ST/ZIP from the last driver location ping. */

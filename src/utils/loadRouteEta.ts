@@ -116,6 +116,7 @@ export type StoredRoadEta = {
 	remainingMiles: number | null;
 	durationSeconds: number | null;
 	distanceMeters: number | null;
+	lastLocationUpdateAt: string | null;
 };
 
 /** Parse load enrichment `roadEta` (same snapshot as the LOAD chat header). */
@@ -129,11 +130,23 @@ export function parseStoredRoadEta(value: unknown): StoredRoadEta | null {
 			: null;
 	const arrivalLabel = String(rec.arrivalLabel ?? "").trim();
 	if (!kind || !arrivalLabel) return null;
+	const lastLocationUpdateAt = String(rec.lastLocationUpdateAt ?? "").trim();
 	return {
 		kind,
 		arrivalLabel,
 		remainingMiles: parseFiniteNumber(rec.remainingMiles),
 		durationSeconds: parseFiniteNumber(rec.durationSeconds),
 		distanceMeters: parseFiniteNumber(rec.distanceMeters),
+		lastLocationUpdateAt: lastLocationUpdateAt || null,
 	};
+}
+
+/** Stored chat/map ETA is only safe when it was computed from this same location ping. */
+export function isStoredRoadEtaFresh(
+	stored: { lastLocationUpdateAt?: string | null } | null | undefined,
+	driverLastLocationUpdateAt: string | null | undefined
+): boolean {
+	const storedAt = stored?.lastLocationUpdateAt?.trim() ?? "";
+	const driverAt = driverLastLocationUpdateAt?.trim() ?? "";
+	return storedAt.length > 0 && storedAt === driverAt;
 }

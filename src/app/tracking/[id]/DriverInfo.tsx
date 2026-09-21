@@ -78,6 +78,8 @@ interface DriverInfoProps {
 	routeTotalMiles?: string | null;
 	/** Remaining road miles to next stop (same snapshot as LOAD chat). */
 	remainingMiles?: number | null;
+	/** When false, Copy Location Update omits the miles line (busy on another load). */
+	includeLocationUpdateMiles?: boolean;
 	/** Load tracking page: hide chat/TMS/push only when driver has no mobile app. */
 	showLoadTrackingActions?: boolean;
 	/** Full-width stale location warning at the top of the card. */
@@ -95,6 +97,7 @@ export default function DriverInfo({
 	routeDetails,
 	routeTotalMiles,
 	remainingMiles = null,
+	includeLocationUpdateMiles = true,
 	showLoadTrackingActions = true,
 	staleLocationBanner = null,
 }: DriverInfoProps) {
@@ -191,7 +194,9 @@ export default function DriverInfo({
 		const location = formatCurrentLocationForUpdate(
 			locationParts.length > 0 ? locationParts.join(", ") : null
 		);
-		const miles = formatMilesLeftForLocationUpdate(remainingMiles);
+		const miles = includeLocationUpdateMiles
+			? formatMilesLeftForLocationUpdate(remainingMiles)
+			: null;
 		const text = buildLoadLocationUpdateMessage(location, miles);
 
 		try {

@@ -15,6 +15,7 @@ type LoadEnrichment = {
 	routeGeocode?: unknown;
 	loadRoute?: unknown;
 	roadEta?: unknown;
+	busyOnLoad?: unknown;
 };
 
 function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
@@ -28,7 +29,8 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 			"trackingPoints" in payload ||
 			"routeGeocode" in payload ||
 			"loadRoute" in payload ||
-			"roadEta" in payload
+			"roadEta" in payload ||
+			"busyOnLoad" in payload
 		) {
 			return inner as LoadEnrichment;
 		}
@@ -38,7 +40,8 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 		"trackingPoints" in root ||
 		"routeGeocode" in root ||
 		"loadRoute" in root ||
-		"roadEta" in root
+		"roadEta" in root ||
+		"busyOnLoad" in root
 	) {
 		return root as LoadEnrichment;
 	}
@@ -172,6 +175,7 @@ export async function fetchTrackingLoadDetails(
 				routeGeocode: enrichment.routeGeocode ?? null,
 				loadRoute: enrichment.loadRoute ?? [],
 				roadEta: enrichment.roadEta ?? null,
+				busyOnLoad: enrichment.busyOnLoad ?? null,
 			},
 		},
 	};

@@ -1,17 +1,18 @@
 /** Staff template for LOAD chat "Copy Location Update" (blank lines as in the brief). */
 export function buildLoadLocationUpdateMessage(
 	currentLocation: string,
-	milesLeft: string,
+	milesLeft?: string | null,
 ): string {
-	return [
+	const lines = [
 		"Team,",
 		"",
 		`Please note that the current location of the unit is ${currentLocation}.`,
-		"",
-		`Miles left to the receiver: ${milesLeft} miles.`,
-		"",
-		"We will keep you posted.",
-	].join("\n");
+	];
+	if (milesLeft != null && milesLeft !== "") {
+		lines.push("", `Miles left to the receiver: ${milesLeft} miles.`);
+	}
+	lines.push("", "We will keep you posted.");
+	return lines.join("\n");
 }
 
 export function formatMilesLeftForLocationUpdate(

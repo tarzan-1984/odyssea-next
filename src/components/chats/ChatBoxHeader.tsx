@@ -40,6 +40,8 @@ import {
 	formatCurrentLocationForUpdate,
 	formatMilesLeftForLocationUpdate,
 } from "@/utils/loadLocationUpdateMessage";
+import BusyOnOtherLoadMessage from "./BusyOnOtherLoadMessage";
+import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 
 interface ChatBoxHeaderProps {
@@ -73,15 +75,18 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const showLoadTrackingHeader =
 		chatRoom?.type === "LOAD" &&
 		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
+	const busyOnLoad = showLoadTrackingHeader
+		? parseBusyOnOtherLoad(chatRoom?.busyOnLoad)
+		: null;
 	const lastLocationLabel = showLoadTrackingHeader
 		? formatLoadChatLastLocationLine({
 				locationLabel: chatRoom?.lastLocationLabel,
-				remainingMiles: chatRoom?.roadEta?.remainingMiles,
+				remainingMiles: busyOnLoad ? null : chatRoom?.roadEta?.remainingMiles,
 				updatedAt: chatRoom?.lastLocationUpdateAt,
 			})
 		: "";
 	const roadEtaLabel =
-		showLoadTrackingHeader && chatRoom?.roadEta?.arrivalLabel
+		showLoadTrackingHeader && !busyOnLoad && chatRoom?.roadEta?.arrivalLabel
 			? `ETA ${chatRoom.roadEta.arrivalLabel} · ${roadEtaHeaderKindLabel(chatRoom.roadEta.kind)}`
 			: "";
 
@@ -134,9 +139,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 
 	const handleCopyLocationUpdate = async () => {
 		const location = formatCurrentLocationForUpdate(chatRoom?.lastLocationLabel);
-		const miles = formatMilesLeftForLocationUpdate(
-			chatRoom?.roadEta?.remainingMiles,
-		);
+		const miles = busyOnLoad
+			? null
+			: formatMilesLeftForLocationUpdate(chatRoom?.roadEta?.remainingMiles);
 		const text = buildLoadLocationUpdateMessage(location, miles);
 
 		try {
@@ -335,11 +340,17 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					>
 						{getChatDisplayName()}
 					</button>
-					{roadEtaLabel || lastLocationLabel || showCopyLocationUpdateButton ? (
+					{busyOnLoad || roadEtaLabel || lastLocationLabel || showCopyLocationUpdateButton ? (
 						<div className="mt-1 space-y-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+							{busyOnLoad ? (
+								<BusyOnOtherLoadMessage
+									busy={busyOnLoad}
+									className="font-medium text-brand-600 dark:text-brand-400"
+								/>
+							) : null}
 							{roadEtaLabel || showCopyLocationUpdateButton ? (
 								<div className="flex max-w-full flex-wrap items-center gap-2">
-									{roadEtaLabel ? (
+									{!busyOnLoad && roadEtaLabel ? (
 										<p className="font-medium text-brand-600 dark:text-brand-400">
 											{roadEtaLabel}
 										</p>
