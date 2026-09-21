@@ -365,14 +365,12 @@ async function coordsFromFormattedLine(
 		return { lat: zipp.lat, lon: zipp.lon };
 	}
 
-	// Airport / unique ZIPs often use a different place name (e.g. 60666 → "Amf Ohare")
-	// while the city is still valid in that state. Accept when the ZIP's region matches
-	// and the stated city exists there.
+	// Airport / suburb ZIPs often use a parent-city name (60666 → "Amf Ohare",
+	// 30337 → "Atlanta" while the municipality is College Park). Zippopotam
+	// also omits many real cities, so do not require a city directory hit —
+	// a ZIP in the stated state is enough to pin coordinates.
 	if (zipRegionMatches(line.regionCode, line.country, zipp) && zipp.lat != null && zipp.lon != null) {
-		const cityExists = await tryZippopotamCityRegion(line.city, line.regionCode, line.country);
-		if (cityExists) {
-			return { lat: zipp.lat, lon: zipp.lon };
-		}
+		return { lat: zipp.lat, lon: zipp.lon };
 	}
 
 	return null;
@@ -592,16 +590,11 @@ export async function geocodeOfferToFormattedAddress(
 				formattedLine.country,
 				formattedLine.postal,
 			));
-		const sameRegionCityExists =
+		const sameRegion =
 			postalHit != null &&
-			zipRegionMatches(formattedLine.regionCode, formattedLine.country, postalHit) &&
-			(await tryZippopotamCityRegion(
-				formattedLine.city,
-				formattedLine.regionCode,
-				formattedLine.country,
-			)) != null;
+			zipRegionMatches(formattedLine.regionCode, formattedLine.country, postalHit);
 
-		if (postalHit && (nameMatch || cityOwnsPostal || sameRegionCityExists)) {
+		if (postalHit && (nameMatch || cityOwnsPostal || sameRegion)) {
 			const displayCity = nameMatch
 				? simplifyPlaceName(postalHit.placeName, formattedLine.city)
 				: simplifyPlaceName(formattedLine.city);

@@ -37,6 +37,49 @@ describe("geocodeOfferAddressCoordinates", () => {
 		global.fetch = fetchMock as unknown as typeof fetch;
 	});
 
+	it("geocodes College Park GA 30337 even when Zippopotam names the ZIP Atlanta", async () => {
+		const atlantaZip: ZippPlace = {
+			"place name": "Atlanta",
+			"post code": "30337",
+			state: "Georgia",
+			"state abbreviation": "GA",
+			latitude: "33.6428",
+			longitude: "-84.4618",
+		};
+
+		fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(input));
+			if (url.includes("/us/30337")) {
+				return jsonResponse(postalBody(atlantaZip));
+			}
+			return jsonResponse({}, 404);
+		});
+
+		const point = await geocodeOfferAddressCoordinates("College Park, GA 30337");
+		expect(point).toEqual({ lat: 33.6428, lon: -84.4618 });
+	});
+
+	it("rejects College Park MD when ZIP 30337 is in Georgia", async () => {
+		const atlantaZip: ZippPlace = {
+			"place name": "Atlanta",
+			"post code": "30337",
+			state: "Georgia",
+			"state abbreviation": "GA",
+			latitude: "33.6428",
+			longitude: "-84.4618",
+		};
+
+		fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(input));
+			if (url.includes("/us/30337")) {
+				return jsonResponse(postalBody(atlantaZip));
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(geocodeOfferAddressCoordinates("College Park, MD 30337")).resolves.toBeNull();
+	});
+
 	it("geocodes Chicago IL 60666 even when Zippopotam names the ZIP Amf Ohare", async () => {
 		const ohare: ZippPlace = {
 			"place name": "Amf Ohare",
@@ -143,6 +186,29 @@ describe("geocodeOfferToFormattedAddress", () => {
 	beforeEach(() => {
 		fetchMock.mockReset();
 		global.fetch = fetchMock as unknown as typeof fetch;
+	});
+
+	it("keeps College Park when ZIP 30337 is listed as Atlanta", async () => {
+		const atlantaZip: ZippPlace = {
+			"place name": "Atlanta",
+			"post code": "30337",
+			state: "Georgia",
+			"state abbreviation": "GA",
+			latitude: "33.6428",
+			longitude: "-84.4618",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/30337")) {
+				return jsonResponse(postalBody(atlantaZip));
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(geocodeOfferToFormattedAddress("College Park, GA 30337")).resolves.toBe(
+			"College Park, GA 30337",
+		);
 	});
 
 	it("formats Elk Grove Vlg as Elk Grove Village", async () => {
