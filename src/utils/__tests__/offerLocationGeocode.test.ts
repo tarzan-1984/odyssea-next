@@ -1,4 +1,7 @@
-import { geocodeOfferAddressCoordinates } from "../offerLocationGeocode";
+import {
+	geocodeOfferAddressCoordinates,
+	geocodeOfferToFormattedAddress,
+} from "../offerLocationGeocode";
 
 type ZippPlace = {
 	"place name": string;
@@ -104,5 +107,69 @@ describe("geocodeOfferAddressCoordinates", () => {
 
 		const point = await geocodeOfferAddressCoordinates(input);
 		expect(point).toEqual({ lat: 44.5955, lon: -86.0961 });
+	});
+
+	it("geocodes Elk Grove Vlg via expanded Village name", async () => {
+		const village: ZippPlace = {
+			"place name": "Elk Grove Village",
+			"post code": "60007",
+			state: "Illinois",
+			"state abbreviation": "IL",
+			latitude: "42.0076",
+			longitude: "-87.9931",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/il/Elk Grove Village")) {
+				return jsonResponse({
+					"place name": "Elk Grove Village",
+					state: "Illinois",
+					"state abbreviation": "IL",
+					places: [village],
+				});
+			}
+			return jsonResponse({}, 404);
+		});
+
+		const point = await geocodeOfferAddressCoordinates("Elk Grove Vlg, IL");
+		expect(point).toEqual({ lat: 42.0076, lon: -87.9931 });
+	});
+});
+
+describe("geocodeOfferToFormattedAddress", () => {
+	const fetchMock = jest.fn();
+
+	beforeEach(() => {
+		fetchMock.mockReset();
+		global.fetch = fetchMock as unknown as typeof fetch;
+	});
+
+	it("formats Elk Grove Vlg as Elk Grove Village", async () => {
+		const village: ZippPlace = {
+			"place name": "Elk Grove Village",
+			"post code": "60007",
+			state: "Illinois",
+			"state abbreviation": "IL",
+			latitude: "42.0076",
+			longitude: "-87.9931",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/il/Elk Grove Village")) {
+				return jsonResponse({
+					"place name": "Elk Grove Village",
+					state: "Illinois",
+					"state abbreviation": "IL",
+					places: [village],
+				});
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(geocodeOfferToFormattedAddress("Elk Grove Vlg, IL")).resolves.toBe(
+			"Elk Grove Village, IL 60007",
+		);
 	});
 });

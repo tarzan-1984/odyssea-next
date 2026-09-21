@@ -3,6 +3,8 @@ import {
 	parseCityRegionCode,
 	parseCityRegionFromAddress,
 	parseCityRegionPostalLine,
+	placeNamesMatch,
+	zippopotamUrl,
 } from "../offerLocationCountry";
 import {
 	isValidLocationFormat,
@@ -101,6 +103,25 @@ describe("location format", () => {
 		);
 		expect(normalizeLocationForGeocode("CHICAGO, IL 60666, USA")).toBe(
 			"CHICAGO, IL 60666",
+		);
+	});
+});
+
+describe("placeNamesMatch", () => {
+	it("treats Vlg as Village", () => {
+		expect(placeNamesMatch("Elk Grove Vlg", "Elk Grove Village")).toBe(true);
+		expect(placeNamesMatch("Elk Grove Vlg.", "Elk Grove Village")).toBe(true);
+	});
+
+	it("still matches St vs Saint", () => {
+		expect(placeNamesMatch("St. Louis", "Saint Louis")).toBe(true);
+	});
+});
+
+describe("zippopotamUrl", () => {
+	it("expands Vlg before looking up the city", () => {
+		expect(zippopotamUrl("us", "IL", "Elk Grove Vlg")).toBe(
+			"https://api.zippopotam.us/us/il/Elk%20Grove%20Village",
 		);
 	});
 });

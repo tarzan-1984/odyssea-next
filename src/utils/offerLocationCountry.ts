@@ -282,11 +282,12 @@ export function nominatimCountryLabel(country: OfferGeocodeCountry): string {
 }
 
 export function buildNominatimQuery(address: string, country: OfferGeocodeCountry): string {
+	const expanded = expandPlaceAbbreviations(address.trim());
 	const label = nominatimCountryLabel(country);
-	if (new RegExp(`\\b${label}\\b`, "i").test(address)) {
-		return address.trim();
+	if (new RegExp(`\\b${label}\\b`, "i").test(expanded)) {
+		return expanded;
 	}
-	return `${address.trim()}, ${label}`;
+	return `${expanded}, ${label}`;
 }
 
 export function regionCodeToFullName(code: string, country: OfferGeocodeCountry): string {
@@ -308,7 +309,7 @@ export function zippopotamUrl(
 ): string {
 	const countryPath = country;
 	const regionPath = regionCode.toLowerCase();
-	return `https://api.zippopotam.us/${countryPath}/${encodeURIComponent(regionPath)}/${encodeURIComponent(city)}`;
+	return `https://api.zippopotam.us/${countryPath}/${encodeURIComponent(regionPath)}/${encodeURIComponent(expandPlaceAbbreviations(city))}`;
 }
 
 export function zippopotamPostalUrl(
@@ -398,7 +399,7 @@ export function lettersOnlyKey(s: string): string {
 		.replace(/[^a-z]/g, "");
 }
 
-/** True when two place names refer to the same city (ignores punctuation / "St" vs "Saint"). */
+/** True when two place names refer to the same city (ignores punctuation / "St" vs "Saint" / "Vlg" vs "Village"). */
 export function placeNamesMatch(a: string, b: string): boolean {
 	const left = lettersOnlyKey(expandPlaceAbbreviations(a));
 	const right = lettersOnlyKey(expandPlaceAbbreviations(b));
@@ -413,7 +414,8 @@ function expandPlaceAbbreviations(value: string): string {
 	return value
 		.replace(/\bSt\.?\b/gi, "Saint")
 		.replace(/\bFt\.?\b/gi, "Fort")
-		.replace(/\bMt\.?\b/gi, "Mount");
+		.replace(/\bMt\.?\b/gi, "Mount")
+		.replace(/\bVlg\.?\b/gi, "Village");
 }
 
 /**
