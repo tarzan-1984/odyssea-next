@@ -139,7 +139,7 @@ export interface CreateOfferPayload {
 	/** Map driverId -> empty_miles. Used for rate_offers: empty_miles per driver, total_miles = loaded_miles + empty_miles */
 	driverEmptyMiles?: Record<string, number>;
 	weight?: number;
-	commodity?: string;
+	commodity: string;
 	specialRequirements?: string[];
 	notes?: string;
 }

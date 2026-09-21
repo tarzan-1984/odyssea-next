@@ -218,7 +218,7 @@ function routePointToRow(
 	};
 }
 
-const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight"];
+const REQUIRED_FIELDS: (keyof typeof initialFormState)[] = ["weight", "commodity"];
 
 type EditComparableSnapshot = {
 	externalId: string;
@@ -1201,7 +1201,7 @@ export default function CreateOfferModal({
 						? effectiveDriverEmptyMiles
 						: undefined,
 				weight: parseWeight(formValues.weight),
-				commodity: formValues.commodity.trim() || undefined,
+				commodity: formValues.commodity.trim(),
 				specialRequirements:
 					formValues.specialRequirements.length > 0
 						? formValues.specialRequirements
@@ -1392,6 +1392,8 @@ export default function CreateOfferModal({
 								onChange={e => handleChange("commodity", e.target.value)}
 								placeholder="Enter commodity"
 								className="dark:bg-gray-900"
+								error={!!errors.commodity}
+								hint={errors.commodity}
 							/>
 						</div>
 					</div>
