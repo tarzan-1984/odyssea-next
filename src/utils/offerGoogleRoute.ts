@@ -139,14 +139,15 @@ export function parseGoogleResolvedPlace(
 		}
 	}
 
-	const direct = parseCityRegionPostalLine(stripped) ?? parseCityRegionFromAddress(stripped);
-	if (direct && "postal" in direct) {
-		return { city: direct.city, regionCode: direct.regionCode, postal: direct.postal };
+	const postalLine = parseCityRegionPostalLine(stripped);
+	if (postalLine) {
+		return { city: postalLine.city, regionCode: postalLine.regionCode, postal: postalLine.postal };
 	}
-	if (direct) {
+	const cityStateLine = parseCityRegionFromAddress(stripped);
+	if (cityStateLine) {
 		return {
-			city: direct.city,
-			regionCode: direct.regionCode,
+			city: cityStateLine.city,
+			regionCode: cityStateLine.regionCode,
 			postal: zipCode?.trim() || null,
 		};
 	}

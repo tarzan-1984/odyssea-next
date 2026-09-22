@@ -110,7 +110,7 @@ export function simplifyPlaceName(placeName: string, preferredCity?: string): st
 	return withoutParens || trimmed;
 }
 
-function nominatimHeaders(userAgent: string): HeadersInit {
+function nominatimHeaders(userAgent: string): Record<string, string> {
 	return {
 		"User-Agent": userAgent,
 		"Accept-Language": "en",
