@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createBidRate } from "@/app-api/bidRates";
 import offers from "@/app-api/offers";
 import { Modal } from "@/components/ui/modal";
@@ -14,7 +14,8 @@ import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import { EditLoadedMilesIcon } from "@/icons";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateBidRates } from "@/utils/roleAccess";
-import { isValidLocationFormat } from "@/utils/offerLocationFormat";
+import { isValidLocationFormat, LOCATION_GEOCODE_ERROR } from "@/utils/offerLocationFormat";
+import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 import BidRateRouteBuilder, {
 	bidRouteRowsToPayload,
 	geocodeBidRouteRows,
@@ -42,6 +43,7 @@ const EMPTY_FORM: LeaveBidForm = {
 
 export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	const currentUser = useCurrentUser();
+	const queryClient = useQueryClient();
 	const canSubmitBid = canCreateBidRates(currentUser?.role);
 	const [form, setForm] = useState<LeaveBidForm>(EMPTY_FORM);
 	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
@@ -50,6 +52,9 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	const [submitting, setSubmitting] = useState(false);
 
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
+	const appliedGoogleRouteKeyRef = useRef("");
+	const routeRowsRef = useRef<BidRouteRow[]>([]);
+	routeRowsRef.current = routeRows;
 	const [manualDistance, setManualDistance] = useState<number | null>(null);
 	const [isEditDistanceModalOpen, setIsEditDistanceModalOpen] = useState(false);
 	const [editDistanceInput, setEditDistanceInput] = useState("");
@@ -64,6 +69,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 			setError(null);
 			setSubmitting(false);
 			setCommittedLocations([]);
+			appliedGoogleRouteKeyRef.current = "";
 			setManualDistance(null);
 			setIsEditDistanceModalOpen(false);
 			setEditDistanceInput("");
@@ -75,6 +81,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	const handleLocationsCommit = useCallback((locations: string[]) => {
 		setCommittedLocations(locations);
 		setManualDistance(null);
+		appliedGoogleRouteKeyRef.current = "";
 	}, []);
 
 	const allLocationsFilledAndValid = (locs: string[]) =>
@@ -92,7 +99,9 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 		retry: 1,
 	});
 
-	const distance = manualDistance ?? routeDistanceData?.loadedMiles ?? null;
+	const googleStopsResolved =
+		routeDistanceData?.stops != null && offerRouteStopsResolved(routeDistanceData.stops);
+	const distance = manualDistance ?? (googleStopsResolved ? routeDistanceData.loadedMiles : null);
 	const routeDistanceError =
 		manualDistance != null
 			? null
@@ -104,9 +113,59 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 	const showDistanceEditIcon =
 		!isCalculatingRoute &&
 		allLocationsFilledAndValid(committedLocations) &&
-		(routeDistanceData?.loadedMiles != null ||
+		(googleStopsResolved ||
 			routeDistanceQueryError != null ||
 			manualDistance != null);
+
+	useEffect(() => {
+		if (committedLocations.length === 0) {
+			appliedGoogleRouteKeyRef.current = "";
+		}
+	}, [committedLocations]);
+
+	useEffect(() => {
+		const stops = routeDistanceData?.stops;
+		if (!stops || stops.length === 0) return;
+		const key = committedLocations.join("|");
+		if (!key || appliedGoogleRouteKeyRef.current === key) return;
+		const currentKey = routeRowsRef.current.map(row => row.location.trim()).join("|");
+		if (currentKey !== key) return;
+		appliedGoogleRouteKeyRef.current = key;
+
+		const currentRows = routeRowsRef.current;
+		if (currentRows.length !== stops.length) {
+			appliedGoogleRouteKeyRef.current = "";
+			return;
+		}
+
+		setRouteRows(
+			currentRows.map((row, index) => {
+				const stop = stops[index];
+				if (!stop || stop.error || stop.latitude == null || stop.longitude == null) {
+					return { ...row, latitude: null, longitude: null };
+				}
+				return {
+					...row,
+					location: stop.location || row.location,
+					latitude: stop.latitude,
+					longitude: stop.longitude,
+				};
+			}),
+		);
+
+		if (offerRouteStopsResolved(stops)) {
+			const formatted = stops.map(stop => stop.location);
+			const formattedKey = formatted.join("|");
+			if (formattedKey !== key) {
+				queryClient.setQueryData(["route-distance", formatted], routeDistanceData);
+				appliedGoogleRouteKeyRef.current = formattedKey;
+				setCommittedLocations(formatted);
+			}
+		} else {
+			const failed = stops.find(stop => stop.error);
+			setRouteError(failed?.error || LOCATION_GEOCODE_ERROR);
+		}
+	}, [routeDistanceData, committedLocations, queryClient]);
 
 	function updateField<K extends keyof LeaveBidForm>(key: K, value: LeaveBidForm[K]) {
 		setForm(prev => ({ ...prev, [key]: value }));

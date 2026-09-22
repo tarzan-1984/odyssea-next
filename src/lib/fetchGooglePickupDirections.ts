@@ -9,6 +9,16 @@ export type GooglePickupRoute = {
 	hasTolls: boolean;
 	avoidsTraffic: boolean;
 	estimatedArrivalAt: string | null;
+	waypoints: GoogleRouteWaypoint[];
+};
+
+export type GoogleRouteWaypoint = {
+	index: number;
+	type: "origin" | "waypoint" | "destination";
+	resolvedAddress: string;
+	latitude: number;
+	longitude: number;
+	zipCode: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -35,7 +45,36 @@ function parseBestRoute(raw: unknown): GooglePickupRoute | null {
 		hasTolls: route.hasTolls === true,
 		avoidsTraffic: route.avoidsTraffic === true,
 		estimatedArrivalAt: null,
+		waypoints: [],
 	};
+}
+
+function parseWaypoints(raw: unknown): GoogleRouteWaypoint[] {
+	if (!Array.isArray(raw)) return [];
+	return raw.flatMap((value): GoogleRouteWaypoint[] => {
+		const waypoint = asRecord(value);
+		if (!waypoint) return [];
+		const latitude = Number(waypoint.latitude);
+		const longitude = Number(waypoint.longitude);
+		const type = waypoint.type;
+		if (
+			!Number.isFinite(latitude) ||
+			!Number.isFinite(longitude) ||
+			typeof waypoint.resolvedAddress !== "string" ||
+			(type !== "origin" && type !== "waypoint" && type !== "destination")
+		)
+			return [];
+		return [
+			{
+				index: Number(waypoint.index),
+				type,
+				resolvedAddress: waypoint.resolvedAddress,
+				latitude,
+				longitude,
+				zipCode: typeof waypoint.zipCode === "string" ? waypoint.zipCode : null,
+			},
+		];
+	});
 }
 
 function unwrapDirectionsPayload(body: unknown): GooglePickupRoute | null {
@@ -45,7 +84,11 @@ function unwrapDirectionsPayload(body: unknown): GooglePickupRoute | null {
 		if (best) {
 			const arrival =
 				typeof current.estimatedArrivalAt === "string" ? current.estimatedArrivalAt : null;
-			return { ...best, estimatedArrivalAt: arrival };
+			return {
+				...best,
+				estimatedArrivalAt: arrival,
+				waypoints: parseWaypoints(current.waypoints),
+			};
 		}
 		current = asRecord(current.data);
 	}

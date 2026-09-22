@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/modal";
 import Button from "@/components/ui/button/Button";
 import Label from "@/components/form/Label";
@@ -35,8 +35,8 @@ import {
 	LOCATION_FORMAT_ERROR,
 	LOCATION_GEOCODE_ERROR,
 	normalizeLocationForGeocode,
-	needsLocationGeocode,
 } from "@/utils/offerLocationFormat";
+import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateOffers } from "@/utils/roleAccess";
 import Switch from "@/components/form/switch/Switch";
@@ -557,6 +557,7 @@ export default function CreateOfferModal({
 	editData = null,
 }: CreateOfferModalProps) {
 	const currentUser = useCurrentUser();
+	const queryClient = useQueryClient();
 	const canSubmitOffer = canCreateOffers(currentUser?.role);
 	const isEditMode = Boolean(editData);
 	const effectiveExternalId = editData?.externalId ?? externalId;
@@ -594,6 +595,10 @@ export default function CreateOfferModal({
 	 * only when locations actually changed, not on every focus/blur.
 	 */
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
+	/** Avoid re-applying the same Google route result onto the form. */
+	const appliedGoogleRouteKeyRef = useRef("");
+	const routeRowsRef = useRef<RouteRow[]>([]);
+	routeRowsRef.current = routeRows;
 	/** Row-id key of the latest GET/prefill route that still needs geocode on open. */
 	const pendingPrefillGeocodeKeyRef = useRef("");
 	/** Row-id key already sent through handleAddressBlur for the current open. */
@@ -608,6 +613,7 @@ export default function CreateOfferModal({
 		if (!isOpen) {
 			pendingPrefillGeocodeKeyRef.current = "";
 			appliedPrefillGeocodeKeyRef.current = "";
+			appliedGoogleRouteKeyRef.current = "";
 			preserveUrlLoadedMilesRef.current = false;
 			timeBeforeAsapRef.current = {};
 			return;
@@ -709,14 +715,17 @@ export default function CreateOfferModal({
 	} = useQuery({
 		queryKey: ["route-distance", committedLocations],
 		queryFn: () => offers.calculateRouteDistance(committedLocations),
-		enabled:
-			manualLoadedMiles == null && allLocationsFilledAndValid(committedLocations),
+		enabled: allLocationsFilledAndValid(committedLocations),
 		staleTime: 20 * 60 * 1000,
 		retry: 1,
 	});
 
+	const googleStopsResolved =
+		routeDistanceData?.stops != null && offerRouteStopsResolved(routeDistanceData.stops);
 	const loadedMiles =
-		manualLoadedMiles ?? routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
+		manualLoadedMiles ??
+		(googleStopsResolved ? routeDistanceData.loadedMiles : null) ??
+		editFallbackLoadedMiles;
 	const routeDistanceError =
 		manualLoadedMiles != null
 			? null
@@ -729,9 +738,57 @@ export default function CreateOfferModal({
 		!isCalculatingRoute &&
 		(manualLoadedMiles != null ||
 			(allLocationsFilledAndValid(committedLocations) &&
-				(routeDistanceData?.loadedMiles != null ||
+				(googleStopsResolved ||
 					routeDistanceQueryError != null ||
 					editFallbackLoadedMiles != null)));
+
+	useEffect(() => {
+		if (committedLocations.length === 0) {
+			appliedGoogleRouteKeyRef.current = "";
+		}
+	}, [committedLocations]);
+
+	useEffect(() => {
+		const stops = routeDistanceData?.stops;
+		if (!stops || stops.length === 0) return;
+		const key = committedLocations.join("|");
+		if (!key || appliedGoogleRouteKeyRef.current === key) return;
+		const currentKey = routeRowsRef.current.map(row => row.location.trim()).join("|");
+		if (currentKey !== key) return;
+		appliedGoogleRouteKeyRef.current = key;
+
+		const currentRows = routeRowsRef.current;
+		if (currentRows.length !== stops.length) {
+			appliedGoogleRouteKeyRef.current = "";
+			return;
+		}
+
+		const errors: Record<string, string> = {};
+		const nextRows = currentRows.map((row, index) => {
+			const stop = stops[index];
+			if (!stop || stop.error || stop.latitude == null || stop.longitude == null) {
+				errors[row.id] = stop?.error || LOCATION_GEOCODE_ERROR;
+				return { ...row, coordinates: "" };
+			}
+			return {
+				...row,
+				location: stop.location || row.location,
+				coordinates: `${stop.latitude},${stop.longitude}`,
+			};
+		});
+		setRouteRows(nextRows);
+		setRouteRowLocationErrors(errors);
+
+		if (offerRouteStopsResolved(stops)) {
+			const formatted = stops.map(stop => stop.location);
+			const formattedKey = formatted.join("|");
+			if (formattedKey !== key) {
+				queryClient.setQueryData(["route-distance", formatted], routeDistanceData);
+				appliedGoogleRouteKeyRef.current = formattedKey;
+				setCommittedLocations(formatted);
+			}
+		}
+	}, [routeDistanceData, committedLocations, queryClient]);
 
 	const clearUrlLoadedMilesLock = useCallback(() => {
 		if (!preserveUrlLoadedMilesRef.current) return;
@@ -816,12 +873,9 @@ export default function CreateOfferModal({
 	);
 
 	const commitLocations = useCallback((rows: RouteRow[]) => {
-		// Only commit if ALL rows have a filled, valid, geocoded location — so adding
-		// a new empty row or an unresolved address does not trigger a distance request.
 		const allFilled = rows.every(r => r.location.trim() !== "");
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
-		const allHaveCoords = rows.every(r => parseRouteCoordinates(r.coordinates));
-		if (!allFilled || !allValid || !allHaveCoords) {
+		if (!allFilled || !allValid) {
 			setCommittedLocations([]);
 			if (!preserveUrlLoadedMilesRef.current) {
 				setManualLoadedMiles(null);
@@ -830,7 +884,6 @@ export default function CreateOfferModal({
 		}
 		const locs = rows.map(r => r.location.trim());
 		setCommittedLocations(locs);
-		// Keep URL-provided miles; otherwise clear so distance can be recalculated.
 		if (!preserveUrlLoadedMilesRef.current) {
 			setManualLoadedMiles(null);
 		}
@@ -914,48 +967,11 @@ export default function CreateOfferModal({
 
 			clearLocationError();
 
-			const geocodeAddress = normalizeLocationForGeocode(trimmed);
-			let finalAddress = trimmed;
-
-			if (needsLocationGeocode(trimmed)) {
-				try {
-					const formatted = await offers.geocodeToFormattedAddress(geocodeAddress);
-					if (formatted) {
-						finalAddress = formatted;
-					}
-				} catch {
-					// Keep original value; coordinates lookup below decides.
-				}
-			} else if (geocodeAddress !== trimmed) {
-				finalAddress = geocodeAddress;
+			const normalized = normalizeLocationForGeocode(trimmed);
+			if (normalized !== trimmed) {
+				patchRow({ location: normalized });
 			}
 
-			if (finalAddress !== trimmed) {
-				patchRow({ location: finalAddress });
-			}
-
-			try {
-				const coords = await offers.geocodeCoordinates(finalAddress);
-				if (coords) {
-					patchRow({
-						coordinates: `${coords.latitude},${coords.longitude}`,
-					});
-					clearLocationError();
-				} else {
-					patchRow({ coordinates: "" });
-					setLocationError(LOCATION_GEOCODE_ERROR);
-					commitAfterPatch();
-					return;
-				}
-			} catch {
-				patchRow({ coordinates: "" });
-				setLocationError(LOCATION_GEOCODE_ERROR);
-				commitAfterPatch();
-				return;
-			}
-
-			// Commit after geocoding resolves (or immediately if no geocoding)
-			// Use a microtask so setRouteRows state is flushed before reading it
 			commitAfterPatch();
 		},
 		[commitLocations]

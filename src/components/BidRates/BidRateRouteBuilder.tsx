@@ -12,12 +12,10 @@ import {
 	LOCATION_FORMAT_ERROR,
 	LOCATION_GEOCODE_ERROR,
 	LOCATION_POSTAL_ERROR,
-	LOCATION_ZIP_MISMATCH_ERROR,
 	locationHasPostalCode,
-	needsLocationGeocode,
 	normalizeLocationForGeocode,
 } from "@/utils/offerLocationFormat";
-import { parseCityRegionPostalLine } from "@/utils/offerLocationCountry";
+import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 
 const DND_BID_ROUTE_ROW_TYPE = "BID_ROUTE_ROW";
 
@@ -96,83 +94,61 @@ export type ResolvedBidRouteLocation = {
 	error: string | null;
 };
 
-/** Geocode a stop to city/state/ZIP + coordinates. Rejects unknown places. */
-export async function resolveBidRouteLocation(
-	location: string,
-): Promise<ResolvedBidRouteLocation> {
-	const trimmed = location.trim();
-	if (!trimmed) {
-		return { location: trimmed, latitude: null, longitude: null, error: "Each stop must have a location" };
-	}
-	if (!isValidLocationFormat(trimmed)) {
-		return { location: trimmed, latitude: null, longitude: null, error: LOCATION_FORMAT_ERROR };
-	}
-
-	const geocodeAddress = normalizeLocationForGeocode(trimmed);
-	let finalAddress = trimmed;
-
-	if (needsLocationGeocode(trimmed)) {
-		try {
-			const formatted = await offers.geocodeToFormattedAddress(geocodeAddress);
-			if (formatted?.trim()) {
-				finalAddress = formatted.trim();
-			}
-		} catch {
-			// Keep original; coords / postal checks below decide.
-		}
-	} else if (geocodeAddress !== trimmed) {
-		finalAddress = geocodeAddress;
-	}
-
-	let latitude: number | null = null;
-	let longitude: number | null = null;
-	try {
-		const coords = await offers.geocodeCoordinates(finalAddress);
-		if (coords) {
-			latitude = coords.latitude;
-			longitude = coords.longitude;
-		}
-	} catch {
-		// Treated as geocode failure below.
-	}
-
-	if (latitude == null || longitude == null) {
-		const hasCityAndPostal =
-			parseCityRegionPostalLine(trimmed) != null ||
-			parseCityRegionPostalLine(finalAddress) != null;
-		return {
-			location: trimmed,
-			latitude: null,
-			longitude: null,
-			error: hasCityAndPostal ? LOCATION_ZIP_MISMATCH_ERROR : LOCATION_GEOCODE_ERROR,
-		};
-	}
-	if (!locationHasPostalCode(finalAddress)) {
-		return { location: trimmed, latitude: null, longitude: null, error: LOCATION_POSTAL_ERROR };
-	}
-
-	return { location: finalAddress, latitude, longitude, error: null };
-}
-
-/** Fill missing coords / ZIP on every stop. Returns rows + first error, if any. */
+/** Resolve the whole route with one Google Maps request (miles + coords + ZIP). */
 export async function geocodeBidRouteRows(
 	rows: BidRouteRow[],
 ): Promise<{ rows: BidRouteRow[]; error: string | null }> {
-	const next = [...rows];
-	for (let index = 0; index < next.length; index++) {
-		const row = next[index];
-		const resolved = await resolveBidRouteLocation(row.location);
-		if (resolved.error) {
-			return { rows: next, error: resolved.error };
+	const trimmed = rows.map(row => ({ ...row, location: row.location.trim() }));
+	if (trimmed.some(row => !row.location)) {
+		return { rows, error: "Each stop must have a location" };
+	}
+	if (trimmed.some(row => !isValidLocationFormat(row.location))) {
+		return { rows, error: LOCATION_FORMAT_ERROR };
+	}
+	if (trimmed.length < 2) {
+		return { rows, error: "Add at least one Origin and one Destination" };
+	}
+	if (
+		trimmed.every(
+			row =>
+				row.latitude != null &&
+				row.longitude != null &&
+				Number.isFinite(row.latitude) &&
+				Number.isFinite(row.longitude) &&
+				locationHasPostalCode(row.location),
+		)
+	) {
+		return { rows: trimmed, error: null };
+	}
+
+	try {
+		const result = await offers.calculateRouteDistance(trimmed.map(row => row.location));
+		const next = trimmed.map((row, index) => {
+			const stop = result.stops[index];
+			if (!stop || stop.error || stop.latitude == null || stop.longitude == null) {
+				return row;
+			}
+			return {
+				...row,
+				location: stop.location,
+				latitude: stop.latitude,
+				longitude: stop.longitude,
+			};
+		});
+		const failed = result.stops.find(stop => stop.error);
+		if (failed?.error) {
+			return { rows: next, error: failed.error };
 		}
-		next[index] = {
-			...row,
-			location: resolved.location,
-			latitude: resolved.latitude,
-			longitude: resolved.longitude,
+		if (!offerRouteStopsResolved(result.stops)) {
+			return { rows: next, error: LOCATION_GEOCODE_ERROR };
+		}
+		return { rows: next, error: null };
+	} catch (error) {
+		return {
+			rows,
+			error: error instanceof Error ? error.message : LOCATION_GEOCODE_ERROR,
 		};
 	}
-	return { rows: next, error: null };
 }
 
 /** Same payload shape as offers.route (time left empty for bid rates). */
@@ -391,7 +367,6 @@ export default function BidRateRouteBuilder({
 }: BidRateRouteBuilderProps) {
 	const pendingDropRef = useRef<number | null>(null);
 	const [locationErrors, setLocationErrors] = useState<Record<string, string>>({});
-	const [geocodingIds, setGeocodingIds] = useState<Record<string, boolean>>({});
 
 	const updateRow = useCallback(
 		(index: number, location: string) => {
@@ -425,12 +400,6 @@ export default function BidRateRouteBuilder({
 				setLocationErrors(errors => {
 					if (!(removedId in errors)) return errors;
 					const next = { ...errors };
-					delete next[removedId];
-					return next;
-				});
-				setGeocodingIds(ids => {
-					if (!ids[removedId]) return ids;
-					const next = { ...ids };
 					delete next[removedId];
 					return next;
 				});
@@ -494,51 +463,17 @@ export default function BidRateRouteBuilder({
 				return next;
 			});
 
-			setGeocodingIds(prev => ({ ...prev, [rowId]: true }));
-			try {
-				const resolved = await resolveBidRouteLocation(trimmed);
-				if (resolved.error) {
-					setLocationErrors(prev => ({ ...prev, [rowId]: resolved.error! }));
-					onLocationsCommit?.([]);
-					return;
+			const normalized = normalizeLocationForGeocode(trimmed);
+			onChange(prev => {
+				const next = [...prev];
+				const targetIndex =
+					next[index]?.id === rowId ? index : next.findIndex(row => row.id === rowId);
+				if (targetIndex >= 0 && normalized !== next[targetIndex].location) {
+					next[targetIndex] = { ...next[targetIndex], location: normalized };
 				}
-
-				onChange(prev => {
-					const next = [...prev];
-					const apply = (targetIndex: number) => {
-						next[targetIndex] = {
-							...next[targetIndex],
-							location: resolved.location,
-							latitude: resolved.latitude,
-							longitude: resolved.longitude,
-						};
-					};
-					if (next[index]?.id === rowId) {
-						apply(index);
-					} else {
-						const foundIndex = next.findIndex(row => row.id === rowId);
-						if (foundIndex >= 0) {
-							apply(foundIndex);
-						}
-					}
-					return next;
-				});
-
-				// Commit after geocode so distance calc uses the final address
-				setTimeout(() => {
-					onChange(current => {
-						commitLocationsFromRows(current, onLocationsCommit);
-						return current;
-					});
-				}, 0);
-			} finally {
-				setGeocodingIds(prev => {
-					if (!prev[rowId]) return prev;
-					const next = { ...prev };
-					delete next[rowId];
-					return next;
-				});
-			}
+				commitLocationsFromRows(next, onLocationsCommit);
+				return next;
+			});
 		},
 		[onChange, onLocationsCommit],
 	);
@@ -562,7 +497,6 @@ export default function BidRateRouteBuilder({
 					onAddressBlur={onAddressBlur}
 					onLocationChange={onLocationChange}
 					locationError={locationErrors[row.id]}
-					isGeocoding={Boolean(geocodingIds[row.id])}
 					canRemove={
 						(row.type === "pickup" && pickupCount > 1) ||
 						(row.type === "delivery" && deliveryCount > 1)

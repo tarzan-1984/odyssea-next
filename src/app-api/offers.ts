@@ -1,6 +1,9 @@
 import axios from "axios";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import { formatOfferDateTimeFieldForDisplay } from "@/utils/offerDateTimeRange";
+import type { OfferRouteDistanceResult } from "@/utils/offerGoogleRoute";
+
+export type { OfferRouteDistanceResult, OfferRouteStop } from "@/utils/offerGoogleRoute";
 
 
 export interface OfferDriver {
@@ -295,11 +298,11 @@ const offers = {
 	},
 
 	/**
-	 * Calculate route distance (road miles) for a sequence of addresses via Google Maps.
-	 * Requires at least 2 locations. Returns loadedMiles or throws on error.
+	 * One Google Maps request: road miles + resolved city/state/ZIP and coordinates.
+	 * Requires at least 2 locations. Throws when Google cannot build a route.
 	 */
-	async calculateRouteDistance(locations: string[]): Promise<{ loadedMiles: number }> {
-		const response = await axios.post<{ loadedMiles?: number; error?: string }>(
+	async calculateRouteDistance(locations: string[]): Promise<OfferRouteDistanceResult> {
+		const response = await axios.post<OfferRouteDistanceResult & { error?: string }>(
 			"/api/offers/calculate-route-distance",
 			{ locations },
 			{
@@ -312,8 +315,13 @@ const offers = {
 
 		const data = response.data;
 
-		if (response.status >= 200 && response.status < 300 && typeof data.loadedMiles === "number") {
-			return { loadedMiles: data.loadedMiles };
+		if (
+			response.status >= 200 &&
+			response.status < 300 &&
+			typeof data.loadedMiles === "number" &&
+			Array.isArray(data.stops)
+		) {
+			return { loadedMiles: data.loadedMiles, stops: data.stops };
 		}
 
 		throw new Error(

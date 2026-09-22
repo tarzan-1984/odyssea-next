@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -28,7 +28,8 @@ import BidRateRouteBuilder, {
 	validateBidRouteRows,
 	type BidRouteRow,
 } from "@/components/BidRates/BidRateRouteBuilder";
-import { isValidLocationFormat } from "@/utils/offerLocationFormat";
+import { isValidLocationFormat, LOCATION_GEOCODE_ERROR } from "@/utils/offerLocationFormat";
+import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 import ShipmentDatePicker from "./ShipmentDatePicker";
 import { getLoadBoardPickupPastError } from "./loadBoardTableUtils";
 import {
@@ -175,6 +176,7 @@ export default function NewShipmentModal({
 	prefillShipment = null,
 }: NewShipmentModalProps) {
 	const isEdit = shipment != null;
+	const queryClient = useQueryClient();
 	const [activeTab, setActiveTab] = useState<NewShipmentTabId>("load-details");
 	const [routeRows, setRouteRows] = useState<BidRouteRow[]>(initialBidRouteRows);
 	const [form, setForm] = useState<NewShipmentForm>(EMPTY_FORM);
@@ -183,6 +185,9 @@ export default function NewShipmentModal({
 	const [submitting, setSubmitting] = useState(false);
 
 	const [committedLocations, setCommittedLocations] = useState<string[]>([]);
+	const appliedGoogleRouteKeyRef = useRef("");
+	const routeRowsRef = useRef<BidRouteRow[]>([]);
+	routeRowsRef.current = routeRows;
 	const [manualLoadedMiles, setManualLoadedMiles] = useState<number | null>(null);
 	const [editFallbackLoadedMiles, setEditFallbackLoadedMiles] = useState<number | null>(
 		null,
@@ -204,6 +209,7 @@ export default function NewShipmentModal({
 				.map(row => row.location.trim())
 				.filter(loc => loc !== "" && isValidLocationFormat(loc));
 			setCommittedLocations(locs.length >= 2 ? locs : []);
+			appliedGoogleRouteKeyRef.current = "";
 			setEditFallbackLoadedMiles(
 				source.loadedMiles != null && Number.isFinite(source.loadedMiles)
 					? source.loadedMiles
@@ -214,6 +220,7 @@ export default function NewShipmentModal({
 			setRouteRows(initialBidRouteRows());
 			setForm(EMPTY_FORM);
 			setCommittedLocations([]);
+			appliedGoogleRouteKeyRef.current = "";
 			setEditFallbackLoadedMiles(null);
 			setManualLoadedMiles(null);
 		}
@@ -243,14 +250,17 @@ export default function NewShipmentModal({
 	} = useQuery({
 		queryKey: ["load-board-route-distance", committedLocations],
 		queryFn: () => offers.calculateRouteDistance(committedLocations),
-		enabled:
-			manualLoadedMiles == null && allLocationsFilledAndValid(committedLocations),
+		enabled: allLocationsFilledAndValid(committedLocations),
 		staleTime: 20 * 60 * 1000,
 		retry: 1,
 	});
 
+	const googleStopsResolved =
+		routeDistanceData?.stops != null && offerRouteStopsResolved(routeDistanceData.stops);
 	const loadedMiles =
-		manualLoadedMiles ?? routeDistanceData?.loadedMiles ?? editFallbackLoadedMiles;
+		manualLoadedMiles ??
+		(googleStopsResolved ? routeDistanceData.loadedMiles : null) ??
+		editFallbackLoadedMiles;
 	const routeDistanceError =
 		manualLoadedMiles != null
 			? null
@@ -263,14 +273,68 @@ export default function NewShipmentModal({
 		!isCalculatingRoute &&
 		(manualLoadedMiles != null ||
 			(allLocationsFilledAndValid(committedLocations) &&
-				(routeDistanceData?.loadedMiles != null ||
+				(googleStopsResolved ||
 					routeDistanceQueryError != null ||
 					editFallbackLoadedMiles != null)));
+
+	useEffect(() => {
+		if (committedLocations.length === 0) {
+			appliedGoogleRouteKeyRef.current = "";
+		}
+	}, [committedLocations]);
+
+	useEffect(() => {
+		const stops = routeDistanceData?.stops;
+		if (!stops || stops.length === 0) return;
+		const key = committedLocations.join("|");
+		if (!key || appliedGoogleRouteKeyRef.current === key) return;
+		const currentKey = routeRowsRef.current.map(row => row.location.trim()).join("|");
+		if (currentKey !== key) return;
+		appliedGoogleRouteKeyRef.current = key;
+
+		const currentRows = routeRowsRef.current;
+		if (currentRows.length !== stops.length) {
+			appliedGoogleRouteKeyRef.current = "";
+			return;
+		}
+
+		setRouteRows(
+			currentRows.map((row, index) => {
+				const stop = stops[index];
+				if (!stop || stop.error || stop.latitude == null || stop.longitude == null) {
+					return { ...row, latitude: null, longitude: null };
+				}
+				return {
+					...row,
+					location: stop.location || row.location,
+					latitude: stop.latitude,
+					longitude: stop.longitude,
+				};
+			}),
+		);
+
+		if (offerRouteStopsResolved(stops)) {
+			const formatted = stops.map(stop => stop.location);
+			const formattedKey = formatted.join("|");
+			if (formattedKey !== key) {
+				queryClient.setQueryData(
+					["load-board-route-distance", formatted],
+					routeDistanceData,
+				);
+				appliedGoogleRouteKeyRef.current = formattedKey;
+				setCommittedLocations(formatted);
+			}
+		} else {
+			const failed = stops.find(stop => stop.error);
+			setError(failed?.error || LOCATION_GEOCODE_ERROR);
+		}
+	}, [routeDistanceData, committedLocations, queryClient]);
 
 	const handleLocationsCommit = useCallback((locations: string[]) => {
 		setCommittedLocations(locations);
 		setManualLoadedMiles(null);
 		setEditFallbackLoadedMiles(null);
+		appliedGoogleRouteKeyRef.current = "";
 	}, []);
 
 	const openEditMilesModal = () => {
