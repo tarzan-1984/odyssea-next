@@ -7,9 +7,11 @@ import {
 } from "@/lib/fetchGooglePickupDirections";
 import {
 	applyGoogleWaypointsToLocations,
+	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
 	type GoogleRouteWaypointLike,
 } from "@/utils/offerGoogleRoute";
+import { geocodeOfferToFormattedAddress } from "@/utils/offerLocationGeocode";
 
 export const maxDuration = 180;
 
@@ -82,7 +84,11 @@ export async function POST(request: NextRequest) {
 		}
 
 		const loadedMiles = totalMeters * METERS_TO_MILES;
-		const stops = applyGoogleWaypointsToLocations(locations, waypoints);
+		const stops = await enrichStopsWithPostal(
+			locations,
+			applyGoogleWaypointsToLocations(locations, waypoints),
+			geocodeOfferToFormattedAddress,
+		);
 
 		return NextResponse.json({ loadedMiles, stops }, { status: 200 });
 	} catch (error) {

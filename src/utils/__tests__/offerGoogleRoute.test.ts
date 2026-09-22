@@ -1,5 +1,6 @@
 import {
 	applyGoogleWaypointsToLocations,
+	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
 	parseGoogleResolvedPlace,
 	resolveStopFromGoogleWaypoint,
@@ -70,6 +71,23 @@ describe("resolveStopFromGoogleWaypoint", () => {
 		});
 	});
 
+	it("keeps coords when Google omits ZIP so it can be filled later", () => {
+		expect(
+			resolveStopFromGoogleWaypoint("Amarillo, TX", {
+				resolvedAddress: "Amarillo, TX, USA",
+				latitude: 35.222,
+				longitude: -101.8313,
+				zipCode: null,
+			}),
+		).toEqual({
+			location: "Amarillo, TX",
+			latitude: 35.222,
+			longitude: -101.8313,
+			zipCode: null,
+			error: null,
+		});
+	});
+
 	it("rejects a ZIP that belongs to another state", () => {
 		expect(resolveStopFromGoogleWaypoint("College Park, MD 30337", atlantaAirport)).toEqual({
 			location: "College Park, MD 30337",
@@ -128,6 +146,31 @@ describe("applyGoogleWaypointsToLocations", () => {
 			"Aberdeen, NC 28315",
 		]);
 		expect(stops.every((stop) => stop.error == null)).toBe(true);
+	});
+});
+
+describe("enrichStopsWithPostal", () => {
+	it("fills ZIP for City, ST when Google omitted it", async () => {
+		const stops = await enrichStopsWithPostal(
+			["Amarillo, TX"],
+			[
+				{
+					location: "Amarillo, TX",
+					latitude: 35.222,
+					longitude: -101.8313,
+					zipCode: null,
+					error: null,
+				},
+			],
+			async () => "Amarillo, TX 79101",
+		);
+		expect(stops[0]).toEqual({
+			location: "Amarillo, TX 79101",
+			latitude: 35.222,
+			longitude: -101.8313,
+			zipCode: "79101",
+			error: null,
+		});
 	});
 });
 

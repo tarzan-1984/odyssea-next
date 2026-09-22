@@ -9,6 +9,7 @@ import {
 	LOCATION_GEOCODE_ERROR,
 	LOCATION_POSTAL_ERROR,
 	LOCATION_ZIP_MISMATCH_ERROR,
+	locationHasPostalCode,
 } from "./offerLocationFormat";
 
 export type GoogleRouteWaypointLike = {
@@ -200,11 +201,19 @@ export function resolveStopFromGoogleWaypoint(
 	const regionCode = (user?.regionCode || google?.regionCode || "").trim();
 	const postal = (googlePostal || user?.postal || "").trim();
 
-	if (!postal) {
-		return failed(LOCATION_POSTAL_ERROR);
-	}
 	if (!city || !regionCode) {
 		return failed(LOCATION_GEOCODE_ERROR);
+	}
+
+	// Google often omits ZIP on "City, ST". Keep coords and fill postal afterwards.
+	if (!postal) {
+		return {
+			location: `${city}, ${regionCode}`,
+			latitude: waypoint.latitude,
+			longitude: waypoint.longitude,
+			zipCode: null,
+			error: null,
+		};
 	}
 
 	return {
@@ -222,6 +231,34 @@ export function applyGoogleWaypointsToLocations(
 ): OfferRouteStop[] {
 	return locations.map((location, index) =>
 		resolveStopFromGoogleWaypoint(location, waypoints[index] ?? null),
+	);
+}
+
+/** When Google did not return a ZIP, look it up from city/state (same as the old formatted geocode). */
+export async function enrichStopsWithPostal(
+	locations: string[],
+	stops: OfferRouteStop[],
+	lookupFormatted: (input: string) => Promise<string>,
+): Promise<OfferRouteStop[]> {
+	return Promise.all(
+		stops.map(async (stop, index) => {
+			if (stop.error) return stop;
+			if (stop.zipCode || locationHasPostalCode(stop.location)) return stop;
+
+			const query = locations[index]?.trim() || stop.location;
+			const formatted = (await lookupFormatted(query)).trim();
+			if (!formatted || !locationHasPostalCode(formatted)) {
+				return { ...stop, error: LOCATION_POSTAL_ERROR };
+			}
+			const line = parseCityRegionPostalLine(formatted);
+			return {
+				location: formatted,
+				latitude: stop.latitude,
+				longitude: stop.longitude,
+				zipCode: line?.postal ?? stop.zipCode,
+				error: null,
+			};
+		}),
 	);
 }
 
@@ -243,7 +280,8 @@ export function offerRouteStopsResolved(stops: OfferRouteStop[]): boolean {
 				stop.latitude != null &&
 				stop.longitude != null &&
 				Number.isFinite(stop.latitude) &&
-				Number.isFinite(stop.longitude),
+				Number.isFinite(stop.longitude) &&
+				Boolean(stop.zipCode || locationHasPostalCode(stop.location)),
 		)
 	);
 }
