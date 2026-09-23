@@ -165,7 +165,18 @@ export default function ChatRichComposeInput({
 			closeMentionPicker();
 			return;
 		}
+		const sel = window.getSelection();
+		const selecting =
+			Boolean(sel) &&
+			!sel!.isCollapsed &&
+			el.contains(sel!.anchorNode) &&
+			el.contains(sel!.focusNode);
 		syncEditorMentions(el, mentionNames);
+		// Keep an active text selection; don't open the mention picker over it.
+		if (selecting) {
+			closeMentionPicker();
+			return;
+		}
 		const { text, caret } = readEditorTextAndCaret(el);
 		const nextQuery = findMentionQueryAtCaret(text, caret, mentionNames);
 		if (!nextQuery) {
@@ -358,6 +369,14 @@ export default function ChatRichComposeInput({
 					if (mentionQueryRef.current) updateMentionPickerPosition();
 				}}
 				onClick={() => {
+					const sel = window.getSelection();
+					if (
+						sel &&
+						!sel.isCollapsed &&
+						editorRef.current?.contains(sel.anchorNode)
+					) {
+						return;
+					}
 					refreshMentionState();
 				}}
 				onBlur={() => {

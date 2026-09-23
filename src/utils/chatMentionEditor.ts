@@ -41,10 +41,74 @@ function visitEditorText(
 	visit(root, true);
 }
 
-export function readEditorTextAndCaret(editor: HTMLElement): { text: string; caret: number } {
+function readPlainOffset(
+	editor: HTMLElement,
+	targetNode: Node | null,
+	targetOffset: number
+): number | null {
+	if (!targetNode || !editor.contains(targetNode)) return null;
+	let text = "";
+	let found: number | null = null;
+
+	const visit = (node: Node, isRoot = false) => {
+		if (found != null) return;
+		if (node.nodeType === Node.TEXT_NODE) {
+			const value = (node.textContent || "").replace(/\u00a0/g, " ");
+			if (node === targetNode) {
+				found = text.length + Math.min(targetOffset, value.length);
+				return;
+			}
+			text += value;
+			return;
+		}
+		if (node.nodeType !== Node.ELEMENT_NODE) return;
+		const el = node as Element;
+		if (el.tagName.toLowerCase() === "br") {
+			if (el === targetNode) {
+				found = text.length;
+				return;
+			}
+			text += "\n";
+			return;
+		}
+		const children = Array.from(el.childNodes);
+		for (let i = 0; i < children.length; i += 1) {
+			if (targetNode === el && targetOffset === i) {
+				found = text.length;
+				return;
+			}
+			const child = children[i];
+			if (
+				!isRoot &&
+				i > 0 &&
+				child.nodeType === Node.ELEMENT_NODE &&
+				isBlockElement(child as Element)
+			) {
+				text += "\n";
+			}
+			visit(child);
+			if (found != null) return;
+		}
+		if (targetNode === el && targetOffset >= children.length) {
+			found = text.length;
+		}
+	};
+
+	visit(editor, true);
+	return found;
+}
+
+export function readEditorTextAndCaret(editor: HTMLElement): {
+	text: string;
+	caret: number;
+	anchor: number;
+	focus: number;
+} {
 	const sel = window.getSelection();
 	const anchorNode = sel?.anchorNode ?? null;
 	const anchorOffset = sel?.anchorOffset ?? 0;
+	const focusNode = sel?.focusNode ?? null;
+	const focusOffset = sel?.focusOffset ?? 0;
 	let text = "";
 	let caret = 0;
 	let caretSet = false;
@@ -94,7 +158,12 @@ export function readEditorTextAndCaret(editor: HTMLElement): { text: string; car
 
 	visit(editor, true);
 	if (!caretSet) caret = text.length;
-	return { text, caret };
+
+	const focus =
+		readPlainOffset(editor, focusNode, focusOffset) ?? caret;
+	const anchor = caret;
+
+	return { text, caret: anchor, anchor, focus };
 }
 
 export function setEditorCaret(editor: HTMLElement, target: number): void {
@@ -243,10 +312,21 @@ function wrapMatchesInEditor(editor: HTMLElement, names: string[]): void {
 }
 
 export function syncEditorMentions(editor: HTMLElement, names: string[]): void {
-	const { caret } = readEditorTextAndCaret(editor);
+	const { anchor, focus } = readEditorTextAndCaret(editor);
+	const beforeHtml = editor.innerHTML;
 	unwrapInvalidMentions(editor, names);
 	wrapMatchesInEditor(editor, names);
-	setEditorCaret(editor, caret);
+	// Avoid collapsing a user selection (double-click / drag) when DOM is unchanged.
+	if (editor.innerHTML === beforeHtml) return;
+	if (anchor === focus) {
+		setEditorCaret(editor, anchor);
+		return;
+	}
+	setEditorSelection(
+		editor,
+		Math.min(anchor, focus),
+		Math.max(anchor, focus)
+	);
 }
 
 function escapeHtml(value: string): string {
