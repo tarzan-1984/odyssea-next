@@ -633,6 +633,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		if (!Array.isArray(raw)) return [];
 		return raw
 			.filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+			// Guard: enrichment must only return DRIVER; same externalId can belong to TRACKING staff.
+			.filter(d => {
+				const role = String(d.role ?? "").trim().toUpperCase();
+				return !role || role === "DRIVER";
+			})
 			.map(d => normalizeTrackingLoadDriver(d)) as LoadDriver[];
 	}, [loadDetails]);
 

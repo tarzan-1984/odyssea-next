@@ -61,6 +61,10 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 function normalizeEnrichmentDrivers(drivers: unknown[]): Record<string, unknown>[] {
 	return drivers
 		.filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+		.filter(d => {
+			const role = String(d.role ?? "").trim().toUpperCase();
+			return !role || role === "DRIVER";
+		})
 		.map(d => normalizeTrackingLoadDriver(d));
 }
 
