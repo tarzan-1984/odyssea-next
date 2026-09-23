@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	/* config options here */
+	eslint: {
+		// Existing codebase has many legacy lint warnings; fail CI via `yarn lint` instead.
+		ignoreDuringBuilds: true,
+	},
 	// Parent repo has an empty package-lock.json; without this Next traces from
 	// /htdocs/odyssea2 and `next build` fails with ENOENT for some app pages.
 	outputFileTracingRoot: path.join(__dirname),

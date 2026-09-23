@@ -12,6 +12,8 @@ import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastAct
 import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 import { useCurrentUser } from "@/stores/userStore";
 import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
+import LoadChatRestStatusIcon from "@/components/chats/LoadChatRestStatusIcon";
+import SetLoadRestModal from "@/components/chats/SetLoadRestModal";
 import {
 	buildLoadLocationUpdateMessage,
 	formatCurrentLocationForUpdate,
@@ -84,6 +86,15 @@ interface DriverInfoProps {
 	showLoadTrackingActions?: boolean;
 	/** Full-width stale location warning at the top of the card. */
 	staleLocationBanner?: StaleLocationBanner | null;
+	/** Load rest state from loads.is_rest. */
+	isRest?: boolean;
+	restDate?: string | null;
+	restStartedAt?: string | null;
+	onRestChanged?: (update: {
+		isRest: boolean;
+		restDate?: string | null;
+		restStartedAt?: string | null;
+	}) => void;
 }
 
 const TMS_DRIVER_PAGE_URL = "https://www.endurance-tms.com/add-driver/";
@@ -100,8 +111,13 @@ export default function DriverInfo({
 	includeLocationUpdateMiles = true,
 	showLoadTrackingActions = true,
 	staleLocationBanner = null,
+	isRest = false,
+	restDate = null,
+	restStartedAt = null,
+	onRestChanged,
 }: DriverInfoProps) {
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
 	const currentUser = useCurrentUser();
 	const { resolvedLastActiveApp, usesMobileApp } = useResolvedDriverLastActiveApp(
@@ -186,6 +202,9 @@ export default function DriverInfo({
 		Boolean(loadId?.trim()) &&
 		canSeeLoadStaleLocationSystemMessage(currentUser?.role) &&
 		!showStaleLocationBanner;
+	const canSetRest =
+		Boolean(loadId?.trim()) &&
+		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
 
 	const handleCopyLocationUpdate = async () => {
 		const locationParts = [driverData.city, driverData.state, driverData.zip]
@@ -276,6 +295,15 @@ export default function DriverInfo({
 						)}
 						<DriverMobileAppIcon usesApp={usesMobileAppForUi} />
 					</div>
+					{canSetRest ? (
+						<LoadChatRestStatusIcon
+							isRest={Boolean(isRest)}
+							restDate={restDate}
+							restStartedAt={restStartedAt}
+							onClick={() => setIsRestModalOpen(true)}
+							className="mt-2 flex flex-col items-center justify-center rounded-full"
+						/>
+					) : null}
 					{showSendPushButton && (
 						<div className="mt-2 flex w-full justify-center">
 							<button
@@ -440,6 +468,16 @@ export default function DriverInfo({
 				isOpen={isPushModalOpen}
 				onClose={() => setIsPushModalOpen(false)}
 				drivers={isPushModalOpen && pushModalDriver ? [pushModalDriver] : null}
+			/>
+			<SetLoadRestModal
+				isOpen={isRestModalOpen}
+				onClose={() => setIsRestModalOpen(false)}
+				loadId={loadId}
+				isRest={Boolean(isRest)}
+				restDate={restDate}
+				onSaved={update => {
+					onRestChanged?.(update);
+				}}
 			/>
 		</div>
 	);

@@ -240,7 +240,7 @@ export async function enrichStopsWithPostal(
 	stops: OfferRouteStop[],
 	lookupFormatted: (input: string) => Promise<string>,
 ): Promise<OfferRouteStop[]> {
-	return Promise.all(
+	return await Promise.all(
 		stops.map(async (stop, index) => {
 			if (stop.error) return stop;
 			if (stop.zipCode || locationHasPostalCode(stop.location)) return stop;
@@ -258,6 +258,20 @@ export async function enrichStopsWithPostal(
 				zipCode: line?.postal ?? stop.zipCode,
 				error: null,
 			};
+		}),
+	);
+}
+
+/** Resolve missing ZIP / full state names before Google Directions. */
+export async function prepareLocationsForGoogleRoute(
+	locations: string[],
+	lookupFormatted: (input: string) => Promise<string>,
+): Promise<string[]> {
+	return await Promise.all(
+		locations.map(async (location) => {
+			if (locationHasPostalCode(location)) return location;
+			const formatted = (await lookupFormatted(location)).trim();
+			return formatted && locationHasPostalCode(formatted) ? formatted : location;
 		}),
 	);
 }

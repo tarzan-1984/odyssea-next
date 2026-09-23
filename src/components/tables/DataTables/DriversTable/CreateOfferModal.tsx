@@ -907,7 +907,7 @@ export default function CreateOfferModal({
 	const pendingDropRef = useRef<number | null>(null);
 
 	const handleAddressBlur = useCallback(
-		async (index: number, value: string, rowId: string) => {
+		(index: number, value: string, rowId: string) => {
 			const trimmed = value.trim();
 
 			const patchRow = (patch: Partial<RouteRow>) => {
@@ -996,7 +996,7 @@ export default function CreateOfferModal({
 			for (const { row, index } of rowsToResolve) {
 				const loc = row.location.trim();
 				if (!loc) continue;
-				await handleAddressBlur(index, loc, row.id).catch(() => {});
+				handleAddressBlur(index, loc, row.id);
 			}
 		};
 		applyPrefillGeocode().catch(() => {});

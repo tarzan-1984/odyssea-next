@@ -25,7 +25,7 @@ export function findActiveLoadChatInList(
 }
 
 /** Lookup LOAD chat by TMS load id via API (active or archived). */
-export async function findLoadChatByLoadId(loadId: string): Promise<ChatRoom | null> {
+export function findLoadChatByLoadId(loadId: string): Promise<ChatRoom | null> {
 	return chatApi.getLoadChatRoomByLoadId(loadId);
 }
 

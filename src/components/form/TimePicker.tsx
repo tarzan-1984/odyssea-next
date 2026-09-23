@@ -16,6 +16,9 @@ type PropsType = {
 	placeholder?: string;
 	className?: string;
 	disabled?: boolean;
+	required?: boolean;
+	/** When false, clicking the label does not focus the input. */
+	associateLabel?: boolean;
 	/** Optional end time below the picker — stored as "start — end" */
 	allowTimeRange?: boolean;
 };
@@ -308,6 +311,8 @@ export default function TimePicker({
 	placeholder,
 	className = "",
 	disabled = false,
+	required = false,
+	associateLabel = true,
 	allowTimeRange = false,
 }: PropsType) {
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -416,7 +421,12 @@ export default function TimePicker({
 
 	return (
 		<div className={className}>
-			{label && <Label htmlFor={id}>{label}</Label>}
+			{label && (
+				<Label htmlFor={associateLabel ? id : undefined}>
+					{label}
+					{required ? <span className="text-error-500"> *</span> : null}
+				</Label>
+			)}
 			<div className="relative w-full">
 				<input
 					ref={inputRef}

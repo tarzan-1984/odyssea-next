@@ -71,6 +71,8 @@ import OpenBidLimitIcon from "./open-bid-limit.svg";
 import LoadTrackingChatIcon from "./load-tracking-chat.svg";
 import MobileMessageNotificationIcon from "./mobile-message-notification.svg";
 import CopyLocationUpdateIcon from "./copy-location-update.svg";
+import LoadRestIcon from "./load-rest.svg";
+import LoadTurnOnIcon from "./load-turn-on.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
@@ -179,6 +181,8 @@ export {
 	LoadTrackingChatIcon,
 	MobileMessageNotificationIcon,
 	CopyLocationUpdateIcon,
+	LoadRestIcon,
+	LoadTurnOnIcon,
 	OffersIcon,
 	WorkstationIcon,
 	CheckListIcon,

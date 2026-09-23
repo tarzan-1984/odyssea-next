@@ -3,6 +3,7 @@ import {
 	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
 	parseGoogleResolvedPlace,
+	prepareLocationsForGoogleRoute,
 	resolveStopFromGoogleWaypoint,
 } from "../offerGoogleRoute";
 import {
@@ -98,6 +99,23 @@ describe("resolveStopFromGoogleWaypoint", () => {
 		});
 	});
 
+	it("keeps the typed city when the user wrote a full state name", () => {
+		expect(
+			resolveStopFromGoogleWaypoint("Jessup, Maryland", {
+				resolvedAddress: "8201 Stayton Dr, Jessup, MD 20794, USA",
+				latitude: 39.149,
+				longitude: -76.7752,
+				zipCode: "20794",
+			}),
+		).toEqual({
+			location: "Jessup, MD 20794",
+			latitude: 39.149,
+			longitude: -76.7752,
+			zipCode: "20794",
+			error: null,
+		});
+	});
+
 	it("rejects a misspelled city when Google resolved the real name", () => {
 		expect(
 			resolveStopFromGoogleWaypoint("Waseon, Ohio 43567", {
@@ -146,6 +164,28 @@ describe("applyGoogleWaypointsToLocations", () => {
 			"Aberdeen, NC 28315",
 		]);
 		expect(stops.every((stop) => stop.error == null)).toBe(true);
+	});
+});
+
+describe("prepareLocationsForGoogleRoute", () => {
+	it("fills ZIP before Google when the user typed a city without postal", async () => {
+		const lookup = jest.fn(async (input: string) => {
+			if (input === "Spartanburg, SC") return "Spartanburg, SC 29301";
+			if (input === "Jessup, Maryland") return "Jessup, MD 20794";
+			return "";
+		});
+		await expect(
+			prepareLocationsForGoogleRoute(["Spartanburg, SC", "Jessup, Maryland"], lookup),
+		).resolves.toEqual(["Spartanburg, SC 29301", "Jessup, MD 20794"]);
+		expect(lookup).toHaveBeenCalledTimes(2);
+	});
+
+	it("leaves a location unchanged when it already has a ZIP", async () => {
+		const lookup = jest.fn(async () => "should not run");
+		await expect(
+			prepareLocationsForGoogleRoute(["Spartanburg, SC 29301"], lookup),
+		).resolves.toEqual(["Spartanburg, SC 29301"]);
+		expect(lookup).not.toHaveBeenCalled();
 	});
 });
 

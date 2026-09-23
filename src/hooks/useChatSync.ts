@@ -12,6 +12,7 @@ import {
 	normalizeChatParticipants,
 } from "@/utils/normalizeChatParticipants";
 import { pickAuthoritativeLastMessage } from "@/utils/pickAuthoritativeLastMessage";
+import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
 
 /** Merge persisted/API unread with store. If source says 0, trust it (clears ghost badges after read). */
 const mergeSourcesUnreadCount = (
@@ -143,6 +144,7 @@ export const useChatSync = () => {
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
+											...mergeLoadRestFields(cachedRoom, storeRoom),
 										};
 									}
 									return cachedRoom;
@@ -175,6 +177,7 @@ export const useChatSync = () => {
 									);
 									return {
 										...apiRoom,
+										...mergeLoadRestFields(storeRoom, apiRoom),
 										unreadCount: finalUnreadCount,
 										lastMessage: mergeRoomLastMessage(
 											apiRoom.lastMessage,
@@ -219,6 +222,7 @@ export const useChatSync = () => {
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
+											...mergeLoadRestFields(cachedRoom, storeRoom),
 										};
 									}
 									return cachedRoom;
@@ -252,6 +256,7 @@ export const useChatSync = () => {
 								);
 								return {
 									...apiRoom,
+									...mergeLoadRestFields(storeRoom, apiRoom),
 									unreadCount: finalUnreadCount,
 									lastMessage: mergeRoomLastMessage(
 										apiRoom.lastMessage,
@@ -516,6 +521,7 @@ export const useChatSync = () => {
 
 			const normalizedRoom = {
 				...chatRoom,
+				...mergeLoadRestFields(existingRoom, chatRoom),
 				participants: mergeChatRoomParticipants(
 					chatRoom.participants,
 					existingRoom?.participants

@@ -436,7 +436,7 @@ export default function BidRateRouteBuilder({
 	}, []);
 
 	const onAddressBlur = useCallback(
-		async (index: number, location: string, rowId: string) => {
+		(index: number, location: string, rowId: string) => {
 			const trimmed = location.trim();
 			if (!trimmed) {
 				setLocationErrors(prev => {

@@ -395,7 +395,7 @@ export async function getCroppedImageBlobFromElement(
 		canvas.height
 	);
 
-	return canvasToBlob(canvas, mimeType, quality);
+	return await canvasToBlob(canvas, mimeType, quality);
 }
 
 export async function replaceCanvasFromBlob(

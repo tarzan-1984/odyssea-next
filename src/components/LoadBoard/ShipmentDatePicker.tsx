@@ -14,6 +14,8 @@ type Props = {
 	placeholder?: string;
 	className?: string;
 	required?: boolean;
+	/** When false, clicking the label does not focus the input. */
+	associateLabel?: boolean;
 	/** Disallow selecting calendar days before this date (local midnight). Default: today. */
 	minDate?: Date | "today" | null;
 };
@@ -75,6 +77,7 @@ export default function ShipmentDatePicker({
 	placeholder = EMPTY_PLACEHOLDER,
 	className = "",
 	required = false,
+	associateLabel = true,
 	minDate = "today",
 }: Props) {
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -130,7 +133,7 @@ export default function ShipmentDatePicker({
 	return (
 		<div className={className}>
 			{label && (
-				<Label htmlFor={id}>
+				<Label htmlFor={associateLabel ? id : undefined}>
 					{label}
 					{required ? <span className="text-error-500"> *</span> : null}
 				</Label>

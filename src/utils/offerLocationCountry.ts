@@ -436,6 +436,24 @@ export function parseCityRegionFromAddress(
 		return { city: line.city, regionCode: line.regionCode, country: line.country };
 	}
 
+	const commaIdx = trimmed.indexOf(",");
+	if (commaIdx > 0) {
+		const city = trimmed.slice(0, commaIdx).trim();
+		const afterComma = trimmed.slice(commaIdx + 1).trim();
+		const regionToken = afterComma
+			.replace(/\s+\d{5}(?:-\d{4})?\b.*$/i, "")
+			.replace(/\s+[A-Z]\d[A-Z](?:\s?\d[A-Z]\d)?\b.*$/i, "")
+			.trim();
+		const regionResolved = resolveRegionToken(regionToken);
+		if (city && regionResolved) {
+			return {
+				city,
+				regionCode: regionResolved.regionCode,
+				country: regionResolved.country,
+			};
+		}
+	}
+
 	return null;
 }
 

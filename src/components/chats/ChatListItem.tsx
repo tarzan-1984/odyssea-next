@@ -20,7 +20,7 @@ import {
 } from "@/utils/chatOtherParticipant";
 import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
-import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass } from "@/utils/loadStatusLabel";
+import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass, LOAD_CHAT_REST_BG_CLASS, LOAD_CHAT_STALE_BG_CLASS } from "@/utils/loadStatusLabel";
 import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 
 interface ChatListItemProps {
@@ -117,13 +117,15 @@ export default function ChatListItem({
 	const loadStatusLabel =
 		chatRoom.type === "LOAD" ? formatLoadChatStatusLabel(chatRoom.loadStatus) : null;
 	const isStaleLocationChat =
-		chatRoom.isLocationStale === true ||
-		Boolean(chatRoom.staleLocationAlert);
-	const loadStatusBgClass = isStaleLocationChat
-		? "bg-[#ffdcdc] dark:bg-[#F5A0A0]"
-		: chatRoom.type === "LOAD"
-			? loadChatStatusBackgroundClass(chatRoom.loadStatus)
-			: null;
+		!chatRoom.isRest &&
+		(chatRoom.isLocationStale === true || Boolean(chatRoom.staleLocationAlert));
+	const loadStatusBgClass = chatRoom.isRest
+		? LOAD_CHAT_REST_BG_CLASS
+		: isStaleLocationChat
+			? LOAD_CHAT_STALE_BG_CLASS
+			: chatRoom.type === "LOAD"
+				? loadChatStatusBackgroundClass(chatRoom.loadStatus)
+				: null;
 
 	const toggleDropdown = () => {
 		if (onMenuToggle) {

@@ -1,24 +1,43 @@
 import type { ChatRoom } from "@/app-api/chatApi";
 
+type RawChatParticipant = {
+	hideParticipant?: boolean;
+	userId?: string;
+	user?: {
+		id?: string;
+		firstName?: string;
+		lastName?: string;
+		avatar?: string;
+		profilePhoto?: string;
+		role?: string;
+		userColor?: string | null;
+		externalId?: string | null;
+		phone?: string | null;
+	};
+};
+
 /** Keep participant fields needed for LOAD chat search (phone, externalId). */
 export function normalizeChatParticipants(participants: unknown): ChatRoom["participants"] {
 	if (!Array.isArray(participants)) return [];
 
-	return participants.map((p: any) => ({
-		...p,
-		hideParticipant: p.hideParticipant === true,
-		user: {
-			id: p.user?.id,
-			firstName: p.user?.firstName,
-			lastName: p.user?.lastName,
-			avatar: p.user?.profilePhoto ?? p.user?.avatar ?? "",
-			profilePhoto: p.user?.profilePhoto,
-			role: p.user?.role ?? "USER",
-			userColor: p.user?.userColor ?? null,
-			externalId: p.user?.externalId ?? null,
-			phone: p.user?.phone ?? null,
-		},
-	}));
+	return participants.map((participant) => {
+		const p = participant as RawChatParticipant;
+		return {
+			...p,
+			hideParticipant: p.hideParticipant === true,
+			user: {
+				id: p.user?.id,
+				firstName: p.user?.firstName,
+				lastName: p.user?.lastName,
+				avatar: p.user?.profilePhoto ?? p.user?.avatar ?? "",
+				profilePhoto: p.user?.profilePhoto,
+				role: p.user?.role ?? "USER",
+				userColor: p.user?.userColor ?? null,
+				externalId: p.user?.externalId ?? null,
+				phone: p.user?.phone ?? null,
+			},
+		};
+	}) as ChatRoom["participants"];
 }
 
 /** Preserve list fields when single-room API omits them. */

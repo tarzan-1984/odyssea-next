@@ -13,6 +13,7 @@ import {
 	messagesTailLagsBehindRoom,
 } from "@/utils/chatMessagesMerge";
 import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
+import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
 
 const SYNC_BATCH_CHUNK_SIZE = 50;
 /** Only need the newest message to compare tail vs server. */
@@ -118,6 +119,7 @@ export async function catchUpChatsOnReconnect(): Promise<void> {
 		const storeRoom = previousRooms.find(r => r.id === apiRoom.id);
 		return {
 			...apiRoom,
+			...mergeLoadRestFields(storeRoom, apiRoom),
 			unreadCount: apiRoom.unreadCount ?? storeRoom?.unreadCount ?? 0,
 			lastMessage: apiRoom.lastMessage ?? storeRoom?.lastMessage,
 			updatedAt: apiRoom.updatedAt ?? storeRoom?.updatedAt ?? apiRoom.createdAt,

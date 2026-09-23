@@ -34,12 +34,18 @@ describe("isLoadDispatchTermsSystemMessage", () => {
 		).toBe(true);
 	});
 
-	it("ignores proximity, stale-location, and ordinary chat messages", () => {
+	it("ignores proximity, stale-location, rest-ended, and ordinary chat messages", () => {
 		expect(isLoadDispatchTermsSystemMessage(proximityMessage)).toBe(false);
 		expect(
 			isLoadDispatchTermsSystemMessage({
 				isSystemMessage: true,
 				systemMessageKind: "load_stale_location",
+			})
+		).toBe(false);
+		expect(
+			isLoadDispatchTermsSystemMessage({
+				isSystemMessage: true,
+				systemMessageKind: "driver_rest_ended",
 			})
 		).toBe(false);
 		expect(

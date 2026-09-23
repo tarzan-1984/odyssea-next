@@ -23,6 +23,10 @@ const LOAD_CHAT_STATUS_BG_CLASS: Record<string, string> = {
 	canceled: "bg-[#ffdcdc] dark:bg-[#F5A0A0]",
 };
 
+/** Resting load chats override status color (same idea as the stale-location red). */
+export const LOAD_CHAT_REST_BG_CLASS = "bg-[#BFDBFE] dark:bg-[#4F8EF7]";
+export const LOAD_CHAT_STALE_BG_CLASS = "bg-[#ffdcdc] dark:bg-[#F5A0A0]";
+
 export function normalizeLoadChatStatus(
 	status: string | null | undefined
 ): string {

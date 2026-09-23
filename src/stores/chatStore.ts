@@ -19,7 +19,14 @@ import {
 import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 import { trimChatMessagesWindow } from "@/utils/trimChatMessagesWindow";
 import { mergeChatRoomParticipants } from "@/utils/normalizeChatParticipants";
+import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
 import { useUserStore } from "./userStore";
+
+function omitUndefined<T extends Record<string, unknown>>(patch: T): T {
+	return Object.fromEntries(
+		Object.entries(patch).filter(([, value]) => value !== undefined)
+	) as T;
+}
 
 const persistMessageReadState = (message: Message) => {
 	indexedDBChatService
@@ -308,7 +315,15 @@ export const useChatStore = create<ChatState>()(
 
 				setChatRooms: chatRooms => {
 					// Sort chat rooms by last message date when setting
-					const sortedRooms = sortChatRoomsByLastMessage(chatRooms);
+					const previousRooms = get().chatRooms;
+					const mergedIncoming = chatRooms.map(room => {
+						const previous = previousRooms.find(item => item.id === room.id);
+						return {
+							...room,
+							...mergeLoadRestFields(previous, room),
+						};
+					});
+					const sortedRooms = sortChatRoomsByLastMessage(mergedIncoming);
 					const { currentChatRoom } = get();
 					let nextCurrentChatRoom = currentChatRoom;
 					if (currentChatRoom) {
@@ -317,6 +332,7 @@ export const useChatStore = create<ChatState>()(
 							nextCurrentChatRoom = {
 								...currentChatRoom,
 								loadStatus: matchingRoom.loadStatus,
+								...mergeLoadRestFields(currentChatRoom, matchingRoom),
 								roadEta: matchingRoom.roadEta,
 								busyOnLoad: matchingRoom.busyOnLoad,
 								lastLocationUpdateAt: matchingRoom.lastLocationUpdateAt,
@@ -347,18 +363,27 @@ export const useChatStore = create<ChatState>()(
 					const existingIndex = chatRooms.findIndex(room => room.id === chatRoom.id);
 
 					if (existingIndex >= 0) {
-						// Update existing room
+						const previous = chatRooms[existingIndex];
+						const mergedRoom = {
+							...previous,
+							...chatRoom,
+							...mergeLoadRestFields(previous, chatRoom),
+							participants: mergeChatRoomParticipants(
+								chatRoom.participants,
+								previous.participants
+							),
+						};
 						const updatedRooms = [...chatRooms];
-						updatedRooms[existingIndex] = chatRoom;
-						// Sort after update
+						updatedRooms[existingIndex] = mergedRoom;
 						const sortedRooms = sortChatRoomsByLastMessage(updatedRooms);
 						const patch: Partial<ChatState> = { chatRooms: sortedRooms };
 						if (currentChatRoom?.id === chatRoom.id) {
 							patch.currentChatRoom = {
 								...currentChatRoom,
-								...chatRoom,
+								...mergedRoom,
+								...mergeLoadRestFields(currentChatRoom, mergedRoom),
 								participants: mergeChatRoomParticipants(
-									chatRoom.participants,
+									mergedRoom.participants,
 									currentChatRoom.participants
 								),
 							};
@@ -377,7 +402,15 @@ export const useChatStore = create<ChatState>()(
 					const { chatRooms, currentChatRoom } = get();
 					const incomingById = new Map(incomingRooms.map(room => [room.id, room]));
 					const existingIds = new Set(chatRooms.map(room => room.id));
-					const mergedRooms = chatRooms.map(room => incomingById.get(room.id) ?? room);
+					const mergedRooms = chatRooms.map(room => {
+						const incoming = incomingById.get(room.id);
+						if (!incoming) return room;
+						return {
+							...room,
+							...incoming,
+							...mergeLoadRestFields(room, incoming),
+						};
+					});
 					for (const room of incomingRooms) {
 						if (!existingIds.has(room.id)) mergedRooms.push(room);
 					}
@@ -391,6 +424,7 @@ export const useChatStore = create<ChatState>()(
 							patch.currentChatRoom = {
 								...currentChatRoom,
 								...incomingCurrent,
+								...mergeLoadRestFields(currentChatRoom, incomingCurrent),
 								participants: mergeChatRoomParticipants(
 									incomingCurrent.participants,
 									currentChatRoom.participants
@@ -403,9 +437,18 @@ export const useChatStore = create<ChatState>()(
 
 				updateChatRoom: (chatRoomId, updates) => {
 					const { chatRooms, currentChatRoom } = get();
+					const cleanUpdates = omitUndefined(updates as Record<string, unknown>) as Partial<ChatRoom>;
+					const previous = chatRooms.find(room => room.id === chatRoomId);
+					const restTouched =
+						"isRest" in cleanUpdates ||
+						"restDate" in cleanUpdates ||
+						"restStartedAt" in cleanUpdates;
+					const mergedUpdates = restTouched
+						? { ...cleanUpdates, ...mergeLoadRestFields(previous, cleanUpdates) }
+						: cleanUpdates;
 
 					const updatedRooms = chatRooms.map(room =>
-						room.id === chatRoomId ? { ...room, ...updates } : room
+						room.id === chatRoomId ? { ...room, ...mergedUpdates } : room
 					);
 
 					// Sort chat rooms by last message date after update
@@ -413,12 +456,12 @@ export const useChatStore = create<ChatState>()(
 
 					const updatedState: Partial<ChatState> = { chatRooms: sortedRooms };
 					if (currentChatRoom?.id === chatRoomId) {
-						updatedState.currentChatRoom = { ...currentChatRoom, ...updates } as ChatRoom;
+						updatedState.currentChatRoom = { ...currentChatRoom, ...mergedUpdates } as ChatRoom;
 					}
 					set(updatedState, false, "updateChatRoom");
 
 					// Sync to IndexedDB
-					indexedDBChatService.updateChatRoom(chatRoomId, updates).catch(error => {
+					indexedDBChatService.updateChatRoom(chatRoomId, mergedUpdates).catch(error => {
 						console.error("Failed to update chat room in IndexedDB:", error);
 					});
 				},
@@ -1320,7 +1363,7 @@ export const useChatStore = create<ChatState>()(
 					}
 				},
 
-				ensureAvailableArchiveDays: async () => get().getAvailableArchiveDays(),
+				ensureAvailableArchiveDays: () => get().getAvailableArchiveDays(),
 
 				tryLoadNextArchivePage: async () => {
 					await get().ensureAvailableArchiveDays();

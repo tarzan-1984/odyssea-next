@@ -1,6 +1,6 @@
 "use client";
 
-import { fetchTrackingLoadDetails } from "@/lib/fetchTrackingLoadDetails";
+import { fetchTrackingLoadDetails, patchTrackingLoadDetailsRest } from "@/lib/fetchTrackingLoadDetails";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -82,6 +82,9 @@ type LoadDetailsResponse = {
 			loadRoute?: unknown;
 			roadEta?: unknown;
 			busyOnLoad?: unknown;
+			isRest?: boolean;
+			restDate?: string | null;
+			restStartedAt?: string | null;
 			shippers?: Array<{
 				address_id?: string | number;
 				id?: string;
@@ -109,6 +112,9 @@ type LoadDetailsResponse = {
 		loadRoute?: unknown;
 		roadEta?: unknown;
 		busyOnLoad?: unknown;
+		isRest?: boolean;
+		restDate?: string | null;
+		restStartedAt?: string | null;
 		shippers?: Array<{
 			address_id?: string | number;
 			id?: string;
@@ -363,6 +369,24 @@ function getLoadStatusFromDetails(details: LoadDetailsResponse | undefined): str
 	return normalizeTrackingStatus(meta?.load_status ?? null);
 }
 
+function getLoadRestFromDetails(details: LoadDetailsResponse | undefined): {
+	isRest: boolean;
+	restDate: string | null;
+	restStartedAt: string | null;
+} {
+	const isRest = Boolean(details?.data?.data?.isRest ?? details?.data?.isRest);
+	const restDateRaw = details?.data?.data?.restDate ?? details?.data?.restDate ?? null;
+	const restDate =
+		typeof restDateRaw === "string" && restDateRaw.trim() ? restDateRaw : null;
+	const restStartedAtRaw =
+		details?.data?.data?.restStartedAt ?? details?.data?.restStartedAt ?? null;
+	const restStartedAt =
+		typeof restStartedAtRaw === "string" && restStartedAtRaw.trim()
+			? restStartedAtRaw
+			: null;
+	return { isRest, restDate, restStartedAt };
+}
+
 export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
@@ -465,6 +489,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		refetchOnWindowFocus: !isLoadDeliveredFromCache,
 		refetchOnReconnect: !isLoadDeliveredFromCache,
 	});
+	const loadRest = getLoadRestFromDetails(loadDetails as LoadDetailsResponse | undefined);
+	const isLoadResting = loadRest.isRest;
 
 	const isPageLoading = isAuthLoading || isLoadDetailsPending;
 	const isPageReady = !isPageLoading && Boolean(loadDetails);
@@ -1013,6 +1039,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isDriverLoadedEnroute &&
 		loadQualifiesForStaleTrackingCheck &&
 		hasLastLocationUpdate &&
+		!isLoadResting &&
 		isLastLocationOlderThanNy(
 			currentTrackingDriver.lastLocationUpdateAt,
 			STALE_LOCATION_THRESHOLD
@@ -1183,6 +1210,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isDriverLoadedEnroute &&
 		normalizedLoadStatus === "loaded_enroute" &&
 		hasLastLocationUpdate &&
+		!isLoadResting &&
 		isLastLocationOlderThanNy(
 			currentTrackingDriver.lastLocationUpdateAt,
 			STALE_LOCATION_THRESHOLD
@@ -1684,6 +1712,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								includeLocationUpdateMiles={!busyOnLoad}
 								showLoadTrackingActions={mapUiMode !== "no_app"}
 								staleLocationBanner={driverStaleLocationBanner}
+								isRest={loadRest.isRest}
+								restDate={loadRest.restDate}
+								restStartedAt={loadRest.restStartedAt}
+								onRestChanged={update => {
+									queryClient.setQueryData(
+										trackingLoadDetailsQueryKey,
+										(current: LoadDetailsResponse | undefined) =>
+											patchTrackingLoadDetailsRest(current, update)
+									);
+								}}
 							/>
 						</div>
 					)}

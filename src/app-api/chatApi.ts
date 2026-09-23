@@ -66,6 +66,12 @@ export interface ChatRoom {
 	isLoadArchived?: boolean;
 	/** Current loads.status for LOAD chats (from loads table). */
 	loadStatus?: string | null;
+	/** LOAD chat: loads.is_rest — rest badge under the header avatar. */
+	isRest?: boolean;
+	/** LOAD chat: loads.rest_date — when rest ends. */
+	restDate?: string | null;
+	/** LOAD chat: loads.rest_started_at — when rest began. */
+	restStartedAt?: string | null;
 	/** Staff-only: stored road ETA for the next pickup/delivery. */
 	roadEta?: {
 		kind: "first_pickup" | "pickup" | "delivery";

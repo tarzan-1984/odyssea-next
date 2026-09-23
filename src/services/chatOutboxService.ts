@@ -41,23 +41,27 @@ class ChatOutboxService {
 		window.localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(items));
 	}
 
-	async getAll(): Promise<ChatOutboxItem[]> {
-		return this.readAll();
+	getAll(): Promise<ChatOutboxItem[]> {
+		return Promise.resolve(this.readAll());
 	}
 
-	async getForRoom(chatRoomId: string): Promise<ChatOutboxItem[]> {
-		return this.readAll()
-			.filter(item => item.chatRoomId === chatRoomId)
-			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-	}
-
-	async getPending(): Promise<ChatOutboxItem[]> {
-		return this.readAll().filter(
-			item => item.status === "uploading" || item.status === "sending"
+	getForRoom(chatRoomId: string): Promise<ChatOutboxItem[]> {
+		return Promise.resolve(
+			this.readAll()
+				.filter(item => item.chatRoomId === chatRoomId)
+				.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 		);
 	}
 
-	async upsert(item: ChatOutboxItem): Promise<void> {
+	getPending(): Promise<ChatOutboxItem[]> {
+		return Promise.resolve(
+			this.readAll().filter(
+				item => item.status === "uploading" || item.status === "sending"
+			)
+		);
+	}
+
+	upsert(item: ChatOutboxItem): Promise<void> {
 		const all = this.readAll();
 		const index = all.findIndex(row => row.clientMessageId === item.clientMessageId);
 		if (index >= 0) {
@@ -66,26 +70,28 @@ class ChatOutboxService {
 			all.push(item);
 		}
 		this.writeAll(all);
+		return Promise.resolve();
 	}
 
-	async patch(
+	patch(
 		clientMessageId: string,
 		patch: Partial<ChatOutboxItem>
 	): Promise<ChatOutboxItem | null> {
 		const all = this.readAll();
 		const index = all.findIndex(row => row.clientMessageId === clientMessageId);
-		if (index < 0) return null;
+		if (index < 0) return Promise.resolve(null);
 		const next = { ...all[index], ...patch };
 		all[index] = next;
 		this.writeAll(all);
-		return next;
+		return Promise.resolve(next);
 	}
 
-	async remove(clientMessageId: string): Promise<void> {
+	remove(clientMessageId: string): Promise<void> {
 		const all = this.readAll();
 		const next = all.filter(row => row.clientMessageId !== clientMessageId);
-		if (next.length === all.length) return;
+		if (next.length === all.length) return Promise.resolve();
 		this.writeAll(next);
+		return Promise.resolve();
 	}
 
 	async markAcknowledged(clientMessageId: string, serverMessageId: string): Promise<void> {
@@ -98,9 +104,10 @@ class ChatOutboxService {
 		await this.patch(clientMessageId, { retryCount: (item.retryCount ?? 0) + 1 });
 	}
 
-	async clearAll(): Promise<void> {
-		if (typeof window === "undefined") return;
+	clearAll(): Promise<void> {
+		if (typeof window === "undefined") return Promise.resolve();
 		window.localStorage.removeItem(OUTBOX_STORAGE_KEY);
+		return Promise.resolve();
 	}
 }
 

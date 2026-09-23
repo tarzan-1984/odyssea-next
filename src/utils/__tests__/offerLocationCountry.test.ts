@@ -83,6 +83,14 @@ describe("parseCityRegionFromAddress", () => {
 			country: "us",
 		});
 	});
+
+	it("parses a full US state name without ZIP", () => {
+		expect(parseCityRegionFromAddress("Jessup, Maryland")).toEqual({
+			city: "Jessup",
+			regionCode: "MD",
+			country: "us",
+		});
+	});
 });
 
 describe("location format", () => {
@@ -93,6 +101,8 @@ describe("location format", () => {
 		"CHICAGO, IL 60666",
 		"CHICAGO, IL 60666, USA",
 		"CHICAGO, IL 60666 USA",
+		"Jessup, Maryland",
+		"Spartanburg, SC",
 	])("accepts %j", (input) => {
 		expect(isValidLocationFormat(input)).toBe(true);
 	});

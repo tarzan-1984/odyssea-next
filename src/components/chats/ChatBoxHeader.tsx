@@ -21,6 +21,8 @@ import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
 import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
+import SetLoadRestModal from "./SetLoadRestModal";
+import LoadChatRestStatusIcon from "./LoadChatRestStatusIcon";
 import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import {
 	CHAT_HEADER_AVATAR_CLASS,
@@ -43,6 +45,7 @@ import {
 import BusyOnOtherLoadMessage from "./BusyOnOtherLoadMessage";
 import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
+import { useChatStore } from "@/stores/chatStore";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -70,8 +73,10 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
 	const currentUser = useCurrentUser();
+	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const showLoadTrackingHeader =
 		chatRoom?.type === "LOAD" &&
 		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
@@ -113,6 +118,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		};
 	}, [chatRoom]);
 
+	const canSetRest =
+		showLoadTrackingHeader && Boolean(chatRoom?.loadId?.trim());
 	const canShowStalePushButton =
 		Boolean(pushModalDriver) && canSendCheckListMessages(currentUser?.role);
 
@@ -120,7 +127,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		currentUser?.role,
 	);
 	const showStaleLocationAlert =
-		Boolean(chatRoom?.staleLocationAlert?.trim()) && canSeeLoadHeaderAlerts;
+		Boolean(chatRoom?.staleLocationAlert?.trim()) &&
+		canSeeLoadHeaderAlerts &&
+		!chatRoom?.isRest;
 	const isLoadChatArchived = Boolean(
 		chatRoom?.isLoadArchived || chatRoom?.isArchived,
 	);
@@ -244,7 +253,8 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			<div className="sticky top-0 z-10 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
 			<div className="flex items-center justify-between px-5 py-4 xl:px-6">
 				<div className="flex items-start gap-3 min-w-0">
-					<div className="relative h-12 w-full max-w-[48px] rounded-full">
+					<div className="relative flex w-12 shrink-0 flex-col items-center">
+						<div className="relative h-12 w-12">
 						{(() => {
 							if (!chatRoom) {
 								return renderAvatar(null, "w-12 h-12");
@@ -307,6 +317,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							return renderAvatar(null, CHAT_HEADER_AVATAR_CLASS);
 						})()}
 						{chatRoom &&
+							chatRoom.type !== "LOAD" &&
 							(() => {
 								let showOnlineIndicator = false;
 
@@ -328,6 +339,15 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 									<span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
 								) : null;
 							})()}
+						</div>
+						{chatRoom?.type === "LOAD" ? (
+							<LoadChatRestStatusIcon
+								isRest={Boolean(chatRoom.isRest)}
+								restDate={chatRoom.restDate}
+								restStartedAt={chatRoom.restStartedAt}
+								onClick={canSetRest ? () => setIsRestModalOpen(true) : undefined}
+							/>
+						) : null}
 					</div>
 
 					<div className="min-w-0">
@@ -518,6 +538,25 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 				isOpen={isPushModalOpen}
 				onClose={() => setIsPushModalOpen(false)}
 				drivers={isPushModalOpen && pushModalDriver ? [pushModalDriver] : null}
+			/>
+			<SetLoadRestModal
+				isOpen={isRestModalOpen}
+				onClose={() => setIsRestModalOpen(false)}
+				loadId={chatRoom?.loadId}
+				isRest={Boolean(chatRoom?.isRest)}
+				restDate={chatRoom?.restDate}
+				onSaved={update => {
+					if (chatRoom?.id) {
+						updateChatRoom(chatRoom.id, {
+							isRest: update.isRest,
+							restDate: update.restDate ?? null,
+							restStartedAt: update.restStartedAt ?? null,
+							...(update.isRest
+								? { isLocationStale: false, staleLocationAlert: null }
+								: {}),
+						});
+					}
+				}}
 			/>
 		</>
 	);

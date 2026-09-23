@@ -163,6 +163,7 @@ const eslintConfig = [
 			"@typescript-eslint/no-explicit-any": "off", // Allow use of `any` in tests
 			"@typescript-eslint/no-require-imports": "off", // Allow require() in Jest files
 			"react/display-name": "off", // Disable display name rule for mocks
+			"require-await": "off",
 		},
 	},
 ];

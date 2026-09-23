@@ -4,6 +4,19 @@ export function normalizeDriverExternalId(value: unknown): string {
 	return String(value).trim();
 }
 
+/** TMS load ids may arrive as `12345` or `load_12345`. */
+export function normalizeComparableLoadId(value: unknown): string {
+	return String(value ?? "")
+		.trim()
+		.replace(/^load_/i, "");
+}
+
+export function trackingLoadIdsMatch(left: unknown, right: unknown): boolean {
+	const a = normalizeComparableLoadId(left);
+	const b = normalizeComparableLoadId(right);
+	return a.length > 0 && a === b;
+}
+
 /** Normalize TMS load post id (`tracking_load_id` / `trackingLoadId`). */
 export function normalizeTrackingLoadId(value: unknown): string {
 	if (value == null) return "";

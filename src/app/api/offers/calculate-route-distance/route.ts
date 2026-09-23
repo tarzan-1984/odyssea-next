@@ -9,6 +9,7 @@ import {
 	applyGoogleWaypointsToLocations,
 	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
+	prepareLocationsForGoogleRoute,
 	type GoogleRouteWaypointLike,
 } from "@/utils/offerGoogleRoute";
 import { geocodeOfferToFormattedAddress } from "@/utils/offerLocationGeocode";
@@ -61,16 +62,21 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		const googleLocations = await prepareLocationsForGoogleRoute(
+			locations,
+			geocodeOfferToFormattedAddress,
+		);
+
 		let totalMeters = 0;
 		let originIndex = 0;
 		let waypoints: GoogleRouteWaypointLike[] = [];
 
-		while (originIndex < locations.length - 1) {
-			const destinations = locations.slice(
+		while (originIndex < googleLocations.length - 1) {
+			const destinations = googleLocations.slice(
 				originIndex + 1,
 				originIndex + 1 + MAX_GOOGLE_DESTINATIONS
 			);
-			const route = await googleRoute(locations[originIndex], destinations);
+			const route = await googleRoute(googleLocations[originIndex], destinations);
 			if (!route) {
 				return NextResponse.json(
 					{ error: "Could not calculate route between addresses" },

@@ -8,6 +8,7 @@ type TmsLoadBody = {
 };
 
 import { normalizeTrackingLoadDriver } from "@/utils/trackingLoadDriver";
+import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
 
 type LoadEnrichment = {
 	drivers?: unknown[];
@@ -16,6 +17,9 @@ type LoadEnrichment = {
 	loadRoute?: unknown;
 	roadEta?: unknown;
 	busyOnLoad?: unknown;
+	isRest?: boolean;
+	restDate?: string | null;
+	restStartedAt?: string | null;
 };
 
 function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
@@ -30,7 +34,10 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 			"routeGeocode" in payload ||
 			"loadRoute" in payload ||
 			"roadEta" in payload ||
-			"busyOnLoad" in payload
+			"busyOnLoad" in payload ||
+			"isRest" in payload ||
+			"restDate" in payload ||
+			"restStartedAt" in payload
 		) {
 			return inner as LoadEnrichment;
 		}
@@ -41,7 +48,10 @@ function unwrapEnrichmentBody(body: unknown): LoadEnrichment {
 		"routeGeocode" in root ||
 		"loadRoute" in root ||
 		"roadEta" in root ||
-		"busyOnLoad" in root
+		"busyOnLoad" in root ||
+		"isRest" in root ||
+		"restDate" in root ||
+		"restStartedAt" in root
 	) {
 		return root as LoadEnrichment;
 	}
@@ -176,7 +186,88 @@ export async function fetchTrackingLoadDetails(
 				loadRoute: enrichment.loadRoute ?? [],
 				roadEta: enrichment.roadEta ?? null,
 				busyOnLoad: enrichment.busyOnLoad ?? null,
+				isRest: enrichment.isRest === true,
+				restDate: typeof enrichment.restDate === "string" ? enrichment.restDate : null,
+				restStartedAt:
+					typeof enrichment.restStartedAt === "string" ? enrichment.restStartedAt : null,
 			},
 		},
 	};
+}
+
+export type TrackingLoadRestPatch = {
+	isRest: boolean;
+	restDate?: string | null;
+	restStartedAt?: string | null;
+};
+
+function restFieldsFromTrackingDetails(details: Record<string, unknown>): {
+	isRest?: boolean;
+	restDate?: string | null;
+	restStartedAt?: string | null;
+} {
+	const data =
+		details.data && typeof details.data === "object"
+			? (details.data as Record<string, unknown>)
+			: null;
+	const nested =
+		data?.data && typeof data.data === "object"
+			? (data.data as Record<string, unknown>)
+			: null;
+	return {
+		isRest: Boolean(nested?.isRest ?? data?.isRest ?? details.isRest),
+		restDate: (nested?.restDate ?? data?.restDate ?? details.restDate) as
+			| string
+			| null
+			| undefined,
+		restStartedAt: (nested?.restStartedAt ??
+			data?.restStartedAt ??
+			details.restStartedAt) as string | null | undefined,
+	};
+}
+
+export function patchTrackingLoadDetailsRest<T>(
+	details: T,
+	update: TrackingLoadRestPatch,
+): T {
+	if (!details || typeof details !== "object") return details;
+	const root = details as Record<string, unknown>;
+	const merged = mergeLoadRestFields(restFieldsFromTrackingDetails(root), update);
+	const restDate = merged.restDate ?? null;
+	const restStartedAt = merged.restStartedAt ?? null;
+	const data =
+		root.data && typeof root.data === "object"
+			? (root.data as Record<string, unknown>)
+			: null;
+	if (!data) {
+		return {
+			...root,
+			isRest: merged.isRest,
+			restDate,
+			restStartedAt,
+		} as T;
+	}
+	const nested =
+		data.data && typeof data.data === "object"
+			? (data.data as Record<string, unknown>)
+			: null;
+	return {
+		...root,
+		data: {
+			...data,
+			isRest: merged.isRest,
+			restDate,
+			restStartedAt,
+			...(nested
+				? {
+						data: {
+							...nested,
+							isRest: merged.isRest,
+							restDate,
+							restStartedAt,
+						},
+					}
+				: {}),
+		},
+	} as T;
 }

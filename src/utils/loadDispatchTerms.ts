@@ -13,6 +13,7 @@ const LOAD_DISPATCH_TERMS_MIN_VERSION: [number, number, number] = [2, 3, 7];
 const LOAD_DISPATCH_SYSTEM_KIND = "load_dispatch";
 const LOAD_PROXIMITY_SYSTEM_KIND = "load_proximity";
 const LOAD_STALE_LOCATION_SYSTEM_KIND = "load_stale_location";
+const DRIVER_REST_ENDED_SYSTEM_KIND = "driver_rest_ended";
 
 function parseAppVersion(
 	appVersion?: string | null
@@ -79,6 +80,7 @@ export function isLoadDispatchTermsSystemMessage(
 	if (!message.isSystemMessage) return false;
 	if (message.systemMessageKind === LOAD_PROXIMITY_SYSTEM_KIND) return false;
 	if (message.systemMessageKind === LOAD_STALE_LOCATION_SYSTEM_KIND) return false;
+	if (message.systemMessageKind === DRIVER_REST_ENDED_SYSTEM_KIND) return false;
 	if (!message.systemMessageKind) return true;
 	return message.systemMessageKind === LOAD_DISPATCH_SYSTEM_KIND;
 }

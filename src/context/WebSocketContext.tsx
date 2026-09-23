@@ -29,6 +29,9 @@ import { queueMessagesMarkedAsRead } from "@/lib/chatMessagesMarkedAsReadBatch";
 import { ARCHIVED_LOAD_CHATS_QUERY_KEY } from "@/components/chats/loadArchivedChatsQueryKey";
 import { removeArchivedLoadChatFromCache } from "@/utils/removeArchivedLoadChatFromCache";
 import { stripPerUserChatRoomFields } from "@/utils/stripPerUserChatRoomFields";
+import { trackingLoadIdsMatch } from "@/utils/trackingLoadDriver";
+import { patchTrackingLoadDetailsRest } from "@/lib/fetchTrackingLoadDetails";
+import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
 import {
 	TRACKING_TEAMS_QUERY_KEY,
 	fetchTrackingTeamsLoadIds,
@@ -131,6 +134,41 @@ interface ChatRoomUpdatedData {
 	chatRoomId: string;
 	updatedChatRoom: ChatRoom;
 	updatedBy: string;
+}
+
+type LoadRestUpdatedData = {
+	loadId?: string;
+	isRest?: boolean;
+	restDate?: string | null;
+	restStartedAt?: string | null;
+};
+
+function applyLoadRestUpdated(queryClient: QueryClient, data: LoadRestUpdatedData) {
+	const loadId = String(data?.loadId ?? "").trim();
+	if (!loadId || typeof data.isRest !== "boolean") return;
+
+	const incoming = {
+		isRest: data.isRest,
+		restDate: data.restDate,
+		restStartedAt: data.restStartedAt,
+	};
+	const { chatRooms, updateChatRoom } = useChatStore.getState();
+	for (const room of chatRooms) {
+		if (room.type !== "LOAD" || !trackingLoadIdsMatch(room.loadId, loadId)) continue;
+		const patch = mergeLoadRestFields(room, incoming);
+		updateChatRoom(room.id, {
+			...patch,
+			...(patch.isRest ? { isLocationStale: false, staleLocationAlert: null } : {}),
+		});
+	}
+	queryClient.setQueriesData(
+		{
+			predicate: query =>
+				query.queryKey[0] === "tracking-load-details" &&
+				trackingLoadIdsMatch(query.queryKey[1], loadId),
+		},
+		current => patchTrackingLoadDetailsRest(current, incoming)
+	);
 }
 
 interface ParticipantsAddedData {
@@ -1333,6 +1371,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 					.invalidateQueries({ queryKey: [...ARCHIVED_LOAD_CHATS_QUERY_KEY] })
 					.catch(() => {});
 			}
+		});
+
+		newSocket.on("loadRestUpdated", (data: LoadRestUpdatedData) => {
+			applyLoadRestUpdated(queryClient, data);
 		});
 
 		newSocket.on("participantsAdded", (data: ParticipantsAddedData) => {
