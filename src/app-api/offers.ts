@@ -2,6 +2,7 @@ import axios from "axios";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
 import { formatOfferDateTimeFieldForDisplay } from "@/utils/offerDateTimeRange";
 import type { OfferRouteDistanceResult } from "@/utils/offerGoogleRoute";
+import type { UserListItem } from "@/app-api/api-types";
 
 export type { OfferRouteDistanceResult, OfferRouteStop } from "@/utils/offerGoogleRoute";
 
@@ -25,7 +26,10 @@ export interface OfferDriver {
 	driver_eta?: string | null;
 	driver_rating?: number | null;
 	has_offer_chat?: boolean;
-
+	/** Manual reminders sent (0–3; create-push is separate). */
+	reminder_count?: number;
+	/** Unix seconds: assignment baseline or last reminder. */
+	last_reminder_at?: number | null;
 }
 
 export interface OfferRoutePoint {
@@ -180,6 +184,14 @@ export interface ReturnDriverToOfferResponse {
 	error?: string;
 }
 
+export interface SendDriverReminderResponse {
+	success: boolean;
+	message?: string;
+	reminder_count?: number;
+	last_reminder_at?: number;
+	error?: string;
+}
+
 export interface ExtendDriverTimeResponse {
 	success: boolean;
 	action_time?: number | null;
@@ -237,6 +249,66 @@ const offers = {
 		const url = `/api/offers${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 		const response = await axios.get<GetOffersResponse>(url, { withCredentials: true });
 		return response?.data;
+	},
+
+	/**
+	 * Distinct users who created at least one offer (for admin User filter).
+	 */
+	async getOfferCreators(): Promise<{
+		success: boolean;
+		users?: UserListItem[];
+		error?: string;
+	}> {
+		try {
+			const response = await axios.get<{
+				data?: {
+					users?: Array<{
+						id: string;
+						externalId?: string | null;
+						firstName?: string;
+						lastName?: string;
+						role?: string;
+						profilePhoto?: string | null;
+						avatar?: string | null;
+						userColor?: string | null;
+					}>;
+				};
+				users?: Array<{
+					id: string;
+					externalId?: string | null;
+					firstName?: string;
+					lastName?: string;
+					role?: string;
+					profilePhoto?: string | null;
+					avatar?: string | null;
+					userColor?: string | null;
+				}>;
+			}>("/api/offers/creators", { withCredentials: true });
+
+			const payload = response.data;
+			const rawUsers = payload?.data?.users ?? payload?.users ?? [];
+			const users: UserListItem[] = rawUsers.map((u) => ({
+				id: u.id,
+				externalId: u.externalId ?? undefined,
+				firstName: u.firstName ?? "",
+				lastName: u.lastName ?? "",
+				role: u.role ?? "",
+				email: "",
+				phone: "",
+				location: "",
+				type: "",
+				vin: "",
+				status: "ACTIVE",
+				avatar: u.avatar ?? u.profilePhoto ?? undefined,
+				profilePhoto: u.profilePhoto ?? undefined,
+				userColor: u.userColor ?? null,
+			}));
+
+			return { success: true, users };
+		} catch (error) {
+			console.error("Error in getOfferCreators:", error);
+			return { success: false, error: "Failed to fetch offer creators" };
+		}
 	},
 
 	async getOffer(offerId: number): Promise<GetOfferResponse> {
@@ -359,15 +431,18 @@ const offers = {
 				message?: string;
 				errors?: string[];
 			};
-			const errorMsg =
-				errData?.error ?? errData?.message ?? "Failed to create offer";
 			const errorDetails =
 				Array.isArray(errData?.errors) && errData.errors.length > 0
-					? errData.errors.join(". ")
+					? errData.errors.filter(Boolean).join(". ")
 					: "";
+			const errorMsg =
+				errorDetails ||
+				errData?.error ||
+				errData?.message ||
+				"Failed to create offer";
 			return {
 				success: false,
-				error: errorDetails ? `${errorMsg}: ${errorDetails}` : errorMsg,
+				error: errorMsg,
 				errors: errData?.errors,
 			};
 		} catch (error) {
@@ -411,15 +486,18 @@ const offers = {
 				message?: string;
 				errors?: string[];
 			};
-			const errorMsg =
-				errData?.error ?? errData?.message ?? "Failed to update offer";
 			const errorDetails =
 				Array.isArray(errData?.errors) && errData.errors.length > 0
-					? errData.errors.join(". ")
+					? errData.errors.filter(Boolean).join(". ")
 					: "";
+			const errorMsg =
+				errorDetails ||
+				errData?.error ||
+				errData?.message ||
+				"Failed to update offer";
 			return {
 				success: false,
-				error: errorDetails ? `${errorMsg}: ${errorDetails}` : errorMsg,
+				error: errorMsg,
 				errors: errData?.errors,
 			};
 		} catch (error) {
@@ -538,6 +616,44 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in returnDriverToOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async sendDriverReminder(
+		offerId: number,
+		driverExternalId: string
+	): Promise<SendDriverReminderResponse> {
+		try {
+			const response = await axios.post<SendDriverReminderResponse>(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/send-reminder`,
+				{},
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					message: data.message,
+					reminder_count: data.reminder_count,
+					last_reminder_at: data.last_reminder_at,
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to send reminder",
+			};
+		} catch (error) {
+			console.error("Error in sendDriverReminder:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

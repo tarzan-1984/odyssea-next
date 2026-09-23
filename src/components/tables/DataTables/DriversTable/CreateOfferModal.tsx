@@ -1237,8 +1237,13 @@ export default function CreateOfferModal({
 				});
 				onClose();
 			} else {
+				const detailErrors =
+					Array.isArray(result.errors) && result.errors.length > 0
+						? result.errors.filter(Boolean).join(". ")
+						: "";
 				setSubmitError(
-					result.error ??
+					detailErrors ||
+						result.error ||
 						(isEditMode ? "Failed to update offer" : "Failed to create offer")
 				);
 			}
@@ -1496,54 +1501,56 @@ export default function CreateOfferModal({
 							className="w-full dark:bg-gray-900"
 						/>
 					</div>
-
-					{submitError ? (
-						<p className="min-h-[1.25rem] text-sm text-red-500 dark:text-red-400">
-							{submitError}
-						</p>
-					) : (
-						<p className="min-h-[1.25rem] text-sm" aria-hidden="true" />
-					)}
 				</div>
 
-				<div className="flex shrink-0 items-center justify-end gap-3 px-6 pb-6 pt-4 sm:px-8 sm:pb-8">
-					{isSubmitting && (
-						<div className="mr-1 flex items-center" aria-hidden>
-							<SpinnerOne />
-						</div>
-					)}
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={onClose}
-						disabled={isSubmitting}
-					>
-						Cancel
-					</Button>
-					<Button
-						type="submit"
-						size="sm"
-						className="min-w-[6.5rem]"
-						disabled={
-							!canSubmitOffer ||
-							isSubmitting ||
-							isCalculatingRoute ||
-							loadedMiles == null ||
-							loadedMiles === 0 ||
-							Boolean(routeError) ||
-							Object.keys(routeRowLocationErrors).length > 0 ||
-							(isEditMode && !hasEditChanges)
-						}
-					>
-						{isSubmitting
-							? isEditMode
-								? "Editing…"
-								: "Creating…"
-							: isEditMode
-								? "Edit"
-								: "Create"}
-					</Button>
+				<div className="flex shrink-0 flex-col gap-3 px-6 pb-6 pt-4 sm:px-8 sm:pb-8">
+					{submitError ? (
+						<p
+							role="alert"
+							className="text-sm text-red-500 dark:text-red-400"
+						>
+							{submitError}
+						</p>
+					) : null}
+					<div className="flex items-center justify-end gap-3">
+						{isSubmitting && (
+							<div className="mr-1 flex items-center" aria-hidden>
+								<SpinnerOne />
+							</div>
+						)}
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={onClose}
+							disabled={isSubmitting}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							size="sm"
+							className="min-w-[6.5rem]"
+							disabled={
+								!canSubmitOffer ||
+								isSubmitting ||
+								isCalculatingRoute ||
+								loadedMiles == null ||
+								loadedMiles === 0 ||
+								Boolean(routeError) ||
+								Object.keys(routeRowLocationErrors).length > 0 ||
+								(isEditMode && !hasEditChanges)
+							}
+						>
+							{isSubmitting
+								? isEditMode
+									? "Editing…"
+									: "Creating…"
+								: isEditMode
+									? "Edit"
+									: "Create"}
+						</Button>
+					</div>
 				</div>
 			</form>
 		</Modal>

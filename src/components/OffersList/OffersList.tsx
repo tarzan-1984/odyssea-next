@@ -219,6 +219,81 @@ function useCountdownSeconds(actionTimeUnix: number | null, enabled = true): num
 		: Math.max(0, actionTimeUnix - nowUnixSeconds);
 }
 
+const MAX_OFFER_REMINDERS_PER_DRIVER = 3;
+const OFFER_REMINDER_COOLDOWN_SECONDS = 5 * 60;
+
+function formatReminderCountdown(totalSeconds: number): string {
+	const mins = Math.floor(totalSeconds / 60);
+	const secs = totalSeconds % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+const SendReminderButton = memo(function SendReminderButton({
+	offerId,
+	driver,
+	actionKey,
+	canModifyOffersByRole,
+	sendingReminderKey,
+	onSend,
+}: {
+	offerId: number;
+	driver: OfferDriver;
+	actionKey: string | null;
+	canModifyOffersByRole: boolean;
+	sendingReminderKey: string | null;
+	onSend: (offerId: number, driverExternalId: string, actionKey: string) => void;
+}) {
+	const reminderCount = driver.reminder_count ?? 0;
+	const lastReminderAt = normalizeUnixSeconds(driver.last_reminder_at);
+	const eligibleAtUnix =
+		lastReminderAt != null
+			? lastReminderAt + OFFER_REMINDER_COOLDOWN_SECONDS
+			: null;
+	const limitReached = reminderCount >= MAX_OFFER_REMINDERS_PER_DRIVER;
+	const secondsLeft = useCountdownSeconds(
+		eligibleAtUnix,
+		!limitReached && eligibleAtUnix != null
+	);
+	const onCooldown = secondsLeft != null && secondsLeft > 0;
+	const isSending = actionKey != null && sendingReminderKey === actionKey;
+	const driverKey = driver.externalId ?? driver.driver_id;
+	const disabled =
+		!canModifyOffersByRole ||
+		!actionKey ||
+		!driverKey ||
+		limitReached ||
+		onCooldown ||
+		isSending;
+
+	let title = `Send reminder (${reminderCount}/${MAX_OFFER_REMINDERS_PER_DRIVER})`;
+	if (limitReached) {
+		title = `Reminder limit reached (${MAX_OFFER_REMINDERS_PER_DRIVER}/${MAX_OFFER_REMINDERS_PER_DRIVER})`;
+	} else if (onCooldown && secondsLeft != null) {
+		title = `Available in ${formatReminderCountdown(secondsLeft)} (${reminderCount}/${MAX_OFFER_REMINDERS_PER_DRIVER})`;
+	}
+
+	const label = limitReached
+		? `Send reminder (${MAX_OFFER_REMINDERS_PER_DRIVER}/${MAX_OFFER_REMINDERS_PER_DRIVER})`
+		: onCooldown && secondsLeft != null
+			? `Reminder ${formatReminderCountdown(secondsLeft)} (${reminderCount}/${MAX_OFFER_REMINDERS_PER_DRIVER})`
+			: `Send reminder (${reminderCount}/${MAX_OFFER_REMINDERS_PER_DRIVER})`;
+
+	return (
+		<button
+			type="button"
+			title={title}
+			disabled={disabled}
+			onClick={() => {
+				if (disabled || !driverKey || !actionKey) return;
+				onSend(offerId, String(driverKey), actionKey);
+			}}
+			className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+		>
+			{label}
+		</button>
+	);
+});
+
 function formatDriverBidRate(rate: number | null | undefined): string | null {
 	if (rate == null) return null;
 	return `$${Number(rate).toLocaleString("en-US")}`;
@@ -454,16 +529,26 @@ function buildOfferUnavailablePushMessage(_offer: OfferRow): string {
 	return OFFER_UNAVAILABLE_PUSH_BODY;
 }
 
-const DRIVER_TABLE_COL_UNIT = "280px";
-const DRIVER_TABLE_COL_PHONE = "130px";
+const DRIVER_TABLE_COL_UNIT = "240px";
+const DRIVER_TABLE_COL_PHONE = "120px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
 const DRIVER_TABLE_COL_DRIVER_ETA = "104px";
 const DRIVER_TABLE_COL_BID_TIMER = "126px";
+/** Narrow so multiple action buttons wrap instead of forcing horizontal scroll. */
+const DRIVER_TABLE_COL_ACTIONS = "9.5rem";
 
 function fixedDriverTableCol(width: string) {
 	return { width, minWidth: width, maxWidth: width };
 }
+
+/** Actions: fixed min width; no maxWidth so cell can grow slightly if needed. */
+function actionsDriverTableCol() {
+	return { width: DRIVER_TABLE_COL_ACTIONS, minWidth: DRIVER_TABLE_COL_ACTIONS };
+}
+
+const OFFER_DRIVER_ACTIONS_CLASS =
+	"offer-driver-actions flex w-full max-w-full flex-col items-stretch gap-1.5";
 
 function offerDriverToCheckListDriver(driver: OfferDriver): CheckListDriver {
 	return {
@@ -527,6 +612,7 @@ const OffersList = () => {
 	const [returningDriverKey, setReturningDriverKey] = useState<string | null>(null);
 	const [acceptingDriverKey, setAcceptingDriverKey] = useState<string | null>(null);
 	const [creatingChatDriverKey, setCreatingChatDriverKey] = useState<string | null>(null);
+	const [sendingReminderKey, setSendingReminderKey] = useState<string | null>(null);
 	const [showDriverAcceptedModal, setShowDriverAcceptedModal] = useState(false);
 	const [deactivatingOfferId, setDeactivatingOfferId] = useState<number | null>(null);
 	const [deactivateConfirmOffer, setDeactivateConfirmOffer] = useState<OfferRow | null>(null);
@@ -557,6 +643,23 @@ const OffersList = () => {
 			defaultMessage: buildExtendBidTimePushMessage(offer),
 		});
 	}, []);
+
+	const handleSendDriverReminder = useCallback(
+		async (offerId: number, driverExternalId: string, actionKey: string) => {
+			setSendingReminderKey(actionKey);
+			const res = await offersApi.sendDriverReminder(offerId, driverExternalId);
+			setSendingReminderKey(null);
+			if (res.success) {
+				await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
+			} else {
+				console.error(res.error);
+				window.alert(
+					typeof res.error === "string" ? res.error : "Failed to send reminder"
+				);
+			}
+		},
+		[queryClient]
+	);
 
 	const handleCopyOfferTitle = useCallback(async (text: string) => {
 		if (!text) return;
@@ -768,6 +871,8 @@ const OffersList = () => {
 							<span className="text-gray-500 dark:text-gray-400"> User </span>
 							<UserFilterSelect
 								value={userFilterId}
+								source="offer-creators"
+								queryKeyPrefix="offers-user-filter"
 								onChangeAction={(val) => {
 									setUserFilterId(val);
 									setCurrentPage(1);
@@ -1087,7 +1192,7 @@ const OffersList = () => {
 														)}
 													</div>
 													<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.08]">
-													<Table className="w-full border-collapse table-fixed">
+													<Table className="w-full min-w-0 border-collapse table-fixed">
 												<colgroup>
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_UNIT)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
@@ -1099,7 +1204,7 @@ const OffersList = () => {
 													/>
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_BID_TIMER)} />
 													{!row.is_driver_selected && (
-														<col style={fixedDriverTableCol("200px")} />
+														<col style={actionsDriverTableCol()} />
 													)}
 												</colgroup>
 														<TableHeader className="border-b border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.04]">
@@ -1148,20 +1253,20 @@ const OffersList = () => {
 																	key={`${row.id}-${driver.driver_id ?? driver.externalId ?? driverIndex}`}
 																	className={`border-gray-200 dark:border-white/[0.08] ${driver.is_selected ? "bg-green-100 dark:bg-green-900/25" : driver.active === false ? "bg-red-100 dark:bg-red-900/25" : ""}`}
 																>
-															<TableCell className="px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																<span className="inline-flex items-center gap-1.5">
+															<TableCell className="min-w-0 px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<span className="inline-flex max-w-full items-center gap-1.5">
 																	{tmsDriverUrl ? (
 																		<a
 																			href={tmsDriverUrl}
 																			target="_blank"
 																			rel="noopener noreferrer"
 																			onClick={(e) => e.stopPropagation()}
-																			className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+																			className="truncate text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
 																		>
 																			{driverDisplayName}
 																		</a>
 																	) : (
-																		<span>{driverDisplayName}</span>
+																		<span className="truncate">{driverDisplayName}</span>
 																	)}
 																	{driverUnitId ? (
 																		<span onClick={(e) => e.stopPropagation()}>
@@ -1226,7 +1331,7 @@ const OffersList = () => {
 																			/>
 																	</TableCell>
 																	{!row.is_driver_selected && (
-																		<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08]">
+																		<TableCell className="min-w-0 px-2 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-white/[0.08] align-top">
 																			{(() => {
 																				const driverKey = driver.externalId ?? driver.driver_id;
 																				const actionKey = driverKey ? `${row.id}-${driverKey}` : null;
@@ -1270,7 +1375,7 @@ const OffersList = () => {
 																									);
 																								}
 																							}}
-																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
+																							className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
 																						>
 																							<OfferDriverChatIcon className="h-3.5 w-3.5 shrink-0" />
 																							{driver.has_offer_chat ? "Open chat" : "Add chat"}
@@ -1279,7 +1384,7 @@ const OffersList = () => {
 
 																				if (driver.active === false) {
 																					return (
-																						<div className="flex flex-wrap items-center justify-center gap-1.5">
+																						<div className={OFFER_DRIVER_ACTIONS_CLASS}>
 																							{createChatButton}
 																							<button
 																								type="button"
@@ -1299,7 +1404,7 @@ const OffersList = () => {
 																										console.error(res.error);
 																									}
 																								}}
-																								className="rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																								className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																							>
 																								Return
 																							</button>
@@ -1308,8 +1413,16 @@ const OffersList = () => {
 																				}
 
 																				return (
-																					<div className="flex flex-wrap items-center justify-center gap-1.5">
+																					<div className={OFFER_DRIVER_ACTIONS_CLASS}>
 																						{createChatButton}
+																						<SendReminderButton
+																							offerId={row.id}
+																							driver={driver}
+																							actionKey={actionKey}
+																							canModifyOffersByRole={canModifyOffersByRole}
+																							sendingReminderKey={sendingReminderKey}
+																							onSend={handleSendDriverReminder}
+																						/>
 																						<button
 																							type="button"
 																							disabled={
@@ -1341,7 +1454,7 @@ const OffersList = () => {
 																									console.error(res.error);
 																								}
 																							}}
-																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+																							className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 																						>
 																							<OfferDeleteIcon className="h-3.5 w-3.5 shrink-0" />
 																							Delete
@@ -1379,7 +1492,7 @@ const OffersList = () => {
 																										setAcceptingDriverKey(null);
 																									});
 																							}}
-																							className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+																							className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
 																						>
 																							<OfferAcceptIcon className="h-3.5 w-3.5 shrink-0" />
 																							Accept
@@ -1398,7 +1511,7 @@ const OffersList = () => {
 																										driverRate: driver.rate,
 																									});
 																								}}
-																								className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+																								className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
 																							>
 																								<OfferCounterOfferIcon className="h-3.5 w-3.5 shrink-0" />
 																								Counter offer
@@ -1424,7 +1537,8 @@ const OffersList = () => {
 										(deletingDriverKey != null && deletingDriverKey.startsWith(`${row.id}-`)) ||
 										(returningDriverKey != null && returningDriverKey.startsWith(`${row.id}-`)) ||
 										(acceptingDriverKey != null && acceptingDriverKey.startsWith(`${row.id}-`)) ||
-										(creatingChatDriverKey != null && creatingChatDriverKey.startsWith(`${row.id}-`))) && (
+										(creatingChatDriverKey != null && creatingChatDriverKey.startsWith(`${row.id}-`)) ||
+										(sendingReminderKey != null && sendingReminderKey.startsWith(`${row.id}-`))) && (
 										<div
 											className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-white/70 dark:bg-white/10"
 											aria-hidden

@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useQuery } from "@tanstack/react-query";
 import users from "@/app-api/users";
+import offersApi from "@/app-api/offers";
 import { renderAvatar } from "@/helpers";
 import type { UserListItem } from "@/app-api/api-types";
 
@@ -33,10 +34,15 @@ const STALE_TIME_MS = 3 * 60 * 60 * 1000; // 3 hours
 export interface UserFilterSelectProps {
 	value: string;
 	onChangeAction: (val: string) => void;
-	/** Roles included in the dropdown. Defaults to offers creator roles. */
+	/** Roles included in the dropdown. Defaults to offers creator roles. Ignored when source is offer-creators. */
 	roles?: readonly string[];
 	/** React Query key segment so different pages cache separately. */
 	queryKeyPrefix?: string;
+	/**
+	 * role-users: general /users list filtered by roles (Load board).
+	 * offer-creators: distinct authors from offers table (My Offers).
+	 */
+	source?: "role-users" | "offer-creators";
 }
 
 function getUserDisplayName(item: UserListItem): string {
@@ -53,25 +59,32 @@ export default function UserFilterSelect({
 	onChangeAction,
 	roles = OFFERS_USER_ROLES,
 	queryKeyPrefix = "offers-user-filter",
+	source = "role-users",
 }: UserFilterSelectProps) {
 	const [open, setOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	useClickOutside(dropdownRef, () => setOpen(false));
 
 	const rolesKey = [...roles].join(",");
-	const { data } = useQuery({
-		queryKey: [queryKeyPrefix, rolesKey],
-		queryFn: () =>
-			users.getAllUsers({
+	const { data: userList = [] } = useQuery({
+		queryKey: [queryKeyPrefix, source, rolesKey],
+		queryFn: async (): Promise<UserListItem[]> => {
+			if (source === "offer-creators") {
+				const res = await offersApi.getOfferCreators();
+				return res.success ? (res.users ?? []) : [];
+			}
+			const res = await users.getAllUsers({
 				page: 1,
 				limit: 500,
 				roles: [...roles],
-			}),
+				sort: { firstName: "asc" },
+			});
+			return res?.data?.data?.users ?? [];
+		},
 		enabled: open || Boolean(value),
 		staleTime: STALE_TIME_MS,
 	});
 
-	const userList: UserListItem[] = data?.data?.data?.users ?? [];
 	const selectedUser = userList.find((u) => (u.externalId ?? u.id) === value);
 
 	const handleSelect = (val: string) => {
