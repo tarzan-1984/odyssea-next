@@ -115,7 +115,7 @@ describe("resolveStopFromGoogleWaypoint", () => {
 		});
 	});
 
-	it("rejects a misspelled city when Google resolved the real name", () => {
+	it("auto-corrects a near-miss city spelling when Google resolved the real name", () => {
 		expect(
 			resolveStopFromGoogleWaypoint("Waseon, Ohio 43567", {
 				resolvedAddress: "123 N Fulton St, Wauseon, OH 43567, USA",
@@ -124,11 +124,28 @@ describe("resolveStopFromGoogleWaypoint", () => {
 				zipCode: "43567",
 			}),
 		).toEqual({
-			location: "Waseon, Ohio 43567",
-			latitude: null,
-			longitude: null,
-			zipCode: null,
-			error: LOCATION_ZIP_MISMATCH_ERROR,
+			location: "Wauseon, OH 43567",
+			latitude: 41.5492,
+			longitude: -84.1416,
+			zipCode: "43567",
+			error: null,
+		});
+	});
+
+	it("auto-corrects Forth Worth typo when ZIP matches", () => {
+		expect(
+			resolveStopFromGoogleWaypoint("Forth worth, Tx 76112", {
+				resolvedAddress: "Fort Worth, TX 76112, USA",
+				latitude: 32.7357,
+				longitude: -97.214,
+				zipCode: "76112",
+			}),
+		).toEqual({
+			location: "Fort Worth, TX 76112",
+			latitude: 32.7357,
+			longitude: -97.214,
+			zipCode: "76112",
+			error: null,
 		});
 	});
 

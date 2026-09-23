@@ -193,11 +193,13 @@ export function resolveStopFromGoogleWaypoint(
 	if (user?.postal && googlePostal && !postalsCompatible(user.postal, googlePostal)) {
 		return failed(LOCATION_ZIP_MISMATCH_ERROR);
 	}
-	if (user?.city && google?.city && isLikelyCityTypo(user.city, google.city)) {
-		return failed(LOCATION_ZIP_MISMATCH_ERROR);
-	}
 
-	const city = (user?.city || google?.city || "").trim();
+	// Near-miss city spelling (Forth → Fort, Waseon → Wauseon): keep Google's name.
+	const cityTypo =
+		user?.city != null &&
+		google?.city != null &&
+		isLikelyCityTypo(user.city, google.city);
+	const city = (cityTypo ? google.city : user?.city || google?.city || "").trim();
 	const regionCode = (user?.regionCode || google?.regionCode || "").trim();
 	const postal = (googlePostal || user?.postal || "").trim();
 
