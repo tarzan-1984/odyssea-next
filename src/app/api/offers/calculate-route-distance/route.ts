@@ -53,22 +53,34 @@ async function reversePostalFromGeoZips(
 	});
 	if (!response.ok) return null;
 
-	const body = (await response.json().catch(() => null)) as {
-		success?: boolean;
-		data?: {
-			zip?: string | null;
-			city?: string | null;
-			stateCode?: string | null;
-		} | null;
-	} | null;
-	const zip = body?.data?.zip?.trim();
-	if (!body?.success || !zip) return null;
-
-	return {
-		postal: zip,
-		city: body.data?.city?.trim() || null,
-		regionCode: body.data?.stateCode?.trim() || null,
-	};
+	const body: unknown = await response.json().catch(() => null);
+	// Nest TransformInterceptor wraps as { data: { success, data: { zip, ... } } }
+	let current: unknown = body;
+	for (let i = 0; i < 4 && current != null && typeof current === "object"; i++) {
+		const record = current as Record<string, unknown>;
+		const nested = record.data;
+		if (
+			nested != null &&
+			typeof nested === "object" &&
+			typeof (nested as Record<string, unknown>).zip === "string"
+		) {
+			const hit = nested as {
+				zip?: string | null;
+				city?: string | null;
+				stateCode?: string | null;
+			};
+			const zip = hit.zip?.trim();
+			if (!zip) return null;
+			return {
+				postal: zip,
+				city: hit.city?.trim() || null,
+				regionCode: hit.stateCode?.trim() || null,
+			};
+		}
+		if (record.success === false) return null;
+		current = nested;
+	}
+	return null;
 }
 
 /**
