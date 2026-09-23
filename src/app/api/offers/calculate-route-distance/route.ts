@@ -9,10 +9,9 @@ import {
 	applyGoogleWaypointsToLocations,
 	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
-	prepareLocationsForGoogleRoute,
 	type GoogleRouteWaypointLike,
+	type PostalReverseHit,
 } from "@/utils/offerGoogleRoute";
-import { geocodeOfferToFormattedAddress } from "@/utils/offerLocationGeocode";
 
 export const maxDuration = 180;
 
@@ -37,10 +36,46 @@ async function googleRoute(
 	return parseGoogleDirectionsBody(body);
 }
 
+async function reversePostalFromGeoZips(
+	latitude: number,
+	longitude: number,
+): Promise<PostalReverseHit | null> {
+	const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
+	if (!backendBase) return null;
+
+	const qs = new URLSearchParams({
+		latitude: String(latitude),
+		longitude: String(longitude),
+	});
+	const response = await fetch(`${backendBase}/v1/geocoding/geo-zips/reverse?${qs.toString()}`, {
+		method: "GET",
+		cache: "no-store",
+	});
+	if (!response.ok) return null;
+
+	const body = (await response.json().catch(() => null)) as {
+		success?: boolean;
+		data?: {
+			zip?: string | null;
+			city?: string | null;
+			stateCode?: string | null;
+		} | null;
+	} | null;
+	const zip = body?.data?.zip?.trim();
+	if (!body?.success || !zip) return null;
+
+	return {
+		postal: zip,
+		city: body.data?.city?.trim() || null,
+		regionCode: body.data?.stateCode?.trim() || null,
+	};
+}
+
 /**
  * POST /api/offers/calculate-route-distance
  * One Google Maps request (chunked if needed) that validates stops, fills
  * city/state/ZIP + coordinates, and returns loaded miles.
+ * Missing ZIPs are filled via geo_zips reverse on Google waypoint coords.
  * Body: { locations: string[] }
  */
 export async function POST(request: NextRequest) {
@@ -62,21 +97,16 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const googleLocations = await prepareLocationsForGoogleRoute(
-			locations,
-			geocodeOfferToFormattedAddress,
-		);
-
 		let totalMeters = 0;
 		let originIndex = 0;
 		let waypoints: GoogleRouteWaypointLike[] = [];
 
-		while (originIndex < googleLocations.length - 1) {
-			const destinations = googleLocations.slice(
+		while (originIndex < locations.length - 1) {
+			const destinations = locations.slice(
 				originIndex + 1,
 				originIndex + 1 + MAX_GOOGLE_DESTINATIONS
 			);
-			const route = await googleRoute(googleLocations[originIndex], destinations);
+			const route = await googleRoute(locations[originIndex], destinations);
 			if (!route) {
 				return NextResponse.json(
 					{ error: "Could not calculate route between addresses" },
@@ -91,9 +121,8 @@ export async function POST(request: NextRequest) {
 
 		const loadedMiles = totalMeters * METERS_TO_MILES;
 		const stops = await enrichStopsWithPostal(
-			locations,
 			applyGoogleWaypointsToLocations(locations, waypoints),
-			geocodeOfferToFormattedAddress,
+			reversePostalFromGeoZips,
 		);
 
 		return NextResponse.json({ loadedMiles, stops }, { status: 200 });

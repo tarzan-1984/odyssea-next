@@ -234,44 +234,56 @@ export function applyGoogleWaypointsToLocations(
 	);
 }
 
-/** When Google did not return a ZIP, look it up from city/state (same as the old formatted geocode). */
+export type PostalReverseHit = {
+	postal: string;
+	city?: string | null;
+	regionCode?: string | null;
+};
+
+/**
+ * When Google Directions omitted ZIP on a city-level stop, reverse the coords
+ * we already have (geo_zips / PostGIS) — no Zippopotam / Nominatim round-trip.
+ */
 export async function enrichStopsWithPostal(
-	locations: string[],
 	stops: OfferRouteStop[],
-	lookupFormatted: (input: string) => Promise<string>,
+	reversePostal: (
+		latitude: number,
+		longitude: number,
+	) => Promise<PostalReverseHit | null>,
 ): Promise<OfferRouteStop[]> {
 	return await Promise.all(
-		stops.map(async (stop, index) => {
+		stops.map(async (stop) => {
 			if (stop.error) return stop;
 			if (stop.zipCode || locationHasPostalCode(stop.location)) return stop;
-
-			const query = locations[index]?.trim() || stop.location;
-			const formatted = (await lookupFormatted(query)).trim();
-			if (!formatted || !locationHasPostalCode(formatted)) {
+			if (
+				stop.latitude == null ||
+				stop.longitude == null ||
+				!Number.isFinite(stop.latitude) ||
+				!Number.isFinite(stop.longitude)
+			) {
 				return { ...stop, error: LOCATION_POSTAL_ERROR };
 			}
-			const line = parseCityRegionPostalLine(formatted);
+
+			const hit = await reversePostal(stop.latitude, stop.longitude);
+			const postal = hit?.postal?.trim() ?? "";
+			if (!postal) {
+				return { ...stop, error: LOCATION_POSTAL_ERROR };
+			}
+
+			const place = parseUserPlace(stop.location);
+			const city = (place?.city || hit?.city || "").trim();
+			const regionCode = (place?.regionCode || hit?.regionCode || "").trim();
+			if (!city || !regionCode) {
+				return { ...stop, error: LOCATION_POSTAL_ERROR };
+			}
+
 			return {
-				location: formatted,
+				location: formatCityStatePostal(city, regionCode, postal),
 				latitude: stop.latitude,
 				longitude: stop.longitude,
-				zipCode: line?.postal ?? stop.zipCode,
+				zipCode: postal,
 				error: null,
 			};
-		}),
-	);
-}
-
-/** Resolve missing ZIP / full state names before Google Directions. */
-export async function prepareLocationsForGoogleRoute(
-	locations: string[],
-	lookupFormatted: (input: string) => Promise<string>,
-): Promise<string[]> {
-	return await Promise.all(
-		locations.map(async (location) => {
-			if (locationHasPostalCode(location)) return location;
-			const formatted = (await lookupFormatted(location)).trim();
-			return formatted && locationHasPostalCode(formatted) ? formatted : location;
 		}),
 	);
 }

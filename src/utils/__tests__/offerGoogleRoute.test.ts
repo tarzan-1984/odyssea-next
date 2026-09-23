@@ -3,7 +3,6 @@ import {
 	enrichStopsWithPostal,
 	mergeChunkedWaypoints,
 	parseGoogleResolvedPlace,
-	prepareLocationsForGoogleRoute,
 	resolveStopFromGoogleWaypoint,
 } from "../offerGoogleRoute";
 import {
@@ -167,32 +166,14 @@ describe("applyGoogleWaypointsToLocations", () => {
 	});
 });
 
-describe("prepareLocationsForGoogleRoute", () => {
-	it("fills ZIP before Google when the user typed a city without postal", async () => {
-		const lookup = jest.fn(async (input: string) => {
-			if (input === "Spartanburg, SC") return "Spartanburg, SC 29301";
-			if (input === "Jessup, Maryland") return "Jessup, MD 20794";
-			return "";
-		});
-		await expect(
-			prepareLocationsForGoogleRoute(["Spartanburg, SC", "Jessup, Maryland"], lookup),
-		).resolves.toEqual(["Spartanburg, SC 29301", "Jessup, MD 20794"]);
-		expect(lookup).toHaveBeenCalledTimes(2);
-	});
-
-	it("leaves a location unchanged when it already has a ZIP", async () => {
-		const lookup = jest.fn(async () => "should not run");
-		await expect(
-			prepareLocationsForGoogleRoute(["Spartanburg, SC 29301"], lookup),
-		).resolves.toEqual(["Spartanburg, SC 29301"]);
-		expect(lookup).not.toHaveBeenCalled();
-	});
-});
-
 describe("enrichStopsWithPostal", () => {
-	it("fills ZIP for City, ST when Google omitted it", async () => {
+	it("fills ZIP from reverse geocode when Google omitted it", async () => {
+		const reverse = jest.fn(async () => ({
+			postal: "79101",
+			city: "Amarillo",
+			regionCode: "TX",
+		}));
 		const stops = await enrichStopsWithPostal(
-			["Amarillo, TX"],
 			[
 				{
 					location: "Amarillo, TX",
@@ -202,8 +183,9 @@ describe("enrichStopsWithPostal", () => {
 					error: null,
 				},
 			],
-			async () => "Amarillo, TX 79101",
+			reverse,
 		);
+		expect(reverse).toHaveBeenCalledWith(35.222, -101.8313);
 		expect(stops[0]).toEqual({
 			location: "Amarillo, TX 79101",
 			latitude: 35.222,
@@ -211,6 +193,24 @@ describe("enrichStopsWithPostal", () => {
 			zipCode: "79101",
 			error: null,
 		});
+	});
+
+	it("skips reverse when the stop already has a ZIP", async () => {
+		const reverse = jest.fn(async () => ({ postal: "00000" }));
+		const stops = await enrichStopsWithPostal(
+			[
+				{
+					location: "Amarillo, TX 79101",
+					latitude: 35.222,
+					longitude: -101.8313,
+					zipCode: "79101",
+					error: null,
+				},
+			],
+			reverse,
+		);
+		expect(reverse).not.toHaveBeenCalled();
+		expect(stops[0].zipCode).toBe("79101");
 	});
 });
 
