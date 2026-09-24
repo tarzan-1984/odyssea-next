@@ -62,10 +62,13 @@ export default function ChatParticipantsModal({
 	/** LOAD only: show participant externalId next to role for admin externalId 83. */
 	const showParticipantExternalId = isLoadChat && canShowOfferId(currentUser);
 
-	// Roles that can manage LOAD chat participants (not chat picture — see below)
+	// Roles that can manage LOAD chat participants / rename (not chat picture — see below)
 	const loadChatManagerRoles = [
 		'TRACKING_TL',
-		'EXPEDITE_MANAGER', 
+		'TRACKING_TL_DAYTIME',
+		'TRACKING_TL_NIGHTSHIFT',
+		'TRACKING_TL_MORNINGSHIFT',
+		'EXPEDITE_MANAGER',
 		'RECRUITER_TL',
 		'TRACKING',
 		'MORNING_TRACKING',
