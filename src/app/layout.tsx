@@ -1,17 +1,9 @@
 import React from "react";
-import { Outfit } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import "swiper/swiper-bundle.css";
 import "simplebar-react/dist/simplebar.min.css";
 import Providers from "@/app/Providers";
-
-const outfit = Outfit({
-	subsets: ["latin"],
-	weight: ["400", "500", "600", "700"],
-});
-
-
 
 export const metadata: Metadata = {
 	title: "Odysseia Web",
@@ -33,7 +25,19 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
-			<body className={`${outfit.className} dark:bg-gray-900`}>
+			<head>
+				<link rel="preconnect" href="https://fonts.googleapis.com" />
+				<link
+					rel="preconnect"
+					href="https://fonts.gstatic.com"
+					crossOrigin="anonymous"
+				/>
+				<link
+					href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
+					rel="stylesheet"
+				/>
+			</head>
+			<body className="font-outfit dark:bg-gray-900">
 				<Providers>{children}</Providers>
 			</body>
 		</html>
