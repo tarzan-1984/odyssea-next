@@ -21,7 +21,9 @@ import {
 import { formatChatRelativeTimeNy } from "@/utils/nyWallClock";
 import { isBidPlusOneMessage } from "@/utils/bidPlusOneMessage";
 import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass, LOAD_CHAT_REST_BG_CLASS, LOAD_CHAT_STALE_BG_CLASS } from "@/utils/loadStatusLabel";
-import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
+import { isLoadChatLocationStale } from "@/utils/loadChatStaleLocation";
+import { canSeeLoadStaleLocationSystemMessage, isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
+import { useStaleLocationClock } from "@/hooks/useStaleLocationClock";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -114,11 +116,20 @@ export default function ChatListItem({
 		return "";
 	};
 
+	const staleLocationNowMs = useStaleLocationClock();
 	const loadStatusLabel =
 		chatRoom.type === "LOAD" ? formatLoadChatStatusLabel(chatRoom.loadStatus) : null;
 	const isStaleLocationChat =
-		!chatRoom.isRest &&
-		(chatRoom.isLocationStale === true || Boolean(chatRoom.staleLocationAlert));
+		canSeeLoadStaleLocationSystemMessage(currentUser?.role) &&
+		isLoadChatLocationStale(
+			{
+				type: chatRoom.type,
+				loadStatus: chatRoom.loadStatus,
+				isRest: chatRoom.isRest,
+				lastLocationUpdateAt: chatRoom.lastLocationUpdateAt,
+			},
+			staleLocationNowMs
+		);
 	const isRestChat = Boolean(chatRoom.isRest);
 	const loadStatusBgClass = isRestChat
 		? LOAD_CHAT_REST_BG_CLASS

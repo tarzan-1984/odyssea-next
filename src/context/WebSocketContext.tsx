@@ -158,7 +158,6 @@ function applyLoadRestUpdated(queryClient: QueryClient, data: LoadRestUpdatedDat
 		const patch = mergeLoadRestFields(room, incoming);
 		updateChatRoom(room.id, {
 			...patch,
-			...(patch.isRest ? { isLocationStale: false, staleLocationAlert: null } : {}),
 		});
 	}
 	queryClient.setQueriesData(

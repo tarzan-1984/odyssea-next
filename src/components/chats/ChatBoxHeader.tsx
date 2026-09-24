@@ -37,6 +37,7 @@ import { canSendCheckListMessages } from "@/utils/roleAccess";
 import { formatLoadChatLastLocationLine } from "@/utils/nyWallClock";
 import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
 import { normalizeLoadChatStatus } from "@/utils/loadStatusLabel";
+import { resolveLoadChatStaleLocationAlert } from "@/utils/loadChatStaleLocation";
 import {
 	buildLoadLocationUpdateMessage,
 	formatCurrentLocationForUpdate,
@@ -46,6 +47,7 @@ import BusyOnOtherLoadMessage from "./BusyOnOtherLoadMessage";
 import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 import { useChatStore } from "@/stores/chatStore";
+import { useStaleLocationClock } from "@/hooks/useStaleLocationClock";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -126,10 +128,19 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const canSeeLoadHeaderAlerts = canSeeLoadStaleLocationSystemMessage(
 		currentUser?.role,
 	);
-	const showStaleLocationAlert =
-		Boolean(chatRoom?.staleLocationAlert?.trim()) &&
-		canSeeLoadHeaderAlerts &&
-		!chatRoom?.isRest;
+	const staleLocationNowMs = useStaleLocationClock();
+	const staleLocationAlertText = canSeeLoadHeaderAlerts
+		? resolveLoadChatStaleLocationAlert(
+				{
+					type: chatRoom?.type,
+					loadStatus: chatRoom?.loadStatus,
+					isRest: chatRoom?.isRest,
+					lastLocationUpdateAt: chatRoom?.lastLocationUpdateAt,
+				},
+				staleLocationNowMs
+			)
+		: null;
+	const showStaleLocationAlert = Boolean(staleLocationAlertText);
 	const isLoadChatArchived = Boolean(
 		chatRoom?.isLoadArchived || chatRoom?.isArchived,
 	);
@@ -401,7 +412,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					{showStaleLocationAlert ? (
 						<div className="mt-1 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded bg-red-500 px-2 py-1.5 text-xs font-medium leading-snug text-white">
 							<span className="min-w-0 [overflow-wrap:anywhere]">
-								{chatRoom?.staleLocationAlert}
+								{staleLocationAlertText}
 							</span>
 							{canShowStalePushButton ? (
 								<button
@@ -551,9 +562,6 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							isRest: update.isRest,
 							restDate: update.restDate ?? null,
 							restStartedAt: update.restStartedAt ?? null,
-							...(update.isRest
-								? { isLocationStale: false, staleLocationAlert: null }
-								: {}),
 						});
 					}
 				}}
