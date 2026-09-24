@@ -50,6 +50,12 @@ describe("isLoadDispatchTermsSystemMessage", () => {
 		).toBe(false);
 		expect(
 			isLoadDispatchTermsSystemMessage({
+				isSystemMessage: true,
+				systemMessageKind: "driver_rest_updated",
+			})
+		).toBe(false);
+		expect(
+			isLoadDispatchTermsSystemMessage({
 				senderId: driverId,
 				isSystemMessage: false,
 			})

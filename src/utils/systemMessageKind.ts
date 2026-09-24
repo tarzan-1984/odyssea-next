@@ -3,6 +3,7 @@ export const SYSTEM_MESSAGE_KIND = {
 	LOAD_PROXIMITY: 'load_proximity',
 	LOAD_STALE_LOCATION: 'load_stale_location',
 	DRIVER_REST_ENDED: 'driver_rest_ended',
+	DRIVER_REST_UPDATED: 'driver_rest_updated',
 } as const;
 
 export type SystemMessageKind =
@@ -63,6 +64,12 @@ export function isDriverRestEndedSystemMessage(
 	return kind === SYSTEM_MESSAGE_KIND.DRIVER_REST_ENDED;
 }
 
+export function isDriverRestUpdatedSystemMessage(
+	kind: SystemMessageKind | string | null | undefined,
+): boolean {
+	return kind === SYSTEM_MESSAGE_KIND.DRIVER_REST_UPDATED;
+}
+
 export function canSeeLoadStaleLocationSystemMessage(
 	role: string | null | undefined,
 ): boolean {
@@ -92,6 +99,12 @@ export function isSystemMessageVisibleToRole(
 	}
 	if (
 		isDriverRestEndedSystemMessage(kind) &&
+		!canSeeDriverRestEndedSystemMessage(role)
+	) {
+		return false;
+	}
+	if (
+		isDriverRestUpdatedSystemMessage(kind) &&
 		!canSeeDriverRestEndedSystemMessage(role)
 	) {
 		return false;

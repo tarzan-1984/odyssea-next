@@ -26,7 +26,7 @@ import {
 import {
 	isLoadDispatchTermsAcceptedMessage,
 } from "@/utils/loadDispatchTerms";
-import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleLocationSystemMessage, isDriverRestEndedSystemMessage } from "@/utils/systemMessageKind";
+import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleLocationSystemMessage, isDriverRestEndedSystemMessage, isDriverRestUpdatedSystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import { mentionNamesFromCandidates, buildMentionCandidates } from "@/utils/chatMentions";
 
@@ -97,8 +97,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isDispatchMessage = isLoadDispatchSystemMessage(message.systemMessageKind);
 	const isStaleLocationMessage = isLoadStaleLocationSystemMessage(message.systemMessageKind);
 	const isRestEndedMessage = isDriverRestEndedSystemMessage(message.systemMessageKind);
+	const isRestUpdatedMessage = isDriverRestUpdatedSystemMessage(message.systemMessageKind);
 	const useGreenSystemBubble =
-		isTermsAccepted || isProximityMessage || isDispatchMessage;
+		isTermsAccepted || isProximityMessage || isDispatchMessage || isRestUpdatedMessage;
 	const useRedSystemBubble = isStaleLocationMessage || isRestEndedMessage;
 	const allowReactions = chatRoomType !== "BID";
 	const bidPriceBubbleClass = isBidNewOffer
