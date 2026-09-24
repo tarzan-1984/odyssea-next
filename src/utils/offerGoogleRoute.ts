@@ -199,8 +199,8 @@ export function resolveStopFromGoogleWaypoint(
 	if (user?.postal && googlePostal && !postalsCompatible(user.postal, googlePostal)) {
 		return failed(
 			formatLocationZipMismatchError({
-				city: google.city,
-				regionCode: google.regionCode,
+				city: google?.city,
+				regionCode: google?.regionCode,
 				postal: googlePostal,
 			}),
 		);
