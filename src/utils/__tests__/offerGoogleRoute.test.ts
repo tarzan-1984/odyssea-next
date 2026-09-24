@@ -7,7 +7,7 @@ import {
 } from "../offerGoogleRoute";
 import {
 	LOCATION_GEOCODE_ERROR,
-	LOCATION_ZIP_MISMATCH_ERROR,
+	formatLocationZipMismatchError,
 } from "../offerLocationFormat";
 
 describe("parseGoogleResolvedPlace", () => {
@@ -94,7 +94,11 @@ describe("resolveStopFromGoogleWaypoint", () => {
 			latitude: null,
 			longitude: null,
 			zipCode: null,
-			error: LOCATION_ZIP_MISMATCH_ERROR,
+			error: formatLocationZipMismatchError({
+				city: "Atlanta",
+				regionCode: "GA",
+				postal: "30337",
+			}),
 		});
 	});
 

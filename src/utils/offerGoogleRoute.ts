@@ -8,7 +8,7 @@ import {
 import {
 	LOCATION_GEOCODE_ERROR,
 	LOCATION_POSTAL_ERROR,
-	LOCATION_ZIP_MISMATCH_ERROR,
+	formatLocationZipMismatchError,
 	locationHasPostalCode,
 } from "./offerLocationFormat";
 
@@ -188,10 +188,22 @@ export function resolveStopFromGoogleWaypoint(
 	const googlePostal = google?.postal ?? waypoint.zipCode?.trim() ?? null;
 
 	if (user?.regionCode && google?.regionCode && user.regionCode !== google.regionCode) {
-		return failed(LOCATION_ZIP_MISMATCH_ERROR);
+		return failed(
+			formatLocationZipMismatchError({
+				city: google.city,
+				regionCode: google.regionCode,
+				postal: googlePostal,
+			}),
+		);
 	}
 	if (user?.postal && googlePostal && !postalsCompatible(user.postal, googlePostal)) {
-		return failed(LOCATION_ZIP_MISMATCH_ERROR);
+		return failed(
+			formatLocationZipMismatchError({
+				city: google.city,
+				regionCode: google.regionCode,
+				postal: googlePostal,
+			}),
+		);
 	}
 
 	// Near-miss city spelling (Forth → Fort, Waseon → Wauseon): keep Google's name.

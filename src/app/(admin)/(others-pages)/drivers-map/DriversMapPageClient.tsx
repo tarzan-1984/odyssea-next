@@ -109,16 +109,12 @@ export function DriversMapPageClient() {
 			{ value: "available_off", label: "Not available" },
 			{ value: "loaded_enroute", label: "Loaded & Enroute" },
 		];
+		// On vacation / Expired documents / Blocked / Out of service — recruiter/admin-style roles only
 		if (canViewRestrictedStatuses) {
 			options.push(
 				{ value: "banned", label: "Out of service" },
 				{ value: "on_vocation", label: "On vacation" },
 				{ value: "blocked", label: "Blocked" },
-				{ value: "expired_documents", label: "Expired documents" }
-			);
-		} else {
-			options.push(
-				{ value: "on_vocation", label: "On vacation" },
 				{ value: "expired_documents", label: "Expired documents" }
 			);
 		}
@@ -132,7 +128,12 @@ export function DriversMapPageClient() {
 
 	useEffect(() => {
 		if (canViewRestrictedStatuses) return;
-		if (statusFilter === "blocked" || statusFilter === "banned") {
+		if (
+			statusFilter === "blocked" ||
+			statusFilter === "banned" ||
+			statusFilter === "on_vocation" ||
+			statusFilter === "expired_documents"
+		) {
 			setStatusFilter("all");
 		}
 	}, [canViewRestrictedStatuses, statusFilter]);

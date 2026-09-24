@@ -34,8 +34,10 @@ import {
 	LOCATION_COORDINATES_ERROR,
 	LOCATION_FORMAT_ERROR,
 	LOCATION_GEOCODE_ERROR,
+	LOCATION_ROUTE_UNRESOLVED_ERROR,
 	normalizeLocationForGeocode,
 } from "@/utils/offerLocationFormat";
+import { diagnoseOfferLocationError } from "@/utils/offerLocationGeocode";
 import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateOffers } from "@/utils/roleAccess";
@@ -599,6 +601,8 @@ export default function CreateOfferModal({
 	const appliedGoogleRouteKeyRef = useRef("");
 	const routeRowsRef = useRef<RouteRow[]>([]);
 	routeRowsRef.current = routeRows;
+	const routeRowLocationErrorsRef = useRef(routeRowLocationErrors);
+	routeRowLocationErrorsRef.current = routeRowLocationErrors;
 	/** Row-id key of the latest GET/prefill route that still needs geocode on open. */
 	const pendingPrefillGeocodeKeyRef = useRef("");
 	/** Row-id key already sent through handleAddressBlur for the current open. */
@@ -790,6 +794,58 @@ export default function CreateOfferModal({
 		}
 	}, [routeDistanceData, committedLocations, queryClient]);
 
+	// When Google cannot build a route, diagnose each stop so field errors match the real issue
+	// (e.g. city/ZIP mismatch) instead of a generic "could not find" on every field.
+	useEffect(() => {
+		if (!routeDistanceQueryError || committedLocations.length === 0) return;
+		const rowsSnapshot = routeRowsRef.current.map(row => ({
+			id: row.id,
+			location: row.location.trim(),
+		}));
+		let cancelled = false;
+
+		(async () => {
+			const entries = await Promise.all(
+				rowsSnapshot.map(async row => {
+					if (!row.location) return [row.id, null] as const;
+					const message = await diagnoseOfferLocationError(row.location, {
+						requireCityPostalMatch: true,
+					});
+					return [row.id, message] as const;
+				})
+			);
+			if (cancelled) return;
+
+			setRouteRowLocationErrors(prev => {
+				const next: Record<string, string> = { ...prev };
+				for (const [id, message] of entries) {
+					if (message) {
+						next[id] = message;
+					} else if (
+						next[id] === LOCATION_GEOCODE_ERROR ||
+						next[id] === LOCATION_ROUTE_UNRESOLVED_ERROR ||
+						next[id] === LOCATION_COORDINATES_ERROR
+					) {
+						delete next[id];
+					}
+				}
+				const anySpecific = entries.some(([, message]) => message != null);
+				if (!anySpecific) {
+					for (const row of rowsSnapshot) {
+						if (row.location && !next[row.id]) {
+							next[row.id] = LOCATION_ROUTE_UNRESOLVED_ERROR;
+						}
+					}
+				}
+				return next;
+			});
+		})().catch(() => {});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [routeDistanceQueryError, committedLocations]);
+
 	const clearUrlLoadedMilesLock = useCallback(() => {
 		if (!preserveUrlLoadedMilesRef.current) return;
 		preserveUrlLoadedMilesRef.current = false;
@@ -875,7 +931,10 @@ export default function CreateOfferModal({
 	const commitLocations = useCallback((rows: RouteRow[]) => {
 		const allFilled = rows.every(r => r.location.trim() !== "");
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
-		if (!allFilled || !allValid) {
+		const hasFieldErrors = rows.some(
+			r => r.location.trim() !== "" && Boolean(routeRowLocationErrorsRef.current[r.id])
+		);
+		if (!allFilled || !allValid || hasFieldErrors) {
 			setCommittedLocations([]);
 			if (!preserveUrlLoadedMilesRef.current) {
 				setManualLoadedMiles(null);
@@ -928,12 +987,22 @@ export default function CreateOfferModal({
 					if (!prev[rowId]) return prev;
 					const next = { ...prev };
 					delete next[rowId];
+					routeRowLocationErrorsRef.current = next;
 					return next;
 				});
+				if (routeRowLocationErrorsRef.current[rowId]) {
+					const next = { ...routeRowLocationErrorsRef.current };
+					delete next[rowId];
+					routeRowLocationErrorsRef.current = next;
+				}
 			};
 
 			const setLocationError = (message: string) => {
-				setRouteRowLocationErrors(prev => ({ ...prev, [rowId]: message }));
+				setRouteRowLocationErrors(prev => {
+					const next = { ...prev, [rowId]: message };
+					routeRowLocationErrorsRef.current = next;
+					return next;
+				});
 				setRouteError(prev =>
 					prev === LOCATION_COORDINATES_ERROR || prev === LOCATION_FORMAT_ERROR
 						? null
@@ -972,7 +1041,16 @@ export default function CreateOfferModal({
 				patchRow({ location: normalized });
 			}
 
-			commitAfterPatch();
+			void (async () => {
+				const diagnosis = await diagnoseOfferLocationError(normalized);
+				if (diagnosis) {
+					setLocationError(diagnosis);
+					patchRow({ coordinates: "" });
+					setCommittedLocations([]);
+					return;
+				}
+				commitAfterPatch();
+			})();
 		},
 		[commitLocations]
 	);
@@ -1074,7 +1152,25 @@ export default function CreateOfferModal({
 						if (row.location !== "" && !isValidLocationFormat(row.location)) {
 							locationErrors[row.id] = LOCATION_FORMAT_ERROR;
 						} else if (!parseRouteCoordinates(row.coordinates)) {
-							locationErrors[row.id] = LOCATION_GEOCODE_ERROR;
+							const existing = routeRowLocationErrors[row.id];
+							if (existing) {
+								locationErrors[row.id] = existing;
+							} else if (!routeDistanceError) {
+								locationErrors[row.id] = LOCATION_COORDINATES_ERROR;
+							}
+						}
+					}
+					// Route failed and no stop-specific diagnose yet — keep submit blocked
+					// without painting every field as "location not found".
+					if (
+						Object.keys(locationErrors).length === 0 &&
+						routeDistanceError &&
+						trimmedRoute.some(row => !parseRouteCoordinates(row.coordinates))
+					) {
+						for (const row of trimmedRoute) {
+							if (row.location && !parseRouteCoordinates(row.coordinates)) {
+								locationErrors[row.id] = LOCATION_ROUTE_UNRESOLVED_ERROR;
+							}
 						}
 					}
 					if (Object.keys(locationErrors).length === 0) {

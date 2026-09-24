@@ -1,7 +1,9 @@
 import {
 	geocodeOfferAddressCoordinates,
 	geocodeOfferToFormattedAddress,
+	diagnoseOfferLocationError,
 } from "../offerLocationGeocode";
+import { formatLocationZipMismatchError } from "../offerLocationFormat";
 
 type ZippPlace = {
 	"place name": string;
@@ -236,6 +238,126 @@ describe("geocodeOfferToFormattedAddress", () => {
 
 		await expect(geocodeOfferToFormattedAddress("Elk Grove Vlg, IL")).resolves.toBe(
 			"Elk Grove Village, IL 60007",
+		);
+	});
+});
+
+describe("diagnoseOfferLocationError", () => {
+	const fetchMock = jest.fn();
+
+	beforeEach(() => {
+		fetchMock.mockReset();
+		global.fetch = fetchMock as unknown as typeof fetch;
+	});
+
+	it("flags Morristown when ZIP 08057 belongs to Moorestown", async () => {
+		const moorestown: ZippPlace = {
+			"place name": "Moorestown",
+			"post code": "08057",
+			state: "New Jersey",
+			"state abbreviation": "NJ",
+			latitude: "39.9683",
+			longitude: "-74.9533",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/08057")) {
+				return jsonResponse(postalBody(moorestown));
+			}
+			if (url.includes("/us/nj/Morristown") || url.includes("/us/nj/morristown")) {
+				return jsonResponse({
+					"place name": "Morristown",
+					state: "New Jersey",
+					"state abbreviation": "NJ",
+					places: [
+						{
+							"place name": "Morristown",
+							"post code": "07960",
+							state: "New Jersey",
+							"state abbreviation": "NJ",
+							latitude: "40.7952",
+							longitude: "-74.4873",
+						},
+					],
+				});
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(diagnoseOfferLocationError("Morristown, NJ 08057")).resolves.toBe(
+			formatLocationZipMismatchError({
+				city: "Moorestown",
+				regionCode: "NJ",
+				postal: "08057",
+			}),
+		);
+	});
+
+	it("does not flag College Park GA 30337 on blur (airport ZIP)", async () => {
+		const atlantaZip: ZippPlace = {
+			"place name": "Atlanta",
+			"post code": "30337",
+			state: "Georgia",
+			"state abbreviation": "GA",
+			latitude: "33.6428",
+			longitude: "-84.4618",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/30337")) {
+				return jsonResponse(postalBody(atlantaZip));
+			}
+			if (url.includes("/us/ga/College Park") || url.includes("/us/ga/College%20Park")) {
+				return jsonResponse({
+					"place name": "College Park",
+					state: "Georgia",
+					"state abbreviation": "GA",
+					places: [
+						{
+							"place name": "College Park",
+							"post code": "30349",
+							state: "Georgia",
+							"state abbreviation": "GA",
+							latitude: "33.6534",
+							longitude: "-84.4494",
+						},
+					],
+				});
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(diagnoseOfferLocationError("College Park, GA 30337")).resolves.toBeNull();
+	});
+
+	it("flags College Park GA 30337 when requireCityPostalMatch is set", async () => {
+		const atlantaZip: ZippPlace = {
+			"place name": "Atlanta",
+			"post code": "30337",
+			state: "Georgia",
+			"state abbreviation": "GA",
+			latitude: "33.6428",
+			longitude: "-84.4618",
+		};
+
+		fetchMock.mockImplementation(async (inputUrl: RequestInfo | URL) => {
+			const url = decodeURIComponent(String(inputUrl));
+			if (url.includes("/us/30337")) {
+				return jsonResponse(postalBody(atlantaZip));
+			}
+			return jsonResponse({}, 404);
+		});
+
+		await expect(
+			diagnoseOfferLocationError("College Park, GA 30337", { requireCityPostalMatch: true }),
+		).resolves.toBe(
+			formatLocationZipMismatchError({
+				city: "Atlanta",
+				regionCode: "GA",
+				postal: "30337",
+			}),
 		);
 	});
 });

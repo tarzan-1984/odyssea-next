@@ -37,6 +37,27 @@ export const LOCATION_POSTAL_ERROR =
 export const LOCATION_COORDINATES_ERROR =
 	"Each stop must have coordinates — blur each location field to resolve the address";
 
+export const LOCATION_ROUTE_UNRESOLVED_ERROR =
+	"Address could not be resolved for routing. Check city, state, and ZIP.";
+
+/** Prefer a concrete hint when we know which city owns the postal code. */
+export function formatLocationZipMismatchError(expected?: {
+	city?: string | null;
+	regionCode?: string | null;
+	postal?: string | null;
+}): string {
+	const city = expected?.city?.trim();
+	const regionCode = expected?.regionCode?.trim();
+	const postal = expected?.postal?.trim();
+	if (city && regionCode && postal) {
+		return `City and ZIP do not match. ${postal} is ${city}, ${regionCode}.`;
+	}
+	if (city && postal) {
+		return `City and ZIP do not match. ${postal} is ${city}.`;
+	}
+	return LOCATION_ZIP_MISMATCH_ERROR;
+}
+
 /** True when the location already contains a US ZIP, CA postal, or MX CP. */
 export function locationHasPostalCode(value: string): boolean {
 	const trimmed = normalizePostalInput(value.trim());

@@ -19,6 +19,10 @@ import {
 	zippopotamPostalUrl,
 	zippopotamUrl,
 } from "./offerLocationCountry";
+import {
+	formatLocationZipMismatchError,
+	LOCATION_GEOCODE_ERROR,
+} from "./offerLocationFormat";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org/search";
 
@@ -86,6 +90,37 @@ function zipRegionMatches(
 
 function compactPostal(postal: string): string {
 	return postal.replace(/\s/g, "").replace(/-\d{4}$/, "").toUpperCase();
+}
+
+function levenshtein(a: string, b: string): number {
+	if (a === b) return 0;
+	if (!a) return b.length;
+	if (!b) return a.length;
+	const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+	for (let i = 1; i <= a.length; i++) {
+		let diagonal = prev[0];
+		prev[0] = i;
+		for (let j = 1; j <= b.length; j++) {
+			const nextDiagonal = prev[j];
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diagonal + cost);
+			diagonal = nextDiagonal;
+		}
+	}
+	return prev[b.length];
+}
+
+/** Near-miss place names (Morristown / Moorestown, Waseon / Wauseon). */
+function isConfusablePlaceName(a: string, b: string): boolean {
+	if (!a.trim() || !b.trim()) return false;
+	if (placeNamesMatch(a, b)) return false;
+	const left = lettersOnlyKey(a);
+	const right = lettersOnlyKey(b);
+	if (!left || !right) return false;
+	const distance = levenshtein(left, right);
+	const maxLen = Math.max(left.length, right.length);
+	if (maxLen <= 4) return distance === 1;
+	return distance > 0 && distance <= 2;
 }
 
 /**
@@ -695,6 +730,82 @@ export async function geocodeOfferToFormattedAddress(
 	if (fromFreeText) return fromFreeText;
 
 	return "";
+}
+
+/**
+ * Field-level reason a location is bad (ZIP mismatch / unknown postal).
+ * Returns null when the line looks fine or cannot be checked without Google.
+ *
+ * `requireCityPostalMatch`: when true (route failure), flag any city that does not
+ * own the ZIP. When false (blur), only flag near-miss cities (Morristown vs Moorestown)
+ * so airport/suburb ZIPs like College Park + 30337 still reach Google.
+ */
+export async function diagnoseOfferLocationError(
+	input: string,
+	options?: { requireCityPostalMatch?: boolean },
+): Promise<string | null> {
+	const trimmed = canonicalizeOfferLocation(input);
+	if (!trimmed) return null;
+
+	const formattedLine = parseCityRegionPostalLine(trimmed);
+	if (!formattedLine) return null;
+
+	const postalHit = await tryZippopotamPostal(formattedLine.postal, formattedLine.country);
+	if (!postalHit) {
+		return LOCATION_GEOCODE_ERROR;
+	}
+
+	const expectedCity = simplifyPlaceName(postalHit.placeName) || postalHit.placeName;
+	const expectedRegion =
+		postalHit.regionCode ||
+		(zipRegionMatches(formattedLine.regionCode, formattedLine.country, postalHit)
+			? formattedLine.regionCode
+			: "");
+	const expectedPostal = postalHit.postal || formattedLine.postal;
+
+	if (!zipRegionMatches(formattedLine.regionCode, formattedLine.country, postalHit)) {
+		return formatLocationZipMismatchError({
+			city: expectedCity,
+			regionCode: expectedRegion || postalHit.regionCode,
+			postal: expectedPostal,
+		});
+	}
+
+	const nameMatch =
+		postalHit.places.some((place) =>
+			postalMatchesStatedCity(
+				formattedLine.city,
+				formattedLine.regionCode,
+				formattedLine.country,
+				place,
+			),
+		) ||
+		postalMatchesStatedCity(
+			formattedLine.city,
+			formattedLine.regionCode,
+			formattedLine.country,
+			postalHit,
+		);
+	if (nameMatch) return null;
+
+	const cityOwnsPostal = await zippopotamCityIncludesPostal(
+		formattedLine.city,
+		formattedLine.regionCode,
+		formattedLine.country,
+		formattedLine.postal,
+	);
+	if (cityOwnsPostal) return null;
+
+	const strict = options?.requireCityPostalMatch === true;
+	if (!strict && !isConfusablePlaceName(formattedLine.city, expectedCity)) {
+		return null;
+	}
+
+	return formatLocationZipMismatchError({
+		city: expectedCity,
+		regionCode: expectedRegion || formattedLine.regionCode,
+		postal: expectedPostal,
+	});
 }
 
 export {
