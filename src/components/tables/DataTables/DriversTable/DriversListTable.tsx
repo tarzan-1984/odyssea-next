@@ -166,9 +166,82 @@ function isDriverStatusWithHighlightedDate(status: string | null | undefined): b
 /** Test driver on drivers-list — selectable and offerable without Address filter. */
 const TEST_DRIVER_EXTERNAL_ID = "3343";
 const OPEN_BID_LIMIT_TOOLTIP = "Maximum number of active bids reached";
+const LOCATION_STALE_MS = 12 * 60 * 60 * 1000;
 
 function isTestDriver(item: { id?: string | number }): boolean {
 	return String(item?.id ?? "") === TEST_DRIVER_EXTERNAL_ID;
+}
+
+function isDispatcherRole(role: string | undefined | null): boolean {
+	return role?.trim().toUpperCase() === "DISPATCHER";
+}
+
+function isNotAvailableStatus(status: string | null | undefined): boolean {
+	if (!status) return false;
+	return status.trim().toLowerCase() === "available_off";
+}
+
+type LocationDateCellItem = {
+	updated_zipcode?: string | null;
+	date_available?: string | null;
+	date_updated?: string | null;
+	meta_data?: {
+		driver_status?: string | null;
+		status_date?: string | null;
+	} | null;
+};
+
+/** Same rules as Location & Date cell: pink (#f1cfcf) or light red when stale. */
+function getLocationDateCellState(item: LocationDateCellItem) {
+	const driverStatus = item?.meta_data?.driver_status;
+	const updatedZipcodeRaw = String(item?.updated_zipcode ?? "").trim();
+	const hasUpdatedZipcode = Boolean(updatedZipcodeRaw);
+	const dateStr = usesDateAvailableForDisplay(driverStatus)
+		? item?.date_available || ""
+		: item?.updated_zipcode ||
+			item?.date_updated ||
+			item?.meta_data?.status_date ||
+			"";
+	const locationDate = dateStr ? new Date(dateStr.replace(/\s+/, "T")) : null;
+	const dateDisplay = locationDate ? formatDateMmDdYy(locationDate) : dateStr || "";
+	const updatedZipcodeDate = hasUpdatedZipcode
+		? new Date(updatedZipcodeRaw.replace(/\s+/, "T"))
+		: null;
+	const updatedZipcodeDisplay =
+		updatedZipcodeDate && !Number.isNaN(updatedZipcodeDate.getTime())
+			? formatDateMmDdYy(updatedZipcodeDate)
+			: updatedZipcodeRaw;
+	const showUpdatedZipcodeLine =
+		hasUpdatedZipcode && updatedZipcodeDisplay !== dateDisplay;
+	const isOlderThan12h =
+		!showUpdatedZipcodeLine &&
+		!usesDateAvailableForDisplay(driverStatus) &&
+		locationDate != null &&
+		!Number.isNaN(locationDate.getTime()) &&
+		Date.now() - locationDate.getTime() > LOCATION_STALE_MS;
+	const hasRedLocationBackground = showUpdatedZipcodeLine || isOlderThan12h;
+
+	return {
+		driverStatus,
+		dateDisplay,
+		updatedZipcodeDisplay,
+		showUpdatedZipcodeLine,
+		isOlderThan12h,
+		hasRedLocationBackground,
+	};
+}
+
+/**
+ * DISPATCHER cannot select Not available drivers whose Location & Date
+ * cell is not red (no recent location highlight).
+ */
+function isBlockedNotAvailableForDispatcher(
+	role: string | undefined | null,
+	item: LocationDateCellItem
+): boolean {
+	if (!isDispatcherRole(role)) return false;
+	if (!isNotAvailableStatus(item?.meta_data?.driver_status)) return false;
+	return !getLocationDateCellState(item).hasRedLocationBackground;
 }
 
 export interface DriversListTableProps {
@@ -483,11 +556,20 @@ export default function DriversListTable({
 		driverUsesMobileApp(item?.meta_data?.activate_application);
 	const canSelectDriverRow = (item: {
 		id?: string | number;
-		meta_data?: { activate_application?: string; driver_status?: string; driver_id?: string | number };
+		updated_zipcode?: string | null;
+		date_available?: string | null;
+		date_updated?: string | null;
+		meta_data?: {
+			activate_application?: string;
+			driver_status?: string;
+			driver_id?: string | number;
+			status_date?: string | null;
+		};
 	}) =>
 		isDriverRowSelectable(item) &&
 		(canSelectDrivers || isTestDriver(item)) &&
-		!isTmsDriverAtOpenBidLimit(item, atOpenBidLimitIds);
+		!isTmsDriverAtOpenBidLimit(item, atOpenBidLimitIds) &&
+		!isBlockedNotAvailableForDispatcher(currentUser?.role, item);
 	const canBulkSelectDriverRow = (item: {
 		id?: string | number;
 		meta_data?: { activate_application?: string; driver_status?: string };
@@ -523,7 +605,7 @@ export default function DriversListTable({
 		}
 	}, [canSelectDrivers]);
 
-	// Drop selection for drivers without the mobile app or already in the offer
+	// Drop selection for drivers without the mobile app, already in the offer, or blocked for dispatcher
 	useEffect(() => {
 		setSelectedDriverIds(prev => {
 			const next = prev.filter(id => {
@@ -532,7 +614,7 @@ export default function DriversListTable({
 			});
 			return next.length === prev.length ? prev : next;
 		});
-	}, [filteredResults, existingDriverIdsSet, canSelectDrivers, atOpenBidLimitIds]);
+	}, [filteredResults, existingDriverIdsSet, canSelectDrivers, atOpenBidLimitIds, currentUser?.role]);
 
 	useEffect(() => {
 		const handleMouseUp = () => {
@@ -1266,45 +1348,13 @@ export default function DriversListTable({
 
 													{/*location & date — pink cell + updated_zipcode line when zip update present */}
 													{(() => {
-														const driverStatus = item?.meta_data
-															?.driver_status as string | null | undefined;
-														const updatedZipcodeRaw = String(
-															item?.updated_zipcode ?? ""
-														).trim();
-														const hasUpdatedZipcode = Boolean(updatedZipcodeRaw);
-														const dateStr = usesDateAvailableForDisplay(
-															driverStatus
-														)
-															? item?.date_available || ""
-															: item?.updated_zipcode ||
-																(item as any)?.date_updated ||
-																item?.meta_data?.status_date ||
-																"";
-														const locationDate = dateStr
-															? new Date(dateStr.replace(/\s+/, "T"))
-															: null;
-														const dateDisplay = locationDate
-															? formatDateMmDdYy(locationDate)
-															: dateStr || "";
-														const updatedZipcodeDate = hasUpdatedZipcode
-															? new Date(updatedZipcodeRaw.replace(/\s+/, "T"))
-															: null;
-														const updatedZipcodeDisplay =
-															updatedZipcodeDate &&
-															!Number.isNaN(updatedZipcodeDate.getTime())
-																? formatDateMmDdYy(updatedZipcodeDate)
-																: updatedZipcodeRaw;
-														// Highlight only when updated_zipcode is a distinct second line
-														const showUpdatedZipcodeLine =
-															hasUpdatedZipcode &&
-															updatedZipcodeDisplay !== dateDisplay;
-														const isOlderThan12h =
-															!showUpdatedZipcodeLine &&
-															!usesDateAvailableForDisplay(driverStatus) &&
-															locationDate &&
-															!Number.isNaN(locationDate.getTime()) &&
-															Date.now() - locationDate.getTime() >
-																12 * 60 * 60 * 1000;
+														const {
+															driverStatus,
+															dateDisplay,
+															updatedZipcodeDisplay,
+															showUpdatedZipcodeLine,
+															isOlderThan12h,
+														} = getLocationDateCellState(item);
 														const highlightStatusDate =
 															isDriverStatusWithHighlightedDate(driverStatus);
 														const dateTextClass = highlightStatusDate
