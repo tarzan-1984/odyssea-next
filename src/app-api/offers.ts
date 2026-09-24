@@ -192,6 +192,16 @@ export interface SendDriverReminderResponse {
 	error?: string;
 }
 
+export interface SendDriversRemindersResponse {
+	success: boolean;
+	message?: string;
+	accepted_count?: number;
+	skipped_count?: number;
+	accepted_driver_ids?: string[];
+	last_reminder_at?: number;
+	error?: string;
+}
+
 export interface ExtendDriverTimeResponse {
 	success: boolean;
 	action_time?: number | null;
@@ -654,6 +664,46 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in sendDriverReminder:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async sendDriversReminders(
+		offerId: number,
+		driverExternalIds: string[]
+	): Promise<SendDriversRemindersResponse> {
+		try {
+			const response = await axios.post<SendDriversRemindersResponse>(
+				`/api/offers/${offerId}/drivers/send-reminders`,
+				{ driverExternalIds },
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					message: data.message,
+					accepted_count: data.accepted_count,
+					skipped_count: data.skipped_count,
+					accepted_driver_ids: data.accepted_driver_ids,
+					last_reminder_at: data.last_reminder_at,
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to send reminders",
+			};
+		} catch (error) {
+			console.error("Error in sendDriversReminders:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",
