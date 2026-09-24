@@ -119,13 +119,35 @@ export default function ChatListItem({
 	const isStaleLocationChat =
 		!chatRoom.isRest &&
 		(chatRoom.isLocationStale === true || Boolean(chatRoom.staleLocationAlert));
-	const loadStatusBgClass = chatRoom.isRest
+	const isRestChat = Boolean(chatRoom.isRest);
+	const loadStatusBgClass = isRestChat
 		? LOAD_CHAT_REST_BG_CLASS
 		: isStaleLocationChat
 			? LOAD_CHAT_STALE_BG_CLASS
 			: chatRoom.type === "LOAD"
 				? loadChatStatusBackgroundClass(chatRoom.loadStatus)
 				: null;
+	// Rest uses a saturated blue in dark mode — light text; other status pastels keep dark text.
+	const statusTitleClass = loadStatusBgClass
+		? isRestChat
+			? "text-gray-900 dark:text-white"
+			: "text-gray-900"
+		: "text-gray-900 dark:text-white";
+	const statusMetaClass = loadStatusBgClass
+		? isRestChat
+			? "text-gray-700 dark:text-white/85"
+			: "text-gray-500"
+		: "text-gray-500 dark:text-gray-400";
+	const statusIconClass = loadStatusBgClass
+		? isRestChat
+			? "text-gray-600 dark:text-white/70"
+			: "text-gray-400"
+		: "text-gray-400 dark:text-gray-500";
+	const statusLabelClass = loadStatusBgClass
+		? isRestChat
+			? "text-gray-700 dark:text-white/80"
+			: "text-gray-500"
+		: "text-gray-400 dark:text-gray-500";
 
 	const toggleDropdown = () => {
 		if (onMenuToggle) {
@@ -343,61 +365,29 @@ export default function ChatListItem({
 			<div className="flex-1 ml-3 text-left min-w-0">
 				<div className="flex items-center justify-between gap-2">
 					<h3
-						className={`font-medium truncate flex-shrink min-w-0 ${
-							loadStatusBgClass
-								? "text-gray-900"
-								: "text-gray-900 dark:text-white"
-						} ${chatRoom.type === "OFFER" ? "text-sm" : "text-base"}`}
+						className={`font-medium truncate flex-shrink min-w-0 ${statusTitleClass} ${
+							chatRoom.type === "OFFER" ? "text-sm" : "text-base"
+						}`}
 					>
 						{getChatDisplayName(chatRoom)}
 					</h3>
-					<span
-						className={`text-xs flex-shrink-0 ${
-							loadStatusBgClass
-								? "text-gray-500"
-								: "text-gray-500 dark:text-gray-400"
-						}`}
-					>
+					<span className={`text-xs flex-shrink-0 ${statusMetaClass}`}>
 						{getChatLastMessageTime(chatRoom)}
 					</span>
 				</div>
 				<div className="flex items-center gap-1">
-					<p
-						className={`chat-msg-body truncate flex-1 ${
-							loadStatusBgClass
-								? "text-gray-500"
-								: "text-gray-500 dark:text-gray-400"
-						}`}
-					>
+					<p className={`chat-msg-body truncate flex-1 ${statusMetaClass}`}>
 						{getChatLastMessage(chatRoom)}
 					</p>
 					{isPinned && (
-						<PushPinIcon
-							className={`w-3 h-3 flex-shrink-0 ${
-								loadStatusBgClass
-									? "text-gray-400"
-									: "text-gray-400 dark:text-gray-500"
-							}`}
-						/>
+						<PushPinIcon className={`w-3 h-3 flex-shrink-0 ${statusIconClass}`} />
 					)}
 					{isMuted && (
-						<SoundOffIcon
-							className={`w-3 h-3 flex-shrink-0 ${
-								loadStatusBgClass
-									? "text-gray-400"
-									: "text-gray-400 dark:text-gray-500"
-							}`}
-						/>
+						<SoundOffIcon className={`w-3 h-3 flex-shrink-0 ${statusIconClass}`} />
 					)}
 				</div>
 				{loadStatusLabel && (
-					<p
-						className={`text-xs truncate mt-0.5 ${
-							loadStatusBgClass
-								? "text-gray-500"
-								: "text-gray-400 dark:text-gray-500"
-						}`}
-					>
+					<p className={`text-xs truncate mt-0.5 ${statusLabelClass}`}>
 						{loadStatusLabel}
 					</p>
 				)}
