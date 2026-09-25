@@ -358,7 +358,7 @@ function DraggableExtraRow({
 }) {
 	const rowRef = useRef<HTMLDivElement>(null);
 	const handleRef = useRef<HTMLDivElement>(null);
-	const isLastDelivery = row.type === "delivery" && index === rowCount - 1;
+	const isDelivery = row.type === "delivery";
 	const isAsap = isOfferAsapTime(row.time);
 
 	const [{ isDragging }, drag, dragPreview] = useDrag({
@@ -501,7 +501,7 @@ function DraggableExtraRow({
 						<Label htmlFor={`datetime-${row.id}`} className="mb-0">
 							{row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
 						</Label>
-						{isLastDelivery && (
+						{isDelivery && (
 							<Switch
 								label="ASAP"
 								checked={isAsap}
@@ -852,15 +852,6 @@ export default function CreateOfferModal({
 		setManualLoadedMiles(null);
 	}, []);
 
-	const clearAsapFromNonLastRows = useCallback((rows: RouteRow[]): RouteRow[] => {
-		const lastIndex = rows.length - 1;
-		return rows.map((row, i) => {
-			if (i === lastIndex || !isOfferAsapTime(row.time)) return row;
-			delete timeBeforeAsapRef.current[row.id];
-			return { ...row, time: "" };
-		});
-	}, []);
-
 	const addPickUpRow = (afterIndex: number) => {
 		preserveUrlLoadedMilesRef.current = false;
 		setCommittedLocations([]);
@@ -868,7 +859,7 @@ export default function CreateOfferModal({
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("pickup"));
-			return clearAsapFromNonLastRows(next);
+			return next;
 		});
 	};
 
@@ -879,7 +870,7 @@ export default function CreateOfferModal({
 		setRouteRows(prev => {
 			const next = [...prev];
 			next.splice(afterIndex + 1, 0, initialRouteRow("delivery"));
-			return clearAsapFromNonLastRows(next);
+			return next;
 		});
 	};
 
@@ -890,7 +881,6 @@ export default function CreateOfferModal({
 	const handleAsapToggle = useCallback(
 		(index: number, enabled: boolean) => {
 			setRouteRows(prev => {
-				if (index !== prev.length - 1) return prev;
 				const row = prev[index];
 				if (!row || row.type !== "delivery") return prev;
 				const next = [...prev];
@@ -1086,13 +1076,12 @@ export default function CreateOfferModal({
 				const next = [...prev];
 				const [removed] = next.splice(dragIndex, 1);
 				next.splice(hoverIndex, 0, removed);
-				const cleaned = clearAsapFromNonLastRows(next);
-				commitLocations(cleaned);
-				validateRouteChronology(cleaned);
-				return cleaned;
+				commitLocations(next);
+				validateRouteChronology(next);
+				return next;
 			});
 		},
-		[clearAsapFromNonLastRows, commitLocations, validateRouteChronology]
+		[commitLocations, validateRouteChronology]
 	);
 
 	const validate = (): {
