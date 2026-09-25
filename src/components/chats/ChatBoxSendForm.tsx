@@ -43,6 +43,7 @@ import BidComposePlusOneTimer from "./BidComposePlusOneTimer";
 import { useCurrentUser } from "@/stores/userStore";
 import { useChatStore } from "@/stores/chatStore";
 import { buildMentionCandidates } from "@/utils/chatMentions";
+import { chatComposeDraftService } from "@/services/chatComposeDraftService";
 import {
 	applyEditorFormat,
 	formatActionToCommand,
@@ -127,8 +128,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 	) {
 		const [message, setMessage] = useState<string>("");
 		const [composeResetKey, setComposeResetKey] = useState(0);
+		const [composeDraftKey, setComposeDraftKey] = useState(0);
+		const [composeDraftContent, setComposeDraftContent] = useState("");
 		const [isSending, setIsSending] = useState(false);
 		const isSendingRef = useRef(false);
+		const skipDraftPersistRef = useRef(false);
+		const prevChatRoomIdRef = useRef<string | undefined>(undefined);
+		const messageRef = useRef(message);
+		messageRef.current = message;
 		const [plusOneLocked, setPlusOneLocked] = useState(false);
 		const [plusOneStatusLoaded, setPlusOneStatusLoaded] = useState(!isBidChat);
 		const [plusOneUpdatedAt, setPlusOneUpdatedAt] = useState<number | null>(null);
@@ -161,6 +168,9 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			composeResetKey
 		);
 		const isEditing = Boolean(editingMessage);
+		const isEditingRef = useRef(isEditing);
+		isEditingRef.current = isEditing;
+		const wasEditingRef = useRef(false);
 		const chatImageGallery = useChatImageGalleryOptional();
 		const bidAuction = useBidChatAuctionOptional();
 		const currentUser = useCurrentUser();
@@ -296,16 +306,25 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setPlusOneLocked(remaining != null && remaining > 0);
 		}, [showBidPlusOne, isPlusOneBlockedForOwner, plusOneUpdatedAt, tickUnixSec]);
 
+		const persistComposeDraft = useCallback(
+			(markdown: string) => {
+				if (!chatRoomId || isEditingRef.current || skipDraftPersistRef.current) return;
+				chatComposeDraftService.set(chatRoomId, markdown);
+			},
+			[chatRoomId]
+		);
+
 		const syncEditorContent = useCallback(() => {
 			const el = editorRef.current;
 			if (!el) return;
 			const markdown = htmlToMarkdown(el.innerHTML);
 			const plain = getEditorPlainText(el);
 			setMessage(markdown);
+			persistComposeDraft(markdown);
 			if (onTyping) {
 				onTyping(plain.length > 0);
 			}
-		}, [onTyping]);
+		}, [onTyping, persistComposeDraft]);
 
 		const insertTemplateContent = useCallback(
 			(text: string) => {
@@ -343,11 +362,12 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		const handleContentChange = useCallback(
 			(markdown: string, plainText: string) => {
 				setMessage(markdown);
+				persistComposeDraft(markdown);
 				if (onTyping) {
 					onTyping(plainText.length > 0);
 				}
 			},
-			[onTyping]
+			[onTyping, persistComposeDraft]
 		);
 
 		const handleSendMessage = async () => {
@@ -373,11 +393,20 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					onTyping(false);
 				}
 
+				const wasEditing = Boolean(editingMessage);
+				if (!wasEditing && chatRoomId) {
+					chatComposeDraftService.clear(chatRoomId);
+				}
+
 				// Reset form
+				skipDraftPersistRef.current = true;
 				setMessage("");
 				setComposeResetKey(k => k + 1);
 				setAttachedFiles([]);
 				setShowEmojiPicker(false);
+				requestAnimationFrame(() => {
+					skipDraftPersistRef.current = false;
+				});
 
 				// Cancel reply if we were replying
 				if (replyingTo && onCancelReply) {
@@ -592,17 +621,53 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			setEmojiPickerMounted(true);
 		}, []);
 
-		// Reset draft only on chat switch — callback identity must not clear the editor.
+		// Flush previous chat draft, then restore this room's draft on switch.
 		useEffect(() => {
+			const prevId = prevChatRoomIdRef.current;
+			if (prevId && prevId !== chatRoomId && !isEditingRef.current) {
+				chatComposeDraftService.set(prevId, messageRef.current);
+			}
+			prevChatRoomIdRef.current = chatRoomId;
+
 			if (!chatRoomId) return;
 
-			setMessage("");
+			const draft = chatComposeDraftService.get(chatRoomId);
+			skipDraftPersistRef.current = true;
+			setMessage(draft);
+			setComposeDraftContent(draft);
 			setComposeResetKey(k => k + 1);
+			if (draft.trim()) {
+				setComposeDraftKey(k => k + 1);
+			}
 			setAttachedFiles([]);
 			setShowEmojiPicker(false);
 			onTypingRef.current?.(false);
 			onCancelEditRef.current?.();
+			requestAnimationFrame(() => {
+				skipDraftPersistRef.current = false;
+			});
 		}, [chatRoomId]);
+
+		// After leaving edit mode, restore the unsent compose draft for this room.
+		useEffect(() => {
+			if (editingMessage) {
+				wasEditingRef.current = true;
+				return;
+			}
+			if (!wasEditingRef.current || !chatRoomId) return;
+			wasEditingRef.current = false;
+			const draft = chatComposeDraftService.get(chatRoomId);
+			skipDraftPersistRef.current = true;
+			setMessage(draft);
+			setComposeDraftContent(draft);
+			setComposeResetKey(k => k + 1);
+			if (draft.trim()) {
+				setComposeDraftKey(k => k + 1);
+			}
+			requestAnimationFrame(() => {
+				skipDraftPersistRef.current = false;
+			});
+		}, [editingMessage, chatRoomId]);
 
 		useEffect(() => {
 			if (!editingMessage) return;
@@ -694,8 +759,6 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 
 		const handleCancelEdit = () => {
 			onCancelEdit?.();
-			setMessage("");
-			setComposeResetKey(k => k + 1);
 			setShowEmojiPicker(false);
 			onTyping?.(false);
 			requestAnimationFrame(() => {
@@ -1105,8 +1168,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 							<ChatRichComposeInput
 								editorRef={editorRef}
 								resetKey={composeResetKey}
-								draftKey={editDraftKey}
-								draftContent={editingMessage?.content ?? ""}
+								draftKey={isEditing ? editDraftKey : composeDraftKey}
+								draftContent={
+									isEditing ? (editingMessage?.content ?? "") : composeDraftContent
+								}
 								onContentChange={handleContentChange}
 								onKeyDown={handleKeyDown}
 								onPaste={handlePaste}

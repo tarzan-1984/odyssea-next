@@ -24,6 +24,7 @@ import { formatLoadChatStatusLabel, loadChatStatusBackgroundClass, LOAD_CHAT_RES
 import { isLoadChatLocationStale } from "@/utils/loadChatStaleLocation";
 import { canSeeLoadStaleLocationSystemMessage, isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import { useStaleLocationClock } from "@/hooks/useStaleLocationClock";
+import { useChatComposeDraft } from "@/services/chatComposeDraftService";
 
 interface ChatListItemProps {
 	chatRoom: ChatRoom;
@@ -51,6 +52,7 @@ export default function ChatListItem({
 	const [isMuted, setIsMuted] = useState(chatRoom.isMuted || false);
 	const [isPinned, setIsPinned] = useState(chatRoom.isPinned || false);
 	const menuTriggerRef = useRef<HTMLDivElement>(null);
+	const composeDraft = useChatComposeDraft(chatRoom.id);
 
 	const getChatDisplayName = (chatRoom: ChatRoom): string => {
 		// For DIRECT and OFFER chats, show only the other participant's firstName + lastName
@@ -81,6 +83,9 @@ export default function ChatListItem({
 	};
 
 	const getChatLastMessage = (chatRoom: ChatRoom): string => {
+		if (composeDraft.trim()) {
+			return stripMarkdown(composeDraft);
+		}
 		if (
 			chatRoom.lastMessage &&
 			isSystemMessageVisibleToRole(
@@ -388,7 +393,14 @@ export default function ChatListItem({
 				</div>
 				<div className="flex items-center gap-1">
 					<p className={`chat-msg-body truncate flex-1 ${statusMetaClass}`}>
-						{getChatLastMessage(chatRoom)}
+						{composeDraft.trim() ? (
+							<>
+								<span className="font-medium text-blue-500 dark:text-blue-400">Draft: </span>
+								{getChatLastMessage(chatRoom)}
+							</>
+						) : (
+							getChatLastMessage(chatRoom)
+						)}
 					</p>
 					{isPinned && (
 						<PushPinIcon className={`w-3 h-3 flex-shrink-0 ${statusIconClass}`} />
