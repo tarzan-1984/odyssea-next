@@ -28,7 +28,7 @@ function ReactionAvatars({ users }: { users: MessageReactionGroup["users"] }) {
 			{visible.map(user => (
 				<span
 					key={user.id}
-					className="relative inline-flex h-4 w-4 shrink-0 overflow-hidden rounded-full ring-1 ring-white dark:ring-gray-900"
+					className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-white dark:ring-gray-900"
 					style={{
 						backgroundColor: resolveAvatarBackground(
 							user.role,

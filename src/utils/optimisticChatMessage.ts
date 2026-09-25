@@ -3,7 +3,7 @@ import { getMessageMultiAttachments, MESSAGE_MULTI_FILE_SEPARATOR } from "@/app-
 import type { ChatOutboxItem } from "@/services/chatOutboxService";
 import { createClientMessageId } from "@/services/chatOutboxService";
 
-export type PendingOutgoingStatus = "uploading" | "sending" | "acknowledged" | "failed";
+export type PendingOutgoingStatus = "uploading" | "scheduled" | "sending" | "acknowledged" | "failed";
 
 export type PendingOutgoingKind = "text" | "media";
 
@@ -13,6 +13,8 @@ export type PendingOutgoingMeta = {
 	clientMessageId: string;
 	serverMessageId?: string;
 	expectedFileUrls?: string[];
+	/** ISO timestamp when a scheduled (undo-send) message should be dispatched. */
+	scheduledSendAt?: string;
 	retryPayload?: {
 		content: string;
 		replyData?: Message["replyData"];
@@ -92,6 +94,7 @@ function buildOptimisticMessage(params: {
 	kind: PendingOutgoingKind;
 	replyData?: Message["replyData"];
 	status?: PendingOutgoingStatus;
+	scheduledSendAt?: string;
 	expectedFileUrls?: string[];
 	uploadedAttachments?: ChatMessageAttachment[];
 }): Message {
@@ -112,6 +115,7 @@ function buildOptimisticMessage(params: {
 			status: params.status ?? "sending",
 			clientMessageId: params.clientMessageId,
 			expectedFileUrls: params.expectedFileUrls,
+			scheduledSendAt: params.scheduledSendAt,
 			retryPayload: {
 				content: params.content,
 				replyData: params.replyData,
@@ -131,6 +135,8 @@ export function createOptimisticTextMessage(params: {
 	sender: User;
 	content: string;
 	replyData?: Message["replyData"];
+	status?: PendingOutgoingStatus;
+	scheduledSendAt?: string;
 }): Message {
 	const clientMessageId = params.clientMessageId ?? createClientMessageId();
 	return buildOptimisticMessage({
@@ -140,7 +146,8 @@ export function createOptimisticTextMessage(params: {
 		content: params.content,
 		kind: "text",
 		replyData: params.replyData,
-		status: "sending",
+		status: params.status ?? "sending",
+		scheduledSendAt: params.scheduledSendAt,
 	});
 }
 
@@ -151,6 +158,8 @@ export function createOptimisticMediaMessage(params: {
 	content: string;
 	attachments: ChatMessageAttachment[];
 	replyData?: Message["replyData"];
+	status?: PendingOutgoingStatus;
+	scheduledSendAt?: string;
 }): Message {
 	const clientMessageId = params.clientMessageId ?? createClientMessageId();
 	const expectedFileUrls = params.attachments.map(file => file.fileUrl);
@@ -161,7 +170,8 @@ export function createOptimisticMediaMessage(params: {
 		content: params.content,
 		kind: "media",
 		replyData: params.replyData,
-		status: "sending",
+		status: params.status ?? "sending",
+		scheduledSendAt: params.scheduledSendAt,
 		expectedFileUrls,
 		uploadedAttachments: params.attachments,
 	});
@@ -175,7 +185,9 @@ export function outboxItemToOptimisticMessage(item: ChatOutboxItem, sender: User
 				? "acknowledged"
 				: item.status === "uploading"
 					? "uploading"
-					: "sending";
+					: item.status === "scheduled"
+						? "scheduled"
+						: "sending";
 
 	const attachments = item.uploadedAttachments ?? [];
 
@@ -189,12 +201,14 @@ export function outboxItemToOptimisticMessage(item: ChatOutboxItem, sender: User
 				kind: "text",
 				replyData: item.replyData,
 				status: pendingStatus,
+				scheduledSendAt: item.scheduledSendAt,
 			}),
 			pendingOutgoing: {
 				kind: "text",
 				status: pendingStatus,
 				clientMessageId: item.clientMessageId,
 				serverMessageId: item.serverMessageId,
+				scheduledSendAt: item.scheduledSendAt,
 				retryPayload: {
 					content: item.content,
 					replyData: item.replyData,
@@ -212,6 +226,7 @@ export function outboxItemToOptimisticMessage(item: ChatOutboxItem, sender: User
 			kind: "media",
 			replyData: item.replyData,
 			status: pendingStatus,
+			scheduledSendAt: item.scheduledSendAt,
 			expectedFileUrls: attachments.map(row => row.fileUrl),
 			uploadedAttachments: attachments,
 		}),
@@ -220,6 +235,7 @@ export function outboxItemToOptimisticMessage(item: ChatOutboxItem, sender: User
 			status: pendingStatus,
 			clientMessageId: item.clientMessageId,
 			serverMessageId: item.serverMessageId,
+			scheduledSendAt: item.scheduledSendAt,
 			expectedFileUrls: attachments.map(row => row.fileUrl),
 			retryPayload: {
 				content: item.content,

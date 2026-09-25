@@ -29,6 +29,7 @@ import {
 import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleLocationSystemMessage, isDriverRestEndedSystemMessage, isDriverRestUpdatedSystemMessage } from "@/utils/systemMessageKind";
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import { mentionNamesFromCandidates, buildMentionCandidates } from "@/utils/chatMentions";
+import UndoSendProgressBar from "./UndoSendProgressBar";
 
 interface MessageItemProps {
 	message: Message;
@@ -48,6 +49,8 @@ interface MessageItemProps {
 	onRetry?: () => void;
 	/** Discard a failed optimistic/outbox message (not sent to server). */
 	onDiscardFailed?: () => void;
+	/** Cancel a scheduled undo-send message before it is dispatched. */
+	onUndoSend?: () => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -63,6 +66,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onMarkUnread,
 	onRetry,
 	onDiscardFailed,
+	onUndoSend,
 }) => {
 	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
 		string | null
@@ -123,7 +127,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	const isOnline = isUserOnline(message.senderId);
 	const isPending = Boolean(message.pendingOutgoing);
 	const pendingStatus = message.pendingOutgoing?.status;
-	const isPendingSending = pendingStatus === "sending" || pendingStatus === "uploading" || pendingStatus === "acknowledged";
+	const isPendingScheduled = pendingStatus === "scheduled";
+	const isPendingSending =
+		pendingStatus === "sending" ||
+		pendingStatus === "uploading" ||
+		pendingStatus === "acknowledged";
 	const isPendingFailed = pendingStatus === "failed";
 
 	const isImageFile = (fileName?: string): boolean => {
@@ -654,6 +662,23 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					<div className="mt-2 flex flex-col items-end gap-1">
 						{isPending ? (
 							<>
+								{isPendingScheduled ? (
+									<div className="flex items-center gap-2">
+										<UndoSendProgressBar
+											createdAt={message.createdAt}
+											scheduledSendAt={message.pendingOutgoing?.scheduledSendAt}
+										/>
+										{onUndoSend ? (
+											<button
+												type="button"
+												onClick={onUndoSend}
+												className="chat-msg-meta rounded-md bg-brand-500 px-2 py-0.5 font-medium text-white hover:bg-brand-600"
+											>
+												Undo
+											</button>
+										) : null}
+									</div>
+								) : null}
 								{isPendingSending ? (
 									<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
 										<svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">

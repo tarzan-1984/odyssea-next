@@ -175,7 +175,7 @@ export function renderAvatar(
 		return (
 			<span
 				className={twMerge(
-					"relative z-[1] font-semibold text-white",
+					"relative z-[1] flex items-center justify-center font-semibold leading-none text-white",
 					getTextSize(className),
 					className,
 				)}
@@ -188,7 +188,7 @@ export function renderAvatar(
 	return (
 		<div
 			className={twMerge(
-				`flex items-center justify-center rounded-full text-white font-semibold ${getTextSize(className)} w-[15px] h-[15px]`,
+				`flex items-center justify-center rounded-full text-white font-semibold leading-none ${getTextSize(className)} w-[15px] h-[15px]`,
 				className,
 			)}
 			style={{ backgroundColor: bg }}

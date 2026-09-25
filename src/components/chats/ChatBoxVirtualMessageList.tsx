@@ -48,6 +48,7 @@ interface ChatBoxVirtualMessageListProps {
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
 	onDiscardFailed?: (message: Message) => void;
+	onUndoSend?: (message: Message) => void;
 	onContentMeasured?: () => void;
 	isUserScrolledUp?: boolean;
 	suppressScrollAdjustment?: boolean;
@@ -72,6 +73,7 @@ interface VirtualMessageRowProps {
 	onMarkUnread: (messageId: string) => void;
 	onRetry?: (message: Message) => void;
 	onDiscardFailed?: (message: Message) => void;
+	onUndoSend?: (message: Message) => void;
 }
 
 function VirtualMessageRow({
@@ -93,6 +95,7 @@ function VirtualMessageRow({
 	onMarkUnread,
 	onRetry,
 	onDiscardFailed,
+	onUndoSend,
 }: VirtualMessageRowProps) {
 	const rowRef = useRef<HTMLDivElement>(null);
 	const measureRafRef = useRef<number | null>(null);
@@ -194,6 +197,11 @@ function VirtualMessageRow({
 						? () => onDiscardFailed(message)
 						: undefined
 				}
+				onUndoSend={
+					message.pendingOutgoing?.status === "scheduled" && onUndoSend
+						? () => onUndoSend(message)
+						: undefined
+				}
 			/>
 		</div>
 	);
@@ -217,6 +225,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onMarkUnread,
 		onRetry,
 		onDiscardFailed,
+		onUndoSend,
 		onContentMeasured,
 		isUserScrolledUp = false,
 		suppressScrollAdjustment = false,
@@ -472,6 +481,7 @@ const ChatBoxVirtualMessageList = forwardRef<
 						onMarkUnread={onMarkUnread}
 						onRetry={onRetry}
 						onDiscardFailed={onDiscardFailed}
+						onUndoSend={onUndoSend}
 					/>
 				);
 			})}

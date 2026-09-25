@@ -126,7 +126,7 @@ export type MessageReactionGroup = {
 	hasCurrentUser: boolean;
 };
 
-export type PendingOutgoingStatus = "uploading" | "sending" | "acknowledged" | "failed";
+export type PendingOutgoingStatus = "uploading" | "scheduled" | "sending" | "acknowledged" | "failed";
 
 export type PendingOutgoingMeta = {
 	kind: "text" | "media";
@@ -134,6 +134,8 @@ export type PendingOutgoingMeta = {
 	clientMessageId: string;
 	serverMessageId?: string;
 	expectedFileUrls?: string[];
+	/** ISO timestamp when a scheduled (undo-send) message should be dispatched. */
+	scheduledSendAt?: string;
 	retryPayload?: {
 		content: string;
 		replyData?: Message["replyData"];

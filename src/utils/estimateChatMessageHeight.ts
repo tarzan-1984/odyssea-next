@@ -138,6 +138,9 @@ export function estimateChatMessageHeight(
 		if (message.pendingOutgoing?.status === "failed") {
 			height += PENDING_FAILED_PX;
 		}
+		if (message.pendingOutgoing?.status === "scheduled") {
+			height += PENDING_FAILED_PX;
+		}
 	}
 
 	return Math.max(height, isSender ? 64 : 72);

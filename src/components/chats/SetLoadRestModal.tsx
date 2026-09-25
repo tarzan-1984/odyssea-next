@@ -249,6 +249,9 @@ export default function SetLoadRestModal({
 						required
 						associateLabel={false}
 					/>
+					<p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+						Specify time in New York (Eastern Time).
+					</p>
 				</div>
 
 				{restEndTooSoon ? (

@@ -17,7 +17,9 @@ export type ChatOutboxItem = {
 	content: string;
 	replyData?: Message["replyData"];
 	uploadedAttachments?: OutboxUploadedAttachment[];
-	status: "uploading" | "sending" | "failed";
+	status: "uploading" | "scheduled" | "sending" | "failed";
+	/** ISO timestamp when a scheduled (undo-send) item should be dispatched. */
+	scheduledSendAt?: string;
 	serverMessageId?: string;
 	createdAt: string;
 	retryCount: number;

@@ -21,6 +21,7 @@ import { ODYSSEA_WS_RECONNECTED_EVENT } from "@/lib/websocketSyncEvents";
 import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { useChatStore } from "@/stores/chatStore";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
+import { getUndoSendDelaySeconds } from "@/stores/undoSendDelayStore";
 
 const SEND_ACK_TIMEOUT_MS = 15_000;
 
@@ -71,6 +72,7 @@ export function useChatOutboxSend({
 	const inFlightRef = useRef<Set<string>>(new Set());
 	const awaitingAckRef = useRef<Set<string>>(new Set());
 	const ackTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+	const undoTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 	const optimisticMessagesRef = useRef(optimisticMessages);
 
 	useEffect(() => {
@@ -100,15 +102,24 @@ export function useChatOutboxSend({
 		}
 	}, []);
 
+	const clearUndoTimer = useCallback((clientMessageId: string) => {
+		const timer = undoTimersRef.current.get(clientMessageId);
+		if (timer) {
+			clearTimeout(timer);
+			undoTimersRef.current.delete(clientMessageId);
+		}
+	}, []);
+
 	const removeConfirmedOptimistic = useCallback(
 		async (clientMessageId: string) => {
 			clearAckTimer(clientMessageId);
+			clearUndoTimer(clientMessageId);
 			inFlightRef.current.delete(clientMessageId);
 			awaitingAckRef.current.delete(clientMessageId);
 			await chatOutboxService.remove(clientMessageId);
 			setOptimisticMessages(prev => removeOptimisticByClientMessageId(prev, clientMessageId));
 		},
-		[clearAckTimer, setOptimisticMessages]
+		[clearAckTimer, clearUndoTimer, setOptimisticMessages]
 	);
 
 	const tryHttpFallback = useCallback(
@@ -223,17 +234,65 @@ export function useChatOutboxSend({
 		[chatRoomId, sender, sendMessage, markOptimisticFailed, scheduleAckTimeout, setOptimisticMessages, tryHttpFallback]
 	);
 
+	const beginDispatchAfterUndoWindow = useCallback(
+		async (clientMessageId: string) => {
+			const item = (await chatOutboxService.getAll()).find(
+				row => row.clientMessageId === clientMessageId
+			);
+			if (!item || item.status !== "scheduled") return;
+
+			await chatOutboxService.patch(clientMessageId, {
+				status: "sending",
+				scheduledSendAt: undefined,
+			});
+			setOptimisticMessages(prev =>
+				prev.map(msg =>
+					msg.pendingOutgoing?.clientMessageId === clientMessageId
+						? patchOptimisticMessage(msg, {
+								status: "sending",
+								scheduledSendAt: undefined,
+							})
+						: msg
+				)
+			);
+			dispatchOutboxSend({ ...item, status: "sending", scheduledSendAt: undefined }).catch(
+				() => {}
+			);
+		},
+		[dispatchOutboxSend, setOptimisticMessages]
+	);
+
+	const scheduleUndoSend = useCallback(
+		(clientMessageId: string, delayMs: number) => {
+			clearUndoTimer(clientMessageId);
+			const timer = setTimeout(() => {
+				undoTimersRef.current.delete(clientMessageId);
+				beginDispatchAfterUndoWindow(clientMessageId).catch(() => {});
+			}, Math.max(0, delayMs));
+			undoTimersRef.current.set(clientMessageId, timer);
+		},
+		[beginDispatchAfterUndoWindow, clearUndoTimer]
+	);
+
 	const sendTextMessage = useCallback(
 		async (content: string, replyData?: Message["replyData"]) => {
 			if (!chatRoomId || !sender) return;
 
 			const clientMessageId = createClientMessageId();
+			const delaySeconds = getUndoSendDelaySeconds();
+			const isScheduled = delaySeconds > 0;
+			const scheduledSendAt = isScheduled
+				? new Date(Date.now() + delaySeconds * 1000).toISOString()
+				: undefined;
+
 			const optimistic = createOptimisticTextMessage({
 				clientMessageId,
 				chatRoomId,
 				sender,
 				content,
 				replyData,
+				status: isScheduled ? "scheduled" : "sending",
+				scheduledSendAt,
 			});
 
 			setOptimisticMessages(prev => [...prev, optimistic]);
@@ -244,15 +303,20 @@ export function useChatOutboxSend({
 				kind: "text",
 				content,
 				replyData,
-				status: "sending",
+				status: isScheduled ? "scheduled" : "sending",
+				scheduledSendAt,
 				createdAt: optimistic.createdAt,
 				retryCount: 0,
 			};
 
 			await chatOutboxService.upsert(outboxItem);
-			dispatchOutboxSend(outboxItem).catch(() => {});
+			if (isScheduled) {
+				scheduleUndoSend(clientMessageId, delaySeconds * 1000);
+			} else {
+				dispatchOutboxSend(outboxItem).catch(() => {});
+			}
 		},
-		[chatRoomId, sender, dispatchOutboxSend, setOptimisticMessages]
+		[chatRoomId, sender, dispatchOutboxSend, scheduleUndoSend, setOptimisticMessages]
 	);
 
 	const sendMediaMessage = useCallback(
@@ -264,6 +328,12 @@ export function useChatOutboxSend({
 			if (!chatRoomId || !sender || attachments.length === 0) return;
 
 			const clientMessageId = createClientMessageId();
+			const delaySeconds = getUndoSendDelaySeconds();
+			const isScheduled = delaySeconds > 0;
+			const scheduledSendAt = isScheduled
+				? new Date(Date.now() + delaySeconds * 1000).toISOString()
+				: undefined;
+
 			const optimistic = createOptimisticMediaMessage({
 				clientMessageId,
 				chatRoomId,
@@ -271,6 +341,8 @@ export function useChatOutboxSend({
 				content,
 				attachments,
 				replyData,
+				status: isScheduled ? "scheduled" : "sending",
+				scheduledSendAt,
 			});
 
 			setOptimisticMessages(prev => [...prev, optimistic]);
@@ -282,15 +354,20 @@ export function useChatOutboxSend({
 				content,
 				replyData,
 				uploadedAttachments: attachmentsToOutboxUploaded(attachments),
-				status: "sending",
+				status: isScheduled ? "scheduled" : "sending",
+				scheduledSendAt,
 				createdAt: optimistic.createdAt,
 				retryCount: 0,
 			};
 
 			await chatOutboxService.upsert(outboxItem);
-			dispatchOutboxSend(outboxItem).catch(() => {});
+			if (isScheduled) {
+				scheduleUndoSend(clientMessageId, delaySeconds * 1000);
+			} else {
+				dispatchOutboxSend(outboxItem).catch(() => {});
+			}
 		},
-		[chatRoomId, sender, dispatchOutboxSend, setOptimisticMessages]
+		[chatRoomId, sender, dispatchOutboxSend, scheduleUndoSend, setOptimisticMessages]
 	);
 
 	const retryOptimisticMessage = useCallback(
@@ -303,23 +380,40 @@ export function useChatOutboxSend({
 			);
 			if (!item) return;
 
-			await chatOutboxService.patch(clientMessageId, { status: "sending" });
+			clearUndoTimer(clientMessageId);
+			await chatOutboxService.patch(clientMessageId, {
+				status: "sending",
+				scheduledSendAt: undefined,
+			});
 			setOptimisticMessages(prev =>
 				prev.map(msg =>
 					msg.pendingOutgoing?.clientMessageId === clientMessageId
-						? patchOptimisticMessage(msg, { status: "sending" })
+						? patchOptimisticMessage(msg, {
+								status: "sending",
+								scheduledSendAt: undefined,
+							})
 						: msg
 				)
 			);
-			await dispatchOutboxSend({ ...item, status: "sending" });
+			await dispatchOutboxSend({ ...item, status: "sending", scheduledSendAt: undefined });
 		},
-		[chatRoomId, dispatchOutboxSend, setOptimisticMessages]
+		[chatRoomId, clearUndoTimer, dispatchOutboxSend, setOptimisticMessages]
 	);
 
 	const discardFailedOptimisticMessage = useCallback(
 		async (message: Message) => {
 			const clientMessageId = message.pendingOutgoing?.clientMessageId;
 			if (!clientMessageId) return;
+			await removeConfirmedOptimistic(clientMessageId);
+		},
+		[removeConfirmedOptimistic]
+	);
+
+	const cancelScheduledSend = useCallback(
+		async (message: Message) => {
+			const clientMessageId = message.pendingOutgoing?.clientMessageId;
+			if (!clientMessageId) return;
+			if (message.pendingOutgoing?.status !== "scheduled") return;
 			await removeConfirmedOptimistic(clientMessageId);
 		},
 		[removeConfirmedOptimistic]
@@ -344,6 +438,18 @@ export function useChatOutboxSend({
 			if (item.serverMessageId || awaitingAckRef.current.has(item.clientMessageId)) {
 				continue;
 			}
+			if (item.status === "scheduled") {
+				if (undoTimersRef.current.has(item.clientMessageId)) continue;
+				const remainingMs = item.scheduledSendAt
+					? new Date(item.scheduledSendAt).getTime() - Date.now()
+					: 0;
+				if (remainingMs > 0) {
+					scheduleUndoSend(item.clientMessageId, remainingMs);
+				} else {
+					beginDispatchAfterUndoWindow(item.clientMessageId).catch(() => {});
+				}
+				continue;
+			}
 			const shouldRetry =
 				item.status === "uploading" ||
 				item.status === "sending" ||
@@ -352,7 +458,14 @@ export function useChatOutboxSend({
 				dispatchOutboxSend({ ...item, status: "sending" }).catch(() => {});
 			}
 		}
-	}, [chatRoomId, sender, dispatchOutboxSend, setOptimisticMessages]);
+	}, [
+		chatRoomId,
+		sender,
+		beginDispatchAfterUndoWindow,
+		dispatchOutboxSend,
+		scheduleUndoSend,
+		setOptimisticMessages,
+	]);
 
 	useEffect(() => {
 		hydrateRoomOutbox(false).catch(() => {});
@@ -502,6 +615,10 @@ export function useChatOutboxSend({
 				clearTimeout(timer);
 			}
 			ackTimersRef.current.clear();
+			for (const timer of undoTimersRef.current.values()) {
+				clearTimeout(timer);
+			}
+			undoTimersRef.current.clear();
 		};
 	}, []);
 
@@ -510,5 +627,6 @@ export function useChatOutboxSend({
 		sendMediaMessage,
 		retryOptimisticMessage,
 		discardFailedOptimisticMessage,
+		cancelScheduledSend,
 	};
 }
