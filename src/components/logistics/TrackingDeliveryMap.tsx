@@ -9,6 +9,10 @@ import { isMapTilerConfigured, type MapBasemapMode } from "@/lib/mapTileLayer";
 import { ResilientBasemapTileLayer } from "@/components/logistics/ResilientBasemapTileLayer";
 import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 import { collectOrderedTmsLoadStops } from "@/utils/formatTmsLoadRoute";
+import {
+	coordinatesPlausibleForAddresses,
+	coordinatesPlausibleForLocation,
+} from "@/utils/usAddressCoordinatePlausibility";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
@@ -35,6 +39,7 @@ type TmsShipperLike = {
 	latitude?: string | number | null;
 	longitude?: string | number | null;
 	full_address?: string;
+	state?: string | null;
 };
 
 type RoutePoint = {
@@ -232,9 +237,7 @@ function normalizeLocationAddressId(loc: LoadLocation): string | null {
 	return String(addressId).trim();
 }
 
-function parseShipperCoordinates(
-	shipper: TmsShipperLike
-): { lat: number; lng: number } | null {
+function parseShipperCoordinates(shipper: TmsShipperLike): { lat: number; lng: number } | null {
 	const lat =
 		shipper.latitude != null && String(shipper.latitude).trim() !== ""
 			? Number(shipper.latitude)
@@ -249,7 +252,8 @@ function parseShipperCoordinates(
 
 function resolveShipperCoordsByAddressId(
 	addressId: string,
-	shippers: TmsShipperLike[]
+	shippers: TmsShipperLike[],
+	addressHints: string[] = []
 ): { lat: number; lng: number; addressLabel: string } | null {
 	const shipper = shippers.find(entry => {
 		const shipperAddressId = String(entry.address_id ?? entry.id ?? "").trim();
@@ -259,6 +263,18 @@ function resolveShipperCoordsByAddressId(
 
 	const coords = parseShipperCoordinates(shipper);
 	if (!coords) return null;
+
+	// TMS can store a same-named street in another state. Ignore those coordinates.
+	if (
+		!coordinatesPlausibleForAddresses(
+			coords.lat,
+			coords.lng,
+			[...addressHints, shipper.full_address],
+			shipper.state
+		)
+	) {
+		return null;
+	}
 
 	return {
 		...coords,
@@ -317,7 +333,11 @@ async function geocodeStopRows(
 	for (const row of rows) {
 		let pt: RoutePoint | null = null;
 		if (row.addressId && shippers.length > 0) {
-			const shipperCoords = resolveShipperCoordsByAddressId(row.addressId, shippers);
+			const shipperCoords = resolveShipperCoordsByAddressId(
+				row.addressId,
+				shippers,
+				row.candidates
+			);
 			if (shipperCoords) {
 				pt = {
 					lat: shipperCoords.lat,
@@ -351,7 +371,13 @@ function applyServerEndpointsToChain(
 ): RoutePoint[] {
 	if (chain.length === 0) return chain;
 	const next = [...chain];
-	if (serverPickup) {
+	if (
+		serverPickup &&
+		coordinatesPlausibleForAddresses(serverPickup.lat, serverPickup.lng, [
+			serverPickup.addressLabel,
+			next[0].address,
+		])
+	) {
 		next[0] = {
 			lat: serverPickup.lat,
 			lng: serverPickup.lng,
@@ -362,13 +388,20 @@ function applyServerEndpointsToChain(
 	}
 	if (serverDelivery && next.length > 0) {
 		const lastI = next.length - 1;
-		next[lastI] = {
-			lat: serverDelivery.lat,
-			lng: serverDelivery.lng,
-			address: next[lastI].address.startsWith("Delivery")
-				? `${next[lastI].address.split(":")[0]}: ${serverDelivery.addressLabel}`
-				: `Delivery: ${serverDelivery.addressLabel}`,
-		};
+		if (
+			coordinatesPlausibleForAddresses(serverDelivery.lat, serverDelivery.lng, [
+				serverDelivery.addressLabel,
+				next[lastI].address,
+			])
+		) {
+			next[lastI] = {
+				lat: serverDelivery.lat,
+				lng: serverDelivery.lng,
+				address: next[lastI].address.startsWith("Delivery")
+					? `${next[lastI].address.split(":")[0]}: ${serverDelivery.addressLabel}`
+					: `Delivery: ${serverDelivery.addressLabel}`,
+			};
+		}
 	}
 	return next;
 }
@@ -426,7 +459,8 @@ function buildOsrmWaypointSequence(
 	if (chain.length < 2) return [];
 
 	const progressPoint =
-		currentDriverPoint ?? (historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null);
+		currentDriverPoint ??
+		(historyPoints.length > 0 ? historyPoints[historyPoints.length - 1] : null);
 	const nearestStopIndex = progressPoint ? closestChainStopIndex(chain, progressPoint) : 0;
 	const remainingStops = chain.slice(Math.max(nearestStopIndex, 1));
 
@@ -508,7 +542,9 @@ async function stitchOsrmSkippingUnroutable(
 		if (path.length > 0) path.pop();
 		path.push(...leg.path);
 		if (snaps.length === 0) {
-			snaps.push(leg.waypointSnapsLngLat[0] ?? [points[fromIndex].lng, points[fromIndex].lat]);
+			snaps.push(
+				leg.waypointSnapsLngLat[0] ?? [points[fromIndex].lng, points[fromIndex].lat]
+			);
 		}
 		snaps.push(leg.waypointSnapsLngLat[1] ?? [points[i].lng, points[i].lat]);
 		usedPoints.push(points[i]);
@@ -643,7 +679,9 @@ async function geocodeAddress(address: string): Promise<RoutePoint | null> {
 async function geocodeAddressCandidates(candidates: string[]): Promise<RoutePoint | null> {
 	for (const candidate of candidates) {
 		const point = await geocodeAddress(candidate);
-		if (point) return point;
+		if (!point) continue;
+		if (!coordinatesPlausibleForLocation(point.lat, point.lng, candidate)) continue;
+		return point;
 	}
 
 	return null;
@@ -1132,14 +1170,14 @@ export default function TrackingDeliveryMap({
 		const delivery = driverData?.routeGeocode?.delivery ?? null;
 		const coordsClose = Boolean(
 			pickup &&
-				delivery &&
-				Math.abs(pickup.lat - delivery.lat) < 0.0001 &&
-				Math.abs(pickup.lng - delivery.lng) < 0.0001
+			delivery &&
+			Math.abs(pickup.lat - delivery.lat) < 0.0001 &&
+			Math.abs(pickup.lng - delivery.lng) < 0.0001
 		);
 		const sameAddress = Boolean(
 			pickupAddressCandidates[0] &&
-				deliveryAddressCandidates[0] &&
-				pickupAddressCandidates[0] === deliveryAddressCandidates[0]
+			deliveryAddressCandidates[0] &&
+			pickupAddressCandidates[0] === deliveryAddressCandidates[0]
 		);
 		if (!coordsClose && !sameAddress) return "distinct";
 		if (historyMarkerPositions.length > 0) return "history";
@@ -1195,7 +1233,10 @@ export default function TrackingDeliveryMap({
 
 				if (rows.length >= 2) {
 					const shippers = driverData?.shippers ?? [];
-					const { chain: geoChain, rows: geoRows } = await geocodeStopRows(rows, shippers);
+					const { chain: geoChain, rows: geoRows } = await geocodeStopRows(
+						rows,
+						shippers
+					);
 					stopRows = geoRows;
 					chain = isSinglePickupSingleDeliveryRoute(rows)
 						? applyServerEndpointsToChain(geoChain, serverPickup, serverDelivery)
@@ -1203,7 +1244,21 @@ export default function TrackingDeliveryMap({
 				}
 
 				if (chain.length < 2) {
-					if (!serverPickup || !serverDelivery) {
+					const serverEndpointsUsable = Boolean(
+						serverPickup &&
+						serverDelivery &&
+						coordinatesPlausibleForLocation(
+							serverPickup.lat,
+							serverPickup.lng,
+							serverPickup.addressLabel
+						) &&
+						coordinatesPlausibleForLocation(
+							serverDelivery.lat,
+							serverDelivery.lng,
+							serverDelivery.addressLabel
+						)
+					);
+					if (!serverEndpointsUsable || !serverPickup || !serverDelivery) {
 						const [pickupGeo, deliveryGeo] = await Promise.all([
 							geocodeAddressCandidates(pickupAddressCandidates),
 							geocodeAddressCandidates(deliveryAddressCandidates),
@@ -1713,7 +1768,8 @@ export default function TrackingDeliveryMap({
 												: "text-xs text-gray-600 dark:text-gray-300"
 										}
 									>
-										{point.position[0].toFixed(6)}, {point.position[1].toFixed(6)}
+										{point.position[0].toFixed(6)},{" "}
+										{point.position[1].toFixed(6)}
 									</p>
 									{showDriverInHistoryPopup ? (
 										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
