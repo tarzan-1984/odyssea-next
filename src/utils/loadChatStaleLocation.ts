@@ -64,7 +64,7 @@ function formatStaleLocationLastUpdateLabel(
 	const ampm = hour >= 12 ? "PM" : "AM";
 	hour = hour % 12;
 	if (hour === 0) hour = 12;
-	return `${day} ${month} ${hour}.${minute}${ampm} EST`;
+	return `${day} ${month} ${hour}:${minute}${ampm} EST`;
 }
 
 /** Banner copy previously built on the server from isLocationStale latch. */

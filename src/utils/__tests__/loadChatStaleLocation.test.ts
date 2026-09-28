@@ -17,7 +17,7 @@ describe("loadChatStaleLocation", () => {
 		expect(resolveLoadChatStaleLocationAlert(input)).toContain(
 			"No location updates for over 30 minutes"
 		);
-		expect(resolveLoadChatStaleLocationAlert(input)).toContain("4.34AM EST");
+		expect(resolveLoadChatStaleLocationAlert(input)).toContain("4:34AM EST");
 	});
 
 	it("hides alert while load is resting", () => {
