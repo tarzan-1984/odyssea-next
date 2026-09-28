@@ -9,7 +9,7 @@ export function buildLoadLocationUpdateMessage(
 		`Please note that the current location of the unit is ${currentLocation}.`,
 	];
 	if (milesLeft != null && milesLeft !== "") {
-		lines.push("", `Miles left to the receiver: ${milesLeft} miles.`);
+		lines.push("", `Miles left to the receiver: ${milesLeft}.`);
 	}
 	lines.push("", "We will keep you posted.");
 	return lines.join("\n");

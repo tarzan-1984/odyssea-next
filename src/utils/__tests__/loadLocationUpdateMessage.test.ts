@@ -14,7 +14,7 @@ describe("loadLocationUpdateMessage", () => {
 				"",
 				"Please note that the current location of the unit is Smyrna, Georgia, 30080.",
 				"",
-				"Miles left to the receiver: 16 miles.",
+				"Miles left to the receiver: 16.",
 				"",
 				"We will keep you posted.",
 			].join("\n"),
