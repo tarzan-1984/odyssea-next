@@ -1157,7 +1157,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		!busyOnLoad &&
 			roadEtaStop &&
 			hasCurrentDriverCoordinates &&
-			hasFreshLastLocationUpdate
+			hasLastLocationUpdate
 	);
 	const roadEtaCopy = roadEtaBannerCopy(roadEtaStop?.kind ?? "first_pickup");
 
@@ -1193,6 +1193,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	}, [loadDetails]);
 	const canonicalPickupEta =
 		showPickupRoadEta &&
+		hasFreshLastLocationUpdate &&
 		storedRoadEta &&
 		storedRoadEta.kind === roadEtaStop?.kind &&
 		isStoredRoadEtaFresh(storedRoadEta, currentTrackingDriver?.lastLocationUpdateAt)
