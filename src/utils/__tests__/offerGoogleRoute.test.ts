@@ -36,6 +36,19 @@ describe("parseGoogleResolvedPlace", () => {
 			postal: "21214",
 		});
 	});
+
+	it("parses Google city + full state name without a ZIP", () => {
+		expect(parseGoogleResolvedPlace("Milwaukee, Wisconsin")).toEqual({
+			city: "Milwaukee",
+			regionCode: "WI",
+			postal: null,
+		});
+		expect(parseGoogleResolvedPlace("Naples, Florida")).toEqual({
+			city: "Naples",
+			regionCode: "FL",
+			postal: null,
+		});
+	});
 });
 
 describe("resolveStopFromGoogleWaypoint", () => {
@@ -67,6 +80,23 @@ describe("resolveStopFromGoogleWaypoint", () => {
 			latitude: 39.3471,
 			longitude: -76.5662,
 			zipCode: "21214",
+			error: null,
+		});
+	});
+
+	it("accepts Milwaukee, WI when Google returns the full state name and no ZIP", () => {
+		expect(
+			resolveStopFromGoogleWaypoint("Milwaukee, WI", {
+				resolvedAddress: "Milwaukee, Wisconsin",
+				latitude: 43.0410344,
+				longitude: -87.9096783,
+				zipCode: null,
+			}),
+		).toEqual({
+			location: "Milwaukee, WI",
+			latitude: 43.0410344,
+			longitude: -87.9096783,
+			zipCode: null,
 			error: null,
 		});
 	});
