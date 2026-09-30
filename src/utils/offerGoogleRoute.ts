@@ -7,7 +7,6 @@ import {
 } from "./offerLocationCountry";
 import {
 	LOCATION_GEOCODE_ERROR,
-	LOCATION_POSTAL_ERROR,
 	formatLocationZipMismatchError,
 	locationHasPostalCode,
 } from "./offerLocationFormat";
@@ -256,7 +255,8 @@ export type PostalReverseHit = {
 
 /**
  * When Google Directions omitted ZIP on a city-level stop, reverse the coords
- * we already have (geo_zips / PostGIS) — no Zippopotam / Nominatim round-trip.
+ * we already have (geo_zips / PostGIS). A missing ZIP does not reject the stop:
+ * city, state, and coordinates are enough to keep the address.
  */
 export async function enrichStopsWithPostal(
 	stops: OfferRouteStop[],
@@ -275,20 +275,23 @@ export async function enrichStopsWithPostal(
 				!Number.isFinite(stop.latitude) ||
 				!Number.isFinite(stop.longitude)
 			) {
-				return { ...stop, error: LOCATION_POSTAL_ERROR };
+				return stop;
 			}
 
-			const hit = await reversePostal(stop.latitude, stop.longitude);
-			const postal = hit?.postal?.trim() ?? "";
-			if (!postal) {
-				return { ...stop, error: LOCATION_POSTAL_ERROR };
+			let hit: PostalReverseHit | null = null;
+			try {
+				hit = await reversePostal(stop.latitude, stop.longitude);
+			} catch {
+				return stop;
 			}
+			const postal = hit?.postal?.trim() ?? "";
+			if (!postal) return stop;
 
 			const place = parseUserPlace(stop.location);
 			const city = (place?.city || hit?.city || "").trim();
 			const regionCode = (place?.regionCode || hit?.regionCode || "").trim();
 			if (!city || !regionCode) {
-				return { ...stop, error: LOCATION_POSTAL_ERROR };
+				return { ...stop, zipCode: postal };
 			}
 
 			return {
@@ -320,8 +323,7 @@ export function offerRouteStopsResolved(stops: OfferRouteStop[]): boolean {
 				stop.latitude != null &&
 				stop.longitude != null &&
 				Number.isFinite(stop.latitude) &&
-				Number.isFinite(stop.longitude) &&
-				Boolean(stop.zipCode || locationHasPostalCode(stop.location)),
+				Number.isFinite(stop.longitude),
 		)
 	);
 }

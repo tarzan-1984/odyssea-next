@@ -246,6 +246,28 @@ describe("enrichStopsWithPostal", () => {
 		});
 	});
 
+	it("keeps the stop when reverse geocode does not return a ZIP", async () => {
+		const stops = await enrichStopsWithPostal(
+			[
+				{
+					location: "Milwaukee, WI",
+					latitude: 43.041,
+					longitude: -87.91,
+					zipCode: null,
+					error: null,
+				},
+			],
+			async () => null,
+		);
+		expect(stops[0]).toEqual({
+			location: "Milwaukee, WI",
+			latitude: 43.041,
+			longitude: -87.91,
+			zipCode: null,
+			error: null,
+		});
+	});
+
 	it("skips reverse when the stop already has a ZIP", async () => {
 		const reverse = jest.fn(async () => ({ postal: "00000" }));
 		const stops = await enrichStopsWithPostal(
