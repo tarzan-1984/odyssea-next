@@ -17,7 +17,7 @@ import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
 	formatOfferDateOnly,
-	formatOfferDateTime,
+	defaultPickupDateTime,
 	formatOfferDateTimeFieldForDisplay,
 	formatOfferDateTimeRange,
 	getRouteChronologyError,
@@ -41,7 +41,6 @@ import { diagnoseOfferLocationError } from "@/utils/offerLocationGeocode";
 import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateOffers } from "@/utils/roleAccess";
-import Switch from "@/components/form/switch/Switch";
 
 const DND_EXTRA_ROW_TYPE = "CREATE_OFFER_EXTRA_ROW";
 
@@ -156,7 +155,7 @@ function buildRouteRowsFromUrlPrefill(
 		if (fallbackPickupLocation?.trim()) {
 			pickupRow.location = fallbackPickupLocation.trim();
 		}
-		pickupRow.time = formatOfferDateTime(new Date());
+		pickupRow.time = defaultPickupDateTime();
 		return [pickupRow, initialRouteRow("delivery")];
 	}
 
@@ -168,14 +167,14 @@ function buildRouteRowsFromUrlPrefill(
 		if (timeRaw) {
 			row.time = normalizeOfferTimeFromUrl(timeRaw);
 		} else if (index === firstPickupIndex) {
-			row.time = formatOfferDateTime(new Date());
+			row.time = defaultPickupDateTime();
 		}
 		return row;
 	});
 
 	if (!rows.some(r => r.type === "pickup")) {
 		const pickupRow = initialRouteRow("pickup");
-		pickupRow.time = formatOfferDateTime(new Date());
+		pickupRow.time = defaultPickupDateTime();
 		rows.unshift(pickupRow);
 	}
 	if (!rows.some(r => r.type === "delivery")) {
@@ -332,6 +331,9 @@ function DraggableExtraRow({
 	onLocationChange,
 	onTimeBlur,
 	onAsapToggle,
+	timePickerOpen,
+	onTimePickerOpenChange,
+	onTimePickerComplete,
 	locationError,
 	minDate,
 	canRemove = true,
@@ -348,6 +350,9 @@ function DraggableExtraRow({
 	onLocationChange?: (rowId: string) => void;
 	onTimeBlur?: () => void;
 	onAsapToggle?: (index: number, enabled: boolean) => void;
+	timePickerOpen?: boolean;
+	onTimePickerOpenChange?: (open: boolean) => void;
+	onTimePickerComplete?: () => void;
 	locationError?: string;
 	/** Previous stop datetime — delivery cannot be earlier than pick up. */
 	minDate?: Date | null;
@@ -497,32 +502,32 @@ function DraggableExtraRow({
 			{/* Time field + remove button grouped together */}
 			<div className="flex items-end gap-2 shrink-0">
 				<div className="w-full shrink-0 sm:w-[calc(16rem+10px)]">
-					<div className="mb-1.5 flex items-center justify-between gap-2">
-						<Label htmlFor={`datetime-${row.id}`} className="mb-0">
-							{row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
-						</Label>
-						{isDelivery && (
-							<Switch
-								label="ASAP"
-								checked={isAsap}
-								onChange={checked => onAsapToggle?.(index, checked)}
-							/>
-						)}
-					</div>
+					<Label htmlFor={`datetime-${row.id}`}>
+						{row.type === "pickup" ? "Pick up date & time" : "Delivery date & time"}
+					</Label>
 					{isAsap ? (
-						<Input
+						<button
 							id={`datetime-${row.id}`}
-							type="text"
-							value={OFFER_ASAP_TIME}
-							readOnly
-							className="dark:bg-gray-900 cursor-default"
-						/>
+							type="button"
+							className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-left text-sm text-gray-800 shadow-theme-xs cursor-pointer dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+							onClick={() => {
+								onAsapToggle?.(index, false);
+								onTimePickerOpenChange?.(true);
+							}}
+						>
+							{OFFER_ASAP_TIME}
+						</button>
 					) : (
 						<DateTimePicker
 							id={`datetime-${row.id}`}
 							allowTimeRange
 							value={row.time}
 							minDate={minDate ?? null}
+							open={timePickerOpen}
+							onOpenChange={onTimePickerOpenChange}
+							onComplete={onTimePickerComplete}
+							showAsap={isDelivery}
+							onAsap={() => onAsapToggle?.(index, true)}
 							onChange={v => updateExtraRow(index, "time", v)}
 							onBlur={onTimeBlur}
 							className="dark:bg-gray-900"
@@ -611,6 +616,8 @@ export default function CreateOfferModal({
 	const preserveUrlLoadedMilesRef = useRef(false);
 	/** Previous date/time before ASAP toggle, keyed by route row id. */
 	const timeBeforeAsapRef = useRef<Record<string, string>>({});
+	/** Route row whose date/time calendar is open. */
+	const [openTimeRowId, setOpenTimeRowId] = useState<string | null>(null);
 
 	// Reset form and errors when modal opens
 	useEffect(() => {
@@ -620,6 +627,7 @@ export default function CreateOfferModal({
 			appliedGoogleRouteKeyRef.current = "";
 			preserveUrlLoadedMilesRef.current = false;
 			timeBeforeAsapRef.current = {};
+			setOpenTimeRowId(null);
 			return;
 		}
 
@@ -858,7 +866,9 @@ export default function CreateOfferModal({
 		setManualLoadedMiles(null);
 		setRouteRows(prev => {
 			const next = [...prev];
-			next.splice(afterIndex + 1, 0, initialRouteRow("pickup"));
+			const pickupRow = initialRouteRow("pickup");
+			pickupRow.time = defaultPickupDateTime();
+			next.splice(afterIndex + 1, 0, pickupRow);
 			return next;
 		});
 	};
@@ -1387,6 +1397,24 @@ export default function CreateOfferModal({
 									);
 								}}
 								onAsapToggle={handleAsapToggle}
+								timePickerOpen={openTimeRowId === row.id}
+								onTimePickerOpenChange={open => {
+									setOpenTimeRowId(current => {
+										if (open) return row.id;
+										return current === row.id ? null : current;
+									});
+								}}
+								onTimePickerComplete={() => {
+									if (row.type !== "pickup") return;
+									const rows = routeRowsRef.current;
+									const rowIndex = rows.findIndex(item => item.id === row.id);
+									if (rowIndex < 0) return;
+									const delivery = rows
+										.slice(rowIndex + 1)
+										.find(item => item.type === "delivery" && !item.time.trim());
+									if (!delivery) return;
+									setOpenTimeRowId(delivery.id);
+								}}
 								locationError={routeRowLocationErrors[row.id]}
 								minDate={getRouteStopMinDate(
 									routeRows.map(r => r.time),

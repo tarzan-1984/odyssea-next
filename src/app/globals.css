@@ -999,6 +999,42 @@ span.flatpickr-weekday,
 	border-top: 0 !important;
 }
 
+.offer-datetime-asap {
+	display: flex;
+	justify-content: center;
+	padding: 0.625rem 0.75rem 0.25rem;
+}
+
+.offer-datetime-asap-btn {
+	height: 2rem;
+	padding: 0 0.875rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--color-gray-300);
+	background: var(--color-white);
+	color: var(--color-gray-800);
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.offer-datetime-asap-btn:hover {
+	border-color: var(--color-brand-500);
+	color: var(--color-brand-500);
+}
+
+.dark .offer-datetime-asap-btn {
+	border-color: var(--color-gray-600);
+	background: var(--color-gray-800);
+	color: rgb(255 255 255 / 0.9);
+}
+
+.flatpickr-calendar.hasTime .numInputWrapper.offer-time-required-missing,
+.flatpickr-calendar.hasTime .flatpickr-am-pm.offer-time-required-missing {
+	border-color: var(--color-error-500) !important;
+	box-shadow: 0 0 0 3px rgb(240 68 56 / 0.16);
+}
+
 @keyframes fadeOut {
 	0% {
 		opacity: 1;

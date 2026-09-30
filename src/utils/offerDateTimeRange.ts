@@ -171,6 +171,39 @@ function splitOfferDateTimeRange(trimmed: string): [string, string] | null {
 	return null;
 }
 
+export type OfferMeridiem = "AM" | "PM";
+
+/** Current time rounded up to the next 10-minute mark. Exact marks stay put. */
+export function roundUpToTenMinutes(date: Date): Date {
+	const next = new Date(date.getTime());
+	next.setSeconds(0, 0);
+	const remainder = next.getMinutes() % 10;
+	if (remainder !== 0) {
+		next.setMinutes(next.getMinutes() + (10 - remainder));
+	}
+	return next;
+}
+
+/**
+ * Two-digit 24-hour entry → 12-hour display + AM/PM.
+ * 00 → 12 AM, 14 → 02 PM, 16 → 04 PM, 12 → 12 PM.
+ */
+export function hour24DigitsTo12(
+	digits: string
+): { hour12: string; period: OfferMeridiem } | null {
+	if (!/^\d{2}$/.test(digits)) return null;
+	const hour = Number.parseInt(digits, 10);
+	if (hour > 23) return null;
+	if (hour === 0) return { hour12: "12", period: "AM" };
+	if (hour < 12) return { hour12: String(hour).padStart(2, "0"), period: "AM" };
+	if (hour === 12) return { hour12: "12", period: "PM" };
+	return { hour12: String(hour - 12).padStart(2, "0"), period: "PM" };
+}
+
+export function defaultPickupDateTime(now: Date = new Date()): string {
+	return formatOfferDateTime(roundUpToTenMinutes(now));
+}
+
 function formatTimePart(d: Date): string {
 	let hours = d.getHours();
 	const period = hours >= 12 ? "PM" : "AM";
