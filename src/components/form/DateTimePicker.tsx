@@ -573,10 +573,14 @@ export default function DateTimePicker({
 		const startRow = container ? startTimeRow(container) : null;
 		const fields = startRow ? getEndTimeInputs(startRow) : null;
 		const timeReady =
-			fields?.hour?.dataset.offerTimeCommitted === "1" &&
-			fields?.minute?.dataset.offerTimeCommitted === "1" &&
+			fields?.hour != null &&
+			fields.minute != null &&
 			fields.ampm != null &&
-			isMeridiem(rowPeriod(fields.ampm));
+			firstInvalidInRow(fields.hour, fields.minute, fields.ampm) === null;
+		if (timeReady && fields?.hour && fields.minute) {
+			fields.hour.dataset.offerTimeCommitted = "1";
+			fields.minute.dataset.offerTimeCommitted = "1";
+		}
 		if (!start || !fields?.hour || !fields.minute || !fields.ampm || !timeReady) {
 			if (start && fp.input) {
 				fp.input.value = fp.formatDate(start, "m/d/Y");
@@ -591,8 +595,11 @@ export default function DateTimePicker({
 			const timeRow = endRowRef.current.querySelector(".flatpickr-time") as HTMLElement | null;
 			const endFields = timeRow ? getEndTimeInputs(timeRow) : null;
 			const endReady =
-				endFields?.hour?.dataset.offerTimeCommitted === "1" &&
-				endFields?.minute?.dataset.offerTimeCommitted === "1";
+				endFields?.hour != null &&
+				endFields.minute != null &&
+				endFields.ampm != null &&
+				timeRowTouched(endFields.hour, endFields.minute, endFields.ampm) &&
+				firstInvalidInRow(endFields.hour, endFields.minute, endFields.ampm) === null;
 			const endParts = endReady && timeRow ? readEndTimeFromRow(timeRow) : null;
 			const end =
 				endParts != null
@@ -665,13 +672,6 @@ export default function DateTimePicker({
 				});
 			},
 			onChange: () => {
-				const container = fp.calendarContainer;
-				const start = container ? startTimeRow(container) : null;
-				const hour = start ? getEndTimeInputs(start).hour : null;
-				if (start && hour && hour.dataset.offerTimeCommitted !== "1") {
-					clearTimeRow(start);
-					markMissing(hour);
-				}
 				emitValue(fp);
 			},
 			onClose: () => {
