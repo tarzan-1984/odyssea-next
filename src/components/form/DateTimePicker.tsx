@@ -263,6 +263,18 @@ function clearTimeRow(timeRow: HTMLElement) {
 	delete minute.dataset.offerTimeCommitted;
 }
 
+/** Hours are set and minutes were left empty → 00. */
+function fillEmptyMinutes(hour: HTMLInputElement | null, minute: HTMLInputElement | null): boolean {
+	if (!hour || !minute || minute.value.trim() !== "") return false;
+	if (hour.dataset.offerTimeCommitted !== "1") return false;
+	const hourNum = Number.parseInt(hour.value.replace(/\D/g, ""), 10);
+	if (!hour.value.trim() || Number.isNaN(hourNum) || hourNum < 1 || hourNum > 12) return false;
+	minute.value = "00";
+	minute.placeholder = "";
+	minute.dataset.offerTimeCommitted = "1";
+	return true;
+}
+
 function markRowCommitted(timeRow: HTMLElement) {
 	const { hour, minute } = getEndTimeInputs(timeRow);
 	if (hour) hour.dataset.offerTimeCommitted = "1";
@@ -388,6 +400,10 @@ function bindHourMinuteAdvance(
 	});
 	minute.addEventListener("blur", () => {
 		if (commitSingleDigit(minute, () => applyMinuteDigits(minute) === "ok")) {
+			onCommit();
+			return;
+		}
+		if (fillEmptyMinutes(hour, minute)) {
 			onCommit();
 			return;
 		}
@@ -572,6 +588,7 @@ export default function DateTimePicker({
 		const container = fp.calendarContainer;
 		const startRow = container ? startTimeRow(container) : null;
 		const fields = startRow ? getEndTimeInputs(startRow) : null;
+		if (fields) fillEmptyMinutes(fields.hour, fields.minute);
 		const timeReady =
 			fields?.hour != null &&
 			fields.minute != null &&
@@ -594,6 +611,7 @@ export default function DateTimePicker({
 		if (allowTimeRangeRef.current && endRowRef.current) {
 			const timeRow = endRowRef.current.querySelector(".flatpickr-time") as HTMLElement | null;
 			const endFields = timeRow ? getEndTimeInputs(timeRow) : null;
+			if (endFields) fillEmptyMinutes(endFields.hour, endFields.minute);
 			const endReady =
 				endFields?.hour != null &&
 				endFields.minute != null &&
@@ -693,6 +711,7 @@ export default function DateTimePicker({
 						if (fields.minute) {
 							commitSingleDigit(fields.minute, () => applyMinuteDigits(fields.minute!) === "ok");
 						}
+						fillEmptyMinutes(fields.hour, fields.minute);
 					}
 				}
 				const missing = container ? firstMissingRequired(container) : null;

@@ -1,7 +1,9 @@
 import {
+	defaultPickupDateTime,
 	formatOfferDateTime,
 	formatOfferDateTimeRange,
 	getRouteStopMinDate,
+	offerStopTimeOrNewYorkNow,
 	parseOfferDateTimeField,
 	hour24DigitsTo12,
 	parseOfferRouteDateTime,
@@ -53,11 +55,32 @@ describe("URL offer time", () => {
 		expect(formatOfferDateTime(parsed!)).toBe("9/11/2026 02:05 PM");
 	});
 
+	it("uses 00 when a GET time has hours and no minutes", () => {
+		expect(formatOfferDateTime(parseOfferRouteDateTime("9/11/2026 3 PM")!)).toBe("9/11/2026 03:00 PM");
+		expect(formatOfferDateTime(parseOfferRouteDateTime("9/11/2026 14")!)).toBe("9/11/2026 02:00 PM");
+	});
+
 	it("pads the optional end time from a GET range", () => {
 		const { start, end } = parseOfferDateTimeField("9/11/2026 3:5 PM - 4:5 PM");
 		expect(start).not.toBeNull();
 		expect(end).not.toBeNull();
 		expect(formatOfferDateTimeRange(start!, end)).toBe("9/11/2026 03:05 PM — 04:05 PM");
+	});
+});
+
+describe("New York default offer time", () => {
+	const instant = new Date("2026-09-30T16:23:00Z");
+
+	it("uses the current New York clock, rounded up to 10 minutes", () => {
+		expect(defaultPickupDateTime(instant)).toBe("9/30/2026 12:30 PM");
+	});
+
+	it("keeps a GET date and fills the missing time from New York", () => {
+		expect(offerStopTimeOrNewYorkNow("8/13/2026", instant)).toBe("8/13/2026 12:30 PM");
+	});
+
+	it("keeps a GET datetime that already has a time", () => {
+		expect(offerStopTimeOrNewYorkNow("9/11/2026 3:5 PM", instant)).toBe("9/11/2026 03:05 PM");
 	});
 });
 

@@ -16,7 +16,6 @@ import offers, { type CreateOfferRoutePoint } from "@/app-api/offers";
 import { DragHandleIcon, AddPlusCircleIcon, RemoveMinusIcon, EditLoadedMilesIcon } from "@/icons";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import {
-	formatOfferDateOnly,
 	defaultPickupDateTime,
 	formatOfferDateTimeFieldForDisplay,
 	formatOfferDateTimeRange,
@@ -26,8 +25,7 @@ import {
 	isOfferDateWithoutTime,
 	OFFER_ASAP_TIME,
 	OFFER_TIME_REQUIRED_ERROR,
-	parseOfferDateOnly,
-	parseOfferDateTimeField,
+	offerStopTimeOrNewYorkNow,
 } from "@/utils/offerDateTimeRange";
 import {
 	isValidLocationFormat,
@@ -96,14 +94,7 @@ export interface CreateOfferModalProps {
 }
 
 function normalizeOfferTimeFromUrl(raw: string): string {
-	const trimmed = raw.trim();
-	if (!trimmed) return "";
-	const { start, end } = parseOfferDateTimeField(trimmed);
-	if (start) return formatOfferDateTimeRange(start, end);
-	// Date without time (e.g. "8/13/2026") — keep date; Create validates time is required.
-	const dateOnly = parseOfferDateOnly(trimmed);
-	if (dateOnly) return formatOfferDateOnly(dateOnly);
-	return "";
+	return offerStopTimeOrNewYorkNow(raw);
 }
 
 export interface CreateOfferFormValues {
@@ -159,16 +150,11 @@ function buildRouteRowsFromUrlPrefill(
 		return [pickupRow, initialRouteRow("delivery")];
 	}
 
-	const firstPickupIndex = stops.findIndex(s => s.type === "pickup");
-	const rows = stops.map((stop, index) => {
+	const rows = stops.map(stop => {
 		const row = initialRouteRow(stop.type);
 		row.location = stop.location.trim();
 		const timeRaw = stop.time?.trim() ?? "";
-		if (timeRaw) {
-			row.time = normalizeOfferTimeFromUrl(timeRaw);
-		} else if (index === firstPickupIndex) {
-			row.time = defaultPickupDateTime();
-		}
+		row.time = timeRaw ? normalizeOfferTimeFromUrl(timeRaw) : defaultPickupDateTime();
 		return row;
 	});
 

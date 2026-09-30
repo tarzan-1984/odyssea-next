@@ -104,18 +104,19 @@ export const OFFER_TIME_REQUIRED_ERROR = "Each stop must include a time";
 /**
  * "9/11/2026 3:5 PM", "9/11/2026 03:05 PM", or 24-hour "9/11/2026 14:5".
  * A single hour or minute digit is accepted and later shown as 03:05.
+ * Hours without minutes ("9/11/2026 3 PM") become :00.
  */
 export function parseSlashOfferDateTime(s: string): Date | null {
 	const trimmed = s.trim();
 	const re =
-		/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?:\s*(am|pm))?$/i;
+		/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{1,2}))?(?:\s*(am|pm))?$/i;
 	const m = trimmed.match(re);
 	if (!m) return null;
 	const month = parseInt(m[1], 10) - 1;
 	const day = parseInt(m[2], 10);
 	const year = parseInt(m[3], 10);
 	const hour = parseInt(m[4], 10);
-	const minute = parseInt(m[5], 10);
+	const minute = parseInt(m[5] ?? "0", 10);
 	if (minute > 59 || hour > 23) return null;
 	const period = m[6];
 	let h = hour;
@@ -210,8 +211,45 @@ export function hour24DigitsTo12(
 	return { hour12: String(hour - 12).padStart(2, "0"), period: "PM" };
 }
 
-export function defaultPickupDateTime(now: Date = new Date()): string {
-	return formatOfferDateTime(roundUpToTenMinutes(now));
+const NY_TZ = "America/New_York";
+
+/** America/New_York wall clock as a local Date (form fields use local getters). */
+export function newYorkWallClock(instant: Date = new Date()): Date {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone: NY_TZ,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hourCycle: "h23",
+	}).formatToParts(instant);
+	const num = (type: string) => Number(parts.find(part => part.type === type)?.value ?? "0");
+	let hour = num("hour");
+	if (hour === 24) hour = 0;
+	return new Date(num("year"), num("month") - 1, num("day"), hour, num("minute"), num("second"));
+}
+
+/** Pickup default: current New York time, rounded up to 10 minutes. */
+export function defaultPickupDateTime(instant: Date = new Date()): string {
+	return formatOfferDateTime(roundUpToTenMinutes(newYorkWallClock(instant)));
+}
+
+/**
+ * GET stop time. A full datetime is kept. A date without a time, or an empty
+ * value, gets the current New York clock.
+ */
+export function offerStopTimeOrNewYorkNow(raw: string, instant: Date = new Date()): string {
+	const trimmed = raw.trim();
+	if (!trimmed) return defaultPickupDateTime(instant);
+	const { start, end } = parseOfferDateTimeField(trimmed);
+	if (start) return formatOfferDateTimeRange(start, end);
+	const dateOnly = parseOfferDateOnly(trimmed);
+	if (!dateOnly) return "";
+	const clock = roundUpToTenMinutes(newYorkWallClock(instant));
+	dateOnly.setHours(clock.getHours(), clock.getMinutes(), 0, 0);
+	return formatOfferDateTime(dateOnly);
 }
 
 function formatTimePart(d: Date): string {
