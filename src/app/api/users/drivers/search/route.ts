@@ -76,6 +76,8 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 		}
 
+		const requesterId = serverAuth.getUserData(request)?.externalId?.trim() ?? "";
+
 		const { searchParams } = new URL(request.url);
 		const query = new URLSearchParams();
 
@@ -89,6 +91,10 @@ export async function GET(request: NextRequest) {
 		// Default paged=1 if not provided
 		if (!query.has("paged")) {
 			query.set("paged", "1");
+		}
+
+		if (requesterId) {
+			query.set("user_id", requesterId);
 		}
 
 		const excludeAtOpenBidLimit = parseExcludeAtOpenBidLimit(

@@ -24,9 +24,16 @@ export async function GET(
 			);
 		}
 
+		const requesterId = serverAuth.getUserData(request)?.externalId?.trim() ?? "";
+		const tmsUrl = new URL("https://www.endurance-tms.com/wp-json/tms/v1/driver");
+		tmsUrl.searchParams.set("id", id);
+		if (requesterId) {
+			tmsUrl.searchParams.set("user_id", requesterId);
+		}
+
 		// Send request to external TMS API for driver by ID
 		const response = await fetch(
-			`https://www.endurance-tms.com/wp-json/tms/v1/driver?id=${id}`,
+			tmsUrl.toString(),
 			{
 				method: "GET",
 				headers: {
