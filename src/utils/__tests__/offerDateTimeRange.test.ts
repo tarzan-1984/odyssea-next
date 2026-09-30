@@ -1,5 +1,8 @@
 import {
+	formatOfferDateTime,
+	formatOfferDateTimeRange,
 	getRouteStopMinDate,
+	parseOfferDateTimeField,
 	hour24DigitsTo12,
 	parseOfferRouteDateTime,
 	roundUpToTenMinutes,
@@ -35,6 +38,26 @@ describe("hour24DigitsTo12", () => {
 	it("rejects hours above 23", () => {
 		expect(hour24DigitsTo12("24")).toBeNull();
 		expect(hour24DigitsTo12("3")).toBeNull();
+	});
+});
+
+describe("URL offer time", () => {
+	it("pads a single hour and minute digit from a GET param", () => {
+		const parsed = parseOfferRouteDateTime("9/11/2026 3:5 PM");
+		expect(parsed).not.toBeNull();
+		expect(formatOfferDateTime(parsed!)).toBe("9/11/2026 03:05 PM");
+	});
+
+	it("converts a 24-hour GET time and pads a single minute", () => {
+		const parsed = parseOfferRouteDateTime("9/11/2026 14:5");
+		expect(formatOfferDateTime(parsed!)).toBe("9/11/2026 02:05 PM");
+	});
+
+	it("pads the optional end time from a GET range", () => {
+		const { start, end } = parseOfferDateTimeField("9/11/2026 3:5 PM - 4:5 PM");
+		expect(start).not.toBeNull();
+		expect(end).not.toBeNull();
+		expect(formatOfferDateTimeRange(start!, end)).toBe("9/11/2026 03:05 PM — 04:05 PM");
 	});
 });
 

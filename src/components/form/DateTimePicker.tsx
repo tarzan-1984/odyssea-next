@@ -347,8 +347,9 @@ function bindHourMinuteAdvance(
 		"input",
 		() => {
 			clearMissingMarks(calendar);
+			hour.dataset.offerTypedDigits = hour.value.replace(/\D/g, "").slice(0, 2);
 			const ready = applyHour24Input(hour, ampm);
-			if (hour.value.replace(/\D/g, "").length < 2) return;
+			if ((hour.dataset.offerTypedDigits ?? "").length < 2) return;
 			if (!ready) {
 				markMissing(hour);
 				return;
@@ -362,6 +363,7 @@ function bindHourMinuteAdvance(
 		"input",
 		() => {
 			clearMissingMarks(calendar);
+			minute.dataset.offerTypedDigits = minute.value.replace(/\D/g, "").slice(0, 2);
 			const status = applyMinuteDigits(minute);
 			if (status === "partial") return;
 			if (status === "invalid") {
@@ -373,18 +375,35 @@ function bindHourMinuteAdvance(
 		},
 		true
 	);
-	// Flatpickr writes 12:00 AM when an empty hour blurs. Put the placeholder back
-	// unless the user actually committed two digits.
+	// A single digit is finished as 0N (3 → 03). Flatpickr otherwise rewrites the
+	// field on blur, and an empty field must stay empty instead of becoming 12:00 AM.
 	hour.addEventListener("blur", () => {
+		if (commitSingleDigit(hour, () => applyHour24Input(hour, ampm))) {
+			onCommit();
+			return;
+		}
 		if (hour.dataset.offerTimeCommitted === "1") return;
 		hour.value = "";
 		hour.placeholder = "--";
 	});
 	minute.addEventListener("blur", () => {
+		if (commitSingleDigit(minute, () => applyMinuteDigits(minute) === "ok")) {
+			onCommit();
+			return;
+		}
 		if (minute.dataset.offerTimeCommitted === "1") return;
 		minute.value = "";
 		minute.placeholder = "--";
 	});
+}
+
+/** Pad one typed digit to two (3 → 03) and run the existing commit. */
+function commitSingleDigit(input: HTMLInputElement, commit: () => boolean): boolean {
+	if (input.dataset.offerTimeCommitted === "1") return false;
+	const typed = input.dataset.offerTypedDigits ?? "";
+	if (typed.length !== 1) return false;
+	input.value = typed.padStart(2, "0");
+	return commit();
 }
 
 function bindEndTimeRow(timeRow: HTMLElement, onChange: () => void) {
@@ -662,6 +681,20 @@ export default function DateTimePicker({
 					return;
 				}
 				const container = fp.calendarContainer;
+				if (container) {
+					for (const row of [startTimeRow(container), endTimeRowEl(container)]) {
+						if (!row) continue;
+						const fields = getEndTimeInputs(row);
+						if (fields.hour) {
+							commitSingleDigit(fields.hour, () =>
+								applyHour24Input(fields.hour!, fields.ampm)
+							);
+						}
+						if (fields.minute) {
+							commitSingleDigit(fields.minute, () => applyMinuteDigits(fields.minute!) === "ok");
+						}
+					}
+				}
 				const missing = container ? firstMissingRequired(container) : null;
 				const started =
 					fp.selectedDates.length > 0 ||

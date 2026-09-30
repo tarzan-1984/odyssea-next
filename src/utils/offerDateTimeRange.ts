@@ -62,7 +62,7 @@ export function parseOfferDateOnly(s: string): Date | null {
 export function parseLongOfferDateTime(s: string): Date | null {
 	const trimmed = s.trim();
 	const m = trimmed.match(
-		/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i
+		/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s+(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)$/i
 	);
 	if (!m) return null;
 	const day = parseInt(m[1], 10);
@@ -101,11 +101,14 @@ export function isOfferDateWithoutTime(value: string): boolean {
 
 export const OFFER_TIME_REQUIRED_ERROR = "Each stop must include a time";
 
-/** Legacy: "03/24/2026 02:30 pm" */
+/**
+ * "9/11/2026 3:5 PM", "9/11/2026 03:05 PM", or 24-hour "9/11/2026 14:5".
+ * A single hour or minute digit is accepted and later shown as 03:05.
+ */
 export function parseSlashOfferDateTime(s: string): Date | null {
 	const trimmed = s.trim();
 	const re =
-		/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(am|pm)$/i;
+		/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?:\s*(am|pm))?$/i;
 	const m = trimmed.match(re);
 	if (!m) return null;
 	const month = parseInt(m[1], 10) - 1;
@@ -113,8 +116,14 @@ export function parseSlashOfferDateTime(s: string): Date | null {
 	const year = parseInt(m[3], 10);
 	const hour = parseInt(m[4], 10);
 	const minute = parseInt(m[5], 10);
-	const { hour: h, minute: min } = parse12hClock(hour, minute, m[6]);
-	const d = new Date(year, month, day, h, min, 0, 0);
+	if (minute > 59 || hour > 23) return null;
+	const period = m[6];
+	let h = hour;
+	if (period) {
+		if (hour > 12) return null;
+		h = parse12hClock(hour, minute, period).hour;
+	}
+	const d = new Date(year, month, day, h, minute, 0, 0);
 	if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
 		return null;
 	}
@@ -124,10 +133,11 @@ export function parseSlashOfferDateTime(s: string): Date | null {
 /** "12 PM" or "8:30 AM" */
 export function parseOfferTimeOnly(s: string, baseDate: Date): Date | null {
 	const trimmed = s.trim();
-	const m = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+	const m = trimmed.match(/^(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)$/i);
 	if (!m) return null;
 	const hour = parseInt(m[1], 10);
-	const minute = parseInt(m[2] ?? "0", 10) || 0;
+	const minute = parseInt(m[2] ?? "0", 10);
+	if (Number.isNaN(minute) || minute > 59 || hour > 12) return null;
 	const { hour: h, minute: min } = parse12hClock(hour, minute, m[3]);
 	const d = new Date(baseDate);
 	d.setHours(h, min, 0, 0);
@@ -209,10 +219,10 @@ function formatTimePart(d: Date): string {
 	const period = hours >= 12 ? "PM" : "AM";
 	hours = hours % 12 || 12;
 	const minutes = d.getMinutes();
-	return `${hours}:${String(minutes).padStart(2, "0")} ${period}`;
+	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-/** Client format: "8/13/2026 8:00 AM" */
+/** Client format: "8/13/2026 08:00 AM" */
 export function formatOfferDateTime(d: Date): string {
 	return `${formatUsMdY(d)} ${formatTimePart(d)}`;
 }
