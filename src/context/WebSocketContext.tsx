@@ -824,7 +824,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			// Show toast for offer notifications (bid, declined, extended)
 			const offerNotificationTypes = ["offer_bid", "offer_refused", "offer_extend_time"];
 			if (offerNotificationTypes.includes(data.type)) {
-				playNotificationSound();
+				// Decline is frequent and the sound was distracting dispatchers.
+				if (data.type !== "offer_refused") {
+					playNotificationSound();
+				}
 				const addSystemToast = (window as any).addSystemToastNotification;
 				if (typeof addSystemToast === "function") {
 					const variant =
