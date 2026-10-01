@@ -25,7 +25,7 @@ import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTa
 import UserFilterSelect from "./UserFilterSelect";
 import { buildOfferChatUrl } from "@/utils/offerChatUrl";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
-import { canModifyOffers } from "@/utils/roleAccess";
+import { canModifyOffers, canViewAllOffers } from "@/utils/roleAccess";
 import { formatOfferCreateTimeEst } from "@/utils/nyWallClock";
 import SpecialRequirementsList from "@/components/offers/SpecialRequirementsList";
 import DriverRatingBadge from "@/components/tables/DataTables/DriversTable/DriverRatingBadge";
@@ -835,6 +835,7 @@ const OffersList = () => {
 	}, []);
 
 	const isAdmin = currentUser?.role === "ADMINISTRATOR";
+	const canSeeAllOffers = canViewAllOffers(currentUser?.role);
 	const showOfferId =
 		isAdmin && String(currentUser?.externalId ?? "").trim() === "83";
 	const canModifyOffersByRole = canModifyOffers(currentUser?.role);
@@ -876,7 +877,7 @@ const OffersList = () => {
 		limit: itemsPerPage,
 		sort_order: "action_time_asc" as const,
 		status: statusFilter,
-		...(isAdmin
+		...(canSeeAllOffers
 			? userFilterId
 				? { user_id: userFilterId }
 				: {}
@@ -1077,7 +1078,7 @@ const OffersList = () => {
 					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
-					{isAdmin && (
+					{canSeeAllOffers && (
 						<>
 							<span className="text-gray-500 dark:text-gray-400"> User </span>
 							<UserFilterSelect
@@ -1126,7 +1127,7 @@ const OffersList = () => {
 					<div className="space-y-3">
 						{results.map((row) => {
 							const isExpanded = expandedOfferId === row.id;
-							const creatorLabel = isAdmin ? formatOfferCreatorLabel(row.creator) : null;
+							const creatorLabel = canSeeAllOffers ? formatOfferCreatorLabel(row.creator) : null;
 							const allDriversInactive =
 								(row.drivers?.length ?? 0) > 0 &&
 								row.drivers!.every((d) => d.active === false);

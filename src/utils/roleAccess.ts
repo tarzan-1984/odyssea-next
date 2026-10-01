@@ -260,6 +260,13 @@ export function canModifyOffers(role: string | undefined | null): boolean {
 	return role.trim().toUpperCase() !== "DRIVER_UPDATES";
 }
 
+/** My Offers: full list and author filter, not only the current user's offers. */
+export function canViewAllOffers(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return normalized === "ADMINISTRATOR" || normalized === "DRIVER_UPDATES";
+}
+
 /** True if role may create bid rates / Leave bid (GAST may view page but not create). */
 export function canCreateBidRates(role: string | undefined | null): boolean {
 	return !isGastRole(role);
