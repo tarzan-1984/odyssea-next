@@ -250,8 +250,15 @@ export function canCreateOffers(role: string | undefined | null): boolean {
 	return !isGastRole(role);
 }
 
-/** Alias: all offer write actions (create, deactivate, drivers, accept, push, etc.). */
-export const canModifyOffers = canCreateOffers;
+/**
+ * Write actions on My Offers (edit, deactivate, drivers, chat, reminder, delete, accept).
+ * DRIVER_UPDATES may open /offers but cannot use these actions.
+ */
+export function canModifyOffers(role: string | undefined | null): boolean {
+	if (!canCreateOffers(role)) return false;
+	if (!role) return true;
+	return role.trim().toUpperCase() !== "DRIVER_UPDATES";
+}
 
 /** True if role may create bid rates / Leave bid (GAST may view page but not create). */
 export function canCreateBidRates(role: string | undefined | null): boolean {

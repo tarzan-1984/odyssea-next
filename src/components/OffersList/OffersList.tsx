@@ -1049,8 +1049,15 @@ const OffersList = () => {
 							<Button
 								size="sm"
 								variant="primary"
-								disabled={visibleOfferIds.length === 0 || isPending}
-								onClick={toggleAllVisible}
+								disabled={
+									!canModifyOffersByRole ||
+									visibleOfferIds.length === 0 ||
+									isPending
+								}
+								onClick={() => {
+									if (!canModifyOffersByRole) return;
+									toggleAllVisible();
+								}}
 								className="ml-2 h-9"
 							>
 								{allVisibleSelected ? "Deselect all" : "Select all"}
