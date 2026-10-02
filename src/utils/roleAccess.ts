@@ -264,7 +264,11 @@ export function canModifyOffers(role: string | undefined | null): boolean {
 export function canViewAllOffers(role: string | undefined | null): boolean {
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
-	return normalized === "ADMINISTRATOR" || normalized === "DRIVER_UPDATES";
+	return (
+		normalized === "ADMINISTRATOR" ||
+		normalized === "DRIVER_UPDATES" ||
+		normalized === "TRACKING_TL"
+	);
 }
 
 /** True if role may create bid rates / Leave bid (GAST may view page but not create). */
