@@ -960,11 +960,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		Number.isFinite(currentDriverLatitude) && Number.isFinite(currentDriverLongitude);
 	const isDriverLoadedEnroute =
 		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "loaded_enroute";
+	const isDriverBlocked =
+		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "blocked";
+	// Blocked driver still assigned to an active load: keep map, history, last ping, and ETA.
+	const canViewLiveTracking =
+		isDriverLoadedEnroute || (isDriverBlocked && loadStatusAllowsDriverMarker);
 	const hasLastLocationUpdate = hasValidLastLocationUpdate(
 		currentTrackingDriver?.lastLocationUpdateAt
 	);
 	const showDriverLiveMarker =
-		isDriverLoadedEnroute &&
+		canViewLiveTracking &&
 		loadStatusAllowsDriverMarker &&
 		hasCurrentDriverCoordinates &&
 		hasLastLocationUpdate;
@@ -1041,7 +1046,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		isAuthenticated &&
 		currentTrackingDriver &&
 		driverUsesMobileApp &&
-		isDriverLoadedEnroute &&
+		canViewLiveTracking &&
 		loadQualifiesForStaleTrackingCheck &&
 		hasLastLocationUpdate &&
 		!isLoadResting &&
@@ -1058,7 +1063,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		if (
 			currentTrackingDriver &&
 			driverUsesMobileApp &&
-			!isDriverLoadedEnroute &&
+			!canViewLiveTracking &&
 			!isLoadDelivered
 		) {
 			return "driver_not_loaded_enroute";
@@ -1070,11 +1075,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const showLoadHistoryPanel = Boolean(
 		isAuthenticated &&
 		showMapAndTrackingTools &&
-		(isDriverLoadedEnroute || isLoadDelivered)
+		(canViewLiveTracking || isLoadDelivered)
 	);
 	const showCurrentLocationHistoryCard = Boolean(
 		showLoadHistoryPanel &&
-		isDriverLoadedEnroute &&
+		canViewLiveTracking &&
 		LOAD_STATUSES_SHOW_CURRENT_LOCATION.has(normalizedLoadStatus) &&
 		hasCurrentDriverCoordinates &&
 		hasLastLocationUpdate
@@ -1109,7 +1114,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			STALE_LOCATION_THRESHOLD
 		);
 	const roadEtaStop = useMemo((): RoadEtaStop | null => {
-		if (!showMapAndTrackingTools || !isDriverLoadedEnroute) return null;
+		if (!showMapAndTrackingTools || !canViewLiveTracking) return null;
 		if (normalizedLoadStatus === "waiting_on_pu_date") {
 			if (!pickupGeocode) return null;
 			const lat = Number(pickupGeocode.lat);
@@ -1140,8 +1145,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		}
 		return null;
 	}, [
+		canViewLiveTracking,
 		deliveryGeocode,
-		isDriverLoadedEnroute,
 		loadRoutePoints,
 		normalizedLoadStatus,
 		pickupGeocode,
@@ -1213,7 +1218,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		showMapAndTrackingTools &&
 		currentTrackingDriver &&
 		driverUsesMobileApp &&
-		isDriverLoadedEnroute &&
+		canViewLiveTracking &&
 		normalizedLoadStatus === "loaded_enroute" &&
 		hasLastLocationUpdate &&
 		!isLoadResting &&
