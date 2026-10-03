@@ -958,13 +958,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const currentDriverLongitude = Number(currentTrackingDriver?.longitude);
 	const hasCurrentDriverCoordinates =
 		Number.isFinite(currentDriverLatitude) && Number.isFinite(currentDriverLongitude);
-	const isDriverLoadedEnroute =
-		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "loaded_enroute";
-	const isDriverBlocked =
-		normalizeTrackingStatus(currentTrackingDriver?.driverStatus ?? null) === "blocked";
-	// Blocked driver still assigned to an active load: keep map, history, last ping, and ETA.
+	const normalizedDriverStatus = normalizeTrackingStatus(
+		currentTrackingDriver?.driverStatus ?? null
+	);
+	const isDriverLoadedEnroute = normalizedDriverStatus === "loaded_enroute";
+	// Blocked and expired-documents drivers stay on this load's map: history, last ping, and ETA.
+	const driverStatusKeepsLoadTracking =
+		normalizedDriverStatus === "blocked" || normalizedDriverStatus === "expired_documents";
 	const canViewLiveTracking =
-		isDriverLoadedEnroute || (isDriverBlocked && loadStatusAllowsDriverMarker);
+		isDriverLoadedEnroute || (driverStatusKeepsLoadTracking && loadStatusAllowsDriverMarker);
 	const hasLastLocationUpdate = hasValidLastLocationUpdate(
 		currentTrackingDriver?.lastLocationUpdateAt
 	);
