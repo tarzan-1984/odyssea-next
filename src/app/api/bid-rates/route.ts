@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
 		const distance = Number(body?.distance);
 		const route = body?.route;
 		const isDoNotBid = Boolean(body?.isDoNotBid);
+		const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
 
 		if (!Array.isArray(route) || route.length < 2) {
 			return NextResponse.json(
@@ -104,13 +105,24 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		if (isDoNotBid && !reason) {
+			return NextResponse.json({ error: "reason is required" }, { status: 400 });
+		}
+
 		const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/bid-rates`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${accessToken}`,
 			},
-			body: JSON.stringify({ route, broker, rate, distance, isDoNotBid }),
+			body: JSON.stringify({
+				route,
+				broker,
+				rate,
+				distance,
+				isDoNotBid,
+				...(isDoNotBid ? { reason } : {}),
+			}),
 		});
 
 		const data = await response.json();

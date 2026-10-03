@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
@@ -97,6 +97,51 @@ function formatBidDistanceMiles(distance: number | null | undefined): string {
 	if (distance == null || !Number.isFinite(Number(distance))) return "";
 	const miles = Math.round(Number(distance));
 	return `${miles.toLocaleString("en-US")} ${miles === 1 ? "mile" : "miles"}`;
+}
+
+function BidReasonText({ text }: { text: string }) {
+	const [expanded, setExpanded] = useState(false);
+	const textRef = useRef<HTMLParagraphElement>(null);
+	const [clamped, setClamped] = useState(false);
+
+	useLayoutEffect(() => {
+		const el = textRef.current;
+		if (!el || expanded) return;
+
+		const measure = () => {
+			setClamped(el.scrollHeight > el.clientHeight + 1);
+		};
+
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [text, expanded]);
+
+	return (
+		<div className="min-w-0">
+			<p
+				ref={textRef}
+				className={`break-words text-sm text-gray-700 dark:text-gray-300 ${
+					expanded ? "whitespace-pre-wrap" : "line-clamp-2"
+				}`}
+			>
+				{text}
+			</p>
+			{clamped ? (
+				<button
+					type="button"
+					onClick={e => {
+						e.stopPropagation();
+						setExpanded(prev => !prev);
+					}}
+					className="mt-0.5 text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+				>
+					{expanded ? "Show less" : "Read more"}
+				</button>
+			) : null}
+		</div>
+	);
 }
 
 function showBidExpiringToast(bidName: string, bidId: number) {
@@ -345,9 +390,14 @@ export default function BidRatesList({
 												</p>
 												<div className="flex items-center gap-2">
 													{isDoNotBid ? (
-														<p className="text-xl font-semibold text-red-600 dark:text-red-500">
-															Do Not Bid!
-														</p>
+														<div className="flex min-w-0 flex-col gap-1">
+															<p className="text-xl font-semibold text-red-600 dark:text-red-500">
+																Do Not Bid!
+															</p>
+															{row.reason?.trim() ? (
+																<BidReasonText text={row.reason.trim()} />
+															) : null}
+														</div>
 													) : (
 														<>
 															<p className="text-xl font-semibold text-brand-600 dark:text-brand-400">

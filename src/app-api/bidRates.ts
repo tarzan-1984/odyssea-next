@@ -27,6 +27,8 @@ export interface BidRate {
 	isRateChange?: boolean;
 	/** When true, show Do Not Bid! and disable +1 / offers / votes. */
 	isDoNotBid?: boolean;
+	/** Set when the bid was created with Do not bid. */
+	reason?: string | null;
 	/** Unix timestamp in seconds. */
 	createdAt: number;
 	/** Unix timestamp in seconds. */
@@ -66,6 +68,8 @@ export interface CreateBidRatePayload {
 	rate: number;
 	distance: number;
 	isDoNotBid?: boolean;
+	/** Required when isDoNotBid is true. */
+	reason?: string;
 }
 
 export async function getBidRates(

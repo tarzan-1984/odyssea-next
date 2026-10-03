@@ -7,6 +7,7 @@ import offers from "@/app-api/offers";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
 import Checkbox from "@/components/form/input/Checkbox";
 import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
@@ -33,12 +34,14 @@ type LeaveBidForm = {
 	broker: string;
 	rate: string;
 	isDoNotBid: boolean;
+	reason: string;
 };
 
 const EMPTY_FORM: LeaveBidForm = {
 	broker: "",
 	rate: "",
 	isDoNotBid: false,
+	reason: "",
 };
 
 export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
@@ -256,6 +259,12 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 			}
 		}
 
+		const reason = form.reason.trim();
+		if (isDoNotBid && !reason) {
+			setError("Please enter reason.");
+			return;
+		}
+
 		setSubmitting(true);
 		try {
 			await createBidRate({
@@ -264,6 +273,7 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 				rate,
 				distance: Math.round(distance),
 				isDoNotBid,
+				...(isDoNotBid ? { reason } : {}),
 			});
 			onClose();
 		} catch (err) {
@@ -381,6 +391,21 @@ export default function LeaveBidModal({ isOpen, onClose }: LeaveBidModalProps) {
 								/>
 							</div>
 						</div>
+
+						{form.isDoNotBid && (
+							<div>
+								<Label htmlFor="leave-bid-reason">Reason</Label>
+								<div className="mt-1.5">
+									<TextArea
+										id="leave-bid-reason"
+										rows={4}
+										value={form.reason}
+										onChange={value => updateField("reason", value)}
+										placeholder="Enter reason"
+									/>
+								</div>
+							</div>
+						)}
 					</div>
 
 					{error && (
