@@ -8,6 +8,8 @@ import { DownloadIcon, FileIcon } from "@/icons";
 import { chatApi } from "@/app-api/chatApi";
 import { messagesArchiveApi, ArchiveDay } from "@/app-api/messagesArchiveApi";
 import FilePreview from "./FilePreview";
+import { useLoadChatReferenceNumber } from "./LoadChatDownloadContext";
+import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 
 interface FilesModalProps {
 	isOpen: boolean;
@@ -23,6 +25,7 @@ interface FileMessage extends Message {
 
 
 export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProps) {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const [files, setFiles] = useState<FileMessage[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isInitialLoading, setIsInitialLoading] = useState(false);
@@ -278,7 +281,10 @@ export default function FilesModal({ isOpen, onClose, chatRoom }: FilesModalProp
 			e.stopPropagation();
 		}
 		const { downloadChatFile } = await import("@/utils/downloadChatFile");
-		await downloadChatFile(fileUrl, fileName);
+		await downloadChatFile(fileUrl, fileName, {
+			downloadName:
+				loadReferenceDownloadFilename(loadReferenceNumber, fileName, fileUrl) ?? undefined,
+		});
 	};
 
 

@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import type { ChatMessageAttachment } from "@/app-api/chatApi";
 import FilePreview from "@/components/chats/FilePreview";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
-import { isHeicFileName } from "@/utils/downloadChatFile";
+import { isHeicFileName, loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
+import { useLoadChatReferenceNumber } from "@/components/chats/LoadChatDownloadContext";
 
 function formatKb(size?: number | null): string {
 	if (size == null || Number.isNaN(size)) return "";
@@ -14,7 +15,11 @@ function formatKb(size?: number | null): string {
 async function downloadFile(
 	fileUrl: string,
 	fileName: string,
-	hooks?: { onConvertingStart?: () => void; onConvertingEnd?: () => void }
+	hooks?: {
+		onConvertingStart?: () => void;
+		onConvertingEnd?: () => void;
+		downloadName?: string;
+	}
 ) {
 	const { downloadChatFile } = await import("@/utils/downloadChatFile");
 	await downloadChatFile(fileUrl, fileName, hooks);
@@ -46,6 +51,7 @@ export function MessageAttachmentCard({
 	downloadingKey,
 	setDownloadingKey,
 }: MessageAttachmentCardProps) {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const kb = formatKb(item.fileSize);
 	const safeName = item.fileName || "File";
 	const isHeic = isHeicFileName(safeName, item.fileUrl);
@@ -93,6 +99,12 @@ export function MessageAttachmentCard({
 						e.preventDefault();
 						e.stopPropagation();
 						downloadFile(item.fileUrl, safeName, {
+							downloadName:
+								loadReferenceDownloadFilename(
+									loadReferenceNumber,
+									safeName,
+									item.fileUrl
+								) ?? undefined,
 							onConvertingStart: () => setDownloadingKey(itemKey),
 							onConvertingEnd: () => setDownloadingKey(null),
 						}).catch(() => setDownloadingKey(null));

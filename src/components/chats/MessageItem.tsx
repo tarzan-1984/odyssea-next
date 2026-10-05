@@ -30,6 +30,8 @@ import { isLoadDispatchSystemMessage, isLoadProximitySystemMessage, isLoadStaleL
 import { useBidChatAuctionOptional } from "./BidChatAuctionContext";
 import { mentionNamesFromCandidates, buildMentionCandidates } from "@/utils/chatMentions";
 import UndoSendProgressBar from "./UndoSendProgressBar";
+import { useLoadChatReferenceNumber } from "./LoadChatDownloadContext";
+import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 
 interface MessageItemProps {
 	message: Message;
@@ -68,6 +70,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onDiscardFailed,
 	onUndoSend,
 }) => {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const [singleAttachmentDownloadingKey, setSingleAttachmentDownloadingKey] = useState<
 		string | null
 	>(null);
@@ -208,6 +211,19 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				}
 			: null;
 	const legacyAttachmentKey = legacyAttachment ? `${legacyAttachment.fileUrl}-single` : "";
+	const downloadLegacyFile = (event: React.MouseEvent<HTMLAnchorElement>) => {
+		if (!legacyFileUrl) return;
+		const downloadName = loadReferenceDownloadFilename(
+			loadReferenceNumber,
+			message.fileName || "",
+			legacyFileUrl
+		);
+		if (!downloadName) return;
+		event.preventDefault();
+		void import("@/utils/downloadChatFile").then(({ downloadChatFile }) =>
+			downloadChatFile(legacyFileUrl, message.fileName || "download", { downloadName })
+		);
+	};
 	const showMessageMenu = !isPending && getMessageDropdownActionCount(message, currentUser) > 0;
 
 	const renderMessageMenu = () =>
@@ -419,6 +435,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 										download={message.fileName}
 										target="_blank"
 										rel="noopener noreferrer"
+										onClick={downloadLegacyFile}
 										className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 									>
 										<svg
@@ -496,6 +513,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								download={message.fileName}
 								target="_blank"
 								rel="noopener noreferrer"
+								onClick={downloadLegacyFile}
 								className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 							>
 								<svg

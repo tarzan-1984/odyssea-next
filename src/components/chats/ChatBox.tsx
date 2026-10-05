@@ -20,6 +20,7 @@ import ChatBoxVirtualMessageList, {
 } from "./ChatBoxVirtualMessageList";
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
+import { LoadChatDownloadProvider } from "./LoadChatDownloadContext";
 import { BidChatAuctionProvider } from "./BidChatAuctionContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 import { removeChatMessageLocally, restoreChatMessageLocally, isDeletableChatMessage } from "@/lib/chatMessageDelete";
@@ -959,8 +960,12 @@ export default function ChatBox({
 		);
 	}
 
+	const loadReferenceNumber =
+		selectedChatRoom.type === "LOAD" ? selectedChatRoom.referenceNumber : null;
+
 	return (
 		<BidChatAuctionProvider chatRoomId={selectedChatRoomId} enabled={isBidChat}>
+		<LoadChatDownloadProvider referenceNumber={loadReferenceNumber}>
 		<ChatImageGalleryProvider messages={uniqueMessages}>
 			<div
 				data-chat-box
@@ -1232,6 +1237,7 @@ export default function ChatBox({
 				) : null}
 			</div>
 		</ChatImageGalleryProvider>
+		</LoadChatDownloadProvider>
 		</BidChatAuctionProvider>
 	);
 }

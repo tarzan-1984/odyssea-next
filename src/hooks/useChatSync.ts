@@ -144,6 +144,8 @@ export const useChatSync = () => {
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
+											referenceNumber:
+												storeRoom.referenceNumber ?? cachedRoom.referenceNumber,
 											...mergeLoadRestFields(cachedRoom, storeRoom),
 										};
 									}
@@ -222,6 +224,8 @@ export const useChatSync = () => {
 											),
 											updatedAt: storeRoom.updatedAt || cachedRoom.updatedAt,
 											loadStatus: storeRoom.loadStatus ?? cachedRoom.loadStatus,
+											referenceNumber:
+												storeRoom.referenceNumber ?? cachedRoom.referenceNumber,
 											...mergeLoadRestFields(cachedRoom, storeRoom),
 										};
 									}

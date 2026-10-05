@@ -332,6 +332,8 @@ export const useChatStore = create<ChatState>()(
 							nextCurrentChatRoom = {
 								...currentChatRoom,
 								loadStatus: matchingRoom.loadStatus,
+								referenceNumber:
+									matchingRoom.referenceNumber ?? currentChatRoom.referenceNumber,
 								...mergeLoadRestFields(currentChatRoom, matchingRoom),
 								roadEta: matchingRoom.roadEta,
 								busyOnLoad: matchingRoom.busyOnLoad,

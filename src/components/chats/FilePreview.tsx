@@ -14,6 +14,8 @@ import {
 } from "@/config/chatImagePreview";
 import { ensureChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
+import { useLoadChatReferenceNumber } from "@/components/chats/LoadChatDownloadContext";
+import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
 import { useLazyInViewport } from "@/hooks/useLazyInViewport";
 import { ChatMediaPreviewPlaceholder } from "@/components/chats/ChatMediaPreviewPlaceholder";
@@ -252,6 +254,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	compact = false,
 	compactPreview = false,
 }) => {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const [previewContent, setPreviewContent] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string>("");
@@ -845,6 +848,12 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 											await import("@/utils/downloadChatFile");
 										try {
 											await downloadChatFile(fileUrl, fileName, {
+												downloadName:
+													loadReferenceDownloadFilename(
+														loadReferenceNumber,
+														fileName,
+														fileUrl
+													) ?? undefined,
 												onConvertingStart: () => setIsDownloading(true),
 												onConvertingEnd: () => setIsDownloading(false),
 											});

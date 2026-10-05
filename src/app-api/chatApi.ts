@@ -66,6 +66,8 @@ export interface ChatRoom {
 	isLoadArchived?: boolean;
 	/** Current loads.status for LOAD chats (from loads table). */
 	loadStatus?: string | null;
+	/** LOAD chat: loads.reference_number. Used as the downloaded file name. */
+	referenceNumber?: string | null;
 	/** LOAD chat: loads.is_rest — rest badge under the header avatar. */
 	isRest?: boolean;
 	/** LOAD chat: loads.rest_date — when rest ends. */

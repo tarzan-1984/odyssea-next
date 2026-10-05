@@ -8,6 +8,8 @@ import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay"
 import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
 import type { ChatGalleryImage } from "@/utils/chatGalleryImages";
 import { isChatImageFileName } from "@/utils/chatGalleryImages";
+import { useLoadChatReferenceNumber } from "@/components/chats/LoadChatDownloadContext";
+import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 import {
 	applyDocumentGrayscaleToCanvas,
 	canvasToPdfBlob,
@@ -205,6 +207,7 @@ export default function ChatImageLightbox({
 	onPrev,
 	onNext,
 }: ChatImageLightboxProps) {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const current = images[currentIndex];
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [previewLoadError, setPreviewLoadError] = useState("");
@@ -573,13 +576,17 @@ export default function ChatImageLightbox({
 		setIsEditBusy(true);
 		try {
 			const blob = await canvasToPdfBlob(canvas);
-			downloadBlob(blob, editedDownloadFilename(current.fileName));
+			const downloadName =
+				loadReferenceDownloadFilename(loadReferenceNumber, current.fileName, current.fileUrl, {
+					forcePdf: true,
+				}) ?? editedDownloadFilename(current.fileName);
+			downloadBlob(blob, downloadName);
 		} catch (error) {
 			console.error("[ChatImageLightbox] Failed to save edited image:", error);
 		} finally {
 			setIsEditBusy(false);
 		}
-	}, [current, isEditBusy]);
+	}, [current, isEditBusy, loadReferenceNumber]);
 
 	const handleZoomIn = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();

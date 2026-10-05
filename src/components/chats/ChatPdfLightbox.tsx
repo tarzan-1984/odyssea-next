@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/modal";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 import ChatImageEditCanvas from "@/components/chats/ChatImageEditCanvas";
 import ChatEraserSettingsPanel from "@/components/chats/ChatEraserSettingsPanel";
+import { useLoadChatReferenceNumber } from "@/components/chats/LoadChatDownloadContext";
+import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 import {
 	applyDocumentGrayscaleToCanvas,
 	canvasToPdfBlob,
@@ -141,6 +143,7 @@ export default function ChatPdfLightbox({
 	fileSize,
 	onClose,
 }: ChatPdfLightboxProps) {
+	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const [modalImageScale, setModalImageScale] = useState(1);
 	const [modalImgNaturalSize, setModalImgNaturalSize] = useState<{
 		w: number;
@@ -508,13 +511,17 @@ export default function ChatPdfLightbox({
 		setIsEditBusy(true);
 		try {
 			const blob = await canvasToPdfBlob(canvas);
-			downloadBlob(blob, editedPdfPageFilename(fileName, pageIndex + 1));
+			const downloadName =
+				loadReferenceDownloadFilename(loadReferenceNumber, fileName, fileUrl, {
+					forcePdf: true,
+				}) ?? editedPdfPageFilename(fileName, pageIndex + 1);
+			downloadBlob(blob, downloadName);
 		} catch (error) {
 			console.error("[ChatPdfLightbox] Failed to save edited PDF page:", error);
 		} finally {
 			setIsEditBusy(false);
 		}
-	}, [fileName, isEditBusy, pageIndex]);
+	}, [fileName, fileUrl, isEditBusy, loadReferenceNumber, pageIndex]);
 
 	const handleZoomIn = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
