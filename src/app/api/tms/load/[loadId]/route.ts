@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { serverAuth } from "@/utils/auth";
 
-const TMS_LOAD_BASE_URL = "https://www.endurance-tms.com/wp-json/tms/v1/load";
+const TMS_BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL_TMS ?? "").replace(/\/$/, "");
+const TMS_LOAD_BASE_URL = `${TMS_BASE_URL}/v1/load`;
 const TMS_API_KEY = process.env.TMS_API_KEY || "tms_api_key_2024_driver_access";
 
 /** Nest TransformInterceptor wraps as { data, timestamp, path }. TMS body is { success, data: { meta_data } }. */
