@@ -23,7 +23,6 @@ export default function ChatSyncInitializer() {
 	const isCatchUpRunningRef = React.useRef(false);
 
 	React.useEffect(() => {
-		const previousPathname = lastPathnameRef.current;
 		// Check if we're on a tracking page
 		const isTrackingPage = pathname?.startsWith("/tracking/") || 
 			(typeof window !== "undefined" && window.location.pathname.startsWith("/tracking/"));
@@ -42,23 +41,6 @@ export default function ChatSyncInitializer() {
 		}
 
 		if (!currentUser) return;
-
-		const isChatPage = pathname === "/chat" || pathname?.startsWith("/chat/");
-		const enteredChatPage =
-			isChatPage &&
-			previousPathname !== null &&
-			previousPathname !== "/chat" &&
-			!previousPathname.startsWith("/chat/");
-
-		// Unknown rooms received while browsing other pages are deliberately not
-		// fetched one-by-one. Refresh them in one request when chat is opened.
-		if (enteredChatPage) {
-			hasLoadedRef.current = true;
-			loadChatRooms({ force: true }).catch((error: unknown) => {
-				console.error("Failed to refresh chat rooms:", error);
-			});
-			return;
-		}
 
 		// Ensure a single initial load
 		if (!hasLoadedRef.current) {
