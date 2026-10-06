@@ -1,8 +1,16 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { useNotifications, useUnreadCount, useLoadMoreNotifications, useMarkAllAsRead, useNotificationsStore } from "@/stores/notificationsStore";
+import {
+	useNotifications,
+	useUnreadCount,
+	useNotificationsLoading,
+	useLoadNotifications,
+	useLoadMoreNotifications,
+	useMarkAllAsRead,
+	useNotificationsStore,
+} from "@/stores/notificationsStore";
 import { useUserStore } from "@/stores/userStore";
 import { getNotificationHref } from "@/utils/offerChatUrl";
 import type { Notification } from "@/app-api/notificationsApi";
@@ -143,6 +151,8 @@ export default function NotificationDropdown() {
 	const [isLoadingMore, setIsLoadingMore] = useState(false);
 	const notifications = useNotifications();
 	const unreadCount = useUnreadCount();
+	const isLoading = useNotificationsLoading();
+	const loadNotifications = useLoadNotifications();
 	const loadMoreNotifications = useLoadMoreNotifications();
 	const markAllAsRead = useMarkAllAsRead();
 	const currentUser = useUserStore(state => state.currentUser);
@@ -185,27 +195,23 @@ export default function NotificationDropdown() {
 	};
 
 	const handleClick = async () => {
-		if (!isOpen && currentUser?.id) {
-			// Mark all notifications as read when opening dropdown
-			try {
-				await markAllAsRead();
-			} catch (error) {
-				console.error('Failed to mark notifications as read:', error);
-			}
+		if (isOpen) {
+			closeDropdown();
+			return;
 		}
-		toggleDropdown();
+
+		// Open immediately; fetch the heavier notification list only on demand.
+		setIsOpen(true);
+		if (!currentUser?.id) return;
+
+		try {
+			await loadNotifications(1);
+			// Preserve the existing behavior: opening the dropdown marks all as read.
+			await markAllAsRead();
+		} catch (error) {
+			console.error('Failed to load notifications:', error);
+		}
 	};
-
-	// Notifications are now loaded automatically by NotificationsInitializer
-	// Only load more if user scrolls to bottom and there are more notifications
-	useEffect(() => {
-		if (isOpen && notifications.length === 0) {
-			// Notifications should have been loaded on app start
-		}
-	}, [isOpen, notifications.length]);
-
-	// Unread count is now loaded automatically by NotificationsInitializer
-	// No need to load it here
 	return (
 		<div className="relative inline-flex shrink-0">
 			<button
@@ -265,7 +271,11 @@ export default function NotificationDropdown() {
 					</button>
 				</div>
 				<ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar space-y-2">
-					{notifications.length === 0 ? (
+					{isLoading ? (
+						<li className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+							Loading notifications...
+						</li>
+					) : notifications.length === 0 ? (
 						<li className="p-6 text-center text-gray-500 dark:text-gray-400">
 							<svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
