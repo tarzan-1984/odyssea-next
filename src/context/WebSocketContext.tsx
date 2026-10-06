@@ -221,6 +221,7 @@ const OFFER_LIST_STRUCTURE_REASONS = new Set([
 	"offer_created",
 	"offer_updated",
 	"offer_deactivated",
+	"offer_returned",
 	"driver_selected",
 ]);
 

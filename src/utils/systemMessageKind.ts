@@ -11,6 +11,7 @@ export type SystemMessageKind =
 
 export const STALE_LOCATION_ALERT_VISIBLE_ROLES = [
 	'ADMINISTRATOR',
+	'GAST',
 	'TRACKING',
 	'TRACKING_TL',
 	'MORNING_TRACKING',
@@ -34,6 +35,7 @@ export const DRIVER_REST_ENDED_VISIBLE_ROLES = [
 	'MORNING_TRACKING',
 	'TRACKING_TL',
 	'ADMINISTRATOR',
+	'GAST',
 ] as const;
 
 const DRIVER_REST_ENDED_VISIBLE_ROLE_SET = new Set<string>(

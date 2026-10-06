@@ -752,6 +752,10 @@ const OffersList = () => {
 	const [deactivateConfirmOffer, setDeactivateConfirmOffer] = useState<OfferRow | null>(null);
 	const [showBulkDeactivateConfirm, setShowBulkDeactivateConfirm] = useState(false);
 	const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
+	const [returningOfferId, setReturningOfferId] = useState<number | null>(null);
+	const [returnConfirmOffer, setReturnConfirmOffer] = useState<OfferRow | null>(null);
+	const [showBulkReturnConfirm, setShowBulkReturnConfirm] = useState(false);
+	const [isBulkReturning, setIsBulkReturning] = useState(false);
 	const [editOfferData, setEditOfferData] = useState<EditOfferData | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
@@ -1016,6 +1020,46 @@ const OffersList = () => {
 		}
 	};
 
+	const handleConfirmReturnOffer = async () => {
+		if (!returnConfirmOffer) return;
+		const offer = returnConfirmOffer;
+		setReturningOfferId(offer.id);
+		const res = await offersApi.returnOffer(offer.id);
+		setReturningOfferId(null);
+		setReturnConfirmOffer(null);
+		if (res.success) {
+			setSelectedOfferIds((prev) => prev.filter((id) => id !== offer.id));
+			await queryClient.invalidateQueries({
+				queryKey: ["offers-list-cards"],
+			});
+		} else {
+			console.error(res.error);
+			window.alert(
+				typeof res.error === "string" ? res.error : "Failed to return offer"
+			);
+		}
+	};
+
+	const handleConfirmBulkReturnOffers = async () => {
+		if (selectedOfferIds.length === 0) return;
+		setIsBulkReturning(true);
+		const res = await offersApi.returnOffers(selectedOfferIds);
+		setIsBulkReturning(false);
+		setShowBulkReturnConfirm(false);
+		if (res.success) {
+			setSelectedOfferIds([]);
+			setSelectedOfferDriverKeys([]);
+			await queryClient.invalidateQueries({
+				queryKey: ["offers-list-cards"],
+			});
+		} else {
+			console.error(res.error);
+			window.alert(
+				typeof res.error === "string" ? res.error : "Failed to return offers"
+			);
+		}
+	};
+
 	useEffect(() => {
 		const nowUnixSeconds = Math.floor(Date.now() / 1000);
 		const nextExpiry = results
@@ -1053,36 +1097,42 @@ const OffersList = () => {
 						}}
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
-					{statusFilter === "active" && (
-						<>
-							<Button
-								size="sm"
-								variant="primary"
-								disabled={
-									!canModifyOffersByRole ||
-									visibleOfferIds.length === 0 ||
-									isPending
-								}
-								onClick={() => {
-									if (!canModifyOffersByRole) return;
-									toggleAllVisible();
-								}}
-								className="ml-2 h-9"
-							>
-								{allVisibleSelected ? "Deselect all" : "Select all"}
-							</Button>
-							{selectedOfferIds.length > 0 && (
-								<button
-									type="button"
-									disabled={!canModifyOffersByRole || isBulkDeactivating}
-									onClick={() => setShowBulkDeactivateConfirm(true)}
-									className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
-								>
-									Deactivate offers
-									<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
-								</button>
-							)}
-						</>
+					<Button
+						size="sm"
+						variant="primary"
+						disabled={
+							!canModifyOffersByRole ||
+							visibleOfferIds.length === 0 ||
+							isPending
+						}
+						onClick={() => {
+							if (!canModifyOffersByRole) return;
+							toggleAllVisible();
+						}}
+						className="ml-2 h-9"
+					>
+						{allVisibleSelected ? "Deselect all" : "Select all"}
+					</Button>
+					{statusFilter === "active" && selectedOfferIds.length > 0 && (
+						<button
+							type="button"
+							disabled={!canModifyOffersByRole || isBulkDeactivating}
+							onClick={() => setShowBulkDeactivateConfirm(true)}
+							className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-0 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+						>
+							Deactivate offers
+							<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
+						</button>
+					)}
+					{statusFilter === "inactive" && selectedOfferIds.length > 0 && (
+						<button
+							type="button"
+							disabled={!canModifyOffersByRole || isBulkReturning}
+							onClick={() => setShowBulkReturnConfirm(true)}
+							className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-green-300 bg-green-50 px-4 py-0 text-sm font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+						>
+							Return offers
+						</button>
 					)}
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
@@ -1111,9 +1161,7 @@ const OffersList = () => {
 							const nextStatus = val as "active" | "inactive";
 							setStatusFilter(nextStatus);
 							setCurrentPage(1);
-							if (nextStatus === "inactive") {
-								setSelectedOfferIds([]);
-							}
+							setSelectedOfferIds([]);
 							setSelectedOfferDriverKeys([]);
 						}}
 					/>
@@ -1158,16 +1206,14 @@ const OffersList = () => {
 								>
 									<div className="flex items-start justify-between gap-3">
 										<div className="flex min-w-0 flex-1 items-center gap-2">
-											{statusFilter === "active" && (
-												<input
-													type="checkbox"
-													className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
-													checked={selectedOfferIds.includes(row.id)}
-													onChange={() => toggleOfferSelected(row.id)}
-													onClick={(e) => e.stopPropagation()}
-													aria-label={`Select offer ${row.id}`}
-												/>
-											)}
+											<input
+												type="checkbox"
+												className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+												checked={selectedOfferIds.includes(row.id)}
+												onChange={() => toggleOfferSelected(row.id)}
+												onClick={(e) => e.stopPropagation()}
+												aria-label={`Select offer ${row.id}`}
+											/>
 											<button
 												type="button"
 												className="min-w-0 max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-base font-medium text-gray-900 hover:text-brand-600 dark:text-white dark:hover:text-brand-300"
@@ -1219,6 +1265,20 @@ const OffersList = () => {
 												>
 													Deactivate offer
 													<DeactivateOfferIcon className="h-5 w-5 shrink-0" aria-hidden />
+												</button>
+											)}
+											{row.active === false && (
+												<button
+													type="button"
+													disabled={!canModifyOffersByRole || returningOfferId === row.id}
+													onClick={(e) => {
+														e.stopPropagation();
+														if (!canModifyOffersByRole) return;
+														setReturnConfirmOffer(row);
+													}}
+													className="inline-flex h-[39px] items-center justify-center gap-2 rounded-lg border border-green-300 bg-green-50 px-4 py-0 text-sm font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50"
+												>
+													Return
 												</button>
 											)}
 											<button
@@ -1982,6 +2042,32 @@ const OffersList = () => {
 				isLoading={deactivatingOfferId === deactivateConfirmOffer?.id}
 				icon={<DeactivateOfferIcon className="h-6 w-6" aria-hidden />}
 				variant="danger"
+			/>
+
+			<ConfirmModal
+				isOpen={returnConfirmOffer != null}
+				onClose={() => setReturnConfirmOffer(null)}
+				onConfirm={handleConfirmReturnOffer}
+				title="Return offer"
+				message="Return this offer to active? Driver bids will be cleared and drivers will get a new offer notification."
+				confirmText="Confirm"
+				cancelText="Cancel"
+				isLoading={returningOfferId === returnConfirmOffer?.id}
+				icon={<CheckCircleIcon className="h-6 w-6" aria-hidden />}
+				variant="info"
+			/>
+
+			<ConfirmModal
+				isOpen={showBulkReturnConfirm}
+				onClose={() => setShowBulkReturnConfirm(false)}
+				onConfirm={handleConfirmBulkReturnOffers}
+				title="Return offers"
+				message={`Return ${selectedOfferIds.length} selected offer(s) to active? Driver bids will be cleared and drivers will get a new offer notification.`}
+				confirmText="Confirm"
+				cancelText="Cancel"
+				isLoading={isBulkReturning}
+				icon={<CheckCircleIcon className="h-6 w-6" aria-hidden />}
+				variant="info"
 			/>
 
 			<ConfirmModal

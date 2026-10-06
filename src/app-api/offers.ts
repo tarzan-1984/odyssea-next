@@ -240,6 +240,19 @@ export interface DeactivateOffersResponse {
 	deactivatedIds?: number[];
 }
 
+export interface ReturnOfferResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+export interface ReturnOffersResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+	returnedIds?: number[];
+}
+
 /**
  * Offers API – create offer and rate_offers via backend.
  * Uses axios with credentials (cookies) for auth.
@@ -924,6 +937,70 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in deactivateOffers:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Return an inactive offer: reactivate it and reset driver bids.
+	 */
+	async returnOffer(offerId: number): Promise<ReturnOfferResponse> {
+		try {
+			const response = await axios.patch<ReturnOfferResponse>(
+				`/api/offers/${offerId}/return-offer`,
+				{},
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true, message: data.message };
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to return offer",
+			};
+		} catch (error) {
+			console.error("Error in returnOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Return multiple inactive offers in one request.
+	 */
+	async returnOffers(offerIds: number[]): Promise<ReturnOffersResponse> {
+		try {
+			const response = await axios.patch<ReturnOffersResponse>(
+				`/api/offers/return-offers`,
+				{ offerIds },
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			const data = response.data;
+			if (response.status >= 200 && response.status < 300) {
+				return {
+					success: true,
+					message: data.message,
+					returnedIds: data.returnedIds ?? [],
+				};
+			}
+			return {
+				success: false,
+				error:
+					(data as { error?: string; message?: string })?.error ??
+					(data as { message?: string })?.message ??
+					"Failed to return offers",
+			};
+		} catch (error) {
+			console.error("Error in returnOffers:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

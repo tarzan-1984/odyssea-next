@@ -168,7 +168,7 @@ export const LOAD_TRACKING_HISTORY_EDIT_ROLES = [
 ] as const;
 
 export function canEditLoadTrackingHistory(role: string | undefined | null): boolean {
-	if (isGastRole(role)) return true;
+	if (isGastRole(role)) return false;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
 	return (LOAD_TRACKING_HISTORY_EDIT_ROLES as readonly string[]).includes(normalized);
