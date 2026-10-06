@@ -743,9 +743,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				let chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
 				const roomSnapshot = messageData.chatRoom as ChatRoom | undefined;
 
-				if (!chatRoom && roomSnapshot?.id === messageData.chatRoomId) {
+				if (!chatRoom && roomSnapshot && roomSnapshot.id === messageData.chatRoomId) {
 					chatRoom = {
 						...roomSnapshot,
+						id: roomSnapshot.id,
+						type: roomSnapshot.type,
+						isArchived: roomSnapshot.isArchived,
+						createdAt: roomSnapshot.createdAt,
+						updatedAt: messageData.message.createdAt ?? roomSnapshot.updatedAt,
 						participants: Array.isArray(roomSnapshot.participants)
 							? roomSnapshot.participants.map(participant => ({
 									...participant,
