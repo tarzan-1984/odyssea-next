@@ -28,14 +28,46 @@ export function findOfferChatRoom(
 	unitId?: string | null,
 	currentUserId?: string | null
 ): ChatRoom | undefined {
+	return findOfferDriverChatRoom(chatRooms, offerId, unitId, null, currentUserId);
+}
+
+/**
+ * Match an OFFER room to a driver row.
+ * Live `chatRoomCreated` payloads may omit externalId, so driver user id is a fallback.
+ */
+export function findOfferDriverChatRoom(
+	chatRooms: ChatRoom[],
+	offerId: string,
+	unitId?: string | null,
+	driverUserId?: string | null,
+	currentUserId?: string | null
+): ChatRoom | undefined {
 	const normalizedOfferId = offerId.trim();
-	const normalizedUnitId = unitId?.trim() ?? null;
+	const normalizedUnitId = unitId?.trim() || null;
+	const normalizedDriverUserId = driverUserId?.trim() || null;
 
 	return chatRooms.find(room => {
 		if ((room.type || "").toUpperCase().trim() !== "OFFER") return false;
 		if (getOfferIdFromChatRoom(room) !== normalizedOfferId) return false;
-		if (!normalizedUnitId) return true;
-		return getOfferDriverUnitId(room, currentUserId) === normalizedUnitId;
+		if (!normalizedUnitId && !normalizedDriverUserId) return true;
+
+		const otherParticipants = room.participants.filter(
+			p => p.user?.id !== currentUserId
+		);
+		const driverParticipant =
+			otherParticipants.find(p => (p.user?.role || "").toUpperCase().trim() === "DRIVER") ??
+			otherParticipants[0];
+		if (!driverParticipant?.user) return false;
+		if (
+			normalizedUnitId &&
+			(driverParticipant.user.externalId?.trim() || null) === normalizedUnitId
+		) {
+			return true;
+		}
+		if (normalizedDriverUserId && driverParticipant.user.id === normalizedDriverUserId) {
+			return true;
+		}
+		return false;
 	});
 }
 

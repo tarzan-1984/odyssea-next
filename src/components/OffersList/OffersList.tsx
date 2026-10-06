@@ -24,6 +24,10 @@ import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/Ch
 import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
 import UserFilterSelect from "./UserFilterSelect";
 import { buildOfferChatUrl } from "@/utils/offerChatUrl";
+import {
+	OfferCardUnreadBadge,
+	OfferChatUnreadBadge,
+} from "@/components/OffersList/OfferChatUnreadBadge";
 import { buildTmsDriverPageUrl } from "@/utils/tmsUrls";
 import { canModifyOffers, canViewAllOffers } from "@/utils/roleAccess";
 import { formatOfferCreateTimeEst } from "@/utils/nyWallClock";
@@ -532,6 +536,10 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 			>
 				{driverName}
 			</span>
+			<OfferChatUnreadBadge
+				offerId={offer.id}
+				unitId={driver.externalId ?? driver.driver_id}
+			/>
 			{isInactiveDriver ? null : remainingSeconds != null && remainingSeconds > 0 ? (
 				<span className="inline-flex min-w-[64px] items-center justify-center rounded-md bg-brand-600 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
 					{formatCountdown(remainingSeconds)}
@@ -1171,6 +1179,7 @@ const OffersList = () => {
 											>
 												{offerTitle}
 											</button>
+											<OfferCardUnreadBadge offerId={row.id} drivers={row.drivers} />
 											{hasHazmat(row.special_requirements) && (
 												<Image
 													src="/images/hazmat.png"
@@ -1682,10 +1691,15 @@ const OffersList = () => {
 																									);
 																								}
 																							}}
-																							className="inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
+																							className="relative inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
 																						>
 																							<OfferDriverChatIcon className="h-3.5 w-3.5 shrink-0" />
 																							{driver.has_offer_chat ? "Open chat" : "Add chat"}
+																							<OfferChatUnreadBadge
+																								offerId={row.id}
+																								unitId={driverUnitId}
+																								placement="corner"
+																							/>
 																						</button>
 																					) : null;
 

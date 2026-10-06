@@ -26,6 +26,8 @@ export interface OfferDriver {
 	driver_eta?: string | null;
 	driver_rating?: number | null;
 	has_offer_chat?: boolean;
+	/** Unread messages in this driver's offer chat for the current user. */
+	offer_chat_unread_count?: number;
 	/** Manual reminders sent (0–3; create-push is separate). */
 	reminder_count?: number;
 	/** Unix seconds: assignment baseline or last reminder. */
