@@ -225,6 +225,23 @@ const OFFER_LIST_STRUCTURE_REASONS = new Set([
 	"driver_selected",
 ]);
 
+const OFFER_LIST_QUERY_KEYS = [["offers-list-cards"], ["offers-list"]] as const;
+
+function hasActiveOfferListQuery(queryClient: QueryClient): boolean {
+	return OFFER_LIST_QUERY_KEYS.some(queryKey =>
+		queryClient
+			.getQueryCache()
+			.findAll({ queryKey })
+			.some(query => query.isActive())
+	);
+}
+
+function markOfferListsStaleWithoutRefetch(queryClient: QueryClient): void {
+	for (const queryKey of OFFER_LIST_QUERY_KEYS) {
+		queryClient.invalidateQueries({ queryKey, refetchType: "none" }).catch(() => {});
+	}
+}
+
 function replaceOfferInCachedList(
 	old: GetOffersResponse | undefined,
 	updatedOffer: OfferRow,
@@ -554,6 +571,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			) {
 				queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 				queryClient.invalidateQueries({ queryKey: ["offers-list"] });
+				return;
+			}
+
+			// Offer details are only consumed by the Offers queries. When those
+			// queries are inactive (for example while the user is in Chat), avoid a
+			// request for every realtime event. Mark cached lists stale so opening
+			// Offers later still triggers a fresh list fetch.
+			if (!hasActiveOfferListQuery(queryClient)) {
+				markOfferListsStaleWithoutRefetch(queryClient);
 				return;
 			}
 
