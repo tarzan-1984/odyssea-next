@@ -6,7 +6,6 @@ import type { UserListItem } from "@/app-api/api-types";
 
 export type { OfferRouteDistanceResult, OfferRouteStop } from "@/utils/offerGoogleRoute";
 
-
 export interface OfferDriver {
 	driver_id: string;
 	externalId: string | null;
