@@ -46,6 +46,7 @@ export interface OfferCreator {
 	lastName: string;
 	externalId: string | null;
 	role: string;
+	phone?: string | null;
 }
 
 export interface OfferRow {
