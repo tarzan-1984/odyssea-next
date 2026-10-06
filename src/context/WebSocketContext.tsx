@@ -741,6 +741,33 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				// Update chat room's lastMessage for ALL chats (not just current one)
 				const state = useChatStore.getState();
 				let chatRoom = state.chatRooms.find(room => room.id === messageData.chatRoomId);
+				const roomSnapshot = messageData.chatRoom as ChatRoom | undefined;
+
+				if (!chatRoom && roomSnapshot?.id === messageData.chatRoomId) {
+					chatRoom = {
+						...roomSnapshot,
+						participants: Array.isArray(roomSnapshot.participants)
+							? roomSnapshot.participants.map(participant => ({
+									...participant,
+									user: {
+										...participant.user,
+										avatar:
+											participant.user?.avatar ??
+											participant.user?.profilePhoto ??
+											"",
+									},
+								}))
+							: [],
+						lastMessage: messageData.message,
+					};
+					addChatRoom(chatRoom);
+					indexedDBChatService.addChatRoom(chatRoom).catch((error: Error) => {
+						console.error("Failed to cache WebSocket chat room snapshot:", error);
+					});
+					if (newSocket.connected) {
+						newSocket.emit("joinChatRoom", { chatRoomId: chatRoom.id });
+					}
+				}
 
 				// If chat room doesn't exist in store, it might have been deleted/hidden
 				// Try to restore it by loading from API
