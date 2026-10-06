@@ -84,11 +84,15 @@ class NotificationsApi {
 
       const result = await response.json();
 
-      if (!result.success || result.data === undefined) {
-        throw new Error(result.error || 'Failed to get unread count');
+      // The backend response interceptor wraps controller responses in `data`.
+      // Keep this compatible with an unwrapped response as well.
+      const payload = result.data?.success ? result.data : result;
+
+      if (!payload.success || payload.data === undefined) {
+        throw new Error(payload.error || 'Failed to get unread count');
       }
 
-      return result.data.unreadCount;
+      return payload.data.unreadCount;
     } catch (error) {
       console.error('Failed to get unread count:', error);
       throw error;
