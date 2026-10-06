@@ -443,7 +443,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				transports: ["websocket", "polling"],
 			});
 
-		const restoreChatRoomById = async (chatRoomId: string) => {
+		const chatRoomRestoreInFlight = new Map<string, Promise<ChatRoom>>();
+		const restoreChatRoomById = async (chatRoomId: string): Promise<ChatRoom> => {
+			const existingRestore = chatRoomRestoreInFlight.get(chatRoomId);
+			if (existingRestore) return existingRestore;
+
+			const restorePromise = (async () => {
 			const restoredRoom = (await chatApi.getChatRoom(chatRoomId)) as ChatRoom & {
 				messages?: Message[];
 			};
@@ -489,6 +494,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 			}
 
 			return normalized;
+			})();
+
+			chatRoomRestoreInFlight.set(chatRoomId, restorePromise);
+			try {
+				return await restorePromise;
+			} finally {
+				if (chatRoomRestoreInFlight.get(chatRoomId) === restorePromise) {
+					chatRoomRestoreInFlight.delete(chatRoomId);
+				}
+			}
 		};
 
 		// Connection event handlers
@@ -729,7 +744,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 				// If chat room doesn't exist in store, it might have been deleted/hidden
 				// Try to restore it by loading from API
-				if (!chatRoom) {
+				const isChatPage =
+					typeof window !== "undefined" &&
+					(window.location.pathname === "/chat" ||
+						window.location.pathname.startsWith("/chat/"));
+				if (!chatRoom && isChatPage) {
 					console.log(
 						"🔄 [WebSocket] Chat room not found in store, attempting to restore:",
 						messageData.chatRoomId
@@ -742,6 +761,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 						console.error("❌ [WebSocket] Failed to restore chat room:", restoreError);
 						// Continue with message processing even if restore failed
 					}
+				} else if (!chatRoom) {
+					console.debug(
+						"⏭️ [WebSocket] Deferring unknown chat room until chat page opens:",
+						messageData.chatRoomId
+					);
 				}
 
 				// Process message regardless of whether chat room is in store
