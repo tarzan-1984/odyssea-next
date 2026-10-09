@@ -19,6 +19,7 @@ type MobileAppSettingsPayload = {
 	locationMaxAgeMs: number;
 	locationMinDistanceM: number;
 	reverseGeocodeMinDistanceM: number;
+	loadProximityRadiusMiles: number;
 	driverTrackingPointMinIntervalMs: number;
 	createdAt?: string;
 	updatedAt?: string;
@@ -77,6 +78,8 @@ type ApiEnvelope<T> = {
 /** Backend stores `locationMinIntervalMs`; max 24 h per API validation. */
 const LOCATION_INTERVAL_MAX_MINUTES = 1440;
 const MS_PER_MINUTE = 60_000;
+const METERS_PER_MILE = 1609.344;
+const LOAD_PROXIMITY_MAX_METERS = 160_934;
 const PUSH_USERS_PAGE_SIZE = 20;
 const PUSH_USERS_CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -137,6 +140,10 @@ function parseMobileSettings(json: unknown): MobileAppSettingsPayload | null {
 		...raw,
 		locationMaxAgeMs:
 			typeof raw.locationMaxAgeMs === "number" ? raw.locationMaxAgeMs : 15 * MS_PER_MINUTE,
+		loadProximityRadiusMiles:
+			typeof raw.loadProximityRadiusMiles === "number"
+				? raw.loadProximityRadiusMiles
+				: 1.5,
 		reverseGeocodeMinDistanceM:
 			typeof raw.reverseGeocodeMinDistanceM === "number"
 				? raw.reverseGeocodeMinDistanceM
@@ -276,6 +283,7 @@ export default function AppSettingsPage() {
 	const [maxLocationAgeMin, setMaxLocationAgeMin] = useState("");
 	const [distanceM, setDistanceM] = useState("");
 	const [reverseGeocodeM, setReverseGeocodeM] = useState("");
+	const [loadProximityRadiusM, setLoadProximityRadiusM] = useState("");
 	const [driverTrackingIntervalMin, setDriverTrackingIntervalMin] = useState("");
 	const [tmsCronIntervalMin, setTmsCronIntervalMin] = useState("");
 	const [tmsBatchSize, setTmsBatchSize] = useState("");
@@ -506,6 +514,9 @@ export default function AppSettingsPage() {
 			setMaxLocationAgeMin(String(Math.round(s.locationMaxAgeMs / MS_PER_MINUTE)));
 			setDistanceM(String(s.locationMinDistanceM));
 			setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
+			setLoadProximityRadiusM(
+				String(Math.round(s.loadProximityRadiusMiles * METERS_PER_MILE))
+			);
 			setDriverTrackingIntervalMin(
 				String(Math.round(s.driverTrackingPointMinIntervalMs / MS_PER_MINUTE))
 			);
@@ -936,6 +947,8 @@ export default function AppSettingsPage() {
 		const locationMaxAgeMs = maxLocationAgeMinutes * MS_PER_MINUTE;
 		const locationMinDistanceM = Number.parseInt(distanceM, 10);
 		const reverseGeocodeMinDistanceM = Number.parseInt(reverseGeocodeM, 10);
+		const loadProximityRadiusMeters = Number.parseInt(loadProximityRadiusM, 10);
+		const loadProximityRadiusMiles = loadProximityRadiusMeters / METERS_PER_MILE;
 		const driverTrackingIntervalMinutes = Number.parseInt(driverTrackingIntervalMin, 10);
 		const driverTrackingPointMinIntervalMs = driverTrackingIntervalMinutes * MS_PER_MINUTE;
 
@@ -946,6 +959,8 @@ export default function AppSettingsPage() {
 			!Number.isFinite(locationMaxAgeMs) ||
 			!Number.isFinite(locationMinDistanceM) ||
 			!Number.isFinite(reverseGeocodeMinDistanceM) ||
+			!Number.isFinite(loadProximityRadiusMeters) ||
+			!Number.isFinite(loadProximityRadiusMiles) ||
 			!Number.isFinite(driverTrackingIntervalMinutes) ||
 			!Number.isFinite(driverTrackingPointMinIntervalMs) ||
 			intervalMinutes < 0 ||
@@ -955,11 +970,13 @@ export default function AppSettingsPage() {
 			locationMinDistanceM < 0 ||
 			reverseGeocodeMinDistanceM < 100 ||
 			reverseGeocodeMinDistanceM > 500_000 ||
+			loadProximityRadiusMeters < 1 ||
+			loadProximityRadiusMeters > LOAD_PROXIMITY_MAX_METERS ||
 			driverTrackingIntervalMinutes < 0 ||
 			driverTrackingIntervalMinutes > LOCATION_INTERVAL_MAX_MINUTES
 		) {
 			setErrorMobile(
-				`Valid values: location interval and maximum age 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 disables that gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; tracking history interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min.`
+				`Valid values: location interval and maximum age 0–${LOCATION_INTERVAL_MAX_MINUTES} min (0 disables that gate); min distance ≥ 0 m (0 = no distance gate); reverse geocode distance 100–500000 m; load proximity radius 1–${LOAD_PROXIMITY_MAX_METERS} m; tracking history interval 0–${LOCATION_INTERVAL_MAX_MINUTES} min.`
 			);
 			setSavingMobile(false);
 			return;
@@ -974,6 +991,7 @@ export default function AppSettingsPage() {
 					locationMaxAgeMs,
 					locationMinDistanceM,
 					reverseGeocodeMinDistanceM,
+					loadProximityRadiusMiles,
 					driverTrackingPointMinIntervalMs,
 				}),
 			});
@@ -996,11 +1014,14 @@ export default function AppSettingsPage() {
 				setMaxLocationAgeMin(String(Math.round(s.locationMaxAgeMs / MS_PER_MINUTE)));
 				setDistanceM(String(s.locationMinDistanceM));
 				setReverseGeocodeM(String(s.reverseGeocodeMinDistanceM));
+				setLoadProximityRadiusM(
+					String(Math.round(s.loadProximityRadiusMiles * METERS_PER_MILE))
+				);
 				setDriverTrackingIntervalMin(
 					String(Math.round(s.driverTrackingPointMinIntervalMs / MS_PER_MINUTE))
 				);
 			}
-			setSuccessMobile("Mobile app settings saved.");
+			setSuccessMobile("Location and load proximity settings saved.");
 		} catch {
 			setErrorMobile("Network error while saving");
 		} finally {
@@ -1515,13 +1536,14 @@ export default function AppSettingsPage() {
 					className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900"
 				>
 					<h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-						Mobile app — location throttling
+						Location and load proximity
 					</h2>
 					<p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
 						Shared settings for the iOS and Android driver apps. Interval and distance
 						control movement sends; maximum age enables a freshness heartbeat;
 						reverse geocode distance controls how far a driver must move from the last
-						successful address lookup before ZIP/city/state are resolved again.
+						successful address lookup before ZIP/city/state are resolved again. Load
+						proximity controls when pickup and delivery chat alerts are sent.
 					</p>
 
 					{loadingMobile ? (
@@ -1625,6 +1647,30 @@ export default function AppSettingsPage() {
 									After moving this far from the last successful ZIP/city/state
 									lookup, the app runs Expo then Nominatim. Default 5000 m (5 km).
 									Range 100–500000.
+								</p>
+							</div>
+
+							<div className="max-w-xl">
+								<Label htmlFor="loadProximityRadiusM" className="mb-1">
+									Pickup/delivery chat alert radius (meters)
+								</Label>
+								<Input
+									id="loadProximityRadiusM"
+									name="loadProximityRadiusM"
+									type="number"
+									min="1"
+									max={String(LOAD_PROXIMITY_MAX_METERS)}
+									step={1}
+									value={loadProximityRadiusM}
+									onChange={e => setLoadProximityRadiusM(e.target.value)}
+									placeholder="50"
+									required
+									className="!h-9 !min-h-0 !py-1.5"
+								/>
+								<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+									When a driver enters this radius around a pickup or delivery point,
+									the backend sends a proximity message to the load chat. The value is
+									stored centrally and applies to both pickup and delivery points.
 								</p>
 							</div>
 
