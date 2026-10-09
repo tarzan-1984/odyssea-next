@@ -124,14 +124,21 @@ export function usePickupRoadEta({
 
 		(async () => {
 			try {
-				if (destinationLabel.length >= 3) {
-					const google = await fetchGooglePickupDirections(
+				const coordinateDestination = `${pickupPoint.lat},${pickupPoint.lng}`;
+				const googleDestinations = [destinationLabel, coordinateDestination].filter(
+					(value, index, all) => value.length >= 3 && all.indexOf(value) === index
+				);
+				let google: Awaited<ReturnType<typeof fetchGooglePickupDirections>> = null;
+				for (const googleDestination of googleDestinations) {
+					google = await fetchGooglePickupDirections(
 						driverPoint,
-						destinationLabel,
+						googleDestination,
 						controller.signal
 					);
 					if (controller.signal.aborted) return;
-					if (google) {
+					if (google) break;
+				}
+				if (google) {
 						const arrivalMs = google.estimatedArrivalAt
 							? Date.parse(google.estimatedArrivalAt)
 							: NaN;
@@ -157,7 +164,6 @@ export function usePickupRoadEta({
 						setStatus("ready");
 						lastCompletedRouteKeyRef.current = routeKey;
 						return;
-					}
 				}
 
 				const stats = await fetchOsrmDrivingLegStats(
