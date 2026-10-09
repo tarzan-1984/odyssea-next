@@ -12,6 +12,7 @@ import { useCurrentUser } from "@/stores/userStore";
 import DriverInfo, { getDriverInfoCardWidthClass } from "../../[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
+import TrackingStatusCard from "@/components/logistics/TrackingStatusCard";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import BusyOnOtherLoadBanner from "@/components/logistics/BusyOnOtherLoadBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
@@ -31,7 +32,7 @@ import {
 	normalizeTrackingLoadId,
 } from "@/utils/trackingLoadDriver";
 import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
-import { formatNyWallClockForDisplay, isLastLocationOlderThanNy } from "@/utils/nyWallClock";
+import { isLastLocationOlderThanNy, parseNaiveNyDateTime } from "@/utils/nyWallClock";
 import { formatTmsLoadRoute } from "@/utils/formatTmsLoadRoute";
 import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 
@@ -272,7 +273,18 @@ type DriverTrackingPointCreatedPayload = {
 };
 
 function formatHistoryDate(dateString: string | null) {
-	return formatNyWallClockForDisplay(dateString);
+	const date = parseNaiveNyDateTime(dateString);
+	if (!date) return dateString?.trim() || "N/A";
+	const formatted = new Intl.DateTimeFormat("en-US", {
+		timeZone: "UTC",
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	}).format(date);
+	return formatted.replace(/, (\d{2}:\d{2})$/, " · $1");
 }
 
 function formatTrackingDeviceLabel(point: {
@@ -1242,7 +1254,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			: null;
 
 	return (
-		<section className="absolute inset-0 w-full h-full" data-load-id={loadId}>
+		<section className="absolute inset-0 h-full w-full overflow-hidden bg-[#eef8fb]" data-load-id={loadId}>
 			{isPageLoading && (
 				<div
 					className="absolute inset-0 z-[2000] flex items-center justify-center bg-white dark:bg-gray-950"
@@ -1275,7 +1287,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				<button
 					type="button"
 					onClick={() => router.back()}
-					className="absolute left-14 top-4 z-[1000] inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-500 bg-brand-500 px-3 py-1.5 text-xs font-medium leading-none text-white transition-colors hover:bg-brand-600 dark:border-brand-400 dark:bg-brand-400 dark:hover:bg-brand-500"
+					className="absolute left-4 top-4 z-[1000] inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium leading-none text-slate-600 shadow-sm backdrop-blur transition-colors hover:border-brand-300 hover:text-brand-600"
 					aria-label="Go back"
 				>
 					<svg className="size-4 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden>
@@ -1294,16 +1306,15 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			{isPageReady && (
 				<>
 					{mapUiMode === "no_app" && (
-						<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-[min(18vh,8rem)] dark:bg-gray-950">
-							<div className="max-w-md text-center">
-								<p className="text-lg font-semibold text-gray-900 dark:text-white">
-									Driver is not using the mobile app
-								</p>
-								<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-									Map, load history, and live tracking are unavailable until the
-									driver opens the mobile application at least once.
-								</p>
-							</div>
+						<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-16">
+							<TrackingStatusCard
+								tone="info"
+								icon="phone"
+								title="Driver is not using the mobile app"
+							>
+								Map, load history, and live tracking are unavailable until the driver
+								opens the mobile application at least once.
+							</TrackingStatusCard>
 						</div>
 					)}
 					{mapUiMode === "driver_not_loaded_enroute" && (
@@ -1374,24 +1385,24 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						</>
 					)}
 					{showLoadHistoryPanel && (
-						<div className="absolute right-4 top-4 z-[1000] w-[25vw] max-w-[25vw] max-h-[50vh] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+						<div className="absolute right-4 top-4 z-[1000] flex max-h-[55vh] w-[363px] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-[14px] bg-white font-[Manrope,sans-serif] shadow-[0_8px_24px_rgba(8,20,41,0.12)]">
 							<button
 								type="button"
-								className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800"
+								className="flex w-full shrink-0 items-center justify-between gap-3 px-[18px] pb-4 pt-[14px] text-left"
 								onClick={() => setIsHistoryOpen(value => !value)}
 							>
-								<span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+								<span className="flex items-center gap-2 text-[13px] font-semibold leading-[18px] text-[#09172E]">
 									Load history
-									<span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+									<span className="rounded-[9px] bg-[#E8EEFF] px-2 py-[3px] text-[10px] font-bold leading-[14px] text-[#3D6EF5]">
 										{loadHistoryPanelCount}
 									</span>
 								</span>
-								<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+								<span className="text-[13px] font-medium text-[#3D6EF5]">
 									{isHistoryOpen ? "Hide" : "Show"}
 								</span>
 							</button>
 							{isHistoryOpen && trackingDeviceHistoryGroups.length > 0 ? (
-								<div className="border-b border-gray-200 px-4 py-2 dark:border-gray-800">
+								<div className="shrink-0 px-[18px] pb-3">
 									<div
 										className="flex flex-wrap gap-2"
 										role="tablist"
@@ -1408,10 +1419,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 													type="button"
 													role="tab"
 													aria-selected={isActive}
-													className={`inline-flex max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+													className={`inline-flex max-w-full items-center gap-[7px] rounded-full px-3 py-2 text-[11px] font-semibold leading-[15px] transition-colors ${
 														isActive
-															? "border-brand-500 bg-brand-500 text-white shadow-sm"
-															: "border-gray-200 bg-gray-50 text-gray-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-brand-500 dark:hover:bg-gray-800"
+															? "bg-[#4477FF] text-white"
+															: "bg-white text-[#4477FF] ring-1 ring-inset ring-[#4477FF]"
 													}`}
 													title={group.label}
 													onClick={() => {
@@ -1424,10 +1435,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 												>
 													<span className="truncate">{group.label}</span>
 													<span
-														className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+														className={`rounded-lg px-[7px] py-0.5 text-[9px] font-bold leading-[13px] ${
 															isActive
-																? "bg-white/20 text-white"
-																: "bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+																? "bg-[#6B94FF] text-white"
+																: "bg-[rgba(107,148,255,0.35)] text-[#4477FF]"
 														}`}
 													>
 														{group.points.length}
@@ -1440,11 +1451,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							) : null}
 							{isHistoryOpen && (
 								<div
-									className={`overflow-y-auto px-4 py-3 ${
-										trackingDeviceHistoryGroups.length > 0
-											? "max-h-[calc(50vh-93px)]"
-											: "max-h-[calc(50vh-45px)]"
-									}`}
+									className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-4"
 								>
 									{hasLoadHistoryPanelItems ? (
 										<ol className="space-y-3">
@@ -1458,17 +1465,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 														? historyDragDraft
 														: point.position;
 
-												let cardTone: string;
-												if (isEditingCard) {
-													cardTone =
-														"border-blue-700 bg-blue-100 text-blue-950 shadow-md ring-2 ring-blue-500/50 ring-offset-1 ring-offset-white dark:border-blue-400 dark:bg-blue-950 dark:text-blue-100 dark:ring-blue-400/35 dark:ring-offset-gray-900";
-												} else if (isSelectedCard) {
-													cardTone =
-														"border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-100";
-												} else {
-													cardTone =
-														"border-gray-100 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300";
-												}
+												const cardTone =
+													isEditingCard || isSelectedCard
+														? "bg-[#E8EEFF] ring-1 ring-[#4477FF]"
+														: "bg-[#F7F9FC]";
 
 												return (
 													<li
@@ -1483,7 +1483,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 														<div
 															role="button"
 															tabIndex={0}
-															className={`w-full rounded-md border p-3 text-left text-xs transition-colors ${cardTone}`}
+															className={`w-full rounded-xl px-3 py-3 text-left transition-colors ${cardTone}`}
 															onClick={() => {
 																applyHistoryPointSelection(index);
 															}}
@@ -1499,14 +1499,8 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																}
 															}}
 														>
-															<div className="mb-2 flex items-center justify-between gap-2">
-																<p
-																	className={`font-semibold ${
-																		isEditingCard
-																			? "text-blue-900 dark:text-blue-50"
-																			: "text-gray-900 dark:text-white"
-																	}`}
-																>
+															<div className="mb-1 flex items-start justify-between gap-2">
+																<p className="text-[12px] font-bold leading-[17px] text-[#09172E]">
 																	Step {index + 1}
 																</p>
 																{canEditLoadHistory ? (
@@ -1516,7 +1510,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																			<>
 																				<button
 																					type="button"
-																					className="rounded border border-blue-600 bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+																					className="rounded-full bg-[#4477FF] px-2.5 py-1 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
 																					disabled={
 																						Boolean(
 																							savingHistoryPointId
@@ -1532,7 +1526,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																				</button>
 																				<button
 																					type="button"
-																					className="rounded border border-gray-400 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+																					className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#637899] ring-1 ring-[#DDE5F1] disabled:cursor-not-allowed disabled:opacity-60"
 																					disabled={Boolean(
 																						savingHistoryPointId
 																					)}
@@ -1548,7 +1542,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																			<>
 																				<button
 																					type="button"
-																					className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-blue-100 bg-white p-0 text-blue-600 shadow-sm transition hover:scale-110 hover:border-blue-600 hover:bg-blue-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:border-blue-900 dark:bg-gray-900 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:bg-blue-500 dark:hover:text-white"
+																					className="inline-flex h-4 w-4 items-center justify-center"
 																					aria-label="Edit history point"
 																					onClick={event => {
 																						event.stopPropagation();
@@ -1561,22 +1555,21 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																					}}
 																				>
 																					<svg
-																						className="h-full w-full"
-																						xmlns="http://www.w3.org/2000/svg"
-																						viewBox="0 0 122.88 122.88"
+																						width="16"
+																						height="16"
+																						viewBox="0 0 16 16"
+																						fill="none"
 																						aria-hidden="true"
 																					>
 																						<path
-																							fill="currentColor"
-																							fillRule="evenodd"
-																							clipRule="evenodd"
-																							d="M14.1,0h94.67c7.76,0,14.1,6.35,14.1,14.1v94.67c0,7.75-6.35,14.1-14.1,14.1H14.1c-7.75,0-14.1-6.34-14.1-14.1 V14.1C0,6.34,6.34,0,14.1,0L14.1,0z M81.35,28.38L94.1,41.14c1.68,1.68,1.68,4.44,0,6.11l-7.06,7.06L68.17,35.44l7.06-7.06 C76.91,26.7,79.66,26.7,81.35,28.38L81.35,28.38z M52.34,88.98c-5.1,1.58-10.21,3.15-15.32,4.74c-12.01,3.71-11.95,6.18-8.68-5.37 l5.16-18.2l0,0l-0.02-0.02L64.6,39.01l18.87,18.87l-31.1,31.11L52.34,88.98L52.34,88.98z M36.73,73.36l12.39,12.39 c-3.35,1.03-6.71,2.06-10.07,3.11c-7.88,2.42-7.84,4.05-5.7-3.54L36.73,73.36L36.73,73.36z"
+																							d="M14.0107 2.932L13.068 1.98933C12.3533 1.27467 11.19 1.27533 10.4753 1.98933L3.37734 9.08667C3.03134 9.43267 2.76667 9.86067 2.61267 10.324L2.08 11.9227C1.88934 12.4933 2.036 13.112 2.46134 13.5387C2.764 13.8407 3.16334 14.0013 3.574 14.0013C3.74134 14.0013 3.91134 13.9747 4.07667 13.9193L5.67534 13.3867C6.13934 13.232 6.56734 12.9673 6.91267 12.622L14.01 5.52467C14.7247 4.81 14.7247 3.64667 14.01 2.932H14.0107ZM3.76067 12.9713C3.552 13.0407 3.32467 12.988 3.16867 12.832C3.01267 12.676 2.95934 12.4487 3.02867 12.24L3.50467 10.8113L5.18867 12.4953L3.76067 12.9713ZM6.20667 11.9153C6.176 11.946 6.13667 11.9673 6.104 11.9967L4.004 9.89667C4.03267 9.864 4.054 9.82467 4.08534 9.794L9.41467 4.46467L11.536 6.586L6.20667 11.9153ZM13.304 4.818L12.2433 5.87867L10.122 3.75733L11.1827 2.69667C11.3453 2.534 11.5587 2.45333 11.772 2.45333C11.9853 2.45333 12.1987 2.53467 12.3613 2.69667L13.304 3.63933C13.6287 3.964 13.6287 4.49333 13.304 4.818Z"
+																							fill="#4477FF"
 																						/>
 																					</svg>
 																				</button>
 																				<button
 																					type="button"
-																					className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded border border-red-200 bg-white p-0 text-red-600 shadow-sm transition hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:text-white hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400 dark:hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white"
+																					className="inline-flex h-[18px] w-[18px] items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
 																					aria-label="Delete history point"
 																					disabled={
 																						!point.id ||
@@ -1592,14 +1585,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																					}}
 																				>
 																					<svg
-																						className="h-full w-full"
-																						xmlns="http://www.w3.org/2000/svg"
-																						viewBox="0 0 122.88 122.88"
+																						width="18"
+																						height="18"
+																						viewBox="0 0 18 18"
+																						fill="none"
 																						aria-hidden="true"
 																					>
 																						<path
-																							fill="currentColor"
-																							d="M7.513,0h107.854c2.066,0,3.944,0.845,5.306,2.207s2.207,3.24,2.207,5.306v107.854c0,2.066-0.846,3.944-2.207,5.306 c-1.361,1.362-3.239,2.207-5.306,2.207H7.513c-2.066,0-3.945-0.845-5.306-2.207C0.845,119.312,0,117.434,0,115.367V7.513 c0-2.066,0.845-3.945,2.207-5.306S5.447,0,7.513,0L7.513,0z M35.018,38.629c0,0.924,0.353,1.848,1.057,2.553l20.164,20.164 l0.094,0.095l-0.094,0.094L36.075,81.698c-0.705,0.705-1.057,1.629-1.057,2.553s0.353,1.849,1.057,2.554 c0.705,0.704,1.629,1.058,2.553,1.058c0.924,0,1.848-0.354,2.553-1.058l20.163-20.164l0.095-0.095l0.095,0.095l20.163,20.164 c0.705,0.704,1.63,1.058,2.554,1.058s1.849-0.354,2.553-1.058c0.705-0.705,1.058-1.63,1.058-2.554s-0.353-1.848-1.058-2.553 L66.641,61.534l-0.095-0.094l0.095-0.095l20.163-20.164c0.705-0.705,1.058-1.629,1.058-2.553s-0.353-1.848-1.058-2.553 c-0.704-0.705-1.629-1.057-2.553-1.057s-1.849,0.353-2.554,1.057L61.534,56.239l-0.095,0.095l-0.095-0.095L41.182,36.076 c-0.705-0.705-1.629-1.057-2.553-1.057c-0.924,0-1.848,0.353-2.553,1.057C35.371,36.781,35.018,37.705,35.018,38.629L35.018,38.629 z"
+																							d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5"
+																							stroke="#5C6E8C"
+																							strokeLinecap="round"
 																						/>
 																					</svg>
 																				</button>
@@ -1608,93 +1603,51 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																	</div>
 																) : null}
 															</div>
-															<p>
-																<span className="font-medium">
-																	Coordinates:
-																</span>{" "}
-																{displayCoords[0].toFixed(6)},{" "}
-																{displayCoords[1].toFixed(6)}
-															</p>
-															{point.placeLabel ? (
+															<div className="text-[10px] font-medium leading-[14px] text-[#637899]">
 																<p>
-																	<span className="font-medium">
-																		Place:
-																	</span>{" "}
-																	{point.placeLabel}
+																	Coordinates: {displayCoords[0].toFixed(6)},{" "}
+																	{displayCoords[1].toFixed(6)}
 																</p>
-															) : null}
-															{point.deviceLabel ? (
-																<p>
-																	<span className="font-medium">
-																		Device:
-																	</span>{" "}
-																	{point.deviceLabel}
-																	{point.deviceId ? (
-																		<span className="ml-1 text-[10px] text-gray-500 dark:text-gray-400">
-																			(
-																			{point.deviceId.slice(
-																				0,
-																				8
-																			)}
-																			…)
-																		</span>
-																	) : null}
-																</p>
-															) : null}
-															<p>
-																<span className="font-medium">
-																	Tracked:
-																</span>{" "}
-																{formatHistoryDate(point.createdAt)}
-															</p>
-															<p>
-																<span className="font-medium">
-																	Updated:
-																</span>{" "}
-																{formatHistoryDate(point.updatedAt)}
-															</p>
+																{point.placeLabel ? (
+																	<p>Place: {point.placeLabel}</p>
+																) : null}
+																{point.deviceLabel ? (
+																	<p>Device: {point.deviceLabel}</p>
+																) : null}
+																<p>Tracked: {formatHistoryDate(point.createdAt)}</p>
+															</div>
 														</div>
 													</li>
 												);
 											})}
 											{showCurrentLocationHistoryCard ? (
 												<li key="current-location">
-													<div className="w-full rounded-md border border-gray-100 bg-gray-50 p-3 text-left text-xs text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
-														<div className="mb-2">
-															<p className="font-semibold text-gray-900 dark:text-white">
-																Last location update
+													<div className="w-full rounded-xl bg-[#E8EEFF] px-3 py-3 text-left">
+														<p className="mb-1 text-[12px] font-bold leading-[17px] text-[#09172E]">
+															Last location update
+														</p>
+														<div className="text-[10px] font-medium leading-[14px] text-[#637899]">
+															<p>
+																Coordinates: {currentDriverLatitude.toFixed(6)},{" "}
+																{currentDriverLongitude.toFixed(6)}
+															</p>
+															{currentLocationPlaceLabel !== "N/A" ? (
+																<p>Place: {currentLocationPlaceLabel}</p>
+															) : null}
+															<p>
+																Tracked:{" "}
+																{formatHistoryDate(
+																	currentTrackingDriver?.lastLocationUpdateAt ??
+																		null
+																)}
 															</p>
 														</div>
-														<p>
-															<span className="font-medium">
-																Coordinates:
-															</span>{" "}
-															{currentDriverLatitude.toFixed(6)},{" "}
-															{currentDriverLongitude.toFixed(6)}
-														</p>
-														{currentLocationPlaceLabel !== "N/A" ? (
-															<p>
-																<span className="font-medium">
-																	Place:
-																</span>{" "}
-																{currentLocationPlaceLabel}
-															</p>
-														) : null}
-														<p>
-															<span className="font-medium">
-																Tracked:
-															</span>{" "}
-															{formatHistoryDate(
-																currentTrackingDriver?.lastLocationUpdateAt ??
-																	null
-															)}
-														</p>
 													</div>
 												</li>
 											) : null}
 										</ol>
 									) : (
-										<p className="text-sm text-gray-500 dark:text-gray-400">
+										<p className="text-[12px] font-medium text-[#637899]">
 											No history points yet.
 										</p>
 									)}
@@ -1704,7 +1657,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 					)}
 					{isAuthenticated && currentTrackingDriver && !isLoadDelivered && (
 						<div
-							className={`absolute bottom-[50px] z-[1000] flex justify-center ${
+							className={`absolute bottom-6 z-[1000] flex justify-center ${
 								loadRouteDetails.trim()
 									? "left-4 right-4"
 									: "left-1/2 -translate-x-1/2"

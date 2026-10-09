@@ -84,12 +84,10 @@ function getHistoryMarkerRadiusByZoom(zoom: number): number {
 	);
 }
 
-/** Matches `createHistoryPointIcon` outer box so thinning uses real on-screen footprint. */
+/** Matches `createHistoryPointIcon` halo so thinning uses the real on-screen footprint. */
 function getHistoryPointMarkerOuterPx(historyMarkerRadius: number): number {
-	const diameterPx = historyMarkerRadius * 2;
-	const diameter = Math.round(Math.max(22, diameterPx + 6));
-	const ringSize = 2;
-	return Math.ceil(diameter * 1.5 + ringSize * 2);
+	const inner = Math.round(Math.max(18, historyMarkerRadius * 2));
+	return Math.ceil(inner * (37 / 28));
 }
 
 /**
@@ -734,14 +732,20 @@ function overlappingStopMarkerOffsetX(markers: LoadStopMarker[], index: number):
 
 function createStopDivIcon(kind: StopKind, offsetX: number): L.DivIcon {
 	const isPickup = kind === "pickup";
+	const color = isPickup ? "#20AD6D" : "#E5484D";
+	const label = isPickup ? "PU" : "DEL";
+	const size = 70;
 	return L.divIcon({
 		className: isPickup
 			? "tracking-pickup-stop-marker-icon"
 			: "tracking-delivery-stop-marker-icon",
-		html: `<img src="${isPickup ? "/images/pickUp.png" : "/images/deliveryMarcer.png"}" width="52" height="72" alt="" style="width:52px;height:72px;display:block;" />`,
-		iconSize: [52, 72],
-		iconAnchor: [26 - offsetX, 72],
-		popupAnchor: [offsetX, -64],
+		html: `<div class="tracking-stop-marker" style="width:${size}px;height:${size}px;">
+<div class="tracking-stop-marker-halo" style="background:${color};"></div>
+<div class="tracking-stop-marker-core" style="background:${color};font-size:${isPickup ? 13 : 11}px;">${label}</div>
+</div>`,
+		iconSize: [size, size],
+		iconAnchor: [size / 2 - offsetX, size / 2],
+		popupAnchor: [offsetX, -28],
 	});
 }
 
@@ -844,7 +848,6 @@ function stopMapClickBubbling(e: L.LeafletMouseEvent) {
 function createHistoryPointIcon({
 	diameterPx,
 	index,
-	isLast,
 	isSelected,
 }: {
 	diameterPx: number;
@@ -852,24 +855,22 @@ function createHistoryPointIcon({
 	isLast: boolean;
 	isSelected: boolean;
 }) {
-	const diameter = Math.round(Math.max(22, diameterPx + 6));
-	const color = isLast ? "#16a34a" : "#2563eb";
-	const borderColor = isLast ? "#15803d" : "#1d4ed8";
-	const ringColor = isLast ? "rgba(22, 163, 74, 0.25)" : "rgba(37, 99, 235, 0.25)";
-	const ringSize = isSelected ? 4 : 2;
-	const outer = Math.ceil(diameter * 1.5 + ringSize * 2);
-	const fontSize = Math.max(10, Math.min(15, diameter * 0.45));
+	const inner = Math.round(Math.max(18, diameterPx));
+	const outer = Math.ceil(inner * (37 / 28));
+	const fontSize = inner >= 26 ? 11 : Math.max(9, Math.round(inner * 0.4));
+	const selectedRing = isSelected ? "box-shadow:0 0 0 2px #ffffff;" : "";
 
 	return L.divIcon({
 		className: "tracking-history-point-icon",
 		html: `<div class="tracking-history-marker-wrap" style="width:${outer}px;height:${outer}px;">
-<div class="tracking-history-marker-pin" style="width:${diameter}px;height:${diameter}px;background:${color};border-color:${borderColor};box-shadow:0 0 0 ${ringSize}px ${ringColor};">
+<div class="tracking-history-marker-halo" style="width:${outer}px;height:${outer}px;"></div>
+<div class="tracking-history-marker-dot" style="width:${inner}px;height:${inner}px;${selectedRing}">
 <span style="font-size:${fontSize}px;">${index + 1}</span>
 </div>
 </div>`,
 		iconSize: [outer, outer],
-		iconAnchor: [outer / 2, outer / 2 + diameter * 0.56],
-		popupAnchor: [0, -outer / 2],
+		iconAnchor: [outer / 2, outer / 2],
+		popupAnchor: [0, -inner / 2],
 	});
 }
 
@@ -1058,20 +1059,21 @@ export default function TrackingDeliveryMap({
 
 	// Custom driver marker icon
 	const carIcon = useMemo(() => {
-		const anchorX = driverMarkerSize / 2;
-		const anchorY = driverMarkerSize * 0.95;
+		const outer = Math.max(52, driverMarkerSize);
+		const inner = Math.round(outer * (44 / 70));
 		return L.divIcon({
 			className: "tracking-driver-marker-icon",
-			html: `
-				<img
-					src="/images/tracking-driver-marker.png"
-					alt="Driver"
-					style="width:${driverMarkerSize}px;height:auto;display:block;"
-				/>
-			`,
-			iconSize: [driverMarkerSize, driverMarkerSize],
-			iconAnchor: [anchorX, anchorY],
-			popupAnchor: [0, -driverMarkerSize * 0.92],
+			html: `<div class="tracking-driver-marker" style="width:${outer}px;height:${outer}px;">
+<div class="tracking-driver-marker-halo"></div>
+<div class="tracking-driver-marker-core" style="width:${inner}px;height:${inner}px;">
+<svg width="22" height="16" viewBox="0 0 22 16" fill="none" aria-hidden="true">
+<path fill="#ffffff" d="M1 3.5A1.5 1.5 0 0 1 2.5 2h9A1.5 1.5 0 0 1 13 3.5V5h2.2c.4 0 .8.2 1.1.5l2.8 3.2c.3.3.4.7.4 1.1V12a1 1 0 0 1-1 1h-.9a2.15 2.15 0 0 1-4.2 0H8.6a2.15 2.15 0 0 1-4.2 0H2.5A1.5 1.5 0 0 1 1 11.5v-8ZM13 6.8V11h4.4L15.2 8.1c-.1-.1-.2-.2-.4-.2H13V6.8ZM6.5 13.2a1.15 1.15 0 1 0 0-2.3 1.15 1.15 0 0 0 0 2.3Zm9 0a1.15 1.15 0 1 0 0-2.3 1.15 1.15 0 0 0 0 2.3Z"/>
+</svg>
+</div>
+</div>`,
+			iconSize: [outer, outer],
+			iconAnchor: [outer / 2, outer / 2],
+			popupAnchor: [0, -inner / 2],
 		});
 	}, [driverMarkerSize]);
 
@@ -1521,27 +1523,79 @@ export default function TrackingDeliveryMap({
 						border: none !important;
 					}
 					.tracking-history-marker-wrap {
+						position: relative;
 						display: flex;
 						align-items: center;
 						justify-content: center;
 					}
-					.tracking-history-marker-pin {
+					.tracking-history-marker-halo {
+						position: absolute;
+						border-radius: 50%;
+						background: rgba(61, 110, 245, 0.16);
+					}
+					.tracking-history-marker-dot {
+						position: relative;
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						border: 2px solid;
-						border-radius: 50% 50% 50% 0;
+						border-radius: 50%;
+						background: #3d6ef5;
 						box-sizing: border-box;
 						color: #ffffff;
-						font-weight: 800;
+						font-family: Manrope, sans-serif;
+						font-weight: 700;
 						line-height: 1;
 						text-align: center;
-						text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
-						transform: rotate(-45deg);
 					}
-					.tracking-history-marker-pin span {
-						display: block;
-						transform: rotate(45deg);
+					.tracking-stop-marker {
+						position: relative;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+					.tracking-stop-marker-halo {
+						position: absolute;
+						inset: 0;
+						border-radius: 50%;
+						opacity: 0.2;
+					}
+					.tracking-stop-marker-core {
+						position: relative;
+						width: 46px;
+						height: 46px;
+						border-radius: 50%;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						color: #ffffff;
+						font-family: Manrope, sans-serif;
+						font-weight: 700;
+						letter-spacing: 0.02em;
+						line-height: 1;
+					}
+					.tracking-driver-marker-icon {
+						background: transparent !important;
+						border: none !important;
+					}
+					.tracking-driver-marker {
+						position: relative;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+					}
+					.tracking-driver-marker-halo {
+						position: absolute;
+						inset: 0;
+						border-radius: 50%;
+						background: rgba(61, 110, 245, 0.14);
+					}
+					.tracking-driver-marker-core {
+						position: relative;
+						border-radius: 50%;
+						background: #3d6ef5;
+						display: flex;
+						align-items: center;
+						justify-content: center;
 					}
 					.tracking-history-point-editing {
 						transition: fill 0.65s ease-in-out, stroke 0.65s ease-in-out;
@@ -1577,17 +1631,17 @@ export default function TrackingDeliveryMap({
 			</style>
 			{enableBasemapModeSwitch ? (
 				<div
-					className="pointer-events-none absolute left-40 top-4 z-[1000] flex flex-col items-start gap-1"
+					className="pointer-events-none absolute left-4 top-[4.25rem] z-[1000] flex flex-col items-start gap-1"
 					role="group"
 					aria-label="Map display mode"
 				>
-					<div className="pointer-events-auto inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white/95 shadow-md backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/95">
+					<div className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(8,19,41,0.12)]">
 						<button
 							type="button"
-							className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+							className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
 								basemapMode === "simple"
-									? "bg-brand-500 text-white dark:bg-brand-400"
-									: "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+									? "bg-[#3D6EF5] text-white"
+									: "text-[#637899] hover:bg-[#F4F7FB]"
 							}`}
 							onClick={() => setBasemapMode("simple")}
 						>
@@ -1605,10 +1659,10 @@ export default function TrackingDeliveryMap({
 											: "Satellite map is available in production"
 							}
 							disabled={!mapTilerUsable}
-							className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+							className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
 								basemapMode === "hybrid"
-									? "bg-brand-500 text-white dark:bg-brand-400"
-									: "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+									? "bg-[#3D6EF5] text-white"
+									: "text-[#637899] hover:bg-[#F4F7FB]"
 							} disabled:cursor-not-allowed disabled:opacity-45`}
 							onClick={() => setBasemapMode("hybrid")}
 						>
@@ -1647,15 +1701,15 @@ export default function TrackingDeliveryMap({
 				/>
 				{loadRoute && (
 					<>
-						{/* Completed (red) drawn first; remaining (blue) on top — same geometry, no overlapping segments. */}
+						{/* Completed (green, from pickup) under remaining (red, toward delivery). */}
 						{loadRoute.completedPath.length > 1 && (
 							<Polyline
 								positions={loadRoute.completedPath}
 								smoothFactor={0}
 								pathOptions={{
-									color: "#dc2626",
+									color: "#20AD6D",
 									weight: 5,
-									opacity: 0.9,
+									opacity: 0.95,
 									interactive: false,
 								}}
 							/>
@@ -1665,7 +1719,7 @@ export default function TrackingDeliveryMap({
 								positions={loadRoute.remainingPath}
 								smoothFactor={0}
 								pathOptions={{
-									color: "#2563eb",
+									color: "#E5484D",
 									weight: 5,
 									opacity: 0.85,
 									interactive: false,

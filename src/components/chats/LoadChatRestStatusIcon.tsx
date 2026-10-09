@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoadRestIcon, LoadTurnOnIcon } from "@/icons";
+import { LoadTurnOnIcon } from "@/icons";
 import {
 	formatRestCountdown,
 	remainingRestMs,
@@ -45,7 +45,7 @@ export default function LoadChatRestStatusIcon({
 	const toneClass = TONE_CLASS[restCountdownTone(remainingMs, restDate, restStartedAt)];
 
 	const icon = isRest ? (
-		<LoadRestIcon className="h-6 w-7 text-brand-600 dark:text-brand-400" />
+		<img src="/images/tracking-info/rest.svg" className="h-6 w-[37px]" alt="" aria-hidden />
 	) : (
 		<LoadTurnOnIcon className="h-7 w-7" />
 	);
@@ -55,10 +55,10 @@ export default function LoadChatRestStatusIcon({
 
 	const body = (
 		<>
-			<span className="flex h-7 w-7 items-center justify-center">{icon}</span>
+			<span className="flex h-6 min-w-[37px] items-center justify-center">{icon}</span>
 			{showCountdown ? (
 				<span
-					className={`mt-0.5 font-mono text-[10px] leading-none tabular-nums ${toneClass}`}
+					className={`mt-1 whitespace-nowrap font-mono text-[10px] leading-none tabular-nums ${toneClass}`}
 				>
 					{countdown}
 				</span>

@@ -25,6 +25,16 @@ const mergeSourcesUnreadCount = (
 	return Math.max(s, st);
 };
 
+/** Active LOAD chats painted from cache with no loads.status must hit the API. */
+function loadChatListNeedsStatusRefresh(rooms: ChatRoom[]): boolean {
+	return rooms.some(
+		room =>
+			room.type === "LOAD" &&
+			room.isLoadArchived !== true &&
+			!String(room.loadStatus ?? "").trim()
+	);
+}
+
 const mergeRoomLastMessage = (
 	sourceLast: ChatRoom["lastMessage"],
 	storeLast: ChatRoom["lastMessage"],
@@ -122,7 +132,10 @@ export const useChatSync = () => {
 						if (!force && isCacheFresh) {
 							// Load from cache for immediate display only if cache is fresh
 							const cachedRooms = await indexedDBChatService.getChatRooms();
-							if (cachedRooms.length > 0) {
+							if (
+								cachedRooms.length > 0 &&
+								!loadChatListNeedsStatusRefresh(cachedRooms)
+							) {
 								// Merge cached data with current store state to preserve real-time updates
 								const currentStoreRooms = useChatStore.getState().chatRooms;
 								const mergedCachedRooms = cachedRooms.map(cachedRoom => {

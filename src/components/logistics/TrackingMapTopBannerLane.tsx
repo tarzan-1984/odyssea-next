@@ -13,8 +13,8 @@ export function TrackingMapTopBannerLane({
 	reserveRightForHistory = false,
 }: TrackingMapTopBannerLaneProps) {
 	const laneClass = reserveRightForHistory
-		? "left-[19.5rem] right-[calc(25vw+1.25rem)]"
-		: "left-[19.5rem] right-4";
+		? "left-[8rem] right-[calc(25vw+1.25rem)]"
+		: "left-[8rem] right-4";
 
 	return (
 		<div

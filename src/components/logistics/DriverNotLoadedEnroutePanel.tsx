@@ -1,6 +1,7 @@
 "use client";
 
 import { useCurrentUser } from "@/stores/userStore";
+import TrackingStatusCard from "./TrackingStatusCard";
 
 const TMS_DRIVER_PAGE_URL = "https://www.endurance-tms.com/add-driver/";
 
@@ -20,24 +21,23 @@ export default function DriverNotLoadedEnroutePanel({
 		: null;
 
 	return (
-		<div className="absolute inset-0 z-[500] bg-white dark:bg-gray-950">
-			<div className="pointer-events-none absolute inset-x-0 top-20 z-[600] flex justify-center px-6">
-				<div className="max-w-lg rounded-lg border border-gray-200 bg-white px-6 py-4 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-					<p className="text-base font-semibold text-gray-900 dark:text-white">
-						Driver status is not Loaded &amp; Enroute
-					</p>
-					<p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
+		<div className="absolute inset-0 z-[500] bg-white">
+			<div className="pointer-events-none absolute inset-x-0 top-16 z-[600] flex justify-center px-6">
+				<TrackingStatusCard
+					tone="warning"
+					icon="status"
+					title="Driver status is not Loaded & Enroute"
+				>
+					<p>
 						Current driver status:{" "}
-						<span className="font-medium text-gray-900 dark:text-white">
-							{driverStatusLabel}
-						</span>
+						<span className="font-semibold text-[#152238]">{driverStatusLabel}</span>
 						. Please verify the driver status in{" "}
 						{driverPageUrl ? (
 							<a
 								href={driverPageUrl}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="pointer-events-auto font-medium text-brand-500 underline hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+								className="pointer-events-auto font-semibold text-[#3D6EF5] underline"
 							>
 								TMS
 							</a>
@@ -46,11 +46,11 @@ export default function DriverNotLoadedEnroutePanel({
 						)}{" "}
 						before tracking this load on the map.
 					</p>
-					<p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-						Map, load history, and live tracking are available only when the driver
-						is Loaded &amp; Enroute.
+					<p className="mt-2">
+						Map, load history, and live tracking are available only when the driver is
+						Loaded &amp; Enroute.
 					</p>
-				</div>
+				</TrackingStatusCard>
 			</div>
 		</div>
 	);

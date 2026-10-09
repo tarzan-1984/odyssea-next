@@ -622,11 +622,12 @@ class IndexedDBChatService {
 				getRequest.onsuccess = () => {
 					const existingChatRoom = getRequest.result as StoredChatRoom;
 					if (existingChatRoom) {
-						// Update the chat room
+						// Keep cachedAt from the last full list save. Bumping it here
+						// made every location ping look like a fresh chat list, so
+						// loads.status was never re-read from the API.
 						const updatedChatRoom: StoredChatRoom = {
 							...existingChatRoom,
 							...updates,
-							cachedAt: Date.now(),
 						};
 
 						const putRequest = store.put(updatedChatRoom);
