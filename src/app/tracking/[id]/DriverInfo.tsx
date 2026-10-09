@@ -162,13 +162,16 @@ export default function DriverInfo({
 	const fullName = `${driverData.firstName} ${driverData.lastName}`.trim();
 	const externalId = driverData.externalId?.trim() || null;
 	const driverDisplayName = externalId ? `(${externalId}) ${fullName}` : fullName;
-	const driverPageUrl = externalId
-		? `${TMS_DRIVER_PAGE_URL}?driver=${encodeURIComponent(externalId)}`
-		: null;
+	const showTmsLinks = currentUser?.role?.trim().toUpperCase() !== "DRIVER";
+	const driverPageUrl =
+		showTmsLinks && externalId
+			? `${TMS_DRIVER_PAGE_URL}?driver=${encodeURIComponent(externalId)}`
+			: null;
 	const tmsLoadId = loadId?.trim() || null;
-	const tmsLoadPageUrl = tmsLoadId
-		? `${TMS_LOAD_PAGE_URL}?post_id=${encodeURIComponent(tmsLoadId)}`
-		: null;
+	const tmsLoadPageUrl =
+		showTmsLinks && tmsLoadId
+			? `${TMS_LOAD_PAGE_URL}?post_id=${encodeURIComponent(tmsLoadId)}`
+			: null;
 	const loadNumberDisplay = loadNumber?.trim() || tmsLoadId;
 	const openChatUrl = tmsLoadId ? `/chat?load=${encodeURIComponent(tmsLoadId)}` : null;
 
@@ -340,20 +343,24 @@ export default function DriverInfo({
 								{coordinates}
 							</p>
 						</div>
-						{tmsLoadId && tmsLoadPageUrl && loadNumberDisplay && (
+						{tmsLoadId && loadNumberDisplay && (
 							<div className="min-w-0">
 								<p className="mb-1 text-xs text-slate-500 dark:text-gray-400">
 									Load number
 								</p>
 								<p className="break-words text-sm font-medium text-slate-900 dark:text-white">
-									<a
-										href={tmsLoadPageUrl}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
-									>
-										{loadNumberDisplay}
-									</a>
+									{tmsLoadPageUrl ? (
+										<a
+											href={tmsLoadPageUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="text-brand-500 hover:text-brand-600 hover:underline dark:text-brand-400 dark:hover:text-brand-300"
+										>
+											{loadNumberDisplay}
+										</a>
+									) : (
+										loadNumberDisplay
+									)}
 								</p>
 							</div>
 						)}

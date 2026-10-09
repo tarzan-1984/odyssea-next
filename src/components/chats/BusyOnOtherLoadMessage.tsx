@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentUser } from "@/stores/userStore";
 import {
 	busyOnOtherLoadHref,
 	busyOnOtherLoadRefLabel,
@@ -15,19 +16,25 @@ export default function BusyOnOtherLoadMessage({
 	busy,
 	className,
 }: BusyOnOtherLoadMessageProps) {
+	const currentUser = useCurrentUser();
+	const showTmsLink = currentUser?.role?.trim().toUpperCase() !== "DRIVER";
 	const refLabel = busyOnOtherLoadRefLabel(busy);
 	const href = busyOnOtherLoadHref(busy);
 	return (
 		<p className={className}>
 			Driver is currently active on Load #
-			<a
-				href={href}
-				target="_blank"
-				rel="noopener noreferrer"
-				className="font-semibold underline underline-offset-2"
-			>
-				{refLabel}
-			</a>
+			{showTmsLink ? (
+				<a
+					href={href}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="font-semibold underline underline-offset-2"
+				>
+					{refLabel}
+				</a>
+			) : (
+				refLabel
+			)}
 			. ETA will be available after delivery is completed.
 		</p>
 	);

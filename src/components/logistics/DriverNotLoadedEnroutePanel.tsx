@@ -1,5 +1,7 @@
 "use client";
 
+import { useCurrentUser } from "@/stores/userStore";
+
 const TMS_DRIVER_PAGE_URL = "https://www.endurance-tms.com/add-driver/";
 
 type DriverNotLoadedEnroutePanelProps = {
@@ -11,7 +13,9 @@ export default function DriverNotLoadedEnroutePanel({
 	driverStatusLabel,
 	driverExternalId,
 }: DriverNotLoadedEnroutePanelProps) {
-	const driverPageUrl = driverExternalId?.trim()
+	const currentUser = useCurrentUser();
+	const showTmsLinks = currentUser?.role?.trim().toUpperCase() !== "DRIVER";
+	const driverPageUrl = showTmsLinks && driverExternalId?.trim()
 		? `${TMS_DRIVER_PAGE_URL}?driver=${encodeURIComponent(driverExternalId.trim())}`
 		: null;
 

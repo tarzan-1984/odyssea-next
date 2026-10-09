@@ -477,7 +477,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 									<AttachmentIcon className="w-4 h-4" />
 									Files
 								</DropdownItem>
-								{chatRoom?.type === "LOAD" && chatRoom.loadId?.trim() ? (
+								{chatRoom?.type === "LOAD" &&
+								chatRoom.loadId?.trim() &&
+								currentUser?.role?.trim().toUpperCase() !== "DRIVER" ? (
 									<a
 										href={`https://www.endurance-tms.com/add-load/?post_id=${encodeURIComponent(
 											chatRoom.loadId.trim()
