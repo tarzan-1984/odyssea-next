@@ -59,6 +59,8 @@ export interface ChatRoom {
 	type: string;
 	loadId?: string;
 	offerId?: string | null;
+	/** OFFER chat: rate_offers.empty_miles for this offer and driver. */
+	emptyMiles?: number | null;
 	avatar?: string;
 	adminId?: string;
 	isArchived: boolean;

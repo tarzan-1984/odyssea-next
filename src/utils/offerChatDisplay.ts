@@ -43,7 +43,19 @@ export function formatOfferRouteForDisplay(route: string): string {
 	return abbreviateStateInLocationString(trimmed);
 }
 
-/** Staff-facing OFFER chat header: "unit firstName lastName\\nroute" (no offer id). */
+/** Rounded empty miles from rate_offers.empty_miles, e.g. "22 mi". */
+export function formatOfferEmptyMiles(miles: number | null | undefined): string | null {
+	if (miles == null || !Number.isFinite(Number(miles))) return null;
+	return `${Math.round(Number(miles))} mi`;
+}
+
+function withEmptyMiles(nameLine: string, miles: number | null | undefined): string {
+	const label = formatOfferEmptyMiles(miles);
+	if (!label) return nameLine;
+	return `${nameLine} ${label}`;
+}
+
+/** Staff-facing OFFER chat header: "unit firstName lastName 22 mi\\nroute" (no offer id). */
 export function getOfferChatStaffHeaderTitle(
 	chatRoom: ChatRoom,
 	currentUserId?: string | null
@@ -52,10 +64,13 @@ export function getOfferChatStaffHeaderTitle(
 	if (!otherParticipant) {
 		const fallbackLine =
 			chatRoom.name?.split("\n")[0]?.replace(/\(id:\s*[^)]+\)/, "").trim() || "Unknown Chat";
-		return fallbackLine;
+		return withEmptyMiles(fallbackLine, chatRoom.emptyMiles);
 	}
 
-	const driverName = formatOfferChatDriverDisplayName(otherParticipant.user);
+	const driverName = withEmptyMiles(
+		formatOfferChatDriverDisplayName(otherParticipant.user),
+		chatRoom.emptyMiles
+	);
 	const route = parseOfferChatRouteLine(chatRoom.name);
 	if (route) {
 		return `${driverName}\n${formatOfferRouteForDisplay(route)}`;

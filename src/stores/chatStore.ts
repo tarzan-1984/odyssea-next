@@ -331,6 +331,10 @@ export const useChatStore = create<ChatState>()(
 						if (matchingRoom) {
 							nextCurrentChatRoom = {
 								...currentChatRoom,
+								emptyMiles:
+									matchingRoom.type === "OFFER"
+										? (matchingRoom.emptyMiles ?? null)
+										: currentChatRoom.emptyMiles,
 								loadStatus: matchingRoom.loadStatus,
 								referenceNumber:
 									matchingRoom.referenceNumber ?? currentChatRoom.referenceNumber,

@@ -12,6 +12,7 @@ import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { chatApi, getMessageMultiAttachments } from "@/app-api/chatApi";
 import { stripMarkdown } from "@/utils/chatMarkdown";
 import { formatChatPeerDisplayName, formatOfferChatDriverDisplayName } from "@/utils/chatPeerDisplayName";
+import { formatOfferEmptyMiles } from "@/utils/offerChatDisplay";
 import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import {
 	getOtherChatParticipant,
@@ -107,6 +108,9 @@ export default function ChatListItem({
 		}
 		return "No messages yet";
 	};
+
+	const offerEmptyMilesLabel =
+		chatRoom.type === "OFFER" ? formatOfferEmptyMiles(chatRoom.emptyMiles) : null;
 
 	const getChatLastMessageTime = (chatRoom: ChatRoom): string => {
 		if (
@@ -391,6 +395,18 @@ export default function ChatListItem({
 						{getChatLastMessageTime(chatRoom)}
 					</span>
 				</div>
+				{offerEmptyMilesLabel ? (
+					<p
+						title="Empty miles to pickup"
+						className={`truncate text-xs font-medium tabular-nums ${
+							loadStatusBgClass
+								? statusMetaClass
+								: "text-gray-700 dark:text-gray-200"
+						}`}
+					>
+						{offerEmptyMilesLabel}
+					</p>
+				) : null}
 				<div className="flex items-center gap-1">
 					<p className={`chat-msg-body truncate flex-1 ${statusMetaClass}`}>
 						{composeDraft.trim() ? (
