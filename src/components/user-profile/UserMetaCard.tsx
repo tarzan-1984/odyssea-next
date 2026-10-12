@@ -6,7 +6,7 @@ import { Camera } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import UploadFile from "@/components/upload-file/UploadFile";
 import { useCurrentUser, useUpdateUserField } from "@/stores/userStore";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { clientAuth } from "@/utils/auth";
 import {UserData} from "@/app-api/api-types";
 import { S3Uploader } from "@/app-api/S3Uploader";
@@ -272,7 +272,7 @@ export default function UserMetaCard({user}: IUserMetaCardProp) {
 								</h4>
 								<div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
 									<p className="text-sm text-gray-500 dark:text-gray-400">
-										{user?.role || "-"}
+										{user?.role ? getRoleDisplayLabel(user.role) : "-"}
 									</p>
 									<div className="hidden h-3.5 w-px bg-gray-300 dark:bg-gray-700 xl:block"></div>
 									<p className="text-sm text-gray-500 dark:text-gray-400">

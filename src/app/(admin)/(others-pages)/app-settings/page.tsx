@@ -8,7 +8,7 @@ import { useClickOutside } from "@/hooks/useClickOutside";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import usersApi from "@/app-api/users";
 import type { UserListItem } from "@/app-api/api-types";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import { useCurrentUser } from "@/stores/userStore";
 import { canModifyAppSettings, canSendCheckListMessages } from "@/utils/roleAccess";
@@ -83,25 +83,32 @@ const LOAD_PROXIMITY_MAX_METERS = 160_934;
 const PUSH_USERS_PAGE_SIZE = 20;
 const PUSH_USERS_CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+const PUSH_RECIPIENT_ROLE_VALUES = [
+	"DRIVER_UPDATES",
+	"MODERATOR",
+	"RECRUITER",
+	"ADMINISTRATOR",
+	"NIGHTSHIFT_TRACKING",
+	"DISPATCHER",
+	"BILLING",
+	"SUBSCRIBER",
+	"ACCOUNTING",
+	"RECRUITER_TL",
+	"TRACKING",
+	"DISPATCHER_TL",
+	"TRACKING_TL",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"MORNING_TRACKING",
+	"EXPEDITE_MANAGER",
+	"DRIVER",
+	"HR_MANAGER",
+] as const;
+
 const PUSH_RECIPIENT_ROLE_OPTIONS: { value: string; label: string }[] = [
 	{ value: "", label: "All roles" },
-	{ value: "DRIVER_UPDATES", label: "Driver Updates" },
-	{ value: "MODERATOR", label: "Moderator" },
-	{ value: "RECRUITER", label: "Recruiter" },
-	{ value: "ADMINISTRATOR", label: "Administrator" },
-	{ value: "NIGHTSHIFT_TRACKING", label: "Nightshift Tracking" },
-	{ value: "DISPATCHER", label: "Dispatcher" },
-	{ value: "BILLING", label: "Billing" },
-	{ value: "SUBSCRIBER", label: "Subscriber" },
-	{ value: "ACCOUNTING", label: "Accounting" },
-	{ value: "RECRUITER_TL", label: "Recruiter TL" },
-	{ value: "TRACKING", label: "Tracking" },
-	{ value: "DISPATCHER_TL", label: "Dispatcher TL" },
-	{ value: "TRACKING_TL", label: "Tracking TL" },
-	{ value: "MORNING_TRACKING", label: "Morning Tracking" },
-	{ value: "EXPEDITE_MANAGER", label: "Expedite Manager" },
-	{ value: "DRIVER", label: "Driver" },
-	{ value: "HR_MANAGER", label: "HR Manager" },
+	...PUSH_RECIPIENT_ROLE_VALUES.map(value => ({ value, label: getRoleDisplayLabel(value) })),
 ];
 
 type UsersListApiResponse = {

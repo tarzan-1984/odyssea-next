@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchDriversPage } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
 import type { DriversListQueryParams } from "@/components/tables/DataTables/DriversTable/driversListQueryOptions";
 import type { DimensionsFilterValues } from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
 import { getActiveDimensionsQueryParams } from "@/components/tables/DataTables/DriversTable/dimensionsFilterUtils";
+import { isAllowedNorthAmericaLatLng } from "@/utils/northAmericaGeoFence";
 
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes
 const PAGE_SIZE = 60;
@@ -74,6 +75,28 @@ function mapDriverToDriverForMap(driver: {
  * Pass enabled=false to skip fetching (when data is provided externally via props).
  */
 export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enabledProp = true) {
+	const [testDriverExternalId, setTestDriverExternalId] = useState("");
+	useEffect(() => {
+		let cancelled = false;
+		void fetch("/api/app-settings/location-environment")
+			.then((response) => (response.ok ? response.json() : null))
+			.then((json: unknown) => {
+				if (cancelled || !json || typeof json !== "object") return;
+				const root = json as {
+					locationTestDriverExternalId?: unknown;
+					data?: { locationTestDriverExternalId?: unknown };
+				};
+				const raw =
+					root.locationTestDriverExternalId ??
+					root.data?.locationTestDriverExternalId;
+				if (typeof raw === "string") setTestDriverExternalId(raw.trim());
+			})
+			.catch(() => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	const baseParams: Omit<DriversListQueryParams, "currentPage"> = {
 		itemsPerPage: PAGE_SIZE,
 		capabilitiesFilter: filters?.capabilitiesFilter ?? [],
@@ -131,10 +154,22 @@ export function useDriversForMap(filters?: Partial<DriversMapFilterParams>, enab
 		}
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-	const rawDrivers: DriverForMap[] = (query.data?.pages ?? [])
-		.flatMap((page) => page.data?.results ?? [])
-		.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
-		.filter((d): d is DriverForMap => d !== null);
+	const rawDrivers: DriverForMap[] = useMemo(
+		() =>
+			(query.data?.pages ?? [])
+				.flatMap((page) => page.data?.results ?? [])
+				.map((d) => mapDriverToDriverForMap(d as Parameters<typeof mapDriverToDriverForMap>[0]))
+				.filter((d): d is DriverForMap => d !== null)
+				.filter((driver) => {
+					const externalId = driver.externalId?.trim() ?? "";
+					if (testDriverExternalId && externalId === testDriverExternalId) return true;
+					return isAllowedNorthAmericaLatLng({
+						latitude: driver.latitude,
+						longitude: driver.longitude,
+					});
+				}),
+		[query.data?.pages, testDriverExternalId],
+	);
 
 	// Same client-side status filter as drivers-list
 	const allDrivers = useMemo(() => {

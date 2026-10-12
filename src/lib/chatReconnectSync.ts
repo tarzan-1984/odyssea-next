@@ -14,6 +14,7 @@ import {
 } from "@/utils/chatMessagesMerge";
 import { MAX_CACHED_MESSAGES_PER_ROOM } from "@/constants/chatCacheLimits";
 import { mergeLoadRestFields } from "@/utils/mergeLoadRestFields";
+import { getChatRoomsListShared } from "@/lib/chatRoomsListRequest";
 
 const SYNC_BATCH_CHUNK_SIZE = 50;
 /** Only need the newest message to compare tail vs server. */
@@ -101,7 +102,7 @@ async function applySyncBatchResults(results: SyncMessagesBatchRoomResult[]): Pr
 export async function catchUpChatsOnReconnect(): Promise<void> {
 	let apiRooms: ChatRoom[];
 	try {
-		apiRooms = await chatApi.getChatRooms();
+		apiRooms = await getChatRoomsListShared();
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "getChatRooms failed";
 		console.warn("[ChatSync] Could not refresh chat rooms after reconnect:", message);

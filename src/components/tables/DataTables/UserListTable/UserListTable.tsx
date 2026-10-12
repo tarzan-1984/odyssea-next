@@ -9,32 +9,38 @@ import Link from "next/link";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import MultiSelect from "@/components/form/MultiSelect";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import DriverMobileAppIcon from "@/components/tables/DataTables/DriversTable/DriverMobileAppIcon";
 import { useCurrentUser } from "@/stores/userStore";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import SetPasswordModal, { type SetPasswordDriver } from "./SetPasswordModal";
 
-// Define all available roles
+const USER_ROLE_VALUES = [
+	"DRIVER_UPDATES",
+	"MODERATOR",
+	"RECRUITER",
+	"ADMINISTRATOR",
+	"NIGHTSHIFT_TRACKING",
+	"DISPATCHER",
+	"BILLING",
+	"SUBSCRIBER",
+	"ACCOUNTING",
+	"RECRUITER_TL",
+	"TRACKING",
+	"DISPATCHER_TL",
+	"TRACKING_TL",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"MORNING_TRACKING",
+	"EXPEDITE_MANAGER",
+	"DRIVER",
+	"HR_MANAGER",
+] as const;
+
 const roleOptions = [
 	{ value: "", label: "Show all" },
-	{ value: "DRIVER_UPDATES", label: "Driver Updates" },
-	{ value: "MODERATOR", label: "Moderator" },
-	{ value: "RECRUITER", label: "Recruiter" },
-	{ value: "ADMINISTRATOR", label: "Administrator" },
-	{ value: "NIGHTSHIFT_TRACKING", label: "Nightshift Tracking" },
-	{ value: "DISPATCHER", label: "Dispatcher" },
-	{ value: "BILLING", label: "Billing" },
-	{ value: "SUBSCRIBER", label: "Subscriber" },
-	{ value: "ACCOUNTING", label: "Accounting" },
-	{ value: "RECRUITER_TL", label: "Recruiter TL" },
-	{ value: "TRACKING", label: "Tracking" },
-	{ value: "DISPATCHER_TL", label: "Dispatcher TL" },
-	{ value: "TRACKING_TL", label: "Tracking TL" },
-	{ value: "MORNING_TRACKING", label: "Morning Tracking" },
-	{ value: "EXPEDITE_MANAGER", label: "Expedite Manager" },
-	{ value: "DRIVER", label: "Driver" },
-	{ value: "HR_MANAGER", label: "HR Manager" },
+	...USER_ROLE_VALUES.map(value => ({ value, label: getRoleDisplayLabel(value) })),
 ];
 
 // VIN column visibility is permission-based: show only for allowed viewer roles.
@@ -333,7 +339,7 @@ export default function UserListTable() {
 										</TableCell>
 										{/* User role */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">
-											{item?.role ? item.role : "-"}
+											{item?.role ? getRoleDisplayLabel(item.role) : "-"}
 										</TableCell>
 										{/* User email */}
 										<TableCell className="px-4 py-3 font-normal dark:text-gray-400/90 text-gray-800 border border-gray-100 dark:border-white/[0.05] text-theme-sm whitespace-nowrap">

@@ -27,23 +27,26 @@ export function chatRoomPlaceholderBg(chatRoomId: string): string {
 
 /** Human-readable labels for user roles (used in chat, modals, etc.) */
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
-	DRIVER_UPDATES: "Driver Updates",
+	DRIVER_UPDATES: "Driver App Assistant",
 	MODERATOR: "Moderator",
 	RECRUITER: "Recruiter",
 	ADMINISTRATOR: "Administrator",
-	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
+	NIGHTSHIFT_TRACKING: "Tracking Coordinator (Evening Shift)",
 	DISPATCHER: "Dispatcher",
 	BILLING: "Billing",
 	ACCOUNTING: "Accounting",
 	RECRUITER_TL: "Recruiter Team Leader",
 	DRIVER: "Driver",
 	EXPEDITE_MANAGER: "Expedite Manager",
-	TRACKING_TL: "Tracking Team Leader",
-	DISPATCHER_TL: "Dispatcher Team Leader",
-	TRACKING: "Tracking",
+	TRACKING_TL: "Tracking Manager",
+	DISPATCHER_TL: "Dispatcher Team Lead",
+	TRACKING: "Tracking Coordinator (Day Shift)",
 	SUBSCRIBER: "Subscriber",
-	MORNING_TRACKING: "Morning Tracking",
+	MORNING_TRACKING: "Tracking Coordinator (Night Shift)",
 	HR_MANAGER: "HR Manager",
+	TRACKING_TL_DAYTIME: "Tracking Team Lead (Day Shift)",
+	TRACKING_TL_NIGHTSHIFT: "Tracking Team Lead (Evening Shift)",
+	TRACKING_TL_MORNINGSHIFT: "Tracking Team Lead (Night Shift)",
 	GAST: "Guest",
 };
 

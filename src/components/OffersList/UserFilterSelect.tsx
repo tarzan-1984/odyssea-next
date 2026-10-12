@@ -6,7 +6,7 @@ import { useClickOutside } from "@/hooks/useClickOutside";
 import { useQuery } from "@tanstack/react-query";
 import users from "@/app-api/users";
 import offersApi from "@/app-api/offers";
-import { renderAvatar } from "@/helpers";
+import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import type { UserListItem } from "@/app-api/api-types";
 
 const OFFERS_USER_ROLES = [
@@ -17,17 +17,6 @@ const OFFERS_USER_ROLES = [
 	"MORNING_TRACKING",
 	"NIGHTSHIFT_TRACKING",
 ] as const;
-
-const ROLE_LABELS: Record<string, string> = {
-	ADMINISTRATOR: "Administrator",
-	DISPATCHER: "Dispatcher",
-	DISPATCHER_TL: "Dispatcher TL",
-	EXPEDITE_MANAGER: "Expedite Manager",
-	MORNING_TRACKING: "Morning Tracking",
-	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
-	MODERATOR: "Moderator",
-	TRACKING_TL: "Tracking TL",
-};
 
 const STALE_TIME_MS = 3 * 60 * 60 * 1000; // 3 hours
 
@@ -51,7 +40,7 @@ function getUserDisplayName(item: UserListItem): string {
 }
 
 function getRoleLabel(role: string): string {
-	return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+	return getRoleDisplayLabel(role);
 }
 
 export default function UserFilterSelect({

@@ -38,18 +38,10 @@ import CounterOfferModal, {
 	type CounterOfferModalState,
 } from "./CounterOfferModal";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
+import { getRoleDisplayLabel } from "@/helpers";
 
 const DRIVER_ACCEPTED_MESSAGE =
 	"The load has been added to the TMS Drafts section. You may now finalize and publish it to create an Active Load chat with the driver and our support team.";
-
-const CREATOR_ROLE_LABELS: Record<string, string> = {
-	ADMINISTRATOR: "Administrator",
-	DISPATCHER: "Dispatcher",
-	DISPATCHER_TL: "Dispatcher TL",
-	EXPEDITE_MANAGER: "Expedite Manager",
-	MORNING_TRACKING: "Morning Tracking",
-	NIGHTSHIFT_TRACKING: "Nightshift Tracking",
-};
 
 function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 	if (!creator) return null;
@@ -61,7 +53,7 @@ function formatOfferCreatorLabel(creator: OfferRow["creator"]): string | null {
 
 	const parts = [name || ""];
 	if (role) {
-		const roleLabel = CREATOR_ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+		const roleLabel = getRoleDisplayLabel(role);
 		parts.push(`(${roleLabel})`);
 	}
 

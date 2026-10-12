@@ -4,6 +4,7 @@ import { chatApi, ChatRoom } from "@/app-api/chatApi";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { chatOutboxService } from "@/services/chatOutboxService";
 import chatRoomsApi from "@/app-api/chatRooms";
+import { getChatRoomsListShared } from "@/lib/chatRoomsListRequest";
 import { useCurrentUser } from "@/stores/userStore";
 import { loadChatMessagesPage, CHAT_MESSAGES_QUERY_KEY } from "@/lib/chatMessagesQuery";
 import { queryClient } from "@/lib/queryClient";
@@ -173,7 +174,7 @@ export const useChatSync = () => {
 
 						// If cache is not fresh, load from API and merge with current store state
 						try {
-							const apiRooms = await chatApi.getChatRooms();
+							const apiRooms = await getChatRoomsListShared();
 							const normalizedApiRooms = apiRooms.map(room => ({
 								...room,
 								participants: normalizeParticipants(room.participants || []),
@@ -254,7 +255,7 @@ export const useChatSync = () => {
 
 					// If no cached data, load from API and merge with current store state
 					try {
-						const apiRooms = await chatApi.getChatRooms();
+						const apiRooms = await getChatRoomsListShared();
 						const normalizedApiRooms = apiRooms.map(room => ({
 							...room,
 							participants: normalizeParticipants(room.participants || []),
