@@ -163,6 +163,7 @@ const LOAD_STATUSES_SHOW_CURRENT_LOCATION = new Set([
 type LoadTrackingPoint = {
 	id?: string | null;
 	externalDriverId?: string | null;
+	driverName?: string | null;
 	latitude?: number | string | null;
 	longitude?: number | string | null;
 	placeLabel?: string | null;
@@ -677,10 +678,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				const driver = externalDriverId
 					? loadDrivers.find(item => item.externalId?.trim() === externalDriverId)
 					: null;
-				const driverName = [driver?.firstName, driver?.lastName]
+				const attachedName = [driver?.firstName, driver?.lastName]
 					.filter(Boolean)
 					.join(" ")
 					.trim();
+				const driverName = attachedName || point.driverName?.trim() || "";
 				return {
 					id: point.id ?? null,
 					position: [latitude, longitude] as [number, number],
@@ -1608,6 +1610,12 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 																	Coordinates: {displayCoords[0].toFixed(6)},{" "}
 																	{displayCoords[1].toFixed(6)}
 																</p>
+																{point.driverName || point.externalDriverId ? (
+																	<p>
+																		Driver:{" "}
+																		{point.driverName || point.externalDriverId}
+																	</p>
+																) : null}
 																{point.placeLabel ? (
 																	<p>Place: {point.placeLabel}</p>
 																) : null}

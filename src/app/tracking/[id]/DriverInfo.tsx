@@ -390,15 +390,38 @@ export default function DriverInfo({
 						</div>
 					</div>
 				</div>
-					{hasRoute ? <div className="flex min-h-[193px] flex-col rounded-2xl bg-[#f7f8fc] p-4">
-						<div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f6ef7]"><RouteInfoIcon className="h-5 w-5" /></span><p className="text-[10px] uppercase tracking-wide text-[#7f8aa5]">Route</p></div>
-						<div className="mt-3 flex flex-1 flex-col justify-between">
-							{routeStops.map((stop, index) => <div key={`${stop.label}-${index}`} className="relative flex gap-2.5">
-								<div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${index === 0 ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-500"}`}><StopPinIcon className="h-4 w-4" /></div>
-								<div className="min-w-0 flex-1"><p className="text-[9px] uppercase text-[#7f8aa5]">{stop.label}</p><p className="truncate text-xs font-semibold text-[#202b45]">{stop.address}</p>{stop.time ? <p className="truncate text-[9px] text-[#8f99af]">{stop.time}</p> : null}{index === 0 && routeStops.length > 1 ? <div className="mt-3 h-px bg-[#dfe4ee]" /> : null}</div>
-							</div>)}
+					{hasRoute ? (
+						/* Out of flow on wide screens so a long route matches the info column and scrolls. */
+						<div className="relative min-h-[193px] xl:min-h-0">
+							<div className="flex max-h-[min(22rem,46vh)] min-h-[193px] flex-col overflow-hidden rounded-2xl bg-[#f7f8fc] p-4 xl:absolute xl:inset-0 xl:max-h-none xl:min-h-0">
+								<div className="flex shrink-0 items-center gap-3">
+									<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f6ef7]">
+										<RouteInfoIcon className="h-5 w-5" />
+									</span>
+									<p className="text-[10px] uppercase tracking-wide text-[#7f8aa5]">Route</p>
+								</div>
+								<div
+									className={`mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain custom-scrollbar ${
+										routeStops.length > 2 ? "" : "justify-between"
+									}`}
+								>
+									{routeStops.map((stop, index) => (
+										<div key={`${stop.label}-${index}`} className="relative flex shrink-0 gap-2.5">
+											<div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${index === 0 ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-500"}`}>
+												<StopPinIcon className="h-4 w-4" />
+											</div>
+											<div className="min-w-0 flex-1">
+												<p className="text-[9px] uppercase text-[#7f8aa5]">{stop.label}</p>
+												<p className="truncate text-xs font-semibold text-[#202b45]">{stop.address}</p>
+												{stop.time ? <p className="truncate text-[9px] text-[#8f99af]">{stop.time}</p> : null}
+												{index === 0 && routeStops.length > 1 ? <div className="mt-3 h-px bg-[#dfe4ee]" /> : null}
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
 						</div>
-					</div> : null}
+					) : null}
 			</div>
 			<CheckListPushModal
 				isOpen={isPushModalOpen}
