@@ -396,6 +396,16 @@ function formatDriverBidRate(rate: number | null | undefined): string | null {
 	return `$${Number(rate).toLocaleString("en-US")}`;
 }
 
+function formatExtensionBidRate(rate: {
+	rate: number;
+	creator_initials: string;
+}): string | null {
+	const amount = formatDriverBidRate(rate.rate);
+	if (!amount) return null;
+	const initials = rate.creator_initials?.trim();
+	return initials ? `${amount} (${initials})` : amount;
+}
+
 function canExtendDriverBidTime(offer: OfferRow, driver: OfferDriver): boolean {
 	return (
 		offer.active !== false &&
@@ -1677,7 +1687,21 @@ const OffersList = () => {
 																	</TableCell>
 																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		<div className="flex flex-col items-center gap-0.5">
-																			<span>{formatDriverBidRate(driver.rate) ?? ""}</span>
+																			{driver.rate != null ? (
+																				<span>{formatDriverBidRate(driver.rate)}</span>
+																			) : null}
+																			{driver.extension_rates?.map((extensionRate) => {
+																				const label = formatExtensionBidRate(extensionRate);
+																				if (!label) return null;
+																				return (
+																					<span
+																						key={extensionRate.offer_id}
+																						className="text-gray-400 dark:text-gray-500"
+																					>
+																						{label}
+																					</span>
+																				);
+																			})}
 																			{driver.counter_offer != null && (
 																				<span className="text-xs font-medium text-yellow-500 dark:text-yellow-400">
 																					{formatDriverBidRate(driver.counter_offer)}

@@ -31,6 +31,15 @@ export interface OfferDriver {
 	reminder_count?: number;
 	/** Unix seconds: assignment baseline or last reminder. */
 	last_reminder_at?: number | null;
+	/**
+	 * Rates this driver placed on other offers with the same extension_id.
+	 * Display only; not a bid on the current offer.
+	 */
+	extension_rates?: Array<{
+		rate: number;
+		creator_initials: string;
+		offer_id: number;
+	}>;
 }
 
 export interface OfferRoutePoint {
