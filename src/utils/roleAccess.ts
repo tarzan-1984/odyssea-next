@@ -327,6 +327,25 @@ export function canAccessMyTeamChatTab(role: string | undefined | null): boolean
 	return (MY_TEAM_CHAT_TAB_ROLES as readonly string[]).includes(normalized);
 }
 
+/** May leave a LOAD chat without deleting it. Messages stay for the other participants. */
+export const LOAD_CHAT_LEAVE_ROLES = [
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"DRIVER_UPDATES",
+	"TRACKING",
+	"NIGHTSHIFT_TRACKING",
+	"MORNING_TRACKING",
+	"TRACKING_TL",
+	"ADMINISTRATOR",
+] as const;
+
+export function canLeaveLoadChat(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (LOAD_CHAT_LEAVE_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Default in-app landing path after login / generic "home" redirects. */
 export function getAppHomePath(role: string | undefined | null): string {
 	if (isGastRole(role)) return "/user-list";

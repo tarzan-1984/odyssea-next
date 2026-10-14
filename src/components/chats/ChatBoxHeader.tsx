@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, LogOut } from "lucide-react";
 import {
 	MoreDotIcon,
 	TrashDeleteIcon,
@@ -33,7 +33,7 @@ import { isMultiUserChatType } from "@/utils/chatRoomTypes";
 import { getOfferChatStaffHeaderTitle } from "@/utils/offerChatDisplay";
 import { formatChatPeerDisplayName } from "@/utils/chatPeerDisplayName";
 import { canSeeLoadStaleLocationSystemMessage } from "@/utils/systemMessageKind";
-import { canSendCheckListMessages } from "@/utils/roleAccess";
+import { canLeaveLoadChat, canSendCheckListMessages } from "@/utils/roleAccess";
 import { formatLoadChatLastLocationLine } from "@/utils/nyWallClock";
 import { roadEtaHeaderKindLabel } from "@/utils/loadRouteEta";
 import { normalizeLoadChatStatus } from "@/utils/loadStatusLabel";
@@ -73,6 +73,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const dropdownAnchorRef = useRef<HTMLButtonElement>(null);
 	const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [chatAction, setChatAction] = useState<"delete" | "leave">("delete");
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
@@ -182,9 +183,24 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	}
 
 	const handleDeleteClick = () => {
+		setChatAction("delete");
 		setIsDeleteModalOpen(true);
 		closeDropdown();
 	};
+
+	const handleLeaveClick = () => {
+		setChatAction("leave");
+		setIsDeleteModalOpen(true);
+		closeDropdown();
+	};
+
+	const canLeaveThisLoadChat =
+		chatRoom?.type === "LOAD" &&
+		canLeaveLoadChat(currentUser?.role) &&
+		Boolean(currentUser?.id) &&
+		chatRoom.participants.some(
+			(participant) => (participant.user?.id || participant.userId) === currentUser?.id,
+		);
 
 	const handleFilesClick = () => {
 		setIsFilesModalOpen(true);
@@ -493,6 +509,15 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 										show in TMS
 									</a>
 								) : null}
+								{canLeaveThisLoadChat ? (
+									<DropdownItem
+										onItemClick={handleLeaveClick}
+										className="flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+									>
+										<LogOut className="h-4 w-4" />
+										Leave chat
+									</DropdownItem>
+								) : null}
 								{/* Show delete/leave button only if user is allowed to */}
 								{(() => {
 									// For LOAD chats: only administrators can delete
@@ -534,6 +559,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 				isOpen={isDeleteModalOpen}
 				onClose={() => setIsDeleteModalOpen(false)}
 				chatRoom={chatRoom}
+				mode={chatAction}
 				onDeleteSuccess={() => {
 					// Handle successful deletion if needed
 					// The WebSocket event will handle the actual removal from state
