@@ -71,7 +71,6 @@ async function fetchDriverExternalIdsAtOpenBidLimit(
  * Requires authentication.
  */
 export async function GET(request: NextRequest) {
-
 	try {
 		const accessToken = serverAuth.getAccessToken(request);
 		if (!accessToken) {
