@@ -419,6 +419,8 @@ export default function DriversListTable({
 			loadedMiles: stripQuotes(searchParams.get("loaded_miles")) || undefined,
 			weight: stripQuotes(searchParams.get("weight")) || undefined,
 			commodity: stripQuotes(searchParams.get("commodity")) || undefined,
+			extensionLoadId:
+				stripQuotes(searchParams.get("extension_load_id")) || undefined,
 		});
 
 		if (country === "USA" || country === "Canada") {

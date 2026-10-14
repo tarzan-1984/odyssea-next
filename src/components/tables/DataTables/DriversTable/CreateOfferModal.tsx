@@ -75,6 +75,8 @@ export interface CreateOfferUrlPrefill {
 	loadedMiles?: string;
 	weight?: string;
 	commodity?: string;
+	/** Non-empty extension_load_id query param. Written into the hidden field. */
+	extensionLoadId?: string;
 }
 
 export interface CreateOfferModalProps {
@@ -86,7 +88,7 @@ export interface CreateOfferModalProps {
 	driverEmptyMiles?: Record<string, number>;
 	/** Pre-fill first pick up location (e.g. drivers-list address search). */
 	initialPickupLocation?: string;
-	/** Prefill from create_offer=1 deep link (route, weight, commodity, miles). */
+	/** Prefill from create_offer=1 deep link (route, weight, commodity, miles, extension_load_id). */
 	initialCreateOfferFromUrl?: CreateOfferUrlPrefill | null;
 	onSubmit?: (values: CreateOfferFormValues) => void;
 	/** When set, modal opens in edit mode with pre-filled values. */
@@ -1287,6 +1289,12 @@ export default function CreateOfferModal({
 				};
 			});
 
+			const extensionLoadIdRaw = new FormData(
+				e.currentTarget as HTMLFormElement
+			).get("extension_load_id");
+			const extensionLoadId =
+				typeof extensionLoadIdRaw === "string" ? extensionLoadIdRaw.trim() : "";
+
 			const payload = {
 				externalId: effectiveExternalId,
 				driverIds: effectiveDriverIds,
@@ -1304,6 +1312,9 @@ export default function CreateOfferModal({
 						? formValues.specialRequirements
 						: undefined,
 				notes: formValues.notes.trim() || undefined,
+				...(!isEditMode && extensionLoadId
+					? { extension_load_id: extensionLoadId }
+					: {}),
 			};
 
 			const result = isEditMode && editData
@@ -1356,6 +1367,14 @@ export default function CreateOfferModal({
 
 					{/* Hidden: selected driver IDs (comma-separated) */}
 					<input type="hidden" name="driverIds" value={driverIdsValue} readOnly />
+
+					{!isEditMode && (
+						<input
+							type="hidden"
+							name="extension_load_id"
+							defaultValue={initialCreateOfferFromUrl?.extensionLoadId?.trim() ?? ""}
+						/>
+					)}
 
 					{/* Route rows: first Pick up, then any intermediate points, last Delivery — all draggable */}
 					<DndProvider backend={HTML5Backend}>

@@ -151,6 +151,8 @@ export interface CreateOfferPayload {
 	commodity: string;
 	specialRequirements?: string[];
 	notes?: string;
+	/** Hidden create-offer field. Stored in offers.extension_id when non-empty. */
+	extension_load_id?: string;
 }
 
 export interface CreateOfferResponse {
