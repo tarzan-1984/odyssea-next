@@ -156,4 +156,6 @@ For support and questions:
 
 **Built with ❤️ using Next.js, TypeScript, and Tailwind CSS**
 
+Production deployments are triggered automatically by pushes to the `main` branch via Vercel.
+
 
