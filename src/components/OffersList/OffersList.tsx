@@ -759,6 +759,7 @@ const OffersList = () => {
 	const [showBulkReturnConfirm, setShowBulkReturnConfirm] = useState(false);
 	const [isBulkReturning, setIsBulkReturning] = useState(false);
 	const [editOfferData, setEditOfferData] = useState<EditOfferData | null>(null);
+	const [editReturnOfferId, setEditReturnOfferId] = useState<number | null>(null);
 	const [pushModalState, setPushModalState] = useState<{
 		drivers: OfferDriver[];
 		defaultMessage: string;
@@ -1239,21 +1240,20 @@ const OffersList = () => {
 											)}
 										</div>
 										<div className="flex flex-shrink-0 items-center justify-center gap-2">
-											{row.active !== false && (
-												<button
-													type="button"
-													disabled={!canModifyOffersByRole}
-													title="Edit offer"
-													onClick={(e) => {
-														e.stopPropagation();
-														if (!canModifyOffersByRole) return;
-														setEditOfferData(buildEditOfferData(row));
-													}}
-													className="inline-flex h-[39px] w-[39px] shrink-0 items-center justify-center p-0 border-0 bg-transparent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-												>
-													<EditOfferIcon className="h-[39px] w-[39px] shrink-0" aria-hidden />
-												</button>
-											)}
+											<button
+												type="button"
+												disabled={!canModifyOffersByRole}
+												title="Edit offer"
+												onClick={(e) => {
+													e.stopPropagation();
+													if (!canModifyOffersByRole) return;
+													setEditReturnOfferId(row.active === false ? row.id : null);
+													setEditOfferData(buildEditOfferData(row));
+												}}
+												className="inline-flex h-[39px] w-[39px] shrink-0 items-center justify-center p-0 border-0 bg-transparent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												<EditOfferIcon className="h-[39px] w-[39px] shrink-0" aria-hidden />
+											</button>
 											{row.active !== false && (
 												<button
 													type="button"
@@ -2004,12 +2004,28 @@ const OffersList = () => {
 			{editOfferData && (
 				<CreateOfferModal
 					isOpen={true}
-					onClose={() => setEditOfferData(null)}
+					onClose={() => {
+						setEditOfferData(null);
+						setEditReturnOfferId(null);
+					}}
 					externalId={editOfferData.externalId}
 					selectedDriverIds={editOfferData.selectedDriverIds}
 					driverEmptyMiles={editOfferData.driverEmptyMiles}
 					editData={editOfferData}
 					onSubmit={async () => {
+						if (editReturnOfferId != null) {
+							const res = await offersApi.returnOffer(editReturnOfferId);
+							if (!res.success) {
+								throw new Error(
+									typeof res.error === "string"
+										? res.error
+										: "Failed to return offer"
+								);
+							}
+							setSelectedOfferIds((prev) =>
+								prev.filter((id) => id !== editReturnOfferId)
+							);
+						}
 						await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 					}}
 				/>

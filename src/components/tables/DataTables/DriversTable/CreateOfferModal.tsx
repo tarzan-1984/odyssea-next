@@ -90,7 +90,7 @@ export interface CreateOfferModalProps {
 	initialPickupLocation?: string;
 	/** Prefill from create_offer=1 deep link (route, weight, commodity, miles, extension_load_id). */
 	initialCreateOfferFromUrl?: CreateOfferUrlPrefill | null;
-	onSubmit?: (values: CreateOfferFormValues) => void;
+	onSubmit?: (values: CreateOfferFormValues) => void | Promise<void>;
 	/** When set, modal opens in edit mode with pre-filled values. */
 	editData?: EditOfferData | null;
 }
@@ -1321,7 +1321,7 @@ export default function CreateOfferModal({
 				? await offers.updateOffer(editData.offerId, payload)
 				: await offers.createOffer(payload);
 			if (result.success) {
-				onSubmit?.({
+				await onSubmit?.({
 					externalId: effectiveExternalId,
 					driverIds: driverIdsValue,
 					route: routeRows,
@@ -1339,6 +1339,14 @@ export default function CreateOfferModal({
 						(isEditMode ? "Failed to update offer" : "Failed to create offer")
 				);
 			}
+		} catch (error) {
+			setSubmitError(
+				error instanceof Error && error.message
+					? error.message
+					: isEditMode
+						? "Failed to update offer"
+						: "Failed to create offer"
+			);
 		} finally {
 			setIsSubmitting(false);
 		}
