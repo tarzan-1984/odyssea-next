@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverAuth } from "@/utils/auth";
 
-// POST /api/public/tracking/load/[loadId]/enrichment — DB data for guests (no auth).
+// POST /api/public/tracking/load/[loadId]/enrichment — DB data for signed-in users.
 export async function POST(
 	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string }> }
@@ -8,6 +9,9 @@ export async function POST(
 	const { loadId } = await params;
 
 	try {
+		if (!serverAuth.getAccessToken(request)) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 		if (!loadId?.trim()) {
 			return NextResponse.json({ error: "Load ID is required" }, { status: 400 });
 		}

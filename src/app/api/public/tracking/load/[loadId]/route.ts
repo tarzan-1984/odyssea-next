@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverAuth } from "@/utils/auth";
 
-// GET /api/public/tracking/load/[loadId] — map data for guests (no auth).
+// GET /api/public/tracking/load/[loadId] — map data for signed-in users.
 export async function GET(
-	_request: NextRequest,
+	request: NextRequest,
 	{ params }: { params: Promise<{ loadId: string }> }
 ) {
 	const { loadId } = await params;
 
 	try {
+		if (!serverAuth.getAccessToken(request)) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 		if (!loadId?.trim()) {
 			return NextResponse.json({ error: "Load ID is required" }, { status: 400 });
 		}

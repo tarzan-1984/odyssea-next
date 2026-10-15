@@ -40,8 +40,6 @@ const publicPages = [
 	"/404",
 	"/500",
 	"/error",
-	// Public tracking page is available for guests (no auth required)
-	"/tracking",
 	"/test",
 	// Privacy Policy - public for everyone (including unauthenticated)
 	"/privacy-policy",
@@ -92,20 +90,19 @@ export function middleware(request: NextRequest) {
 	}
 
 	// Check if it's a page accessible to everyone (authenticated and unauthenticated)
-	const isTrackingPage = pathname.startsWith("/tracking");
 	const isTestPage = pathname.startsWith("/test");
 	const isPrivacyPolicyPage =
 		pathname.startsWith("/privacy-policy") || pathname.startsWith("/extension-privacy-policy");
 
 	// If it's a public page and user is authenticated, redirect to app home
-	// Exception: tracking, test, privacy-policy are accessible to everyone
-	if (isPublicPage && hasToken && !isTrackingPage && !isTestPage && !isPrivacyPolicyPage) {
+	// Exception: test and privacy-policy are accessible to everyone
+	if (isPublicPage && hasToken && !isTestPage && !isPrivacyPolicyPage) {
 		const role = getUserRoleFromCookie(request);
 		return NextResponse.redirect(new URL(getAppHomePath(role), request.url));
 	}
 
 	// These pages are always accessible (no redirect needed)
-	if (isTrackingPage || isTestPage || isPrivacyPolicyPage) {
+	if (isTestPage || isPrivacyPolicyPage) {
 		return NextResponse.next();
 	}
 

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverAuth } from "@/utils/auth";
 
-// GET /api/users/external/[externalId]/public - Get user by external ID (Public, no auth required)
+// GET /api/users/external/[externalId]/public - driver location for signed-in users.
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ externalId: string }> }
 ) {
 	try {
+		if (!serverAuth.getAccessToken(request)) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
 		const { externalId } = await params;
 
 		if (!externalId) {
