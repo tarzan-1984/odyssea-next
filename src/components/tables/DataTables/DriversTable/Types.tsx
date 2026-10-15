@@ -186,6 +186,8 @@ export interface DriverMeta {
 	insurance_agent_email: string;
 	immigration_letter_team_driver: string;
 	immigration_letter: string;
+	immigration_document_file?: string;
+	immigration_document_type?: string;
 	ic_agreement: string;
 	background_file?: string;
 	alaska?: string;

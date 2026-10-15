@@ -40,6 +40,7 @@ import Link from "next/link";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Image from "next/image";
 import macroPointIcon from "@/icons/additional/macropoint.png";
+import iceIcon from "@/icons/additional/ice.jpg";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
 import AlaskaIcon from "@/icons/additional/usa-alaska.svg";
 import SideDoorIcon from "@/icons/additional/side_door.svg";
@@ -1211,6 +1212,13 @@ export default function DriversListTable({
 
 											const military_capability =
 												legal_valid && background_valid;
+											const immigration_document_file =
+												item?.meta_data?.immigration_document_file;
+											const show_ice_icon =
+												legal_document_type === "work-authorization" &&
+												(immigration_document_file == null ||
+													String(immigration_document_file).trim() ===
+														"");
 											const isAlreadyInOffer = existingDriverIdsSet.has(
 												String(item.id)
 											);
@@ -1770,6 +1778,20 @@ export default function DriversListTable({
 																>
 																	<span className="inline-flex">
 																		<Military className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{show_ice_icon && (
+																<Tooltip
+																	content="ICE"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Image
+																			src={iceIcon}
+																			alt="ICE"
+																			className="h-7 w-7"
+																		/>
 																	</span>
 																</Tooltip>
 															)}
