@@ -5,6 +5,7 @@ import {
 	parseGoogleDirectionsBody,
 	type GooglePickupRoute,
 } from "@/lib/fetchGooglePickupDirections";
+import { canonicalizeOfferLocation } from "@/utils/offerLocationCountry";
 import {
 	applyGoogleWaypointsToLocations,
 	enrichStopsWithPostal,
@@ -99,7 +100,9 @@ export async function POST(request: NextRequest) {
 
 		const body = (await request.json()) as { locations?: string[] };
 		const locations = Array.isArray(body.locations)
-			? body.locations.map(item => String(item).trim()).filter(Boolean)
+			? body.locations
+					.map(item => canonicalizeOfferLocation(String(item)))
+					.filter(Boolean)
 			: [];
 
 		if (locations.length < 2) {

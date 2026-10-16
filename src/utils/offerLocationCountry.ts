@@ -21,6 +21,31 @@ const CA_PROVINCE_CODES = new Set([
 	"AB", "BC", "MB", "NB", "NL", "NT", "NS", "NU", "ON", "PE", "QC", "SK", "YT",
 ]);
 
+/**
+ * Abbreviations still typed by carriers. PQ is Quebec (Province de Québec);
+ * without this, "Windsor, PQ" is not a known region and geocoding replaces the city.
+ */
+const LEGACY_CA_REGION_ALIASES: Record<string, string> = {
+	PQ: "QC",
+	NF: "NL",
+	PEI: "PE",
+	YK: "YT",
+};
+
+function canonicalRegionCode(code: string): string {
+	const upper = code.toUpperCase();
+	return LEGACY_CA_REGION_ALIASES[upper] ?? upper;
+}
+
+/** "Windsor, PQ" / "Windsor PQ" → "Windsor, QC" / "Windsor QC". */
+function rewriteLegacyRegionAlias(value: string): string {
+	return value.replace(
+		/(^|,\s*|\s)(PQ|NF|PEI|YK)(?=\s+[A-Z]\d[A-Z]|\s+\d{5}(?:-\d{4})?|$)/gi,
+		(_full, prefix: string, code: string) =>
+			`${prefix}${LEGACY_CA_REGION_ALIASES[code.toUpperCase()]}`,
+	);
+}
+
 const MX_STATE_CODES = new Set([
 	"DIF", "CDMX", "AGU", "BCN", "BCS", "CAM", "CHP", "CHIS", "CHH", "COA", "COL", "DUR", "GUA",
 	"GRO", "HID", "JAL", "MIC", "MOR", "MEX", "NAY", "NLE", "OAX", "PUE", "QUE", "QRO", "NAQ",
@@ -63,7 +88,7 @@ export const MX_STATE_ABBR_TO_NAME: Record<string, string> = {
 export const CITY_REGION_CODE_PATTERN = /^([^,]+),\s*([A-Za-z]{2,4})\s*$/;
 
 function countryFromRegionCode(code: string): OfferGeocodeCountry | null {
-	const upper = code.toUpperCase();
+	const upper = canonicalRegionCode(code);
 	if (CA_PROVINCE_CODES.has(upper)) return "ca";
 	if (MX_STATE_CODES.has(upper)) return "mx";
 	if (US_STATE_CODES.has(upper)) return "us";
@@ -212,6 +237,7 @@ export function canonicalizeOfferLocation(value: string): string {
 	next = replacePeriodBeforeRegionCode(next);
 	next = collapseExtraLocationCommas(next);
 	next = stripCityTrailingPunctuation(next);
+	next = rewriteLegacyRegionAlias(next);
 	return next.replace(/\s+/g, " ").trim();
 }
 
@@ -337,7 +363,7 @@ export function parseCityRegionCode(
 	if (!match) return null;
 
 	const city = match[1].trim();
-	const regionCode = match[2].toUpperCase();
+	const regionCode = canonicalRegionCode(match[2]);
 	const country = countryFromRegionCode(regionCode);
 	if (!country || !city) return null;
 
@@ -476,7 +502,7 @@ function resolveRegionToken(
 	token: string,
 ): { regionCode: string; country: OfferGeocodeCountry } | null {
 	const cleaned = token.trim().replace(/[.,;]+/g, " ").replace(/\s+/g, " ").trim();
-	const upper = cleaned.toUpperCase();
+	const upper = canonicalRegionCode(cleaned);
 	const fromCode = countryFromRegionCode(upper);
 	if (fromCode) return { regionCode: upper, country: fromCode };
 

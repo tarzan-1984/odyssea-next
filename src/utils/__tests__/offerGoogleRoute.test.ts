@@ -188,6 +188,35 @@ describe("resolveStopFromGoogleWaypoint", () => {
 			LOCATION_GEOCODE_ERROR,
 		);
 	});
+
+	it("keeps Windsor when PQ is Quebec and does not swap in another city", () => {
+		const stop = resolveStopFromGoogleWaypoint("Windsor, PQ", {
+			resolvedAddress: "San Diego, CA 92129, USA",
+			latitude: 32.95,
+			longitude: -117.14,
+			zipCode: "92129",
+		});
+		expect(stop.location).toBe("Windsor, PQ");
+		expect(stop.latitude).toBeNull();
+		expect(stop.error).toBeTruthy();
+	});
+
+	it("formats Windsor, PQ from a Quebec geocode", () => {
+		expect(
+			resolveStopFromGoogleWaypoint("Windsor, PQ", {
+				resolvedAddress: "Windsor, QC J1S 2B3, Canada",
+				latitude: 45.566,
+				longitude: -72.004,
+				zipCode: "J1S 2B3",
+			}),
+		).toEqual({
+			location: "Windsor, QC J1S 2B3",
+			latitude: 45.566,
+			longitude: -72.004,
+			zipCode: "J1S 2B3",
+			error: null,
+		});
+	});
 });
 
 describe("applyGoogleWaypointsToLocations", () => {

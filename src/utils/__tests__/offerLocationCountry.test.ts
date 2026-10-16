@@ -91,6 +91,16 @@ describe("parseCityRegionFromAddress", () => {
 			country: "us",
 		});
 	});
+
+	it("treats legacy PQ as Quebec", () => {
+		expect(canonicalizeOfferLocation("Windsor, PQ")).toBe("Windsor, QC");
+		expect(parseCityRegionFromAddress("Windsor, PQ")).toEqual({
+			city: "Windsor",
+			regionCode: "QC",
+			country: "ca",
+		});
+		expect(normalizeLocationForGeocode("Windsor PQ")).toBe("Windsor, QC");
+	});
 });
 
 describe("location format", () => {

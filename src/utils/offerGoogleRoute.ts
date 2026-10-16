@@ -186,6 +186,18 @@ export function resolveStopFromGoogleWaypoint(
 	const google = parseGoogleResolvedPlace(waypoint.resolvedAddress, waypoint.zipCode);
 	const googlePostal = google?.postal ?? waypoint.zipCode?.trim() ?? null;
 
+	// No parsed region (unknown code): do not swap in an unrelated Google city.
+	if (!user?.city && google?.city && !isBarePostalInput(userInput.trim())) {
+		const hint = userInput.split(",")[0]?.trim() ?? "";
+		if (
+			hint &&
+			!placeNamesMatch(hint, google.city) &&
+			!isLikelyCityTypo(hint, google.city)
+		) {
+			return failed(LOCATION_GEOCODE_ERROR);
+		}
+	}
+
 	if (user?.regionCode && google?.regionCode && user.regionCode !== google.regionCode) {
 		return failed(
 			formatLocationZipMismatchError({
