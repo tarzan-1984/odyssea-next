@@ -99,6 +99,8 @@ import BidParticipantRateIcon from "./BidParticipantRateIcon";
 import BidOfferAcceptIcon from "./BidOfferAcceptIcon";
 import BidOfferRejectIcon from "./BidOfferRejectIcon";
 import OfferAcceptIcon from "./OfferAcceptIcon";
+import OfferReadIcon from "./OfferReadIcon";
+import OfferUnreadIcon from "./OfferUnreadIcon";
 import OfferDeleteIcon from "./OfferDeleteIcon";
 import OfferCounterOfferIcon from "./OfferCounterOfferIcon";
 import AddedValueIcon from "./AddedValueIcon";
@@ -208,6 +210,8 @@ export {
 	BidOfferAcceptIcon,
 	BidOfferRejectIcon,
 	OfferAcceptIcon,
+	OfferReadIcon,
+	OfferUnreadIcon,
 	OfferDeleteIcon,
 	OfferCounterOfferIcon,
 	AddedValueIcon,

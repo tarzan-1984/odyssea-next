@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Link from "next/link";
-import { ExternalLink, LogOut } from "lucide-react";
+import { ExternalLink, Link2, LogOut } from "lucide-react";
 import {
 	MoreDotIcon,
 	TrashDeleteIcon,
@@ -48,23 +48,24 @@ import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 import { useChatStore } from "@/stores/chatStore";
 import { useStaleLocationClock } from "@/hooks/useStaleLocationClock";
+import { fetchCustomerLoadTrackingLink } from "@/lib/customerLoadTrackingLink";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
 	isUserOnline?: (userId: string) => boolean;
 }
 
-function showLocationUpdateCopiedToast(): void {
+function showClipboardToast(title: string, message: string, variant: "success" | "error"): void {
 	const addSystemToast = (
 		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
 	).addSystemToastNotification;
 	if (typeof addSystemToast !== "function") return;
 
 	addSystemToast({
-		id: `location-update-${Date.now()}`,
-		title: "Location update",
-		message: "Location update copied to clipboard.",
-		variant: "success",
+		id: `clipboard-${Date.now()}`,
+		title,
+		message,
+		variant,
 	});
 }
 
@@ -78,6 +79,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
+	const [isCopyingTrackingLink, setIsCopyingTrackingLink] = useState(false);
 	const currentUser = useCurrentUser();
 	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const showLoadTrackingHeader =
@@ -168,9 +170,35 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 		try {
 			await navigator.clipboard.writeText(text);
 			setLocationUpdateCopied(true);
-			showLocationUpdateCopiedToast();
+			showClipboardToast(
+				"Location update",
+				"Location update copied to clipboard.",
+				"success"
+			);
 		} catch {
 			setLocationUpdateCopied(false);
+		}
+	};
+
+	const handleCopyTrackingLink = async () => {
+		const loadId = chatRoom?.loadId?.trim();
+		if (!loadId || isCopyingTrackingLink) return;
+
+		setIsCopyingTrackingLink(true);
+		closeDropdown();
+		try {
+			const link = await fetchCustomerLoadTrackingLink(loadId);
+			const path = link.path.startsWith("/") ? link.path : `/${link.path}`;
+			await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+			showClipboardToast("Tracking link", "Tracking link copied to clipboard.", "success");
+		} catch (error) {
+			showClipboardToast(
+				"Tracking link",
+				error instanceof Error ? error.message : "Failed to copy tracking link.",
+				"error"
+			);
+		} finally {
+			setIsCopyingTrackingLink(false);
 		}
 	};
 
@@ -469,7 +497,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							<Dropdown
 								isOpen={isOpen}
 								onClose={closeDropdown}
-								className="w-40 p-2"
+								className={`${chatRoom?.type === "LOAD" ? "w-52" : "w-40"} p-2`}
 								anchorRef={dropdownAnchorRef}
 								anchorAlign="right"
 							>
@@ -493,6 +521,20 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 									<AttachmentIcon className="w-4 h-4" />
 									Files
 								</DropdownItem>
+								{chatRoom?.type === "LOAD" &&
+								chatRoom.loadId?.trim() &&
+								currentUser?.role?.trim().toUpperCase() !== "DRIVER" ? (
+									<DropdownItem
+										onItemClick={() => {
+											handleCopyTrackingLink().catch(() => undefined);
+										}}
+										disabled={isCopyingTrackingLink}
+										className="flex w-full items-center gap-2 font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+									>
+										<Link2 className="h-4 w-4 shrink-0" aria-hidden />
+										Copy tracking link
+									</DropdownItem>
+								) : null}
 								{chatRoom?.type === "LOAD" &&
 								chatRoom.loadId?.trim() &&
 								currentUser?.role?.trim().toUpperCase() !== "DRIVER" ? (

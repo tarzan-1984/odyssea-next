@@ -7,7 +7,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon, OfferAcceptIcon, OfferDeleteIcon, OfferCounterOfferIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon, OfferAcceptIcon, OfferDeleteIcon, OfferCounterOfferIcon, OfferReadIcon, OfferUnreadIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import Button from "@/components/ui/button/Button";
@@ -641,8 +641,8 @@ function buildOfferUnavailablePushMessage(_offer: OfferRow): string {
 }
 
 const DRIVER_TABLE_COL_SELECT = "40px";
+const DRIVER_TABLE_COL_IS_READ = "72px";
 const DRIVER_TABLE_COL_UNIT = "240px";
-const DRIVER_TABLE_COL_PHONE = "120px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
 const DRIVER_TABLE_COL_DRIVER_ETA = "104px";
@@ -1510,8 +1510,8 @@ const OffersList = () => {
 													<Table className="w-full min-w-0 border-collapse table-fixed">
 												<colgroup>
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_SELECT)} />
+													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_IS_READ)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_UNIT)} />
-													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_PHONE)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_DRIVER_ETA)} />
@@ -1567,11 +1567,11 @@ const OffersList = () => {
 																	</TableCell>
 																);
 															})()}
+															<TableCell isHeader className="px-2 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
+																Is read
+															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Unit
-															</TableCell>
-															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
-																Phone
 															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																Empty miles
@@ -1631,47 +1631,60 @@ const OffersList = () => {
 																	/>
 																) : null}
 															</TableCell>
-															<TableCell className="min-w-0 px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
-																<span className="inline-flex max-w-full items-center gap-1.5">
-																	{tmsDriverUrl ? (
-																		<a
-																			href={tmsDriverUrl}
-																			target="_blank"
-																			rel="noopener noreferrer"
-																			onClick={(e) => e.stopPropagation()}
-																			className="truncate text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
-																		>
-																			{driverDisplayName}
-																		</a>
+															<TableCell className="px-2 py-2 text-center border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<span
+																	className="inline-flex items-center justify-center"
+																	title={driver.is_read ? "Read" : "Not read"}
+																>
+																	{driver.is_read ? (
+																		<OfferReadIcon className="h-5 w-5" />
 																	) : (
-																		<span className="truncate">{driverDisplayName}</span>
+																		<OfferUnreadIcon className="h-5 w-5" />
 																	)}
-																	{driverUnitId ? (
-																		<span onClick={(e) => e.stopPropagation()}>
-																			<DriverRatingBadge
-																				avgRating={driver.driver_rating}
-																				onClick={() =>
-																					setRatingModalDriver({
-																						driverId: String(driverUnitId),
-																						name: driverDisplayName,
-																						avgRating: driver.driver_rating ?? null,
-																					})
-																				}
-																			/>
-																		</span>
-																	) : null}
 																</span>
 															</TableCell>
-																<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
-																	{driver.phone ? (
+															<TableCell className="min-w-0 px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
+																<div className="flex min-w-0 flex-col items-start gap-0.5">
+																	<span className="inline-flex max-w-full items-center gap-1.5">
+																		{tmsDriverUrl ? (
 																			<a
-																				href={`tel:${driver.phone.replace(/\s/g, "")}`}
-																				className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+																				href={tmsDriverUrl}
+																				target="_blank"
+																				rel="noopener noreferrer"
+																				onClick={(e) => e.stopPropagation()}
+																				className="truncate text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
 																			>
-																				{driver.phone}
+																				{driverDisplayName}
 																			</a>
+																		) : (
+																			<span className="truncate">{driverDisplayName}</span>
+																		)}
+																		{driverUnitId ? (
+																			<span onClick={(e) => e.stopPropagation()}>
+																				<DriverRatingBadge
+																					avgRating={driver.driver_rating}
+																					onClick={() =>
+																						setRatingModalDriver({
+																							driverId: String(driverUnitId),
+																							name: driverDisplayName,
+																							avgRating: driver.driver_rating ?? null,
+																						})
+																					}
+																				/>
+																			</span>
 																		) : null}
-																	</TableCell>
+																	</span>
+																	{driver.phone ? (
+																		<a
+																			href={`tel:${driver.phone.replace(/\s/g, "")}`}
+																			onClick={(e) => e.stopPropagation()}
+																			className="text-theme-xs text-brand-600 underline hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 whitespace-nowrap"
+																		>
+																			{driver.phone}
+																		</a>
+																	) : null}
+																</div>
+															</TableCell>
 															<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
 																{driver.empty_miles != null
 																			? Math.round(driver.empty_miles)

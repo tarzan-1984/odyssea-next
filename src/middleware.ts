@@ -63,6 +63,11 @@ function buildSignInRedirectUrl(request: NextRequest): URL {
 export function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
+	// Customer shipment map. Open with or without a session; the id is an encrypted token.
+	if (pathname === "/load-tracking" || pathname.startsWith("/load-tracking/")) {
+		return NextResponse.next();
+	}
+
 	// Check if the current path is a public page
 	const isPublicPage = publicPages.some(page => pathname.startsWith(page));
 

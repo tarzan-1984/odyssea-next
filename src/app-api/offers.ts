@@ -25,6 +25,8 @@ export interface OfferDriver {
 	driver_eta?: string | null;
 	driver_rating?: number | null;
 	has_offer_chat?: boolean;
+	/** True after this driver has opened the offer. Reset when the offer is edited or reactivated. */
+	is_read?: boolean;
 	/** Unread messages in this driver's offer chat for the current user. */
 	offer_chat_unread_count?: number;
 	/** Manual reminders sent (0–3; create-push is separate). */

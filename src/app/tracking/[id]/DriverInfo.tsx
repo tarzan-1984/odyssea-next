@@ -18,9 +18,11 @@ import {
 	formatCurrentLocationForUpdate,
 	formatMilesLeftForLocationUpdate,
 } from "@/utils/loadLocationUpdateMessage";
+import { fetchCustomerLoadTrackingLink } from "@/lib/customerLoadTrackingLink";
 import {
 	Bell,
 	FileText,
+	Link2,
 	MessageSquare,
 } from "lucide-react";
 
@@ -56,17 +58,17 @@ export function getDriverInfoCardWidthClass(hasRoute: boolean): string {
 		: "w-[min(calc(100vw-3rem),56rem)]";
 }
 
-function showLocationUpdateCopiedToast(): void {
+function showClipboardToast(title: string, message: string, variant: "success" | "error"): void {
 	const addSystemToast = (
 		window as unknown as { addSystemToastNotification?: (n: SystemToastData) => void }
 	).addSystemToastNotification;
 	if (typeof addSystemToast !== "function") return;
 
 	addSystemToast({
-		id: `location-update-${Date.now()}`,
-		title: "Location update",
-		message: "Location update copied to clipboard.",
-		variant: "success",
+		id: `clipboard-${Date.now()}`,
+		title,
+		message,
+		variant,
 	});
 }
 
@@ -148,6 +150,7 @@ export default function DriverInfo({
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
+	const [isCopyingTrackingLink, setIsCopyingTrackingLink] = useState(false);
 	const currentUser = useCurrentUser();
 	const { resolvedLastActiveApp, usesMobileApp } = useResolvedDriverLastActiveApp(
 		driverData?.externalId,
@@ -238,6 +241,25 @@ export default function DriverInfo({
 		Boolean(loadId?.trim()) &&
 		canSeeLoadStaleLocationSystemMessage(currentUser?.role);
 
+	const handleCopyTrackingLink = async () => {
+		if (!tmsLoadId || isCopyingTrackingLink) return;
+		setIsCopyingTrackingLink(true);
+		try {
+			const link = await fetchCustomerLoadTrackingLink(tmsLoadId);
+			const path = link.path.startsWith("/") ? link.path : `/${link.path}`;
+			await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+			showClipboardToast("Tracking link", "Tracking link copied to clipboard.", "success");
+		} catch (error) {
+			showClipboardToast(
+				"Tracking link",
+				error instanceof Error ? error.message : "Failed to copy tracking link.",
+				"error"
+			);
+		} finally {
+			setIsCopyingTrackingLink(false);
+		}
+	};
+
 	const handleCopyLocationUpdate = async () => {
 		const locationParts = [driverData.city, driverData.state, driverData.zip]
 			.map((value) => value?.trim() ?? "")
@@ -253,7 +275,11 @@ export default function DriverInfo({
 		try {
 			await navigator.clipboard.writeText(text);
 			setLocationUpdateCopied(true);
-			showLocationUpdateCopiedToast();
+			showClipboardToast(
+				"Location update",
+				"Location update copied to clipboard.",
+				"success"
+			);
 		} catch {
 			setLocationUpdateCopied(false);
 		}
@@ -363,6 +389,18 @@ export default function DriverInfo({
 						>
 							<FileText className="h-4 w-4" strokeWidth={1.7} /> Show in TMS
 						</a>
+					) : null}
+					{showTmsLinks && tmsLoadId ? (
+						<button
+							type="button"
+							disabled={isCopyingTrackingLink}
+							onClick={() => {
+								handleCopyTrackingLink().catch(() => undefined);
+							}}
+							className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#edf0f5] px-5 text-sm font-medium text-[#63718f] transition hover:bg-[#e5e9f0] disabled:cursor-wait disabled:opacity-70"
+						>
+							<Link2 className="h-4 w-4" strokeWidth={1.7} /> Copy tracking link
+						</button>
 					) : null}
 					</div>
 				</div>
