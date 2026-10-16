@@ -105,6 +105,8 @@ interface DriverInfoProps {
 	loadNumber?: string | null;
 	/** Human-readable load status from TMS meta_data.load_status. */
 	loadStatusLabel?: string | null;
+	/** Raw TMS load status. Hides the customer tracking link for closed loads. */
+	loadStatus?: string | null;
 	/** Multiline route details (pick up / delivery, address, time). */
 	routeDetails?: string | null;
 	/** Total loaded miles for the load route (TMS meta_data.all_miles). */
@@ -136,6 +138,7 @@ export default function DriverInfo({
 	loadId,
 	loadNumber,
 	loadStatusLabel,
+	loadStatus,
 	routeDetails,
 	routeTotalMiles,
 	remainingMiles = null,
@@ -195,6 +198,12 @@ export default function DriverInfo({
 	const externalId = driverData.externalId?.trim() || null;
 	const driverDisplayName = externalId ? `(${externalId}) ${fullName}` : fullName;
 	const showTmsLinks = currentUser?.role?.trim().toUpperCase() !== "DRIVER";
+	const isClosedLoadStatus = ["delivered", "tonu", "cancelled", "canceled"].includes(
+		String(loadStatus ?? "")
+			.trim()
+			.toLowerCase()
+			.replace(/_/g, "-")
+	);
 	const driverPageUrl =
 		showTmsLinks && externalId
 			? `${TMS_DRIVER_PAGE_URL}?driver=${encodeURIComponent(externalId)}`
@@ -390,7 +399,7 @@ export default function DriverInfo({
 							<FileText className="h-4 w-4" strokeWidth={1.7} /> Show in TMS
 						</a>
 					) : null}
-					{showTmsLinks && tmsLoadId ? (
+					{showTmsLinks && tmsLoadId && !isClosedLoadStatus ? (
 						<button
 							type="button"
 							disabled={isCopyingTrackingLink}

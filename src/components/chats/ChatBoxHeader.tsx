@@ -149,6 +149,9 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	);
 	const isLoadDelivered =
 		normalizeLoadChatStatus(chatRoom?.loadStatus) === "delivered";
+	const isClosedLoadStatus = ["delivered", "tonu", "cancelled", "canceled"].includes(
+		normalizeLoadChatStatus(chatRoom?.loadStatus)
+	);
 	const showCopyLocationUpdateButton =
 		chatRoom?.type === "LOAD" &&
 		canSeeLoadHeaderAlerts &&
@@ -523,6 +526,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 								</DropdownItem>
 								{chatRoom?.type === "LOAD" &&
 								chatRoom.loadId?.trim() &&
+								!isClosedLoadStatus &&
 								currentUser?.role?.trim().toUpperCase() !== "DRIVER" ? (
 									<DropdownItem
 										onItemClick={() => {

@@ -1680,6 +1680,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								loadId={loadId}
 								loadNumber={loadReferenceNumber}
 								loadStatusLabel={loadStatusLabel}
+								loadStatus={normalizedLoadStatus}
 								routeDetails={loadRouteDetails}
 								routeTotalMiles={loadRouteTotalMiles}
 								remainingMiles={busyOnLoad ? null : storedRoadEta?.remainingMiles ?? null}
