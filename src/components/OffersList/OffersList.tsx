@@ -7,7 +7,7 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import PaginationWithIcon from "@/components/tables/DataTables/DriversTable/PaginationWithIcon";
 import { useCurrentUser } from "@/stores/userStore";
-import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon, OfferAcceptIcon, OfferDeleteIcon, OfferCounterOfferIcon, OfferReadIcon, OfferUnreadIcon } from "@/icons";
+import { ChevronDownIcon, ChevronUpIcon, ExtendBidTimeIcon, OfferDriverChatIcon, DeactivateOfferIcon, EditOfferIcon, AddPlusCircleIcon, CheckCircleIcon, OfferAcceptIcon, OfferDeleteIcon, OfferCounterOfferIcon } from "@/icons";
 import { Modal } from "@/components/ui/modal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import Button from "@/components/ui/button/Button";
@@ -641,7 +641,6 @@ function buildOfferUnavailablePushMessage(_offer: OfferRow): string {
 }
 
 const DRIVER_TABLE_COL_SELECT = "40px";
-const DRIVER_TABLE_COL_IS_READ = "72px";
 const DRIVER_TABLE_COL_UNIT = "240px";
 const DRIVER_TABLE_COL_EMPTY_MILES = "88px";
 const DRIVER_TABLE_COL_TOTAL_MILES = "96px";
@@ -681,6 +680,51 @@ function fixedDriverTableCol(width: string) {
 /** Actions: fixed min width; no maxWidth so cell can grow slightly if needed. */
 function actionsDriverTableCol() {
 	return { width: DRIVER_TABLE_COL_ACTIONS, minWidth: DRIVER_TABLE_COL_ACTIONS };
+}
+
+/** Same marks as chat receipts: one gray check = not read, two blue checks = read. */
+function OfferDriverReadMarks({ read }: { read: boolean }) {
+	if (read) {
+		return (
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+				className="text-blue-500"
+				aria-hidden
+			>
+				<path
+					d="M1.5 12.5L5.57574 16.5757C5.81005 16.8101 6.18995 16.8101 6.42426 16.5757L9 14"
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeLinecap="round"
+				/>
+				<path d="M16 7L12 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+				<path
+					d="M7 12L11.5757 16.5757C11.8101 16.8101 12.1899 16.8101 12.4243 16.5757L22 7"
+					stroke="currentColor"
+					strokeWidth="1.5"
+					strokeLinecap="round"
+				/>
+			</svg>
+		);
+	}
+
+	return (
+		<svg
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			className="text-gray-500"
+			aria-hidden
+		>
+			<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor" />
+		</svg>
+	);
 }
 
 const OFFER_DRIVER_ACTIONS_CLASS =
@@ -1510,7 +1554,6 @@ const OffersList = () => {
 													<Table className="w-full min-w-0 border-collapse table-fixed">
 												<colgroup>
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_SELECT)} />
-													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_IS_READ)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_UNIT)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_EMPTY_MILES)} />
 													<col style={fixedDriverTableCol(DRIVER_TABLE_COL_TOTAL_MILES)} />
@@ -1567,9 +1610,6 @@ const OffersList = () => {
 																	</TableCell>
 																);
 															})()}
-															<TableCell isHeader className="px-2 py-2 text-center text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08] whitespace-nowrap">
-																Is read
-															</TableCell>
 															<TableCell isHeader className="px-3 py-2 text-theme-xs font-bold text-gray-700 dark:text-gray-300 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																Unit
 															</TableCell>
@@ -1631,19 +1671,13 @@ const OffersList = () => {
 																	/>
 																) : null}
 															</TableCell>
-															<TableCell className="px-2 py-2 text-center border-b border-r border-gray-200 dark:border-white/[0.08]">
+															<TableCell className="relative min-w-0 px-3 py-2 pr-7 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<span
-																	className="inline-flex items-center justify-center"
+																	className="absolute right-1.5 top-1.5 inline-flex"
 																	title={driver.is_read ? "Read" : "Not read"}
 																>
-																	{driver.is_read ? (
-																		<OfferReadIcon className="h-5 w-5" />
-																	) : (
-																		<OfferUnreadIcon className="h-5 w-5" />
-																	)}
+																	<OfferDriverReadMarks read={Boolean(driver.is_read)} />
 																</span>
-															</TableCell>
-															<TableCell className="min-w-0 px-3 py-2 text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																<div className="flex min-w-0 flex-col items-start gap-0.5">
 																	<span className="inline-flex max-w-full items-center gap-1.5">
 																		{tmsDriverUrl ? (
