@@ -56,6 +56,13 @@ export async function GET(
 			return NextResponse.json({ error: "Shipment not found." }, { status: 404 });
 		}
 
+		if (view.trackingHidden === true) {
+			return NextResponse.json(
+				{ data: { trackingHidden: true } },
+				{ status: 200, headers: { "Cache-Control": "no-store" } }
+			);
+		}
+
 		return NextResponse.json(
 			{ data: view },
 			{ status: 200, headers: { "Cache-Control": "no-store" } }

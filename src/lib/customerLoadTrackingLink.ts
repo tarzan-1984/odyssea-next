@@ -26,3 +26,32 @@ export async function fetchCustomerLoadTrackingLink(
 
 	return { token: body.token, path: body.path };
 }
+
+/** Authenticated helper. Hides or restores the public /load-tracking page for a load. */
+export async function setCustomerTrackingHidden(
+	loadId: string,
+	hidden: boolean
+): Promise<boolean> {
+	const cleanLoadId = loadId.trim();
+	if (!cleanLoadId) {
+		throw new Error("Load ID is required");
+	}
+
+	const response = await fetch(
+		`/api/loads/${encodeURIComponent(cleanLoadId)}/customer-tracking-visibility`,
+		{
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			credentials: "include",
+			cache: "no-store",
+			body: JSON.stringify({ hidden }),
+		}
+	);
+	const body = (await response.json().catch(() => null)) as
+		| { customerTrackingHidden?: boolean; error?: string }
+		| null;
+	if (!response.ok || typeof body?.customerTrackingHidden !== "boolean") {
+		throw new Error(body?.error || "Failed to update tracking visibility");
+	}
+	return body.customerTrackingHidden;
+}

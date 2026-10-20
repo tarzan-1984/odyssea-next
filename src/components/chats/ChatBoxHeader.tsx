@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Link from "next/link";
-import { ExternalLink, Link2, LogOut } from "lucide-react";
+import { ExternalLink, Eye, EyeOff, Link2, LogOut } from "lucide-react";
 import {
 	MoreDotIcon,
 	TrashDeleteIcon,
@@ -48,7 +48,10 @@ import { parseBusyOnOtherLoad } from "@/utils/busyOnOtherLoad";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 import { useChatStore } from "@/stores/chatStore";
 import { useStaleLocationClock } from "@/hooks/useStaleLocationClock";
-import { fetchCustomerLoadTrackingLink } from "@/lib/customerLoadTrackingLink";
+import {
+	fetchCustomerLoadTrackingLink,
+	setCustomerTrackingHidden,
+} from "@/lib/customerLoadTrackingLink";
 
 interface ChatBoxHeaderProps {
 	chatRoom?: ChatRoom;
@@ -80,6 +83,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
 	const [isCopyingTrackingLink, setIsCopyingTrackingLink] = useState(false);
+	const [isTogglingTrackingVisibility, setIsTogglingTrackingVisibility] = useState(false);
 	const currentUser = useCurrentUser();
 	const updateChatRoom = useChatStore(state => state.updateChatRoom);
 	const showLoadTrackingHeader =
@@ -202,6 +206,35 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 			);
 		} finally {
 			setIsCopyingTrackingLink(false);
+		}
+	};
+
+	const handleToggleTrackingVisibility = async () => {
+		const loadId = chatRoom?.loadId?.trim();
+		const roomId = chatRoom?.id;
+		if (!loadId || !roomId || isTogglingTrackingVisibility) return;
+
+		const nextHidden = !Boolean(chatRoom?.customerTrackingHidden);
+		setIsTogglingTrackingVisibility(true);
+		closeDropdown();
+		try {
+			const customerTrackingHidden = await setCustomerTrackingHidden(loadId, nextHidden);
+			updateChatRoom(roomId, { customerTrackingHidden });
+			showClipboardToast(
+				"Tracking link",
+				customerTrackingHidden
+					? "Tracking link is hidden."
+					: "Tracking link is visible again.",
+				"success"
+			);
+		} catch (error) {
+			showClipboardToast(
+				"Tracking link",
+				error instanceof Error ? error.message : "Failed to update tracking link.",
+				"error"
+			);
+		} finally {
+			setIsTogglingTrackingVisibility(false);
 		}
 	};
 
@@ -500,7 +533,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 							<Dropdown
 								isOpen={isOpen}
 								onClose={closeDropdown}
-								className={`${chatRoom?.type === "LOAD" ? "w-52" : "w-40"} p-2`}
+								className={`${chatRoom?.type === "LOAD" ? "w-56" : "w-40"} p-2`}
 								anchorRef={dropdownAnchorRef}
 								anchorAlign="right"
 							>
@@ -537,6 +570,30 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 									>
 										<Link2 className="h-4 w-4 shrink-0" aria-hidden />
 										Copy tracking link
+									</DropdownItem>
+								) : null}
+								{chatRoom?.type === "LOAD" &&
+								chatRoom.loadId?.trim() &&
+								currentUser?.role?.trim().toUpperCase() !== "DRIVER" ? (
+									<DropdownItem
+										onItemClick={() => {
+											handleToggleTrackingVisibility().catch(() => undefined);
+										}}
+										disabled={isTogglingTrackingVisibility}
+										className={
+											chatRoom.customerTrackingHidden
+												? "flex w-full items-center gap-2 font-normal text-left rounded-lg text-green-600 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:hover:bg-green-900/20 dark:hover:text-green-300"
+												: "flex w-full items-center gap-2 font-normal text-left rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+										}
+									>
+										{chatRoom.customerTrackingHidden ? (
+											<Eye className="h-4 w-4 shrink-0" aria-hidden />
+										) : (
+											<EyeOff className="h-4 w-4 shrink-0" aria-hidden />
+										)}
+										{chatRoom.customerTrackingHidden
+											? "Show tracking link"
+											: "Hide tracking link"}
 									</DropdownItem>
 								) : null}
 								{chatRoom?.type === "LOAD" &&

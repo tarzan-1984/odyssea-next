@@ -23,6 +23,7 @@ const TERMINAL_LOAD_STATUSES = new Set(["delivered", "tonu", "cancelled", "cance
 type GeocodeMarker = { lat: number; lng: number; addressLabel: string };
 
 type CustomerTrackingView = {
+	trackingHidden?: boolean;
 	loadStatus?: string | null;
 	pickUpLocation?: string | null;
 	deliveryLocation?: string | null;
@@ -108,6 +109,35 @@ async function fetchCustomerTracking(token: string): Promise<CustomerTrackingVie
 	return body.data;
 }
 
+function TrackingUnavailablePlaque() {
+	return (
+		<div className="absolute inset-0 z-[2000] flex items-center justify-center bg-[#eef8fb] px-6">
+			<div className="w-full max-w-[440px] rounded-2xl bg-white px-[18px] py-6 text-center font-[Manrope,sans-serif] shadow-[0_6px_18px_rgba(20,36,59,0.12)]">
+				<div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#eef3ff]">
+					<svg
+						viewBox="0 0 24 24"
+						className="h-6 w-6 text-[#3D6EF5]"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.8"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						aria-hidden
+					>
+						<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+					</svg>
+				</div>
+				<p className="text-[16px] font-bold leading-[22px] text-[#152238]">
+					Temporarily unavailable
+				</p>
+				<p className="mx-auto mt-1.5 max-w-[320px] text-[13px] font-medium leading-[18px] text-[#637899]">
+					This page is temporarily unavailable. Technical work is in progress.
+				</p>
+			</div>
+		</div>
+	);
+}
+
 export default function CustomerLoadTrackingPageClient({ token }: { token: string }) {
 	const { data, isPending, isError, error } = useQuery({
 		queryKey: ["customer-load-tracking", token],
@@ -118,7 +148,8 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 		refetchOnWindowFocus: true,
 	});
 
-	const position = data?.position ?? null;
+	const trackingHidden = data?.trackingHidden === true;
+	const position = trackingHidden ? null : (data?.position ?? null);
 	const hasPosition = Boolean(
 		position &&
 			Number.isFinite(position.latitude) &&
@@ -209,7 +240,9 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 				</div>
 			)}
 
-			{data && (
+			{trackingHidden && !isPending ? <TrackingUnavailablePlaque /> : null}
+
+			{data && !trackingHidden ? (
 				<>
 					{etaStop ? (
 						<PickupRoadEtaBanner
@@ -229,7 +262,7 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 						showDriverInHistoryPopup={false}
 					/>
 				</>
-			)}
+			) : null}
 		</section>
 	);
 }

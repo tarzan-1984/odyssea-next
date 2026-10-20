@@ -72,6 +72,8 @@ export interface ChatRoom {
 	referenceNumber?: string | null;
 	/** LOAD chat: loads.is_rest — rest badge under the header avatar. */
 	isRest?: boolean;
+	/** LOAD chat: public /load-tracking link is temporarily hidden. */
+	customerTrackingHidden?: boolean;
 	/** LOAD chat: loads.rest_date — when rest ends. */
 	restDate?: string | null;
 	/** LOAD chat: loads.rest_started_at — when rest began. */
