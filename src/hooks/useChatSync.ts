@@ -200,6 +200,9 @@ export const useChatSync = () => {
 											storeRoom.lastMessage
 										),
 										updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
+										loadStatus: apiRoom.loadStatus || storeRoom.loadStatus,
+										referenceNumber:
+											apiRoom.referenceNumber ?? storeRoom.referenceNumber,
 									};
 								}
 								return apiRoom;
@@ -281,6 +284,9 @@ export const useChatSync = () => {
 										storeRoom.lastMessage
 									),
 									updatedAt: storeRoom.updatedAt || apiRoom.updatedAt,
+									loadStatus: apiRoom.loadStatus || storeRoom.loadStatus,
+									referenceNumber:
+										apiRoom.referenceNumber ?? storeRoom.referenceNumber,
 								};
 							}
 							return apiRoom;

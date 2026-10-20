@@ -10,6 +10,7 @@ import {
 	CHAT_MESSAGES_QUERY_KEY,
 } from "@/lib/chatMessagesQuery";
 import { isAbortError } from "@/lib/chatMessagesSingleFlight";
+import { chatApi } from "@/app-api/chatApi";
 
 const PAGE = 1;
 const LIMIT = 50;
@@ -107,6 +108,32 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 	useEffect(() => {
 		setLoadingMessages(isLoading);
 	}, [isLoading, setLoadingMessages]);
+
+	useEffect(() => {
+		if (!chatRoomId || !query.isSuccess) return;
+		const room = useChatStore.getState().chatRooms.find(r => r.id === chatRoomId);
+		if (room?.type !== "LOAD" || String(room.loadStatus ?? "").trim()) return;
+
+		let cancelled = false;
+		void chatApi
+			.getChatRoom(chatRoomId)
+			.then(fresh => {
+				if (cancelled || !String(fresh.loadStatus ?? "").trim()) return;
+				useChatStore.getState().updateChatRoom(chatRoomId, {
+					loadStatus: fresh.loadStatus,
+					referenceNumber: fresh.referenceNumber,
+					isRest: fresh.isRest,
+					customerTrackingHidden: fresh.customerTrackingHidden,
+					restDate: fresh.restDate,
+					restStartedAt: fresh.restStartedAt,
+				});
+			})
+			.catch(() => {});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [chatRoomId, query.isSuccess, query.dataUpdatedAt]);
 
 	useEffect(() => {
 		if (!chatRoomId || !hydration.ready) return;
