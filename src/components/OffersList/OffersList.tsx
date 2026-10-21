@@ -1793,10 +1793,10 @@ const OffersList = () => {
 																									String(row.id),
 																									driverUnitId
 																								);
-																								if (driver.has_offer_chat) {
-																									window.location.href = chatUrl;
+																if (driver.has_offer_chat) {
+																									window.open(chatUrl, "_blank", "noopener,noreferrer");
 																									return;
-																								}
+																}
 																								setCreatingChatDriverKey(actionKey);
 																								const res = await offersApi.createOfferDriverChat(
 																									row.id,
