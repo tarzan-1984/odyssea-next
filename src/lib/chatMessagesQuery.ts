@@ -33,6 +33,7 @@ const isActiveRoom = (chatRoomId: string) => {
 
 const applyMessagesForRoom = (chatRoomId: string, lists: Message[][]) => {
 	if (!isActiveRoom(chatRoomId)) return;
+	if (useChatStore.getState().transcriptUsesCursor) return;
 
 	const storeForRoom = filterMessagesForRoom(
 		useChatStore.getState().messages,
@@ -166,6 +167,11 @@ export async function fetchChatMessagesFromApi(
 	});
 
 	if (!isActiveRoom(chatRoomId)) {
+		return response;
+	}
+
+	if (useChatStore.getState().transcriptUsesCursor) {
+		await indexedDBChatService.saveMessages(chatRoomId, response.messages);
 		return response;
 	}
 

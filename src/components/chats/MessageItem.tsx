@@ -48,6 +48,8 @@ interface MessageItemProps {
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
+	onTogglePin?: (message: Message) => void;
+	highlighted?: boolean;
 	onRetry?: () => void;
 	/** Discard a failed optimistic/outbox message (not sent to server). */
 	onDiscardFailed?: () => void;
@@ -66,6 +68,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 	onEdit,
 	onReply,
 	onMarkUnread,
+	onTogglePin,
+	highlighted = false,
 	onRetry,
 	onDiscardFailed,
 	onUndoSend,
@@ -224,22 +228,28 @@ const MessageItem: React.FC<MessageItemProps> = ({
 			downloadChatFile(legacyFileUrl, message.fileName || "download", { downloadName })
 		);
 	};
-	const showMessageMenu = !isPending && getMessageDropdownActionCount(message, currentUser) > 0;
+	const showMessageMenu =
+		!isPending && getMessageDropdownActionCount(message, currentUser, chatRoomType) > 0;
 
 	const renderMessageMenu = () =>
 		showMessageMenu ? (
 			<MessageDropdown
 				message={message}
 				currentUser={currentUser}
+				chatRoomType={chatRoomType}
 				onDelete={onDelete}
 				onEdit={onEdit}
 				onReply={onReply}
 				onMarkUnread={onMarkUnread}
+				onTogglePin={onTogglePin}
 			/>
 		) : null;
 
 	return (
-		<div className={`pointer-events-none flex ${isSender ? "justify-end" : isSystemMessage ? "justify-start" : "items-start gap-4"}`}>
+		<div
+			data-message-id={message.id}
+			className={`pointer-events-none flex ${highlighted ? "rounded-xl bg-brand-500/10" : ""} ${isSender ? "justify-end" : isSystemMessage ? "justify-start" : "items-start gap-4"}`}
+		>
 			{!isSender && !isSystemMessage && (
 				<div className="relative h-10 w-10 shrink-0 pointer-events-auto">
 					<div
@@ -331,6 +341,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
+									onTogglePin={onTogglePin}
+									chatRoomType={chatRoomType}
 								/>
 							</div>
 							{incomingMessageFooter}
@@ -657,6 +669,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									onEdit={onEdit}
 									onReply={onReply}
 									onMarkUnread={onMarkUnread}
+									onTogglePin={onTogglePin}
+									chatRoomType={chatRoomType}
 								/>
 							</div>
 							{incomingMessageFooter}

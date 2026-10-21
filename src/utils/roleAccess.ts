@@ -235,6 +235,37 @@ export const CHAT_MESSAGE_DELETE_ROLES = [
 	"EXPEDITE_MANAGER",
 ] as const;
 
+/** Roles that may pin messages in LOAD and OFFER chats. */
+export const LOAD_OFFER_PIN_ROLES = [
+	"DISPATCHER",
+	"DISPATCHER_TL",
+	"EXPEDITE_MANAGER",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"DRIVER_UPDATES",
+	"TRACKING",
+	"NIGHTSHIFT_TRACKING",
+	"MORNING_TRACKING",
+	"TRACKING_TL",
+	"ADMINISTRATOR",
+] as const;
+
+/** Drivers and guests cannot pin. LOAD and OFFER chats are limited to LOAD_OFFER_PIN_ROLES. */
+export function canPinChatMessages(
+	role: string | undefined | null,
+	chatType?: string | null
+): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	if (normalized === "DRIVER" || normalized === "GAST") return false;
+	const type = chatType?.trim().toUpperCase();
+	if (type === "LOAD" || type === "OFFER") {
+		return (LOAD_OFFER_PIN_ROLES as readonly string[]).includes(normalized);
+	}
+	return true;
+}
+
 export function canDeleteChatMessages(role: string | undefined | null): boolean {
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();

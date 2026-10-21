@@ -168,6 +168,8 @@ export interface Message {
 		senderName: string;
 	};
 	createdAt: string;
+	/** ISO timestamp when the message was pinned. Null or absent means not pinned. */
+	pinnedAt?: string | null;
 	sender: User;
 	receiver?: User;
 	reactions?: MessageReactionGroup[];
@@ -407,6 +409,70 @@ class ChatApiClient {
 			hasMore: response.pagination?.hasMore || false,
 			total: response.pagination?.total || 0,
 		};
+	}
+
+	async getPinnedMessages(chatRoomId: string): Promise<Message[]> {
+		const response = await this.request<{ messages: Message[] }>(
+			`/messages/chat-room/${chatRoomId}/pinned`
+		);
+		return response.messages || [];
+	}
+
+	async setMessagePinned(
+		messageId: string,
+		pinned: boolean,
+		source?: { chatRoomId: string; createdAt: string }
+	): Promise<Pick<Message, "id" | "chatRoomId" | "pinnedAt">> {
+		return this.request<Pick<Message, "id" | "chatRoomId" | "pinnedAt">>(
+			`/messages/${messageId}/pin`,
+			{
+				method: "POST",
+				body: JSON.stringify({
+					pinned,
+					chatRoomId: source?.chatRoomId,
+					createdAt: source?.createdAt,
+				}),
+			}
+		);
+	}
+
+	async getMessagesAround(
+		chatRoomId: string,
+		messageId: string
+	): Promise<{
+		messages: Message[];
+		hasMoreBefore: boolean;
+		hasMoreAfter: boolean;
+	}> {
+		return this.request(`/messages/chat-room/${chatRoomId}/around/${messageId}`);
+	}
+
+	async getMessagesBefore(
+		chatRoomId: string,
+		beforeCreatedAt: string,
+		beforeId: string,
+		limit: number = 50
+	): Promise<{ messages: Message[]; hasMore: boolean }> {
+		const params = new URLSearchParams({
+			beforeCreatedAt,
+			beforeId,
+			limit: limit.toString(),
+		});
+		return this.request(`/messages/chat-room/${chatRoomId}/before?${params}`);
+	}
+
+	async getMessagesAfter(
+		chatRoomId: string,
+		afterCreatedAt: string,
+		afterId: string,
+		limit: number = 50
+	): Promise<{ messages: Message[]; hasMore: boolean }> {
+		const params = new URLSearchParams({
+			afterCreatedAt,
+			afterId,
+			limit: limit.toString(),
+		});
+		return this.request(`/messages/chat-room/${chatRoomId}/after?${params}`);
 	}
 
 	async syncMessagesBatch(

@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { createPortal } from "react-dom";
 import { Message } from "@/app-api/chatApi";
 import { UserData } from "@/app-api/api-types";
-import { canDeleteChatMessages } from "@/utils/roleAccess";
+import { canDeleteChatMessages, canPinChatMessages } from "@/utils/roleAccess";
 import { isDeletableChatMessage } from "@/lib/chatMessageDelete";
 
 interface MessageDropdownProps {
@@ -14,6 +14,8 @@ interface MessageDropdownProps {
 	onEdit?: (message: Message) => void;
 	onReply?: (message: Message) => void;
 	onMarkUnread?: (messageId: string) => void;
+	onTogglePin?: (message: Message) => void;
+	chatRoomType?: string;
 }
 
 const MENU_WIDTH_PX = 176;
@@ -24,7 +26,8 @@ const MENU_VERTICAL_PADDING_PX = 8;
 
 export function getMessageDropdownActionCount(
 	message: Message,
-	currentUser?: UserData | null
+	currentUser?: UserData | null,
+	chatRoomType?: string
 ): number {
 	const role = currentUser?.role?.trim().toUpperCase();
 	const canDelete =
@@ -34,8 +37,10 @@ export function getMessageDropdownActionCount(
 		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
 		isOwnMessage &&
 		Boolean(message.content?.trim());
+	const canPin =
+		canPinChatMessages(role, chatRoomType) && !message.pendingOutgoing;
 
-	return (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (canDelete ? 1 : 0);
+	return (isOwnMessage ? 0 : 2) + (canEdit ? 1 : 0) + (canDelete ? 1 : 0) + (canPin ? 1 : 0);
 }
 
 export default function MessageDropdown({
@@ -45,6 +50,8 @@ export default function MessageDropdown({
 	onEdit,
 	onReply,
 	onMarkUnread,
+	onTogglePin,
+	chatRoomType,
 }: MessageDropdownProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(
@@ -64,8 +71,17 @@ export default function MessageDropdown({
 		(role === "ADMINISTRATOR" || role === "DRIVER_UPDATES") &&
 		isOwnMessage &&
 		Boolean(message.content?.trim());
+	const canPin =
+		Boolean(onTogglePin) &&
+		canPinChatMessages(role, chatRoomType) &&
+		!message.pendingOutgoing;
+	const isPinned = Boolean(message.pinnedAt);
 
-	const visibleActionCount = getMessageDropdownActionCount(message, currentUser);
+	const visibleActionCount = getMessageDropdownActionCount(
+		message,
+		currentUser,
+		chatRoomType
+	);
 
 	const updateMenuPosition = useCallback(() => {
 		const button = buttonRef.current;
@@ -159,6 +175,11 @@ export default function MessageDropdown({
 		setIsOpen(false);
 	};
 
+	const handleTogglePin = () => {
+		onTogglePin?.(message);
+		setIsOpen(false);
+	};
+
 	return (
 		<div className="relative" ref={dropdownRef}>
 			{/* Dropdown trigger button */}
@@ -245,6 +266,30 @@ export default function MessageDropdown({
 								Mark as unread
 							</button>
 						</>
+					)}
+
+					{canPin && (
+						<button
+							onClick={handleTogglePin}
+							className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 122.879 122.867"
+								xmlns="http://www.w3.org/2000/svg"
+								className="text-gray-500 dark:text-gray-400"
+								aria-hidden
+							>
+								<path
+									fill="currentColor"
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M83.88,0.451L122.427,39c0.603,0.601,0.603,1.585,0,2.188l-13.128,13.125c-0.602,0.604-1.586,0.604-2.187,0l-3.732-3.73l-17.303,17.3c3.882,14.621,0.095,30.857-11.37,42.32c-0.266,0.268-0.535,0.529-0.808,0.787c-1.004,0.955-0.843,0.949-1.813-0.021L47.597,86.48L0,122.867l36.399-47.584L11.874,50.76c-0.978-0.98-0.896-0.826,0.066-1.837c0.24-0.251,0.485-0.503,0.734-0.753C24.137,36.707,40.376,32.917,54.996,36.8l17.301-17.3l-3.733-3.732c-0.601-0.601-0.601-1.585,0-2.188L81.691,0.451C82.295-0.15,83.279-0.15,83.88,0.451z"
+								/>
+							</svg>
+							{isPinned ? "Unpin" : "Pin"}
+						</button>
 					)}
 
 					{canEdit && (

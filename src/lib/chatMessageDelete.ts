@@ -7,7 +7,6 @@ import { isOptimisticMessageId } from "@/utils/optimisticChatMessage";
 export function isDeletableChatMessage(message: Message): boolean {
 	if (message.pendingOutgoing) return false;
 	if (isOptimisticMessageId(message.id)) return false;
-	if (message.isArchivedMessage) return false;
 	return true;
 }
 

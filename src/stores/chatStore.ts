@@ -127,6 +127,10 @@ interface ChatState {
 	// Pagination for messages
 	hasMoreMessages: boolean;
 	currentPage: number;
+	/** False after a jump to an older pin, until the live tail is loaded again. */
+	transcriptFollowsTail: boolean;
+	/** True when older history must be loaded by cursor instead of page offset. */
+	transcriptUsesCursor: boolean;
 
 	// Archive state
 	hasArchivedMessages: boolean;
@@ -219,6 +223,17 @@ interface ChatState {
 
 	// Action to load more messages (for infinite scroll)
 	loadMoreMessages: () => Promise<void>;
+	loadOlderCursorMessages: () => Promise<void>;
+	/** Fill the gap toward the live tail after jumping to an older message. */
+	loadNewerMessages: () => Promise<void>;
+	/** Replace the open transcript with a window around a message that was not loaded. */
+	showTranscriptAround: (
+		messages: Message[],
+		hasMoreBefore: boolean,
+		hasMoreAfter: boolean
+	) => void;
+	/** Drop a jumped window and load the latest page again. */
+	returnTranscriptToTail: () => Promise<void>;
 
 	// Archive-related actions
 	loadArchivedMessages: (year: number, month: number, day: number) => Promise<void>;
@@ -272,6 +287,8 @@ export const useChatStore = create<ChatState>()(
 				error: null,
 				hasMoreMessages: false,
 				currentPage: 1,
+				transcriptFollowsTail: true,
+				transcriptUsesCursor: false,
 
 				// Archive state
 				hasArchivedMessages: false,
@@ -307,6 +324,8 @@ export const useChatStore = create<ChatState>()(
 							archiveDaysLoadedForRoomId: null,
 							archiveDaysInflightRoomId: null,
 							archivedMessagesCache: new Map(),
+							transcriptFollowsTail: true,
+							transcriptUsesCursor: false,
 						},
 						false,
 						"setCurrentChatRoom"
@@ -779,6 +798,13 @@ export const useChatStore = create<ChatState>()(
 						return;
 					}
 
+					// A jumped window is not the live tail. Appending a new message would
+					// place it directly after the gap.
+					if (!get().transcriptFollowsTail) {
+						set({ chatRooms: sortedRooms }, false, "addMessage:detached");
+						return;
+					}
+
 					set(
 						{
 							messages: trimChatMessagesWindow([...roomMessages, incoming]),
@@ -914,6 +940,8 @@ export const useChatStore = create<ChatState>()(
 							error: null,
 							hasMoreMessages: false,
 							currentPage: 1,
+							transcriptFollowsTail: true,
+							transcriptUsesCursor: false,
 						},
 						false,
 						"clearAllData"
@@ -936,6 +964,8 @@ export const useChatStore = create<ChatState>()(
 								error: null,
 								hasMoreMessages: false,
 								currentPage: 1,
+								transcriptFollowsTail: true,
+								transcriptUsesCursor: false,
 								hasArchivedMessages: false,
 								isLoadingArchivedMessages: false,
 								isLoadingAvailableArchives: false,
@@ -956,6 +986,11 @@ export const useChatStore = create<ChatState>()(
 				},
 
 				loadMoreMessages: async () => {
+					if (get().transcriptUsesCursor) {
+						await get().loadOlderCursorMessages();
+						return;
+					}
+
 					const {
 						currentChatRoom,
 						currentPage,
@@ -1035,6 +1070,158 @@ export const useChatStore = create<ChatState>()(
 							false,
 							"loadMoreMessages"
 						);
+					}
+				},
+
+				loadOlderCursorMessages: async () => {
+					const {
+						currentChatRoom,
+						hasMoreMessages,
+						isLoadingMessages,
+						messages,
+					} = get();
+					if (
+						!currentChatRoom ||
+						!hasMoreMessages ||
+						isLoadingMessages ||
+						messages.length === 0
+					) {
+						return;
+					}
+
+					const oldest = [...messages]
+						.filter(message => message.chatRoomId === currentChatRoom.id)
+						.sort(
+							(a, b) =>
+								new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+						)[0];
+					if (!oldest) return;
+
+					try {
+						set({ isLoadingMessages: true }, false, "loadOlderCursorMessages");
+						const { chatApi } = await import("@/app-api/chatApi");
+						const result = await chatApi.getMessagesBefore(
+							currentChatRoom.id,
+							oldest.createdAt,
+							oldest.id,
+							50
+						);
+						const existingIds = new Set(get().messages.map(message => message.id));
+						const older = result.messages.filter(message => !existingIds.has(message.id));
+						set(
+							{
+								messages: trimChatMessagesWindow([...older, ...get().messages]),
+								hasMoreMessages: result.hasMore,
+								isLoadingMessages: false,
+							},
+							false,
+							"loadOlderCursorMessages"
+						);
+					} catch (error) {
+						console.error("Failed to load older messages:", error);
+						set(
+							{ isLoadingMessages: false, error: "Failed to load more messages" },
+							false,
+							"loadOlderCursorMessages"
+						);
+					}
+				},
+
+				loadNewerMessages: async () => {
+					const { currentChatRoom, transcriptFollowsTail, isLoadingMessages, messages } =
+						get();
+					if (
+						!currentChatRoom ||
+						transcriptFollowsTail ||
+						isLoadingMessages ||
+						messages.length === 0
+					) {
+						return;
+					}
+
+					const newest = [...messages]
+						.filter(message => message.chatRoomId === currentChatRoom.id)
+						.sort(
+							(a, b) =>
+								new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+						)
+						.at(-1);
+					if (!newest) return;
+
+					try {
+						set({ isLoadingMessages: true }, false, "loadNewerMessages");
+						const { chatApi } = await import("@/app-api/chatApi");
+						const result = await chatApi.getMessagesAfter(
+							currentChatRoom.id,
+							newest.createdAt,
+							newest.id,
+							50
+						);
+						const existingIds = new Set(get().messages.map(message => message.id));
+						const newer = result.messages.filter(message => !existingIds.has(message.id));
+						set(
+							{
+								messages: trimChatMessagesWindow([...get().messages, ...newer]),
+								transcriptFollowsTail: !result.hasMore,
+								isLoadingMessages: false,
+							},
+							false,
+							"loadNewerMessages"
+						);
+					} catch (error) {
+						console.error("Failed to load newer messages:", error);
+						set({ isLoadingMessages: false }, false, "loadNewerMessages");
+					}
+				},
+
+				showTranscriptAround: (nextMessages, hasMoreBefore, hasMoreAfter) => {
+					set(
+						{
+							messages: trimChatMessagesWindow(nextMessages),
+							hasMoreMessages: hasMoreBefore,
+							transcriptUsesCursor: true,
+							transcriptFollowsTail: !hasMoreAfter,
+							isLoadingMessages: false,
+							error: null,
+						},
+						false,
+						"showTranscriptAround"
+					);
+				},
+
+				returnTranscriptToTail: async () => {
+					const room = get().currentChatRoom;
+					if (!room) return;
+
+					set(
+						{ isLoadingMessages: true, transcriptUsesCursor: true },
+						false,
+						"returnTranscriptToTail"
+					);
+					try {
+						const { chatApi } = await import("@/app-api/chatApi");
+						const result = await chatApi.getMessages(room.id, 1, 50);
+						if (get().currentChatRoom?.id !== room.id) {
+							set({ isLoadingMessages: false }, false, "returnTranscriptToTail");
+							return;
+						}
+						set(
+							{
+								messages: trimChatMessagesWindow(result.messages),
+								currentPage: 1,
+								hasMoreMessages: result.hasMore,
+								transcriptFollowsTail: true,
+								transcriptUsesCursor: false,
+								isLoadingMessages: false,
+								error: null,
+							},
+							false,
+							"returnTranscriptToTail"
+						);
+						await indexedDBChatService.saveMessages(room.id, result.messages);
+					} catch (error) {
+						console.error("Failed to return to latest messages:", error);
+						set({ isLoadingMessages: false }, false, "returnTranscriptToTail");
 					}
 				},
 
@@ -1539,5 +1726,8 @@ export const useChatActions = () =>
 		tryLoadNextArchivePage: state.tryLoadNextArchivePage,
 		loadInitialArchiveIfPgEmpty: state.loadInitialArchiveIfPgEmpty,
 		loadMoreMessages: state.loadMoreMessages,
+		loadNewerMessages: state.loadNewerMessages,
+		showTranscriptAround: state.showTranscriptAround,
+		returnTranscriptToTail: state.returnTranscriptToTail,
 		clearAllData: state.clearAllData,
 	}));

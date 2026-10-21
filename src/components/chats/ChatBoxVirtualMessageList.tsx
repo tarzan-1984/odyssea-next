@@ -24,6 +24,7 @@ function readRowHeight(element: Element): number {
 
 export interface ChatBoxVirtualMessageListHandle {
 	scrollToBottom: () => void;
+	scrollToMessage: (messageId: string) => boolean;
 	measure: () => void;
 	getScrollAnchor: () => ChatBoxVirtualScrollAnchor | null;
 	restoreScrollAnchor: (anchor: ChatBoxVirtualScrollAnchor) => boolean;
@@ -46,6 +47,8 @@ interface ChatBoxVirtualMessageListProps {
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
+	onTogglePin?: (message: Message) => void;
+	highlightedMessageId?: string | null;
 	onRetry?: (message: Message) => void;
 	onDiscardFailed?: (message: Message) => void;
 	onUndoSend?: (message: Message) => void;
@@ -71,6 +74,8 @@ interface VirtualMessageRowProps {
 	onEdit: (message: Message) => void;
 	onReply: (message: Message) => void;
 	onMarkUnread: (messageId: string) => void;
+	onTogglePin?: (message: Message) => void;
+	highlighted?: boolean;
 	onRetry?: (message: Message) => void;
 	onDiscardFailed?: (message: Message) => void;
 	onUndoSend?: (message: Message) => void;
@@ -93,6 +98,8 @@ function VirtualMessageRow({
 	onEdit,
 	onReply,
 	onMarkUnread,
+	onTogglePin,
+	highlighted,
 	onRetry,
 	onDiscardFailed,
 	onUndoSend,
@@ -187,6 +194,8 @@ function VirtualMessageRow({
 				onEdit={onEdit}
 				onReply={onReply}
 				onMarkUnread={onMarkUnread}
+				onTogglePin={onTogglePin}
+				highlighted={highlighted}
 				onRetry={
 					message.pendingOutgoing?.status === "failed" && onRetry
 						? () => onRetry(message)
@@ -223,6 +232,8 @@ const ChatBoxVirtualMessageList = forwardRef<
 		onEdit,
 		onReply,
 		onMarkUnread,
+		onTogglePin,
+		highlightedMessageId,
 		onRetry,
 		onDiscardFailed,
 		onUndoSend,
@@ -311,6 +322,19 @@ const ChatBoxVirtualMessageList = forwardRef<
 		virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
 	}, [messages.length, virtualizer]);
 
+	const scrollToMessage = useCallback(
+		(messageId: string) => {
+			const index = messages.findIndex(message => message.id === messageId);
+			if (index < 0) return false;
+			virtualizer.scrollToIndex(index, { align: "center" });
+			requestAnimationFrame(() => {
+				virtualizer.scrollToIndex(index, { align: "center" });
+			});
+			return true;
+		},
+		[messages, virtualizer]
+	);
+
 	const measure = useCallback(() => {
 		remeasureVisibleRows();
 	}, [remeasureVisibleRows]);
@@ -357,8 +381,8 @@ const ChatBoxVirtualMessageList = forwardRef<
 
 	useImperativeHandle(
 		ref,
-		() => ({ scrollToBottom, measure, getScrollAnchor, restoreScrollAnchor }),
-		[getScrollAnchor, measure, restoreScrollAnchor, scrollToBottom]
+		() => ({ scrollToBottom, scrollToMessage, measure, getScrollAnchor, restoreScrollAnchor }),
+		[getScrollAnchor, measure, restoreScrollAnchor, scrollToBottom, scrollToMessage]
 	);
 
 	useEffect(() => {
@@ -479,6 +503,8 @@ const ChatBoxVirtualMessageList = forwardRef<
 						onEdit={onEdit}
 						onReply={onReply}
 						onMarkUnread={onMarkUnread}
+						onTogglePin={onTogglePin}
+						highlighted={message.id === highlightedMessageId}
 						onRetry={onRetry}
 						onDiscardFailed={onDiscardFailed}
 						onUndoSend={onUndoSend}

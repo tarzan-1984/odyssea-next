@@ -33,9 +33,10 @@ import {
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
-import { canSendChatMessages } from "@/utils/roleAccess";
+import { canPinChatMessages, canSendChatMessages } from "@/utils/roleAccess";
 import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
+import PinnedMessagesBar from "./PinnedMessagesBar";
 
 interface ChatBoxProps {
 	selectedChatRoomId?: string;
@@ -77,6 +78,14 @@ export default function ChatBox({
 	const olderScrollRestoreTimerRef = useRef<number | null>(null);
 	const [suppressVirtualScrollAdjustment, setSuppressVirtualScrollAdjustment] = useState(false);
 	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+	const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+	const [pinnedIndex, setPinnedIndex] = useState(0);
+	const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+	const [pendingJumpId, setPendingJumpId] = useState<string | null>(null);
+	const jumpScrollLockRef = useRef(false);
+	const isLoadingNewerRef = useRef(false);
+	const highlightTimerRef = useRef<number | null>(null);
+	const pinRequestGenRef = useRef(new Map<string, number>());
 
 	useEffect(() => {
 		setUseVirtualMessageList(
@@ -480,12 +489,21 @@ export default function ChatBox({
 	}, []);
 
 	const handleScrollToBottomClick = useCallback(() => {
+		const followsTail = useChatStore.getState().transcriptFollowsTail;
+		if (!followsTail) {
+			jumpScrollLockRef.current = false;
+			setIsUserScrolledUp(false);
+			pendingInitialScrollRef.current = true;
+			isInitialScrollCompleteRef.current = false;
+			void useChatStore.getState().returnTranscriptToTail();
+			return;
+		}
 		setIsUserScrolledUp(false);
 		scrollToBottom();
 	}, [scrollToBottom]);
 
 	const handleVirtualContentMeasured = useCallback(() => {
-		if (isRestoringOlderScrollRef.current) {
+		if (jumpScrollLockRef.current || isRestoringOlderScrollRef.current) {
 			return;
 		}
 		if (pendingInitialScrollRef.current || !isInitialScrollCompleteRef.current) {
@@ -524,6 +542,22 @@ export default function ChatBox({
 
 		if (isProgrammaticScrollRef.current || !isInitialScrollCompleteRef.current) {
 			return;
+		}
+
+		if (
+			isAtBottom &&
+			scrollHeight > clientHeight &&
+			!useChatStore.getState().transcriptFollowsTail &&
+			!isLoadingNewerRef.current &&
+			!loading
+		) {
+			isLoadingNewerRef.current = true;
+			void useChatStore
+				.getState()
+				.loadNewerMessages()
+				.finally(() => {
+					isLoadingNewerRef.current = false;
+				});
 		}
 
 		const hasScrollableContent = scrollHeight > clientHeight;
@@ -668,6 +702,11 @@ export default function ChatBox({
 		}
 		setReplyingTo(null);
 		setEditingMessage(null);
+		setPinnedMessages([]);
+		setPinnedIndex(0);
+		setHighlightedMessageId(null);
+		setPendingJumpId(null);
+		jumpScrollLockRef.current = false;
 	}, [selectedChatRoomId]);
 
 	useEffect(() => {
@@ -678,8 +717,212 @@ export default function ChatBox({
 			if (olderScrollRestoreTimerRef.current != null) {
 				window.clearTimeout(olderScrollRestoreTimerRef.current);
 			}
+			if (highlightTimerRef.current != null) {
+				window.clearTimeout(highlightTimerRef.current);
+			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!selectedChatRoomId) return;
+		let cancelled = false;
+		chatApi
+			.getPinnedMessages(selectedChatRoomId)
+			.then(list => {
+				if (cancelled) return;
+				setPinnedMessages(list);
+				setPinnedIndex(0);
+				for (const pinned of list) {
+					updateMessage(pinned.id, { pinnedAt: pinned.pinnedAt ?? null });
+				}
+			})
+			.catch(error => {
+				console.error("Failed to load pinned messages:", error);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedChatRoomId, updateMessage]);
+
+	useEffect(() => {
+		if (!socket) return;
+
+		const onPinned = (data: {
+			chatRoomId: string;
+			messageId: string;
+			pinnedAt: string | null;
+			message?: Message;
+		}) => {
+			if (!data?.chatRoomId || !data.messageId) return;
+			if (data.chatRoomId !== selectedChatRoomId) return;
+			if (pinRequestGenRef.current.has(data.messageId)) return;
+			updateMessage(data.messageId, { pinnedAt: data.pinnedAt });
+			setPinnedMessages(prev => {
+				if (!data.pinnedAt) {
+					return prev.filter(message => message.id !== data.messageId);
+				}
+				const next = data.message
+					? { ...data.message, pinnedAt: data.pinnedAt }
+					: prev.find(message => message.id === data.messageId);
+				if (!next) return prev;
+				const without = prev.filter(message => message.id !== data.messageId);
+				return [...without, { ...next, pinnedAt: data.pinnedAt }].sort((a, b) =>
+					String(b.pinnedAt).localeCompare(String(a.pinnedAt))
+				);
+			});
+		};
+
+		const onDeleted = (data: { messageId: string; chatRoomId: string }) => {
+			if (data?.chatRoomId !== selectedChatRoomId) return;
+			setPinnedMessages(prev => prev.filter(message => message.id !== data.messageId));
+		};
+
+		socket.on("messagePinned", onPinned);
+		socket.on("messageDeleted", onDeleted);
+		return () => {
+			socket.off("messagePinned", onPinned);
+			socket.off("messageDeleted", onDeleted);
+		};
+	}, [socket, selectedChatRoomId, updateMessage]);
+
+	const revealMessage = useCallback((messageId: string) => {
+		jumpScrollLockRef.current = true;
+		setIsUserScrolledUp(true);
+		isProgrammaticScrollRef.current = true;
+		const scrolled = virtualListRef.current?.scrollToMessage(messageId) ?? false;
+		if (!scrolled && messagesContainerRef.current) {
+			const node = messagesContainerRef.current.querySelector(
+				`[data-message-id="${CSS.escape(messageId)}"]`
+			);
+			node?.scrollIntoView({ block: "center" });
+		}
+		setHighlightedMessageId(messageId);
+		if (highlightTimerRef.current != null) {
+			window.clearTimeout(highlightTimerRef.current);
+		}
+		highlightTimerRef.current = window.setTimeout(() => {
+			setHighlightedMessageId(current => (current === messageId ? null : current));
+			highlightTimerRef.current = null;
+		}, 1600);
+		window.setTimeout(() => {
+			jumpScrollLockRef.current = false;
+			isProgrammaticScrollRef.current = false;
+		}, 400);
+	}, []);
+
+	useLayoutEffect(() => {
+		if (!pendingJumpId) return;
+		if (!uniqueMessages.some(message => message.id === pendingJumpId)) return;
+		const messageId = pendingJumpId;
+		setPendingJumpId(null);
+		revealMessage(messageId);
+	}, [pendingJumpId, uniqueMessages, revealMessage]);
+
+	const jumpToMessage = useCallback(
+		async (messageId: string) => {
+			if (!selectedChatRoomId) return;
+			const loaded = useChatStore
+				.getState()
+				.messages.some(
+					message => message.id === messageId && message.chatRoomId === selectedChatRoomId
+				);
+			if (loaded) {
+				setPendingJumpId(messageId);
+				return;
+			}
+
+			jumpScrollLockRef.current = true;
+			setIsUserScrolledUp(true);
+			try {
+				const around = await chatApi.getMessagesAround(selectedChatRoomId, messageId);
+				if (!around.messages.some(message => message.id === messageId)) {
+					jumpScrollLockRef.current = false;
+					return;
+				}
+				useChatStore
+					.getState()
+					.showTranscriptAround(
+						around.messages,
+						around.hasMoreBefore,
+						around.hasMoreAfter
+					);
+				setPendingJumpId(messageId);
+			} catch (error) {
+				jumpScrollLockRef.current = false;
+				console.error("Failed to open pinned message:", error);
+				chatApi
+					.getPinnedMessages(selectedChatRoomId)
+					.then(setPinnedMessages)
+					.catch(() => undefined);
+			}
+		},
+		[selectedChatRoomId]
+	);
+
+	const handlePinnedBarClick = useCallback(() => {
+		if (pinnedMessages.length === 0) return;
+		const index = ((pinnedIndex % pinnedMessages.length) + pinnedMessages.length) % pinnedMessages.length;
+		const message = pinnedMessages[index];
+		if (!message) return;
+		setPinnedIndex((index + 1) % pinnedMessages.length);
+		void jumpToMessage(message.id);
+	}, [jumpToMessage, pinnedIndex, pinnedMessages]);
+
+	const handleTogglePin = useCallback(
+		(message: Message, pinned?: boolean) => {
+			const nextPinned = pinned ?? !message.pinnedAt;
+			const previous = message.pinnedAt ?? null;
+			const optimisticAt = nextPinned ? new Date().toISOString() : null;
+
+			updateMessage(message.id, {
+				pinnedAt: optimisticAt,
+				...(nextPinned ? { isArchivedMessage: false } : {}),
+			});
+			setPinnedMessages(prev => {
+				const without = prev.filter(item => item.id !== message.id);
+				if (!optimisticAt) return without;
+				return [{ ...message, pinnedAt: optimisticAt }, ...without];
+			});
+			if (optimisticAt) setPinnedIndex(0);
+
+			const requestGen = (pinRequestGenRef.current.get(message.id) ?? 0) + 1;
+			pinRequestGenRef.current.set(message.id, requestGen);
+			void chatApi
+				.setMessagePinned(message.id, nextPinned, {
+					chatRoomId: message.chatRoomId,
+					createdAt: message.createdAt,
+				})
+				.then(updated => {
+					if (pinRequestGenRef.current.get(message.id) !== requestGen) return;
+					const pinnedAt = updated.pinnedAt ?? null;
+					updateMessage(message.id, {
+						pinnedAt,
+						...(pinnedAt ? { isArchivedMessage: false } : {}),
+					});
+					setPinnedMessages(prev =>
+						prev.map(item => (item.id === message.id ? { ...item, pinnedAt } : item))
+					);
+				})
+				.catch(error => {
+					if (pinRequestGenRef.current.get(message.id) !== requestGen) return;
+					updateMessage(message.id, { pinnedAt: previous });
+					setPinnedMessages(prev => {
+						const without = prev.filter(item => item.id !== message.id);
+						if (!previous) return without;
+						return [{ ...message, pinnedAt: previous }, ...without].sort((a, b) =>
+							String(b.pinnedAt).localeCompare(String(a.pinnedAt))
+						);
+					});
+					console.error("Failed to pin message:", error);
+				})
+				.finally(() => {
+					if (pinRequestGenRef.current.get(message.id) === requestGen) {
+						pinRequestGenRef.current.delete(message.id);
+					}
+				});
+		},
+		[updateMessage]
+	);
 
 	useLayoutEffect(() => {
 		if (!messagesReady || !selectedChatRoomId || uniqueMessages.length === 0) return;
@@ -716,7 +959,8 @@ export default function ChatBox({
 			!isUserScrolledUp &&
 			isInitialScrollCompleteRef.current &&
 			!pendingInitialScrollRef.current &&
-			!isRestoringOlderScrollRef.current
+			!isRestoringOlderScrollRef.current &&
+			!jumpScrollLockRef.current
 		) {
 			scrollToBottom();
 		}
@@ -828,13 +1072,24 @@ export default function ChatBox({
 		}
 
 		try {
-			const response = await fetch(`/api/messages/${messageId}`, {
-				method: "DELETE",
-				credentials: "include",
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
+			const deleteParams = new URLSearchParams();
+			if (targetMessage.chatRoomId) {
+				deleteParams.set("chatRoomId", targetMessage.chatRoomId);
+			}
+			if (targetMessage.createdAt) {
+				deleteParams.set("createdAt", targetMessage.createdAt);
+			}
+			const deleteQuery = deleteParams.toString();
+			const response = await fetch(
+				`/api/messages/${messageId}${deleteQuery ? `?${deleteQuery}` : ""}`,
+				{
+					method: "DELETE",
+					credentials: "include",
+					headers: {
+						"Content-Type": "application/json",
+					},
+				}
+			);
 
 			if (response.status === 404) {
 				// Already removed from DB (e.g. archived to S3) — keep local removal.
@@ -994,6 +1249,14 @@ export default function ChatBox({
 				{/* Header */}
 				<ChatBoxHeader chatRoom={selectedChatRoom} isUserOnline={isUserOnline} />
 
+				<PinnedMessagesBar
+					messages={pinnedMessages}
+					activeIndex={pinnedIndex}
+					canUnpin={canPinChatMessages(currentUser?.role, selectedChatRoom?.type)}
+					onClick={handlePinnedBarClick}
+					onUnpin={message => handleTogglePin(message, false)}
+				/>
+
 				{/* Messages */}
 				<div className="relative min-h-0 flex-1">
 					<div
@@ -1069,6 +1332,8 @@ export default function ChatBox({
 								onEdit={handleEditMessage}
 								onReply={handleReplyToMessage}
 								onMarkUnread={handleMarkMessageUnread}
+								onTogglePin={handleTogglePin}
+								highlightedMessageId={highlightedMessageId}
 								onRetry={message => {
 									retryOptimisticMessage(message).catch(error => {
 										console.error("Failed to retry message:", error);
@@ -1102,6 +1367,8 @@ export default function ChatBox({
 										onEdit={handleEditMessage}
 										onReply={handleReplyToMessage}
 										onMarkUnread={handleMarkMessageUnread}
+										onTogglePin={handleTogglePin}
+										highlighted={message.id === highlightedMessageId}
 										onRetry={
 											message.pendingOutgoing?.status === "failed"
 												? () => {

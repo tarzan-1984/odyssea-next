@@ -71,7 +71,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 		}
 
 		// Forward request to backend
-		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/${messageId}`;
+		const { searchParams } = new URL(request.url);
+		const query = searchParams.toString();
+		const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/messages/${messageId}${query ? `?${query}` : ""}`;
 
 		const response = await fetch(backendUrl, {
 			method: "DELETE",

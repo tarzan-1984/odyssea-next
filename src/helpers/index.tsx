@@ -31,6 +31,7 @@ const ROLE_DISPLAY_LABELS: Record<string, string> = {
 	MODERATOR: "Moderator",
 	RECRUITER: "Recruiter",
 	ADMINISTRATOR: "Administrator",
+	OWNER: "Owner",
 	NIGHTSHIFT_TRACKING: "Tracking Coordinator (Evening Shift)",
 	DISPATCHER: "Dispatcher",
 	BILLING: "Billing",
