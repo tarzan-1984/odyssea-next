@@ -8,6 +8,9 @@ interface ChatModalContextType {
 	isContactsModalOpen: boolean;
 	openContactsModal: () => void;
 	closeContactsModal: () => void;
+	isCreateLoadChatModalOpen: boolean;
+	openCreateLoadChatModal: () => void;
+	closeCreateLoadChatModal: () => void;
 }
 
 const ChatModalContext = createContext<ChatModalContextType | undefined>(undefined);
@@ -27,6 +30,7 @@ interface ChatModalProviderProps {
 export const ChatModalProvider: React.FC<ChatModalProviderProps> = ({ children }) => {
 	const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
 	const [isContactsModalOpen, setIsContactsModalOpen] = useState(false);
+	const [isCreateLoadChatModalOpen, setIsCreateLoadChatModalOpen] = useState(false);
 
 	const openAddRoomModal = () => {
 		setIsAddRoomModalOpen(true);
@@ -42,6 +46,13 @@ export const ChatModalProvider: React.FC<ChatModalProviderProps> = ({ children }
 		setIsContactsModalOpen(false);
 	};
 
+	const openCreateLoadChatModal = () => {
+		setIsCreateLoadChatModalOpen(true);
+	};
+	const closeCreateLoadChatModal = () => {
+		setIsCreateLoadChatModalOpen(false);
+	};
+
 	return (
 		<ChatModalContext.Provider
 			value={{
@@ -51,6 +62,9 @@ export const ChatModalProvider: React.FC<ChatModalProviderProps> = ({ children }
 				isContactsModalOpen,
 				openContactsModal,
 				closeContactsModal,
+				isCreateLoadChatModalOpen,
+				openCreateLoadChatModal,
+				closeCreateLoadChatModal,
 			}}
 		>
 			{children}

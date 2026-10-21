@@ -185,6 +185,14 @@ export function canModifyAppSettings(role: string | undefined | null): boolean {
 	return role.trim().toUpperCase() === "ADMINISTRATOR";
 }
 
+/** Manual load chat creation from the chat list. */
+const CREATE_LOAD_CHAT_ROLES = new Set(["ADMINISTRATOR", "TRACKING_TL"]);
+
+export function canCreateLoadChat(role: string | undefined | null): boolean {
+	if (!role) return false;
+	return CREATE_LOAD_CHAT_ROLES.has(role.trim().toUpperCase());
+}
+
 /** App Logs page: administrators and tracking team leads. */
 export const APP_LOGS_ALLOWED_ROLES = ["ADMINISTRATOR", "TRACKING_TL"] as const;
 

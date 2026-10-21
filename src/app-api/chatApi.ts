@@ -604,6 +604,23 @@ class ChatApiClient {
 		});
 	}
 
+	createLoadChat(payload: {
+		load_id: string;
+		title: string;
+		company: "Odysseia" | "Martlet" | "Endurance";
+		dispatch_message?: string;
+		participants: Array<{ id: string; role: string }>;
+	}): Promise<{
+		id?: string;
+		chats?: Array<{ id?: string } | null>;
+		warnings?: string[];
+	}> {
+		return this.request(`/create_load_chat`, {
+			method: "POST",
+			body: JSON.stringify(payload),
+		});
+	}
+
 	deleteLoadChat(
 		loadId: string,
 		chatRoomId?: string,

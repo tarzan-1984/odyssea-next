@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import ChatList from "./ChatList";
 import ChatBox from "./ChatBox";
 import AddNewRoomModal from "./AddNewRoomModal";
+import CreateLoadChatModal from "./CreateLoadChatModal";
 import ContactsModal from "./ContactsModal";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
@@ -256,8 +257,14 @@ export default function ChatContainer() {
 		currentUser?.id,
 	]);
 
-	const { isAddRoomModalOpen, closeAddRoomModal, isContactsModalOpen, closeContactsModal } =
-		useChatModal();
+	const {
+		isAddRoomModalOpen,
+		closeAddRoomModal,
+		isContactsModalOpen,
+		closeContactsModal,
+		isCreateLoadChatModalOpen,
+		closeCreateLoadChatModal,
+	} = useChatModal();
 	// Clear active chat when component unmounts (user leaves chat page)
 	useEffect(() => {
 		return () => {
@@ -378,6 +385,10 @@ export default function ChatContainer() {
 
 			{/* Modals */}
 			<AddNewRoomModal isOpen={isAddRoomModalOpen} onClose={closeAddRoomModal} />
+			<CreateLoadChatModal
+				isOpen={isCreateLoadChatModalOpen}
+				onClose={closeCreateLoadChatModal}
+			/>
 			<ContactsModal isOpen={isContactsModalOpen} onClose={closeContactsModal} />
 		</>
 	);

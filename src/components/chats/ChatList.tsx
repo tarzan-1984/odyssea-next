@@ -22,6 +22,7 @@ import { canShowOfferId } from "@/utils/offerDisplay";
 import {
 	canAccessMyLoadsChatTab,
 	canAccessMyTeamChatTab,
+	canCreateLoadChat,
 } from "@/utils/roleAccess";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -110,7 +111,7 @@ export default function ChatList({
 	const offerFromUrl = searchParams.get("offer")?.trim() ?? null;
 	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
 	const tabFromUrl = parseLoadChatUrlTab(searchParams.get("tab"));
-	const { openAddRoomModal, openContactsModal } = useChatModal();
+	const { openAddRoomModal, openContactsModal, openCreateLoadChatModal } = useChatModal();
 	const { chatRooms, isLoadingChatRooms, loadChatRooms, isWebSocketConnected } =
 		webSocketChatSync;
 
@@ -129,6 +130,10 @@ export default function ChatList({
 	);
 	const showMyTeamTab = useMemo(
 		() => canAccessMyTeamChatTab(currentUser?.role),
+		[currentUser?.role],
+	);
+	const showCreateLoadChat = useMemo(
+		() => canCreateLoadChat(currentUser?.role),
 		[currentUser?.role],
 	);
 
@@ -619,7 +624,7 @@ export default function ChatList({
 						<Dropdown
 							isOpen={isOpenTwo}
 							onClose={closeDropdownTwo}
-							className="w-40 p-2"
+							className="w-44 p-2"
 							anchorRef={headerDropdownAnchorRef}
 							anchorAlign="right"
 						>
@@ -632,6 +637,17 @@ export default function ChatList({
 							>
 								Add New Room
 							</DropdownItem>
+							{showCreateLoadChat ? (
+								<DropdownItem
+									onItemClick={() => {
+										openCreateLoadChatModal();
+										setIsOpenTwo(false);
+									}}
+									className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+								>
+									Add Load Chat
+								</DropdownItem>
+							) : null}
 							<DropdownItem
 								onItemClick={() => {
 									openContactsModal();
