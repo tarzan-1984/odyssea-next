@@ -34,6 +34,7 @@ import {
 	LOCATION_GEOCODE_ERROR,
 	LOCATION_ROUTE_UNRESOLVED_ERROR,
 	normalizeLocationForGeocode,
+	offerLocationsAreSame,
 } from "@/utils/offerLocationFormat";
 import { diagnoseOfferLocationError } from "@/utils/offerLocationGeocode";
 import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
@@ -602,6 +603,8 @@ export default function CreateOfferModal({
 	const appliedPrefillGeocodeKeyRef = useRef("");
 	/** When true, keep URL-provided loaded miles and skip route-distance API. */
 	const preserveUrlLoadedMilesRef = useRef(false);
+	/** Edit-mode miles copied into the manual field once per same-address route. */
+	const sameLocationMilesSeededRef = useRef(false);
 	/** Previous date/time before ASAP toggle, keyed by route row id. */
 	const timeBeforeAsapRef = useRef<Record<string, string>>({});
 	/** Route row whose date/time calendar is open. */
@@ -614,12 +617,14 @@ export default function CreateOfferModal({
 			appliedPrefillGeocodeKeyRef.current = "";
 			appliedGoogleRouteKeyRef.current = "";
 			preserveUrlLoadedMilesRef.current = false;
+			sameLocationMilesSeededRef.current = false;
 			timeBeforeAsapRef.current = {};
 			setOpenTimeRowId(null);
 			return;
 		}
 
 		let nextLocationErrors: Record<string, string> = {};
+		sameLocationMilesSeededRef.current = false;
 
 		if (editData) {
 			pendingPrefillGeocodeKeyRef.current = "";
@@ -708,6 +713,8 @@ export default function CreateOfferModal({
 	const allLocationsFilledAndValid = (locs: string[]) =>
 		locs.length >= 2 && locs.every(l => l.trim() !== "" && isValidLocationFormat(l.trim()));
 
+	const sameStopLocations = offerLocationsAreSame(committedLocations);
+
 	const {
 		data: routeDistanceData,
 		isFetching: isCalculatingRoute,
@@ -715,19 +722,21 @@ export default function CreateOfferModal({
 	} = useQuery({
 		queryKey: ["route-distance", committedLocations],
 		queryFn: () => offers.calculateRouteDistance(committedLocations),
-		enabled: allLocationsFilledAndValid(committedLocations),
+		enabled: allLocationsFilledAndValid(committedLocations) && !sameStopLocations,
 		staleTime: 20 * 60 * 1000,
 		retry: 1,
 	});
 
 	const googleStopsResolved =
 		routeDistanceData?.stops != null && offerRouteStopsResolved(routeDistanceData.stops);
-	const loadedMiles =
-		manualLoadedMiles ??
-		(googleStopsResolved ? routeDistanceData.loadedMiles : null) ??
-		editFallbackLoadedMiles;
-	const routeDistanceError =
-		manualLoadedMiles != null
+	const loadedMiles = sameStopLocations
+		? manualLoadedMiles
+		: (manualLoadedMiles ??
+			(googleStopsResolved ? routeDistanceData.loadedMiles : null) ??
+			editFallbackLoadedMiles);
+	const routeDistanceError = sameStopLocations
+		? null
+		: manualLoadedMiles != null
 			? null
 			: routeDistanceQueryError
 				? routeDistanceQueryError instanceof Error
@@ -735,6 +744,7 @@ export default function CreateOfferModal({
 					: "Could not calculate route distance"
 				: null;
 	const showLoadedMilesEditIcon =
+		!sameStopLocations &&
 		!isCalculatingRoute &&
 		(manualLoadedMiles != null ||
 			(allLocationsFilledAndValid(committedLocations) &&
@@ -794,6 +804,7 @@ export default function CreateOfferModal({
 	// (e.g. city/ZIP mismatch) instead of a generic "could not find" on every field.
 	useEffect(() => {
 		if (!routeDistanceQueryError || committedLocations.length === 0) return;
+		if (offerLocationsAreSame(committedLocations)) return;
 		const rowsSnapshot = routeRowsRef.current.map(row => ({
 			id: row.id,
 			location: row.location.trim(),
@@ -841,6 +852,66 @@ export default function CreateOfferModal({
 			cancelled = true;
 		};
 	}, [routeDistanceQueryError, committedLocations]);
+
+	// Same pickup and delivery have no driving route. Keep coordinates for the offer
+	// without asking Google for miles, and let the user type loaded miles.
+	useEffect(() => {
+		if (!sameStopLocations) return;
+		setRouteRowLocationErrors(prev => {
+			const next = { ...prev };
+			let changed = false;
+			for (const id of Object.keys(next)) {
+				if (
+					next[id] === LOCATION_ROUTE_UNRESOLVED_ERROR ||
+					next[id] === LOCATION_COORDINATES_ERROR
+				) {
+					delete next[id];
+					changed = true;
+				}
+			}
+			if (!changed) return prev;
+			routeRowLocationErrorsRef.current = next;
+			return next;
+		});
+		setRouteError(prev => (prev === LOCATION_COORDINATES_ERROR ? null : prev));
+
+		const address = committedLocations[0]?.trim();
+		if (!address) return;
+		const key = committedLocations.join("|");
+		let cancelled = false;
+
+		void (async () => {
+			const point = await offers.geocodeCoordinates(address);
+			if (cancelled || !point) return;
+			const coordinates = `${point.latitude},${point.longitude}`;
+			setRouteRows(prev => {
+				const currentKey = prev.map(row => row.location.trim()).join("|");
+				if (currentKey !== key) return prev;
+				if (prev.every(row => row.coordinates === coordinates)) return prev;
+				return prev.map(row => ({ ...row, coordinates }));
+			});
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [sameStopLocations, committedLocations]);
+
+	useEffect(() => {
+		if (!sameStopLocations) {
+			sameLocationMilesSeededRef.current = false;
+			return;
+		}
+		if (sameLocationMilesSeededRef.current) return;
+		sameLocationMilesSeededRef.current = true;
+		setManualLoadedMiles(prev => {
+			if (prev != null) return prev;
+			if (editFallbackLoadedMiles != null && editFallbackLoadedMiles > 0) {
+				return Math.round(editFallbackLoadedMiles);
+			}
+			return prev;
+		});
+	}, [sameStopLocations, editFallbackLoadedMiles]);
 
 	const clearUrlLoadedMilesLock = useCallback(() => {
 		if (!preserveUrlLoadedMilesRef.current) return;
@@ -917,6 +988,28 @@ export default function CreateOfferModal({
 	);
 
 	const commitLocations = useCallback((rows: RouteRow[]) => {
+		const locs = rows.map(r => r.location.trim());
+		const sameLocations = offerLocationsAreSame(locs);
+		if (sameLocations) {
+			const nextErrors = { ...routeRowLocationErrorsRef.current };
+			let changed = false;
+			for (const row of rows) {
+				const message = nextErrors[row.id];
+				if (
+					message === LOCATION_ROUTE_UNRESOLVED_ERROR ||
+					message === LOCATION_COORDINATES_ERROR
+				) {
+					delete nextErrors[row.id];
+					changed = true;
+				}
+			}
+			if (changed) {
+				routeRowLocationErrorsRef.current = nextErrors;
+				setRouteRowLocationErrors(nextErrors);
+			}
+			setRouteError(prev => (prev === LOCATION_COORDINATES_ERROR ? null : prev));
+		}
+
 		const allFilled = rows.every(r => r.location.trim() !== "");
 		const allValid = rows.every(r => isValidLocationFormat(r.location.trim()));
 		const hasFieldErrors = rows.some(
@@ -929,9 +1022,8 @@ export default function CreateOfferModal({
 			}
 			return;
 		}
-		const locs = rows.map(r => r.location.trim());
 		setCommittedLocations(locs);
-		if (!preserveUrlLoadedMilesRef.current) {
+		if (!preserveUrlLoadedMilesRef.current && !sameLocations) {
 			setManualLoadedMiles(null);
 		}
 	}, []);
@@ -1135,10 +1227,13 @@ export default function CreateOfferModal({
 				} else if (last.type !== "delivery") {
 					routeError = "The last stop in route must be Delivery";
 				} else {
+					const sameStops = offerLocationsAreSame(
+						trimmedRoute.map(row => row.location)
+					);
 					for (const row of trimmedRoute) {
 						if (row.location !== "" && !isValidLocationFormat(row.location)) {
 							locationErrors[row.id] = LOCATION_FORMAT_ERROR;
-						} else if (!parseRouteCoordinates(row.coordinates)) {
+						} else if (!sameStops && !parseRouteCoordinates(row.coordinates)) {
 							const existing = routeRowLocationErrors[row.id];
 							if (existing) {
 								locationErrors[row.id] = existing;
@@ -1150,6 +1245,7 @@ export default function CreateOfferModal({
 					// Route failed and no stop-specific diagnose yet — keep submit blocked
 					// without painting every field as "location not found".
 					if (
+						!sameStops &&
 						Object.keys(locationErrors).length === 0 &&
 						routeDistanceError &&
 						trimmedRoute.some(row => !parseRouteCoordinates(row.coordinates))
@@ -1461,16 +1557,34 @@ export default function CreateOfferModal({
 								<Input
 									id="loaded-miles-field"
 									type="text"
-									readOnly
+									inputMode={sameStopLocations ? "numeric" : undefined}
+									readOnly={!sameStopLocations}
 									value={
-										loadedMiles != null
-											? Number.isFinite(loadedMiles)
-												? String(Math.round(loadedMiles))
-												: ""
+										loadedMiles != null && Number.isFinite(loadedMiles)
+											? String(Math.round(loadedMiles))
 											: ""
 									}
-									placeholder="Fill all addresses and blur to calculate"
-									className={`cursor-not-allowed ${showLoadedMilesEditIcon ? "pr-11" : ""}`}
+									onChange={
+										sameStopLocations
+											? e => {
+													const raw = e.target.value.replace(/[^\d]/g, "");
+													if (!raw) {
+														setManualLoadedMiles(null);
+														return;
+													}
+													const parsed = Number.parseInt(raw, 10);
+													setManualLoadedMiles(
+														Number.isFinite(parsed) ? parsed : null
+													);
+												}
+											: undefined
+									}
+									placeholder={
+										sameStopLocations
+											? "Enter miles"
+											: "Fill all addresses and blur to calculate"
+									}
+									className={`${sameStopLocations ? "dark:bg-gray-900" : "cursor-not-allowed"} ${showLoadedMilesEditIcon ? "pr-11" : ""}`}
 								/>
 								{showLoadedMilesEditIcon && (
 									<button

@@ -143,6 +143,15 @@ export function normalizeLocationForGeocode(value: string): string {
 	return `${city}, ${regionToken}`;
 }
 
+/** True when every stop is the same place, so driving miles cannot be calculated. */
+export function offerLocationsAreSame(locations: string[]): boolean {
+	const keys = locations
+		.map(value => normalizeLocationForGeocode(value).trim().toLowerCase())
+		.filter(Boolean);
+	if (keys.length < 2) return false;
+	return keys.every(key => key === keys[0]);
+}
+
 export function needsLocationGeocode(value: string): boolean {
 	const trimmed = value.trim();
 	if (!trimmed) return false;
