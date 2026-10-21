@@ -43,12 +43,12 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const participants = rawParticipants
+		const participants: Array<{ id: string; role: string }> = rawParticipants
 			.map((participant: { id?: unknown; role?: unknown }) => ({
 				id: typeof participant?.id === "string" ? participant.id.trim() : "",
 				role: typeof participant?.role === "string" ? participant.role.trim() : "",
 			}))
-			.filter(participant => participant.id && participant.role);
+			.filter((participant: { id: string; role: string }) => Boolean(participant.id && participant.role));
 
 		if (participants.length === 0) {
 			return NextResponse.json({ error: "At least one participant is required" }, { status: 400 });

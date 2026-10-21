@@ -47,7 +47,7 @@ function createdLoadChatCount(data: unknown): { count: number; warnings: string[
 		? record.warnings.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
 		: [];
 	if (Array.isArray(record.chats)) {
-		const count = record.chats.filter(chat => {
+		const count = record.chats.filter((chat: unknown) => {
 			return Boolean(chat && typeof chat === "object" && typeof (chat as { id?: unknown }).id === "string");
 		}).length;
 		return { count, warnings };
