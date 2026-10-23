@@ -113,6 +113,8 @@ export interface ChatRoomParticipant {
 	joinedAt: string;
 	user: User;
 	hideParticipant?: boolean;
+	/** LOAD chat: false until this driver accepts dispatch terms. Missing on old caches. */
+	dispatchTermsAccepted?: boolean;
 }
 
 export type ChatMessageAttachment = {

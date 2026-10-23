@@ -63,6 +63,12 @@ export function mergeChatRoomParticipants(
 			...previous,
 			...incomingParticipant,
 			hideParticipant: incomingParticipant.hideParticipant ?? previous.hideParticipant,
+			// Acceptance is one-way. A stale list payload must not reopen the composer.
+			dispatchTermsAccepted:
+				previous.dispatchTermsAccepted === true ||
+				incomingParticipant.dispatchTermsAccepted === true
+					? true
+					: incomingParticipant.dispatchTermsAccepted ?? previous.dispatchTermsAccepted,
 			user: {
 				...previous.user,
 				...incomingParticipant.user,

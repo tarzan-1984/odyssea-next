@@ -10,7 +10,6 @@ import { GetAllUsersParams, UserListItem } from "@/app-api/api-types";
 import { chatApi } from "@/app-api/chatApi";
 import { renderAvatar, getRoleDisplayLabel } from "@/helpers";
 import { useOnlineStatus } from "@/context/OnlineStatusContext";
-import { useCurrentUser } from "@/stores/userStore";
 import { useEditorFormatState } from "@/hooks/useEditorFormatState";
 import ChatFormatToolbar, { type ChatFormatAction } from "./ChatFormatToolbar";
 import {
@@ -156,7 +155,6 @@ export default function CreateLoadChatModal({ isOpen, onClose }: CreateLoadChatM
 	const [hasMore, setHasMore] = useState(true);
 	const [error, setError] = useState("");
 	const { isUserOnline } = useOnlineStatus();
-	const currentUser = useCurrentUser();
 	const dispatchMessageRef = useRef(dispatchMessage);
 	dispatchMessageRef.current = dispatchMessage;
 
@@ -179,9 +177,7 @@ export default function CreateLoadChatModal({ isOpen, onClose }: CreateLoadChatM
 
 			const response = await usersApi.getAllUsers(params);
 			if (response.success && response.data) {
-				const newUsers: UserListItem[] = (response.data.data?.users || []).filter(
-					(user: UserListItem) => user.id !== currentUser?.id
-				);
+				const newUsers: UserListItem[] = response.data.data?.users || [];
 				const pagination = response.data.data?.pagination;
 				setUsers(prev => (append ? [...prev, ...newUsers] : newUsers));
 

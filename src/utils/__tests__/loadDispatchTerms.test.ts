@@ -18,11 +18,6 @@ const proximityMessage = {
 	systemMessageKind: "load_proximity",
 };
 
-const driverText = {
-	senderId: driverId,
-	isSystemMessage: false,
-};
-
 describe("isLoadDispatchTermsSystemMessage", () => {
 	it("accepts load_dispatch and legacy system messages without a kind", () => {
 		expect(isLoadDispatchTermsSystemMessage(dispatchMessage)).toBe(true);
@@ -71,67 +66,70 @@ describe("getLoadDispatchTermsUiState", () => {
 		appVersion: "2.3.7",
 	};
 
-	it("does not show Accept when the only system message is proximity", () => {
-		const state = getLoadDispatchTermsUiState({
-			...base,
-			messages: [driverText, proximityMessage],
-		});
-		expect(state).toEqual({ hideComposer: false, showAcceptButton: false });
+	it("shows Accept only when the participant flag is false", () => {
+		expect(
+			getLoadDispatchTermsUiState({
+				...base,
+				dispatchTermsAccepted: false,
+			})
+		).toEqual({ hideComposer: true, showAcceptButton: true });
 		expect(
 			driverNeedsLoadDispatchTermsAcceptance({
 				...base,
-				messages: [proximityMessage],
+				dispatchTermsAccepted: false,
 			})
-		).toBe(false);
+		).toBe(true);
 	});
 
-	it("hides composer without Accept while history is loading and last message is proximity", () => {
+	it("keeps the composer when the flag is true or missing", () => {
 		expect(
 			getLoadDispatchTermsUiState({
 				...base,
-				messages: [proximityMessage],
-				messagesReady: false,
+				dispatchTermsAccepted: true,
 			})
-		).toEqual({ hideComposer: true, showAcceptButton: false });
+		).toEqual({ hideComposer: false, showAcceptButton: false });
+		expect(getLoadDispatchTermsUiState(base)).toEqual({
+			hideComposer: false,
+			showAcceptButton: false,
+		});
 	});
 
-	it("shows Accept for a new LOAD chat with a dispatch system message", () => {
+	it("keeps the composer for a missing app version even when the flag is false", () => {
 		expect(
 			getLoadDispatchTermsUiState({
 				...base,
-				messages: [dispatchMessage],
-			})
-		).toEqual({ hideComposer: true, showAcceptButton: true });
-	});
-
-	it("keeps composer hidden but can show Accept before history loads if last message is dispatch", () => {
-		expect(
-			getLoadDispatchTermsUiState({
-				...base,
-				messages: [dispatchMessage],
-				messagesReady: false,
-			})
-		).toEqual({ hideComposer: true, showAcceptButton: true });
-	});
-
-	it("does not show Accept after the driver already sent a message", () => {
-		expect(
-			getLoadDispatchTermsUiState({
-				...base,
-				messages: [dispatchMessage, driverText, proximityMessage],
+				appVersion: null,
+				dispatchTermsAccepted: false,
 			})
 		).toEqual({ hideComposer: false, showAcceptButton: false });
 	});
 
-	it("enforces the gate on web without an app version", () => {
+	it("enforces the flag on web without an app version", () => {
 		expect(
 			getLoadDispatchTermsUiState({
 				isDriver: true,
 				chatType: "LOAD",
 				currentUserId: driverId,
 				skipAppVersionCheck: true,
-				messages: [dispatchMessage],
+				dispatchTermsAccepted: false,
 			})
 		).toEqual({ hideComposer: true, showAcceptButton: true });
+	});
+
+	it("does not gate staff or non-LOAD chats", () => {
+		expect(
+			getLoadDispatchTermsUiState({
+				...base,
+				isDriver: false,
+				dispatchTermsAccepted: false,
+			})
+		).toEqual({ hideComposer: false, showAcceptButton: false });
+		expect(
+			getLoadDispatchTermsUiState({
+				...base,
+				chatType: "DIRECT",
+				dispatchTermsAccepted: false,
+			})
+		).toEqual({ hideComposer: false, showAcceptButton: false });
 	});
 });

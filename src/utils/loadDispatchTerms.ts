@@ -4,9 +4,6 @@ export const LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT =
 
 export const LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL = "Accept shipment terms";
 
-/** First page size used by chat message loaders. */
-const LOAD_CHAT_PAGE_SIZE = 50;
-
 /** Same cutoff as phone OTP login: store 2.3.6 and missing version stay on the old chat. */
 const LOAD_DISPATCH_TERMS_MIN_VERSION: [number, number, number] = [2, 3, 7];
 
@@ -66,8 +63,11 @@ export function isLoadDispatchTermsAcceptedMessage(
 
 export type DispatchTermsMessage = {
 	senderId?: string;
+	sender?: { id?: string | null } | null;
 	isSystemMessage?: boolean;
 	systemMessageKind?: string | null;
+	/** Unsent local bubble. Must not count as an accepted or prior driver message. */
+	pendingOutgoing?: unknown;
 };
 
 /**
@@ -92,31 +92,38 @@ export type LoadDispatchTermsUiState = {
 	showAcceptButton: boolean;
 };
 
-/**
- * Driver must accept dispatch terms before chatting in a newly created LOAD room
- * that has a system dispatch message and no messages from this driver yet.
- * Only app 2.3.7+ unless skipAppVersionCheck (web). A missing version keeps the
- * legacy open chat.
- */
-export function getLoadDispatchTermsUiState(options: {
+export type LoadDispatchTermsUiOptions = {
 	isDriver: boolean;
 	chatType?: string | null;
 	currentUserId?: string | null;
 	appVersion?: string | null;
 	skipAppVersionCheck?: boolean;
-	messages: DispatchTermsMessage[];
-	hasMoreMessages?: boolean;
-	messagesReady?: boolean;
-}): LoadDispatchTermsUiState {
+	/**
+	 * chat_room_participants.dispatch_terms_accepted for this viewer.
+	 * Missing (stale cache) stays open. Only an explicit false hides the composer.
+	 */
+	dispatchTermsAccepted?: boolean | null;
+};
+
+type DispatchTermsParticipant = {
+	userId: string;
+	dispatchTermsAccepted?: boolean | null;
+};
+
+/**
+ * Driver Accept gate for a LOAD chat. The participant flag is the source of truth.
+ * App 2.3.7+ unless skipAppVersionCheck (web). A missing version keeps the composer.
+ */
+export function getLoadDispatchTermsUiState(
+	options: LoadDispatchTermsUiOptions
+): LoadDispatchTermsUiState {
 	const {
 		isDriver,
 		chatType,
 		currentUserId,
 		appVersion,
 		skipAppVersionCheck = false,
-		messages,
-		hasMoreMessages = false,
-		messagesReady = true
+		dispatchTermsAccepted
 	} = options;
 
 	const inactive: LoadDispatchTermsUiState = {
@@ -129,38 +136,39 @@ export function getLoadDispatchTermsUiState(options: {
 	}
 	if (!isDriver || !currentUserId) return inactive;
 	if ((chatType || "").trim().toUpperCase() !== "LOAD") return inactive;
-
-	const driverHasSentMessage = messages.some(
-		message => !message.isSystemMessage && message.senderId === currentUserId
-	);
-	if (driverHasSentMessage) return inactive;
-
-	const hasDispatchSystemMessage = messages.some(isLoadDispatchTermsSystemMessage);
-
-	if (!messagesReady) {
-		return {
-			hideComposer: true,
-			showAcceptButton: hasDispatchSystemMessage
-		};
-	}
-
-	if (!hasDispatchSystemMessage) return inactive;
-
-	// A full first page plus older history means this is not a newly created empty chat.
-	if (hasMoreMessages && messages.length >= LOAD_CHAT_PAGE_SIZE) return inactive;
+	if (dispatchTermsAccepted !== false) return inactive;
 
 	return { hideComposer: true, showAcceptButton: true };
 }
 
-export function driverNeedsLoadDispatchTermsAcceptance(options: {
-	isDriver: boolean;
-	chatType?: string | null;
-	currentUserId?: string | null;
-	appVersion?: string | null;
-	skipAppVersionCheck?: boolean;
-	messages: DispatchTermsMessage[];
-	hasMoreMessages?: boolean;
-	messagesReady?: boolean;
-}): boolean {
+export function driverNeedsLoadDispatchTermsAcceptance(
+	options: LoadDispatchTermsUiOptions
+): boolean {
 	return getLoadDispatchTermsUiState(options).showAcceptButton;
+}
+
+/** First boolean wins. Use the live store before a room snapshot that may still be false. */
+export function resolveDispatchTermsAccepted(
+	sources: Array<DispatchTermsParticipant[] | undefined | null>,
+	userId?: string | null
+): boolean | undefined {
+	if (!userId) return undefined;
+	for (const participants of sources) {
+		const value = participants?.find(participant => participant.userId === userId)
+			?.dispatchTermsAccepted;
+		if (value === true || value === false) return value;
+	}
+	return undefined;
+}
+
+export function markParticipantDispatchTermsAccepted<T extends DispatchTermsParticipant>(
+	participants: T[] | undefined,
+	userId: string
+): T[] | undefined {
+	if (!participants) return participants;
+	return participants.map(participant =>
+		participant.userId === userId
+			? { ...participant, dispatchTermsAccepted: true }
+			: participant
+	);
 }

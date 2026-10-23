@@ -30,6 +30,8 @@ import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
 import {
 	getLoadDispatchTermsUiState,
+	markParticipantDispatchTermsAccepted,
+	resolveDispatchTermsAccepted,
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
@@ -436,17 +438,16 @@ export default function ChatBox({
 			);
 	}, [messages, selectedChatRoomId, optimisticMessages, currentUser?.id, currentUser?.role]);
 
+	const dispatchTermsAccepted = resolveDispatchTermsAccepted(
+		[chatParticipants, selectedChatRoom?.participants],
+		currentUser?.id
+	);
 	const loadDispatchTermsUi = getLoadDispatchTermsUiState({
 		isDriver: currentUser?.role?.trim().toUpperCase() === "DRIVER",
 		chatType: selectedChatRoom?.type,
 		currentUserId: currentUser?.id,
 		skipAppVersionCheck: true,
-		messages: [
-			...uniqueMessages,
-			...(selectedChatRoom?.lastMessage ? [selectedChatRoom.lastMessage] : []),
-		],
-		hasMoreMessages,
-		messagesReady,
+		dispatchTermsAccepted,
 	});
 	const needsLoadDispatchTermsAcceptance = loadDispatchTermsUi.showAcceptButton;
 	const showAcceptShipmentTermsBar =
@@ -1048,6 +1049,20 @@ export default function ChatBox({
 		setIsAcceptingShipmentTerms(true);
 		try {
 			await sendTextMessage(LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT);
+			if (selectedChatRoom && currentUser?.id) {
+				const participants = markParticipantDispatchTermsAccepted(
+					chatParticipants.length
+						? chatParticipants
+						: selectedChatRoom.participants,
+					currentUser.id
+				);
+				if (participants) {
+					updateChatRoom(selectedChatRoom.id, { participants });
+					void indexedDBChatService.updateChatRoom(selectedChatRoom.id, {
+						participants,
+					});
+				}
+			}
 			setTimeout(() => {
 				scrollToBottom();
 			}, 50);

@@ -340,6 +340,10 @@ export const useChatStore = create<ChatState>()(
 						return {
 							...room,
 							...mergeLoadRestFields(previous, room),
+							participants: mergeChatRoomParticipants(
+								room.participants,
+								previous?.participants
+							),
 						};
 					});
 					const sortedRooms = sortChatRoomsByLastMessage(mergedIncoming);
@@ -434,6 +438,10 @@ export const useChatStore = create<ChatState>()(
 							...room,
 							...incoming,
 							...mergeLoadRestFields(room, incoming),
+							participants: mergeChatRoomParticipants(
+								incoming.participants,
+								room.participants
+							),
 						};
 					});
 					for (const room of incomingRooms) {
