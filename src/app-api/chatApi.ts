@@ -59,6 +59,8 @@ export interface ChatRoom {
 	type: string;
 	loadId?: string;
 	offerId?: string | null;
+	/** TMS driver id this OFFER chat belongs to, when the participant is the owner. */
+	offerDriverExternalId?: string | null;
 	/** OFFER chat: rate_offers.empty_miles for this offer and driver. */
 	emptyMiles?: number | null;
 	avatar?: string;

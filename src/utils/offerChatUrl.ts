@@ -50,6 +50,10 @@ export function findOfferDriverChatRoom(
 		if ((room.type || "").toUpperCase().trim() !== "OFFER") return false;
 		if (getOfferIdFromChatRoom(room) !== normalizedOfferId) return false;
 		if (!normalizedUnitId && !normalizedDriverUserId) return true;
+		const linkedUnit = room.offerDriverExternalId?.trim();
+		if (linkedUnit) {
+			return Boolean(normalizedUnitId) && linkedUnit === normalizedUnitId;
+		}
 
 		const otherParticipants = room.participants.filter(
 			p => p.user?.id !== currentUserId
