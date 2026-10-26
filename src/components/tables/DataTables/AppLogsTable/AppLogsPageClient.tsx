@@ -5,8 +5,9 @@ import ComponentCard from "@/components/common/ComponentCard";
 import Button from "@/components/ui/button/Button";
 import AppLogsTable from "./AppLogsTable";
 import DriversLogsTable from "./DriversLogsTable";
+import OffersLogsTable from "./OffersLogsTable";
 
-type AppLogsTab = "load-chats-logs" | "drivers-logs";
+type AppLogsTab = "load-chats-logs" | "drivers-logs" | "offers-logs";
 
 export default function AppLogsPageClient() {
 	const [activeTab, setActiveTab] = useState<AppLogsTab>("load-chats-logs");
@@ -34,6 +35,15 @@ export default function AppLogsPageClient() {
 					>
 						Drivers logs
 					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant={activeTab === "offers-logs" ? "primary" : "outline"}
+						className="h-9 whitespace-nowrap"
+						onClick={() => setActiveTab("offers-logs")}
+					>
+						Offers logs
+					</Button>
 				</>
 			}
 		>
@@ -45,13 +55,21 @@ export default function AppLogsPageClient() {
 					</p>
 					<AppLogsTable />
 				</>
-			) : (
+			) : activeTab === "drivers-logs" ? (
 				<>
 					<p className="text-sm text-gray-600 dark:text-gray-400">
 						Audit log of driver profile / status changes. Sorted by created at (newest first).
 						Search filters by driver id.
 					</p>
 					<DriversLogsTable />
+				</>
+			) : (
+				<>
+					<p className="text-sm text-gray-600 dark:text-gray-400">
+						Audit log of created offers. Sorted by created at (newest first). Filter by driver
+						external id and creation date. Rows are kept for 14 days.
+					</p>
+					<OffersLogsTable />
 				</>
 			)}
 		</ComponentCard>

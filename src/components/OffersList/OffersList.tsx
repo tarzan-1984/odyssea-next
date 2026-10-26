@@ -913,18 +913,13 @@ const OffersList = () => {
 				queryKey: ["offers-list-cards"],
 			});
 			if (driversToNotify.length > 0) {
-				const offerTitle = getOfferTitle(offer);
 				setPushModalState({
 					drivers: driversToNotify,
 					defaultMessage: buildOfferUnavailablePushMessage(offer),
-					...(offerTitle
-						? {
-								offerContext: {
-									offerId: offer.id,
-									offerTitle,
-								},
-							}
-						: {}),
+					offerContext: {
+						offerId: offer.id,
+						offerTitle: getOfferTitle(offer),
+					},
 				});
 			}
 		} else {
@@ -2088,6 +2083,7 @@ const OffersList = () => {
 				}
 				defaultMessage={pushModalState?.defaultMessage}
 				offerContext={pushModalState?.offerContext}
+				redirectManagedOwners
 			/>
 
 			{ratingModalDriver && (

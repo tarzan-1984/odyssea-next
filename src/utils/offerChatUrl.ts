@@ -135,6 +135,7 @@ const OFFER_NOTIFICATION_TYPES = new Set([
 	"offer_updated",
 	"offer_unavailable",
 	"offer_counter_offer",
+	"offer_removed",
 	"offer_custom",
 ]);
 

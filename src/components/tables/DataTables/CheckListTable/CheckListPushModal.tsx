@@ -35,6 +35,7 @@ function buildPushBody(
 	driver: CheckListDriver,
 	message: string,
 	offerContext?: { offerId: number; offerTitle: string },
+	redirectManagedOwners?: boolean,
 ): Record<string, unknown> {
 	const text = message.trim();
 	const ext = driver.externalId?.trim();
@@ -50,8 +51,9 @@ function buildPushBody(
 	}
 	if (offerContext) {
 		body.offerId = offerContext.offerId;
-		body.offerTitle = offerContext.offerTitle;
+		if (offerContext.offerTitle) body.offerTitle = offerContext.offerTitle;
 	}
+	if (redirectManagedOwners) body.redirectManagedOwners = true;
 	return body;
 }
 
@@ -60,6 +62,7 @@ function buildBatchPushBody(
 	drivers: CheckListDriver[],
 	message: string,
 	offerContext?: { offerId: number; offerTitle: string },
+	redirectManagedOwners?: boolean,
 ): Record<string, unknown> {
 	const text = message.trim();
 	const externalIds: string[] = [];
@@ -82,8 +85,9 @@ function buildBatchPushBody(
 	};
 	if (offerContext) {
 		body.offerId = offerContext.offerId;
-		body.offerTitle = offerContext.offerTitle;
+		if (offerContext.offerTitle) body.offerTitle = offerContext.offerTitle;
 	}
+	if (redirectManagedOwners) body.redirectManagedOwners = true;
 	return body;
 }
 
@@ -120,6 +124,8 @@ type CheckListPushModalProps = {
 	drivers: CheckListDriver[] | null;
 	defaultMessage?: string;
 	offerContext?: { offerId: number; offerTitle: string };
+	/** Offer pushes for an owner-managed driver go to that owner. */
+	redirectManagedOwners?: boolean;
 	onSent?: () => void | Promise<void>;
 	/** Mass broadcast: hide driver list and send to all eligible drivers. */
 	hideRecipients?: boolean;
@@ -131,6 +137,7 @@ export default function CheckListPushModal({
 	drivers,
 	defaultMessage = CHECK_LIST_PUSH_DEFAULT_MESSAGE,
 	offerContext,
+	redirectManagedOwners = false,
 	onSent,
 	hideRecipients = false,
 }: CheckListPushModalProps) {
@@ -218,7 +225,9 @@ export default function CheckListPushModal({
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					credentials: "include",
-					body: JSON.stringify(buildBatchPushBody(targets, text, offerContext)),
+					body: JSON.stringify(
+						buildBatchPushBody(targets, text, offerContext, redirectManagedOwners),
+					),
 				});
 				const json = (await res.json().catch(() => ({}))) as {
 					error?: string;
@@ -250,7 +259,9 @@ export default function CheckListPushModal({
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				credentials: "include",
-				body: JSON.stringify(buildPushBody(driver, text, offerContext)),
+				body: JSON.stringify(
+					buildPushBody(driver, text, offerContext, redirectManagedOwners),
+				),
 			});
 			const json = (await res.json().catch(() => ({}))) as {
 				error?: string;
