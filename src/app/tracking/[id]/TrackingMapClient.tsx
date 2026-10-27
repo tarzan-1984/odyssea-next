@@ -198,6 +198,7 @@ export default function TrackingMapClient({
 				driverData={driverData}
 				forceLightMapBasemap
 				enableBasemapModeSwitch
+				historyPointNumbering="compact"
 			/>
 		</div>
 	);

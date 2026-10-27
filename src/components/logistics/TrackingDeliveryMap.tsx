@@ -13,6 +13,10 @@ import {
 	coordinatesPlausibleForAddresses,
 	coordinatesPlausibleForLocation,
 } from "@/utils/usAddressCoordinatePlausibility";
+import {
+	lastIndicesOfConsecutiveStops,
+	mergeHistoryPointIndices,
+} from "@/utils/historyStopClusters";
 
 // Dynamically import react-leaflet components (client-side only)
 // This prevents SSR issues since Leaflet uses window object
@@ -71,6 +75,7 @@ const MIN_HISTORY_MARKER_RADIUS = 6;
 const MAX_HISTORY_MARKER_RADIUS = 15;
 const SELECTED_HISTORY_POINT_ZOOM = 8;
 const DRIVER_WAYPOINT_LABEL = "Current driver location";
+const EMPTY_PINNED_HISTORY_POINTS: readonly number[] = [];
 /** Pixel shift so stacked PU/DEL pins stay visible at city zoom (lat/lng jitter is sub-pixel). */
 const OVERLAPPING_STOP_MARKER_OFFSET_PX = 26;
 
@@ -82,52 +87,6 @@ function getHistoryMarkerRadiusByZoom(zoom: number): number {
 		MAX_HISTORY_MARKER_RADIUS -
 			(MAX_HISTORY_MARKER_RADIUS - MIN_HISTORY_MARKER_RADIUS) * normalized
 	);
-}
-
-/** Matches `createHistoryPointIcon` halo so thinning uses the real on-screen footprint. */
-function getHistoryPointMarkerOuterPx(historyMarkerRadius: number): number {
-	const inner = Math.round(Math.max(18, historyMarkerRadius * 2));
-	return Math.ceil(inner * (37 / 28));
-}
-
-/**
- * Hide history markers that would overlap in screen space (Macropoint-style thinning).
- * Points in route order stay visible when they are far enough from already shown markers.
- */
-function computeVisibleHistoryPointIndices(
-	points: ReadonlyArray<{ position: [number, number] }>,
-	map: L.Map,
-	markerOuterPx: number,
-	forceVisibleIndices: ReadonlySet<number>
-): Set<number> {
-	if (points.length === 0) return new Set();
-
-	const minGapPx = Math.max(18, markerOuterPx * 0.9);
-	const minGapSq = minGapPx * minGapPx;
-	const visible = new Set<number>();
-	const placedPixels: L.Point[] = [];
-
-	for (let i = 0; i < points.length; i++) {
-		const [lat, lng] = points[i].position;
-		const pixel = map.latLngToContainerPoint(L.latLng(lat, lng));
-
-		let overlaps = false;
-		for (const placed of placedPixels) {
-			const dx = pixel.x - placed.x;
-			const dy = pixel.y - placed.y;
-			if (dx * dx + dy * dy < minGapSq) {
-				overlaps = true;
-				break;
-			}
-		}
-
-		if (!overlaps || forceVisibleIndices.has(i)) {
-			visible.add(i);
-			placedPixels.push(pixel);
-		}
-	}
-
-	return visible;
 }
 
 function getDriverMarkerSizeByZoom(zoom: number): number {
@@ -801,11 +760,9 @@ const MapRefSetter = dynamic(
 			return function MapRefSetterComponent({
 				mapRef,
 				onZoomChange,
-				onMapViewChange,
 			}: {
 				mapRef: React.MutableRefObject<L.Map | null>;
 				onZoomChange?: (zoom: number) => void;
-				onMapViewChange?: () => void;
 			}) {
 				const map = useMap();
 				useEffect(() => {
@@ -819,22 +776,15 @@ const MapRefSetter = dynamic(
 							}
 						});
 						onZoomChange?.(map.getZoom());
-						onMapViewChange?.();
 						const handleZoomEnd = () => {
 							onZoomChange?.(map.getZoom());
-							onMapViewChange?.();
-						};
-						const handleMoveEnd = () => {
-							onMapViewChange?.();
 						};
 						map.on("zoomend", handleZoomEnd);
-						map.on("moveend", handleMoveEnd);
 						return () => {
 							map.off("zoomend", handleZoomEnd);
-							map.off("moveend", handleMoveEnd);
 						};
 					}
-				}, [map, mapRef, onMapViewChange, onZoomChange]);
+				}, [map, mapRef, onZoomChange]);
 				return null;
 			};
 		}),
@@ -967,6 +917,14 @@ interface TrackingDeliveryMapProps {
 	onHistoryEditPointDragEnd?: (lat: number, lng: number) => void;
 	/** When false, history point popups omit driver name (public load tracking). */
 	showDriverInHistoryPopup?: boolean;
+	/**
+	 * `source` keeps the history-list step number (gaps when a stop is collapsed).
+	 * `compact` renumbers the markers that stay on the map as 1, 2, 3… and does not
+	 * reveal collapsed points.
+	 */
+	historyPointNumbering?: "source" | "compact";
+	/** History-list indexes to draw in addition to the last point of each stop. */
+	pinnedHistoryPointIndices?: readonly number[];
 	/** When true, basemap stays light even if the app theme is dark (e.g. /tracking/load/[id]). */
 	forceLightMapBasemap?: boolean;
 	/** Show Simple / Hybrid basemap toggle (MapTiler hybrid requires API key). */
@@ -986,6 +944,8 @@ export default function TrackingDeliveryMap({
 	historyEditDragPosition = null,
 	onHistoryEditPointDragEnd,
 	showDriverInHistoryPopup = true,
+	historyPointNumbering = "source",
+	pinnedHistoryPointIndices = EMPTY_PINNED_HISTORY_POINTS,
 	forceLightMapBasemap = false,
 	enableBasemapModeSwitch = false,
 }: TrackingDeliveryMapProps = {}) {
@@ -996,6 +956,7 @@ export default function TrackingDeliveryMap({
 	const [mapTilerUnavailable, setMapTilerUnavailable] = useState(false);
 	const mapTilerUsable = mapTilerConfigured && !mapTilerUnavailable;
 	const [basemapMode, setBasemapMode] = useState<MapBasemapMode>("simple");
+	const compactHistoryNumbers = historyPointNumbering === "compact";
 
 	const handleBasemapFallback = useCallback(() => {
 		setMapTilerUnavailable(true);
@@ -1007,7 +968,6 @@ export default function TrackingDeliveryMap({
 	const [historyMarkerRadius, setHistoryMarkerRadius] = useState(
 		getHistoryMarkerRadiusByZoom(initialZoom)
 	);
-	const [mapViewRevision, setMapViewRevision] = useState(0);
 	const mapRef = useRef<L.Map | null>(null);
 	const hasFitInitialBoundsRef = useRef(false);
 	const lastHistoryFocusCenterKeyRef = useRef<string | null>(null);
@@ -1087,10 +1047,6 @@ export default function TrackingDeliveryMap({
 		setHistoryMarkerRadius(getHistoryMarkerRadiusByZoom(zoom));
 	}, []);
 
-	const handleMapViewChange = useCallback(() => {
-		setMapViewRevision(revision => revision + 1);
-	}, []);
-
 	const pickupAddressCandidates = useMemo(
 		() => getLoadLocationAddressCandidates(driverData?.pick_up_location, "pick_up_location"),
 		[driverData?.pick_up_location]
@@ -1132,33 +1088,65 @@ export default function TrackingDeliveryMap({
 		return filtered;
 	}, [driverData?.load_history_details, historyMarkerPositions]);
 
-	const visibleHistoryPointIndices = useMemo(() => {
-		const map = mapRef.current;
-		if (!map || historyMarkerDetails.length === 0) {
-			return new Set(historyMarkerDetails.map((_, index) => index));
-		}
+	const defaultHistoryStopIndices = useMemo(
+		() =>
+			lastIndicesOfConsecutiveStops(
+				historyMarkerDetails.map(point => ({
+					latitude: point.position[0],
+					longitude: point.position[1],
+				}))
+			),
+		[historyMarkerDetails]
+	);
 
-		const forced = new Set<number>();
-		forced.add(0);
-		forced.add(historyMarkerDetails.length - 1);
-		if (selectedLoadHistoryPointIndex !== null) {
-			forced.add(selectedLoadHistoryPointIndex);
-		}
-		if (editingLoadHistoryPointIndex !== null) {
-			forced.add(editingLoadHistoryPointIndex);
-		}
+	const historyRoutePositions = useMemo(
+		() =>
+			defaultHistoryStopIndices.map(index => historyMarkerDetails[index]?.position).filter(
+				(position): position is [number, number] =>
+					Array.isArray(position) &&
+					Number.isFinite(position[0]) &&
+					Number.isFinite(position[1])
+			),
+		[defaultHistoryStopIndices, historyMarkerDetails]
+	);
 
-		return computeVisibleHistoryPointIndices(
-			historyMarkerDetails,
-			map,
-			getHistoryPointMarkerOuterPx(historyMarkerRadius),
-			forced
-		);
+	const renderedHistoryMarkers = useMemo(() => {
+		const extraIndices = compactHistoryNumbers
+			? []
+			: [
+					...pinnedHistoryPointIndices,
+					...(selectedLoadHistoryPointIndex !== null
+						? [selectedLoadHistoryPointIndex]
+						: []),
+					...(editingLoadHistoryPointIndex !== null
+						? [editingLoadHistoryPointIndex]
+						: []),
+				];
+		const sourceIndices = compactHistoryNumbers
+			? defaultHistoryStopIndices
+			: mergeHistoryPointIndices(
+					defaultHistoryStopIndices,
+					extraIndices,
+					historyMarkerDetails.length
+				);
+
+		return sourceIndices.flatMap((sourceIndex, compactPosition) => {
+			const point = historyMarkerDetails[sourceIndex];
+			if (!point) return [];
+			return [
+				{
+					sourceIndex,
+					displayNumber: compactHistoryNumbers ? compactPosition + 1 : sourceIndex + 1,
+					point,
+				},
+			];
+		});
 	}, [
+		compactHistoryNumbers,
+		defaultHistoryStopIndices,
 		editingLoadHistoryPointIndex,
 		historyMarkerDetails,
-		historyMarkerRadius,
-		mapViewRevision,
+		pinnedHistoryPointIndices,
 		selectedLoadHistoryPointIndex,
 	]);
 
@@ -1322,7 +1310,7 @@ export default function TrackingDeliveryMap({
 				const deliveryMarker = chain[chain.length - 1];
 				const stopMarkers = buildStopMarkersFromChain(chain, stopRows);
 
-				const historyPoints = historyMarkerPositions
+				const historyPoints = historyRoutePositions
 					.map((point, index) => toRoutePoint(point, `History point ${index + 1}`))
 					.filter((point): point is RoutePoint => point !== null);
 
@@ -1401,7 +1389,7 @@ export default function TrackingDeliveryMap({
 		driverData?.delivery_location,
 		pickupAddressCandidates,
 		deliveryAddressCandidates,
-		historyMarkerPositions,
+		historyRoutePositions,
 		coincidentRouteOriginKey,
 	]);
 
@@ -1688,11 +1676,7 @@ export default function TrackingDeliveryMap({
 				scrollWheelZoom={true}
 				key={`map-${mapUsesDarkTiles ? "dark" : "light"}`}
 			>
-				<MapRefSetter
-					mapRef={mapRef}
-					onZoomChange={handleZoomChange}
-					onMapViewChange={handleMapViewChange}
-				/>
+				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<ResilientBasemapTileLayer
 					mode={basemapMode}
@@ -1750,14 +1734,10 @@ export default function TrackingDeliveryMap({
 						))}
 					</>
 				)}
-				{historyMarkerDetails.map((point, index) => {
-					const isSelected = index === selectedLoadHistoryPointIndex;
-					const isEditing = index === editingLoadHistoryPointIndex;
-					const isLastHistoryPoint = index === historyMarkerDetails.length - 1;
-
-					if (!isEditing && !visibleHistoryPointIndices.has(index)) {
-						return null;
-					}
+				{renderedHistoryMarkers.map(({ sourceIndex, displayNumber, point }) => {
+					const isSelected = sourceIndex === selectedLoadHistoryPointIndex;
+					const isEditing = sourceIndex === editingLoadHistoryPointIndex;
+					const isLastHistoryPoint = sourceIndex === historyMarkerDetails.length - 1;
 
 					if (isEditing) {
 						const position = (historyEditDragPosition ?? point.position) as [
@@ -1766,7 +1746,7 @@ export default function TrackingDeliveryMap({
 						];
 						return (
 							<Marker
-								key={`history-point-edit-${index}`}
+								key={`history-point-edit-${sourceIndex}`}
 								position={position}
 								draggable
 								autoPan={false}
@@ -1789,11 +1769,11 @@ export default function TrackingDeliveryMap({
 
 					return (
 						<Marker
-							key={`history-point-${index}`}
+							key={`history-point-${sourceIndex}`}
 							position={point.position}
 							icon={createHistoryPointIcon({
 								diameterPx: historyMarkerRadius * 2,
-								index,
+								index: displayNumber - 1,
 								isLast: isLastHistoryPoint,
 								isSelected,
 							})}
@@ -1801,14 +1781,14 @@ export default function TrackingDeliveryMap({
 							eventHandlers={{
 								click: e => {
 									stopMapClickBubbling(e);
-									onLoadHistoryPointMarkerClick?.(index);
+									onLoadHistoryPointMarkerClick?.(sourceIndex);
 								},
 							}}
 						>
 							<Popup>
 								<div className="text-sm dark:text-white">
 									<p className="font-semibold dark:text-white">
-										History point {index + 1}
+										History point {displayNumber}
 									</p>
 									{point.placeLabel?.trim() ? (
 										<p className="font-semibold text-gray-600 dark:text-gray-300">

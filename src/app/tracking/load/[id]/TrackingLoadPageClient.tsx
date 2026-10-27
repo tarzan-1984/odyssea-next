@@ -410,11 +410,16 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [activeTrackingDeviceKey, setActiveTrackingDeviceKey] = useState<string | null>(null);
 	const [selectedHistoryPointIndex, setSelectedHistoryPointIndex] = useState<number | null>(null);
+	const [pinnedHistoryPointIndices, setPinnedHistoryPointIndices] = useState<number[]>([]);
 	const [editingHistoryPointIndex, setEditingHistoryPointIndex] = useState<number | null>(null);
 	const [historyDragDraft, setHistoryDragDraft] = useState<[number, number] | null>(null);
 	const [historyEditShowApplyCancel, setHistoryEditShowApplyCancel] = useState(false);
 	const [savingHistoryPointId, setSavingHistoryPointId] = useState<string | null>(null);
 	const historyCardRefs = useRef<(HTMLLIElement | null)[]>([]);
+
+	useEffect(() => {
+		setPinnedHistoryPointIndices([]);
+	}, [loadId]);
 
 	useEffect(() => {
 		const checkAuth = () => {
@@ -456,6 +461,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const applyHistoryPointSelection = useCallback((index: number) => {
 		setEditingHistoryPointIndex(prev => (prev !== null && prev !== index ? null : prev));
 		setSelectedHistoryPointIndex(index);
+		setPinnedHistoryPointIndices(prev => (prev.includes(index) ? prev : [...prev, index]));
 	}, []);
 
 	const handleLoadHistoryPointMarkerClick = useCallback(
@@ -803,6 +809,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 				) {
 					setSelectedHistoryPointIndex(selectedHistoryPointIndex - 1);
 				}
+
+				setPinnedHistoryPointIndices(prev =>
+					prev.flatMap(index => {
+						if (index === pointIndex) return [];
+						if (index > pointIndex) return [index - 1];
+						return [index];
+					})
+				);
 
 				if (editingHistoryPointIndex === pointIndex) {
 					setEditingHistoryPointIndex(null);
@@ -1383,6 +1397,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 										: undefined
 								}
 								showDriverInHistoryPopup={isAuthenticated}
+								pinnedHistoryPointIndices={pinnedHistoryPointIndices}
 							/>
 						</>
 					)}
@@ -1431,6 +1446,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 														if (group.key === activeTrackingDeviceKey)
 															return;
 														setActiveTrackingDeviceKey(group.key);
+														setPinnedHistoryPointIndices([]);
 														clearHistoryPointSelection();
 														historyCardRefs.current = [];
 													}}

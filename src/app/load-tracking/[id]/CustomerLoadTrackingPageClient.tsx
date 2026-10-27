@@ -157,7 +157,12 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 	);
 
 	const historyDetails = useMemo(() => {
-		return (data?.trackingPoints ?? []).flatMap(point => {
+		const points = [...(data?.trackingPoints ?? [])].sort((left, right) => {
+			const leftTime = new Date(left.createdAt ?? 0).getTime();
+			const rightTime = new Date(right.createdAt ?? 0).getTime();
+			return leftTime - rightTime;
+		});
+		return points.flatMap(point => {
 			const latitude = Number(point.latitude);
 			const longitude = Number(point.longitude);
 			if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
@@ -260,6 +265,7 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 						enableBasemapModeSwitch
 						initialZoom={4}
 						showDriverInHistoryPopup={false}
+						historyPointNumbering="compact"
 					/>
 				</>
 			) : null}
