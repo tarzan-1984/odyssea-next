@@ -1047,9 +1047,9 @@ const OffersList = () => {
 		if (res.success) {
 			setSelectedOfferIds([]);
 			setSelectedOfferDriverKeys([]);
-			await queryClient.invalidateQueries({
-				queryKey: ["offers-list-cards"],
-			});
+			// List refresh comes from one offer_deactivated socket event
+			// after the deactivation queue drains. Refetching here would
+			// read the list before those writes finish.
 			const driversToNotify = Array.from(driversByKey.values());
 			if (driversToNotify.length > 0) {
 				setPushModalState({
