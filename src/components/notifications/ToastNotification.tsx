@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Message, ChatRoom } from "@/app-api/chatApi";
 import {
 	CHAT_TOAST_AUTO_CLOSE_MS,
@@ -7,6 +8,7 @@ import {
 	isToastSlideFromLeft,
 } from "@/constants/toastNotifications";
 import { stripMarkdown } from "@/utils/chatMarkdown";
+import { buildChatUrlForRoom } from "@/utils/offerChatUrl";
 import { useUserStore } from "@/stores/userStore";
 import { useToastPositionStore } from "@/stores/toastPositionStore";
 
@@ -27,9 +29,12 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	const [isClosing, setIsClosing] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
 	const [avatarError, setAvatarError] = useState(false);
+	const router = useRouter();
 	const currentUser = useUserStore(state => state.currentUser);
 	const toastPosition = useToastPositionStore(state => state.position);
 	const slideFromLeft = isToastSlideFromLeft(toastPosition);
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	useEffect(() => {
 		// Show notification with slight delay for smooth animation
@@ -40,9 +45,15 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 	const handleClose = useCallback(() => {
 		setIsClosing(true);
 		setTimeout(() => {
-			onClose();
+			onCloseRef.current();
 		}, 300); // Match CSS transition duration
-	}, [onClose]);
+	}, []);
+
+	const handleOpenChat = useCallback(() => {
+		if (!chatRoom?.id || isClosing) return;
+		router.push(buildChatUrlForRoom(chatRoom, currentUser?.id));
+		handleClose();
+	}, [chatRoom, currentUser?.id, handleClose, isClosing, router]);
 
 	useEffect(() => {
 		if (isHovered || isClosing) return;
@@ -103,11 +114,20 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 
 	return (
 		<div
-			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out ${getToastSlideClasses(
+			role="button"
+			tabIndex={0}
+			className={`w-[min(calc(100vw-2rem),17.5rem)] xl:w-80 cursor-pointer bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-300 ease-in-out ${getToastSlideClasses(
 				isVisible,
 				isClosing,
 				slideFromLeft
 			)}`}
+			onClick={handleOpenChat}
+			onKeyDown={event => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					handleOpenChat();
+				}
+			}}
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
@@ -136,7 +156,11 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 								{chatTitle}
 							</h4>
 							<button
-								onClick={handleClose}
+								type="button"
+								onClick={event => {
+									event.stopPropagation();
+									handleClose();
+								}}
 								className="ml-1.5 flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300 xl:ml-2"
 							>
 								<svg className="h-3.5 w-3.5 xl:h-4 xl:w-4" fill="currentColor" viewBox="0 0 20 20">

@@ -42,21 +42,47 @@ async function fetchOfferLogsPage(
 function OfferLogDrivers({
 	driversIds,
 	openedDriversIds,
+	selectedDriverId,
 }: {
 	driversIds?: string[];
 	openedDriversIds?: string[];
+	selectedDriverId?: string | null;
 }) {
 	const ids = (driversIds ?? []).map(id => id.trim()).filter(Boolean);
 	if (ids.length === 0) return <>—</>;
 	const opened = new Set((openedDriversIds ?? []).map(id => id.trim()).filter(Boolean));
+	const selected = selectedDriverId?.trim() ?? "";
 	return (
 		<>
-			{ids.map((id, index) => (
-				<span key={`${id}-${index}`}>
-					{index > 0 ? ", " : null}
-					<span className={opened.has(id) ? "text-blue-500 dark:text-blue-400" : undefined}>
-						{id}
+			{ids.map((id, index) => {
+				const className =
+					id === selected
+						? "font-semibold text-green-600 dark:text-green-400"
+						: opened.has(id)
+							? "text-blue-500 dark:text-blue-400"
+							: undefined;
+				return (
+					<span key={`${id}-${index}`}>
+						{index > 0 ? ", " : null}
+						<span className={className}>{id}</span>
 					</span>
+				);
+			})}
+		</>
+	);
+}
+
+function OfferLogRates({ rates }: { rates?: Record<string, number> | null }) {
+	const entries = Object.entries(rates ?? {}).filter(
+		([id, rate]) => id.trim() && Number.isFinite(Number(rate)),
+	);
+	if (entries.length === 0) return <>—</>;
+	return (
+		<>
+			{entries.map(([id, rate], index) => (
+				<span key={id}>
+					{index > 0 ? ", " : null}
+					{id}: {rate}
 				</span>
 			))}
 		</>
@@ -182,7 +208,7 @@ export default function OffersLogsTable() {
 			/>
 
 			<div className="overflow-x-auto border-x border-gray-100 dark:border-white/[0.05]">
-				<div className="min-w-[900px]">
+				<div className="min-w-[960px]">
 					<Table>
 						<TableHeader className="border-b border-gray-100 bg-gray-50 text-gray-700 dark:border-white/[0.05] dark:bg-gray-900 dark:text-gray-300">
 							<TableRow>
@@ -208,13 +234,13 @@ export default function OffersLogsTable() {
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Creator
+									Drivers
 								</TableCell>
 								<TableCell
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
-									Drivers
+									Rates
 								</TableCell>
 							</TableRow>
 						</TableHeader>
@@ -238,8 +264,15 @@ export default function OffersLogsTable() {
 							)}
 							{logs.map(row => (
 								<TableRow key={row.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap align-top">
-										{formatAppLogCreatedAt(row.createDate)}
+									<TableCell className="px-4 py-3 whitespace-nowrap align-top">
+										<div className="text-gray-700 dark:text-gray-300">
+											{formatAppLogCreatedAt(row.createDate)}
+										</div>
+										{row.creator?.trim() ? (
+											<div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+												{row.creator.trim()}
+											</div>
+										) : null}
 									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 align-top max-w-[24rem]">
 										{row.title?.trim() || "—"}
@@ -247,14 +280,15 @@ export default function OffersLogsTable() {
 									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 font-mono text-xs whitespace-nowrap align-top">
 										{row.offerId}
 									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 whitespace-nowrap align-top">
-										{row.creator?.trim() || "—"}
-									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs align-top max-w-[20rem]">
 										<OfferLogDrivers
 											driversIds={row.driversIds}
 											openedDriversIds={row.openedDriversIds}
+											selectedDriverId={row.selectedDriverId}
 										/>
+									</TableCell>
+									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs align-top max-w-[24rem]">
+										<OfferLogRates rates={row.rates} />
 									</TableCell>
 								</TableRow>
 							))}

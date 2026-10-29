@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
 	SYSTEM_TOAST_AUTO_CLOSE_MS,
 	getToastSlideClasses,
@@ -36,11 +36,13 @@ export const SystemToastNotification: React.FC<SystemToastNotificationProps> = (
 	const [avatarError, setAvatarError] = useState(false);
 	const toastPosition = useToastPositionStore(state => state.position);
 	const slideFromLeft = isToastSlideFromLeft(toastPosition);
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
 
 	const handleClose = useCallback(() => {
 		setIsClosing(true);
-		setTimeout(() => onClose(), 300);
-	}, [onClose]);
+		setTimeout(() => onCloseRef.current(), 300);
+	}, []);
 
 	useEffect(() => {
 		const showTimer = setTimeout(() => setIsVisible(true), 100);
