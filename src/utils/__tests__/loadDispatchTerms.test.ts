@@ -2,7 +2,12 @@ import {
 	driverNeedsLoadDispatchTermsAcceptance,
 	getLoadDispatchTermsUiState,
 	isLoadDispatchTermsSystemMessage,
+	lockDispatchTermsAccepted,
+	mergeDispatchTermsAcceptedFlag,
+	resolveDispatchTermsAccepted,
+	unlockDispatchTermsAccepted,
 } from "../loadDispatchTerms";
+import { mergeChatRoomParticipants } from "../normalizeChatParticipants";
 
 const driverId = "driver-1";
 
@@ -114,6 +119,49 @@ describe("getLoadDispatchTermsUiState", () => {
 				dispatchTermsAccepted: false,
 			})
 		).toEqual({ hideComposer: true, showAcceptButton: true });
+	});
+
+	it("replaces the offer-chat default true when the server requires acceptance", () => {
+		expect(mergeDispatchTermsAcceptedFlag(true, false)).toBe(false);
+		expect(
+			mergeDispatchTermsAcceptedFlag(true, false, {
+				chatRoomId: "room-1",
+				userId: driverId,
+			})
+		).toBe(false);
+	});
+
+	it("keeps a just-accepted true ahead of a stale false", () => {
+		lockDispatchTermsAccepted("room-1", driverId);
+		expect(
+			mergeDispatchTermsAcceptedFlag(true, false, {
+				chatRoomId: "room-1",
+				userId: driverId,
+			})
+		).toBe(true);
+		unlockDispatchTermsAccepted("room-1", driverId);
+	});
+
+	it("lets an explicit false win over a cached offer true in participant merge", () => {
+		const merged = mergeChatRoomParticipants(
+			[{ userId: driverId, dispatchTermsAccepted: false, user: { id: driverId } }],
+			[{ userId: driverId, dispatchTermsAccepted: true, user: { id: driverId } }],
+			"room-1"
+		);
+		expect(merged[0]?.dispatchTermsAccepted).toBe(false);
+	});
+
+	it("shows Accept when any snapshot says the driver has not accepted", () => {
+		expect(
+			resolveDispatchTermsAccepted(
+				[
+					[{ userId: driverId, dispatchTermsAccepted: true }],
+					[{ userId: driverId, dispatchTermsAccepted: false }],
+				],
+				driverId,
+				"room-1"
+			)
+		).toBe(false);
 	});
 
 	it("does not gate staff or non-LOAD chats", () => {

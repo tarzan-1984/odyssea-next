@@ -128,7 +128,8 @@ export default function ChatContainer() {
 					...roomFromApi,
 					participants: mergeChatRoomParticipants(
 						roomFromApi.participants,
-						fromList?.participants
+						fromList?.participants,
+						roomFromUrl
 					),
 				};
 				roomResolvedRef.current = roomFromUrl;

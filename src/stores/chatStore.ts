@@ -342,7 +342,8 @@ export const useChatStore = create<ChatState>()(
 							...mergeLoadRestFields(previous, room),
 							participants: mergeChatRoomParticipants(
 								room.participants,
-								previous?.participants
+								previous?.participants,
+								room.id
 							),
 						};
 					});
@@ -371,7 +372,8 @@ export const useChatStore = create<ChatState>()(
 								isLoadArchived: matchingRoom.isLoadArchived,
 								participants: mergeChatRoomParticipants(
 									matchingRoom.participants,
-									currentChatRoom.participants
+									currentChatRoom.participants,
+									currentChatRoom.id
 								),
 							};
 						}
@@ -399,7 +401,8 @@ export const useChatStore = create<ChatState>()(
 							...mergeLoadRestFields(previous, chatRoom),
 							participants: mergeChatRoomParticipants(
 								chatRoom.participants,
-								previous.participants
+								previous.participants,
+								chatRoom.id
 							),
 						};
 						const updatedRooms = [...chatRooms];
@@ -413,7 +416,8 @@ export const useChatStore = create<ChatState>()(
 								...mergeLoadRestFields(currentChatRoom, mergedRoom),
 								participants: mergeChatRoomParticipants(
 									mergedRoom.participants,
-									currentChatRoom.participants
+									currentChatRoom.participants,
+									chatRoom.id
 								),
 							};
 						}
@@ -440,7 +444,8 @@ export const useChatStore = create<ChatState>()(
 							...mergeLoadRestFields(room, incoming),
 							participants: mergeChatRoomParticipants(
 								incoming.participants,
-								room.participants
+								room.participants,
+								room.id
 							),
 						};
 					});
@@ -460,7 +465,8 @@ export const useChatStore = create<ChatState>()(
 								...mergeLoadRestFields(currentChatRoom, incomingCurrent),
 								participants: mergeChatRoomParticipants(
 									incomingCurrent.participants,
-									currentChatRoom.participants
+									currentChatRoom.participants,
+									currentChatRoom.id
 								),
 							};
 						}

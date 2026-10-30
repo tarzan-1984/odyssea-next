@@ -1,7 +1,7 @@
 import React from "react";
 import { Message } from "@/app-api/chatApi";
-import { stripMarkdown } from "@/utils/chatMarkdown";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
+import { replyQuoteText } from "@/utils/chatReplyQuote";
 
 interface MessageReplyProps {
 	replyData: Message['replyData'];
@@ -17,12 +17,7 @@ const MessageReply: React.FC<MessageReplyProps> = ({ replyData }) => {
 				<span className="message-reply-sender">{replyData.senderName}</span>
 				<span className="message-reply-time">{formatNyWallClockDateTime(replyData.time)}</span>
 			</div>
-			<div className="message-reply-content">
-				{(() => {
-					const plain = stripMarkdown(replyData.content);
-					return plain.length > 100 ? `${plain.substring(0, 100)}...` : plain;
-				})()}
-			</div>
+			<div className="message-reply-content">{replyQuoteText(replyData)}</div>
 		</div>
 	);
 };

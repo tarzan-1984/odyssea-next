@@ -30,6 +30,7 @@ import { buildChatUserNameLookup } from "@/utils/resolveChatUserName";
 import { getLatestBidPlusOneMessageIdBySender } from "@/utils/bidPlusOneMessage";
 import {
 	getLoadDispatchTermsUiState,
+	lockDispatchTermsAccepted,
 	markParticipantDispatchTermsAccepted,
 	resolveDispatchTermsAccepted,
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
@@ -101,10 +102,13 @@ export default function ChatBox({
 	const handleReplyToMessage = useCallback((message: Message) => {
 		setEditingMessage(null);
 		setReplyingTo({
+			messageId: message.id,
 			avatar: message.sender.avatar,
 			time: message.createdAt,
-			content: message.content,
-			senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+			content: message.content || "",
+			senderName: `${message.sender.firstName} ${message.sender.lastName}`.trim(),
+			fileUrl: message.fileUrl,
+			fileName: message.fileName,
 		});
 	}, []);
 
@@ -286,7 +290,8 @@ export default function ChatBox({
 		const fromList = chatRooms.find(r => r.id === selectedChatRoomId);
 		return mergeChatRoomParticipants(
 			fromList?.participants ?? [],
-			selectedChatRoom?.participants ?? []
+			selectedChatRoom?.participants ?? [],
+			selectedChatRoomId
 		);
 	}, [selectedChatRoomId, chatRooms, selectedChatRoom?.participants]);
 
@@ -440,7 +445,8 @@ export default function ChatBox({
 
 	const dispatchTermsAccepted = resolveDispatchTermsAccepted(
 		[chatParticipants, selectedChatRoom?.participants],
-		currentUser?.id
+		currentUser?.id,
+		selectedChatRoomId
 	);
 	const loadDispatchTermsUi = getLoadDispatchTermsUiState({
 		isDriver: currentUser?.role?.trim().toUpperCase() === "DRIVER",
@@ -1050,6 +1056,7 @@ export default function ChatBox({
 		try {
 			await sendTextMessage(LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT);
 			if (selectedChatRoom && currentUser?.id) {
+				lockDispatchTermsAccepted(selectedChatRoom.id, currentUser.id);
 				const participants = markParticipantDispatchTermsAccepted(
 					chatParticipants.length
 						? chatParticipants

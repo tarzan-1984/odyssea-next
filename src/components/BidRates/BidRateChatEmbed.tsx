@@ -47,6 +47,7 @@ export default function BidRateChatEmbed({
 					participants: mergeChatRoomParticipants(
 						roomFromApi.participants,
 						fromList?.participants,
+						chatRoomId,
 					),
 				};
 

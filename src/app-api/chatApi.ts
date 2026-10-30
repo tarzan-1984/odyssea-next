@@ -166,10 +166,13 @@ export interface Message {
 	isRead: boolean; // Global read status (true when any participant reads)
 	readBy?: string[]; // Array of user IDs who read the message
 	replyData?: {
+		messageId?: string;
 		avatar?: string;
 		time: string;
 		content: string;
 		senderName: string;
+		fileUrl?: string;
+		fileName?: string;
 	};
 	createdAt: string;
 	/** ISO timestamp when the message was pinned. Null or absent means not pinned. */
@@ -236,10 +239,13 @@ export interface SendMessageDto {
 	fileSize?: number;
 	attachments?: ChatMessageAttachment[];
 	replyData?: {
+		messageId?: string;
 		avatar?: string;
 		time: string;
 		content: string;
 		senderName: string;
+		fileUrl?: string;
+		fileName?: string;
 	};
 }
 

@@ -147,17 +147,73 @@ export function driverNeedsLoadDispatchTermsAcceptance(
 	return getLoadDispatchTermsUiState(options).showAcceptButton;
 }
 
-/** First boolean wins. Use the live store before a room snapshot that may still be false. */
+const dispatchTermsAcceptedLocks = new Set<string>();
+
+function dispatchTermsLockKey(chatRoomId: string, userId: string): string {
+	return `${chatRoomId}\0${userId}`;
+}
+
+/** Keep a just-accepted flag from being cleared by an in-flight snapshot. */
+export function lockDispatchTermsAccepted(chatRoomId: string, userId: string): void {
+	dispatchTermsAcceptedLocks.add(dispatchTermsLockKey(chatRoomId, userId));
+}
+
+export function unlockDispatchTermsAccepted(chatRoomId: string, userId: string): void {
+	dispatchTermsAcceptedLocks.delete(dispatchTermsLockKey(chatRoomId, userId));
+}
+
+export function isDispatchTermsAcceptedLocked(
+	chatRoomId: string,
+	userId: string
+): boolean {
+	return dispatchTermsAcceptedLocks.has(dispatchTermsLockKey(chatRoomId, userId));
+}
+
+/**
+ * Explicit server false must replace the offer-chat default true.
+ * A lock set when this driver accepts blocks a stale false from reopening the composer.
+ */
+export function mergeDispatchTermsAcceptedFlag(
+	previous: boolean | null | undefined,
+	incoming: boolean | null | undefined,
+	scope?: { chatRoomId?: string | null; userId?: string | null }
+): boolean | null | undefined {
+	if (
+		previous === true &&
+		scope?.chatRoomId &&
+		scope.userId &&
+		isDispatchTermsAcceptedLocked(scope.chatRoomId, scope.userId)
+	) {
+		return true;
+	}
+	if (incoming === true || incoming === false) return incoming;
+	return previous ?? incoming;
+}
+
+/**
+ * Any explicit false wins, unless this driver accepted in the current session.
+ * Offer chats default the flag to true; that must not hide the Accept button
+ * after the room becomes a LOAD chat.
+ */
 export function resolveDispatchTermsAccepted(
 	sources: Array<DispatchTermsParticipant[] | undefined | null>,
-	userId?: string | null
+	userId?: string | null,
+	chatRoomId?: string | null
 ): boolean | undefined {
 	if (!userId) return undefined;
+	let sawTrue = false;
+	let sawFalse = false;
 	for (const participants of sources) {
 		const value = participants?.find(participant => participant.userId === userId)
 			?.dispatchTermsAccepted;
-		if (value === true || value === false) return value;
+		if (value === true) sawTrue = true;
+		if (value === false) sawFalse = true;
 	}
+	if (sawTrue && chatRoomId && isDispatchTermsAcceptedLocked(chatRoomId, userId)) {
+		return true;
+	}
+	if (sawFalse) return false;
+	if (sawTrue) return true;
 	return undefined;
 }
 

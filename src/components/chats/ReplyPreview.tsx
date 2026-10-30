@@ -1,7 +1,7 @@
 import React from "react";
 import { Message } from "@/app-api/chatApi";
-import { stripMarkdown } from "@/utils/chatMarkdown";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
+import { replyQuoteText } from "@/utils/chatReplyQuote";
 
 interface ReplyPreviewProps {
 	replyData: Message['replyData'];
@@ -19,12 +19,7 @@ const ReplyPreview: React.FC<ReplyPreviewProps> = ({ replyData, onCancel }) => {
 					<span className="reply-preview-sender">{replyData.senderName}</span>
 					<span className="reply-preview-time">{formatNyWallClockDateTime(replyData.time)}</span>
 				</div>
-				<div className="reply-preview-message">
-					{(() => {
-						const plain = stripMarkdown(replyData.content);
-						return plain.length > 100 ? `${plain.substring(0, 100)}...` : plain;
-					})()}
-				</div>
+				<div className="reply-preview-message">{replyQuoteText(replyData)}</div>
 			</div>
 			<button 
 				className="reply-preview-cancel"

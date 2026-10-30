@@ -548,7 +548,8 @@ export const useChatSync = () => {
 				...mergeLoadRestFields(existingRoom, chatRoom),
 				participants: mergeChatRoomParticipants(
 					chatRoom.participants,
-					existingRoom?.participants
+					existingRoom?.participants,
+					chatRoomId
 				),
 			};
 

@@ -1,4 +1,5 @@
 import type { ChatRoom } from "@/app-api/chatApi";
+import { mergeDispatchTermsAcceptedFlag } from "@/utils/loadDispatchTerms";
 
 type RawChatParticipant = {
 	hideParticipant?: boolean;
@@ -43,7 +44,8 @@ export function normalizeChatParticipants(participants: unknown): ChatRoom["part
 /** Preserve list fields when single-room API omits them. */
 export function mergeChatRoomParticipants(
 	incoming: unknown,
-	existing: ChatRoom["participants"] | undefined
+	existing: ChatRoom["participants"] | undefined,
+	chatRoomId?: string | null
 ): ChatRoom["participants"] {
 	const normalizedIncoming = normalizeChatParticipants(incoming);
 	if (!existing?.length) return normalizedIncoming;
@@ -63,12 +65,14 @@ export function mergeChatRoomParticipants(
 			...previous,
 			...incomingParticipant,
 			hideParticipant: incomingParticipant.hideParticipant ?? previous.hideParticipant,
-			// Acceptance is one-way. A stale list payload must not reopen the composer.
-			dispatchTermsAccepted:
-				previous.dispatchTermsAccepted === true ||
-				incomingParticipant.dispatchTermsAccepted === true
-					? true
-					: incomingParticipant.dispatchTermsAccepted ?? previous.dispatchTermsAccepted,
+			dispatchTermsAccepted: mergeDispatchTermsAcceptedFlag(
+				previous.dispatchTermsAccepted,
+				incomingParticipant.dispatchTermsAccepted,
+				{
+					chatRoomId,
+					userId: userId ?? null,
+				}
+			),
 			user: {
 				...previous.user,
 				...incomingParticipant.user,
