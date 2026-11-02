@@ -65,14 +65,15 @@ export function mergeChatRoomParticipants(
 			...previous,
 			...incomingParticipant,
 			hideParticipant: incomingParticipant.hideParticipant ?? previous.hideParticipant,
-			dispatchTermsAccepted: mergeDispatchTermsAcceptedFlag(
-				previous.dispatchTermsAccepted,
-				incomingParticipant.dispatchTermsAccepted,
-				{
-					chatRoomId,
-					userId: userId ?? null,
-				}
-			),
+			dispatchTermsAccepted:
+				mergeDispatchTermsAcceptedFlag(
+					previous.dispatchTermsAccepted,
+					incomingParticipant.dispatchTermsAccepted,
+					{
+						chatRoomId,
+						userId: userId ?? null,
+					}
+				) ?? undefined,
 			user: {
 				...previous.user,
 				...incomingParticipant.user,
