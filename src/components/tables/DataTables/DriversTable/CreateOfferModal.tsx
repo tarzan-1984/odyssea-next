@@ -38,6 +38,7 @@ import {
 } from "@/utils/offerLocationFormat";
 import { diagnoseOfferLocationError } from "@/utils/offerLocationGeocode";
 import { offerRouteStopsResolved } from "@/utils/offerGoogleRoute";
+import { buildGoogleMapsDirectionsUrl } from "@/utils/googleMapsDirectionsUrl";
 import { useCurrentUser } from "@/stores/userStore";
 import { canCreateOffers } from "@/utils/roleAccess";
 
@@ -712,6 +713,15 @@ export default function CreateOfferModal({
 
 	const allLocationsFilledAndValid = (locs: string[]) =>
 		locs.length >= 2 && locs.every(l => l.trim() !== "" && isValidLocationFormat(l.trim()));
+
+	const googleMapsRouteUrl = buildGoogleMapsDirectionsUrl(
+		routeRows.map(row => row.location)
+	);
+
+	const openRouteInGoogleMaps = () => {
+		if (!googleMapsRouteUrl) return;
+		window.open(googleMapsRouteUrl, "_blank", "noopener,noreferrer");
+	};
 
 	const sameStopLocations = offerLocationsAreSame(committedLocations);
 
@@ -1552,7 +1562,24 @@ export default function CreateOfferModal({
 					{/* Loaded miles (left) and Offered rate (right, optional) */}
 					<div className="flex items-end gap-3 mt-2">
 						<div className="relative w-1/2 min-w-0">
-							<Label htmlFor="loaded-miles-field">Loaded miles</Label>
+							<div className="mb-1.5 flex items-center justify-between gap-2">
+								<Label htmlFor="loaded-miles-field" className="mb-0">
+									Loaded miles
+								</Label>
+								<button
+									type="button"
+									disabled={!googleMapsRouteUrl}
+									onClick={openRouteInGoogleMaps}
+									title={
+										googleMapsRouteUrl
+											? "Open this route in Google Maps"
+											: "Fill every stop location first"
+									}
+									className="inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium text-brand-500 ring-1 ring-inset ring-brand-500/40 transition-colors hover:bg-brand-500/10 disabled:cursor-not-allowed disabled:text-gray-400 disabled:ring-gray-300 disabled:hover:bg-transparent dark:text-brand-400 dark:disabled:text-gray-500 dark:disabled:ring-gray-700"
+								>
+									Check Route
+								</button>
+							</div>
 							<div className="relative">
 								<Input
 									id="loaded-miles-field"
