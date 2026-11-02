@@ -128,6 +128,7 @@ export type NotificationLinkData = {
 
 const OFFER_NOTIFICATION_TYPES = new Set([
 	"offer_bid",
+	"offer_same_load_bid",
 	"offer_refused",
 	"offer_extend_time",
 	"offer_selected",
