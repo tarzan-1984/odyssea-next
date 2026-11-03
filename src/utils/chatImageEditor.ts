@@ -483,10 +483,14 @@ export async function loadChatImageBlobUrl(
 	fileUrl: string,
 	fileName: string
 ): Promise<string> {
-	const response = await fetch(resolveCropSourceUrl(fileUrl, fileName), {
+	const source = resolveCropSourceUrl(fileUrl, fileName);
+	let response = await fetch(source, {
 		credentials: "include",
 		cache: "no-store",
 	});
+	if (!response.ok && source !== fileUrl) {
+		response = await fetch(fileUrl, { cache: "no-store" });
+	}
 	if (!response.ok) {
 		throw new Error("Failed to load image for editing");
 	}

@@ -193,6 +193,8 @@ type ChatImageLightboxProps = {
 	images: ChatGalleryImage[];
 	currentIndex: number;
 	viewOnly?: boolean;
+	/** Hide image editing. Zoom and rotate stay available. */
+	allowEdit?: boolean;
 	onClose: () => void;
 	onPrev: () => void;
 	onNext: () => void;
@@ -203,6 +205,7 @@ export default function ChatImageLightbox({
 	images,
 	currentIndex,
 	viewOnly = false,
+	allowEdit = true,
 	onClose,
 	onPrev,
 	onNext,
@@ -861,20 +864,22 @@ export default function ChatImageLightbox({
 				) : (
 					<>
 						{zoomControls}
-						<button
-							type="button"
-							aria-label="Edit image"
-							disabled={isEditBusy || !previewUrl}
-							onClick={e => {
-								e.stopPropagation();
-								handleStartEdit().catch(console.error);
-							}}
-							className={`${toolTextButtonClass} min-w-[4.75rem]`}
-							title="Edit"
-						>
-							<EditIcon className="h-3.5 w-3.5 shrink-0" />
-							Edit
-						</button>
+						{allowEdit ? (
+							<button
+								type="button"
+								aria-label="Edit image"
+								disabled={isEditBusy || !previewUrl}
+								onClick={e => {
+									e.stopPropagation();
+									handleStartEdit().catch(console.error);
+								}}
+								className={`${toolTextButtonClass} min-w-[4.75rem]`}
+								title="Edit"
+							>
+								<EditIcon className="h-3.5 w-3.5 shrink-0" />
+								Edit
+							</button>
+						) : null}
 						{rotateControls}
 					</>
 				)}

@@ -19,6 +19,8 @@ import {
 
 export type OpenImageOptions = {
 	viewOnly?: boolean;
+	/** Hide image editing. Defaults to true. */
+	allowEdit?: boolean;
 	/** When set, use this list instead of images from chat messages */
 	images?: OpenImageInput[];
 };
@@ -50,6 +52,7 @@ export function ChatImageGalleryProvider({
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [activeImages, setActiveImages] = useState<ChatGalleryImage[]>([]);
 	const [viewOnly, setViewOnly] = useState(false);
+	const [allowEdit, setAllowEdit] = useState(true);
 
 	const openImage = useCallback(
 		(image: OpenImageInput, options?: OpenImageOptions) => {
@@ -72,6 +75,7 @@ export function ChatImageGalleryProvider({
 			}
 
 			setViewOnly(options?.viewOnly ?? false);
+			setAllowEdit(options?.allowEdit ?? true);
 			setActiveImages(images);
 			setCurrentIndex(index);
 			setIsOpen(true);
@@ -83,6 +87,7 @@ export function ChatImageGalleryProvider({
 		setIsOpen(false);
 		setActiveImages([]);
 		setViewOnly(false);
+		setAllowEdit(true);
 	}, []);
 
 	const goPrev = useCallback(() => {
@@ -103,6 +108,7 @@ export function ChatImageGalleryProvider({
 				images={activeImages}
 				currentIndex={currentIndex}
 				viewOnly={viewOnly}
+				allowEdit={allowEdit}
 				onClose={close}
 				onPrev={goPrev}
 				onNext={goNext}

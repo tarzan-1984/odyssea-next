@@ -385,6 +385,28 @@ export function canLeaveLoadChat(role: string | undefined | null): boolean {
 	return (LOAD_CHAT_LEAVE_ROLES as readonly string[]).includes(normalized);
 }
 
+/** May select photos in a LOAD chat. */
+export const LOAD_CHAT_PHOTO_SELECT_ROLES = [
+	"ADMINISTRATOR",
+	"DISPATCHER",
+	"DISPATCHER_TL",
+	"EXPEDITE_MANAGER",
+	"TRACKING_TL_DAYTIME",
+	"TRACKING_TL_NIGHTSHIFT",
+	"TRACKING_TL_MORNINGSHIFT",
+	"DRIVER_UPDATES",
+	"TRACKING",
+	"NIGHTSHIFT_TRACKING",
+	"MORNING_TRACKING",
+	"TRACKING_TL",
+] as const;
+
+export function canSelectLoadChatPhotos(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return (LOAD_CHAT_PHOTO_SELECT_ROLES as readonly string[]).includes(normalized);
+}
+
 /** Default in-app landing path after login / generic "home" redirects. */
 export function getAppHomePath(role: string | undefined | null): string {
 	if (isGastRole(role)) return "/user-list";

@@ -29,6 +29,16 @@ export function isChatImageFileName(fileName?: string | null): boolean {
 	return Boolean(ext && IMAGE_EXTENSIONS.has(ext));
 }
 
+const LOAD_CHAT_TEXT_FILE_EXTENSIONS = new Set(["txt", "pdf", "doc", "docx"]);
+
+/** Photos and sent text documents that can be selected for a LOAD file upload. */
+export function isLoadChatSelectableFileName(fileName?: string | null): boolean {
+	if (!fileName) return false;
+	if (isChatImageFileName(fileName)) return true;
+	const ext = fileName.toLowerCase().split(".").pop();
+	return Boolean(ext && LOAD_CHAT_TEXT_FILE_EXTENSIONS.has(ext));
+}
+
 export function galleryImageKey(fileUrl: string, fileName: string): string {
 	return `${fileUrl.trim().split("?")[0]}::${fileName.trim().toLowerCase()}`;
 }

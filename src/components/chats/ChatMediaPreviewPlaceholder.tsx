@@ -4,11 +4,17 @@ import React from "react";
 
 type ChatMediaPreviewPlaceholderProps = {
 	compact?: boolean;
+	square?: boolean;
 	/** Used to reserve the same height as the eventual inline preview. */
 	fileExtension?: string;
 };
 
-function placeholderHeightClass(compact: boolean, fileExtension?: string): string {
+function placeholderHeightClass(
+	compact: boolean,
+	fileExtension?: string,
+	square?: boolean
+): string {
+	if (square) return "h-full";
 	if (compact) {
 		return "h-24";
 	}
@@ -24,9 +30,10 @@ function placeholderHeightClass(compact: boolean, fileExtension?: string): strin
 /** Skeleton shown until messages are loaded and preview enters the chat viewport. */
 export function ChatMediaPreviewPlaceholder({
 	compact = false,
+	square = false,
 	fileExtension,
 }: ChatMediaPreviewPlaceholderProps) {
-	const heightClass = placeholderHeightClass(compact, fileExtension);
+	const heightClass = placeholderHeightClass(compact, fileExtension, square);
 
 	return (
 		<div

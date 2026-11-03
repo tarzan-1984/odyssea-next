@@ -19,6 +19,7 @@ import { getStatusLabelForFilter } from "@/components/logistics/driversMapConsta
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
 	findNextUnpassedRoutePoint,
+	storedRoadEtaMatchesStop,
 	parseLoadRoutePoints,
 	isStoredRoadEtaFresh,
 	parseStoredRoadEta,
@@ -1160,6 +1161,9 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		if (normalizedLoadStatus === "loaded_enroute") {
 			const next = findNextUnpassedRoutePoint(loadRoutePoints, {
 				skipFirstPickup: true,
+				driver: hasCurrentDriverCoordinates
+					? { lat: currentDriverLatitude, lng: currentDriverLongitude }
+					: null,
 			});
 			if (next) return next;
 			if (!deliveryGeocode) return null;
@@ -1176,7 +1180,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		return null;
 	}, [
 		canViewLiveTracking,
+		currentDriverLatitude,
+		currentDriverLongitude,
 		deliveryGeocode,
+		hasCurrentDriverCoordinates,
 		loadRoutePoints,
 		normalizedLoadStatus,
 		pickupGeocode,
@@ -1231,7 +1238,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		hasFreshLastLocationUpdate &&
 		storedRoadEta &&
 		storedRoadEta.kind === roadEtaStop?.kind &&
-		isStoredRoadEtaFresh(storedRoadEta, currentTrackingDriver?.lastLocationUpdateAt)
+		isStoredRoadEtaFresh(storedRoadEta, currentTrackingDriver?.lastLocationUpdateAt) &&
+		storedRoadEtaMatchesStop(
+			storedRoadEta,
+			hasCurrentDriverCoordinates
+				? { lat: currentDriverLatitude, lng: currentDriverLongitude }
+				: null,
+			roadEtaStop
+		)
 			? storedRoadEta
 			: null;
 

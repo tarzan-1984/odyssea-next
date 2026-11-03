@@ -167,21 +167,27 @@ interface FilePreviewProps {
 	compact?: boolean;
 	/** Full file card with the same preview dimensions used in multi-attachment cells. */
 	compactPreview?: boolean;
+	/** Fill the parent. Parent should be a square (used by the load files grid). */
+	square?: boolean;
+	/** Hide editing in the file viewer. Chat previews keep editing. */
+	allowEdit?: boolean;
 }
 
 function BrokenImagePreview({
 	compact,
+	square = false,
 	message,
 	onClick,
 }: {
 	compact: boolean;
+	square?: boolean;
 	message: string;
 	onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) {
 	return (
 		<div
 			className={`flex flex-col items-center justify-center gap-1 rounded-lg bg-gray-100 px-2 text-center text-gray-500 dark:bg-gray-800 dark:text-gray-400 ${
-				compact ? "h-24" : "h-64"
+				square ? "h-full w-full" : compact ? "h-24" : "h-64"
 			} ${onClick ? "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700" : ""}`}
 			onClick={onClick}
 			role={onClick ? "button" : undefined}
@@ -208,7 +214,7 @@ function BrokenImagePreview({
 
 class FilePreviewErrorBoundary extends React.Component<
 	React.PropsWithChildren<
-		Pick<FilePreviewProps, "compact" | "compactPreview"> & { resetKey: string }
+		Pick<FilePreviewProps, "compact" | "compactPreview" | "square"> & { resetKey: string }
 	>,
 	{ hasError: boolean }
 > {
@@ -224,7 +230,7 @@ class FilePreviewErrorBoundary extends React.Component<
 
 	componentDidUpdate(
 		prevProps: React.PropsWithChildren<
-			Pick<FilePreviewProps, "compact" | "compactPreview"> & { resetKey: string }
+			Pick<FilePreviewProps, "compact" | "compactPreview" | "square"> & { resetKey: string }
 		>
 	) {
 		if (this.props.resetKey !== prevProps.resetKey && this.state.hasError) {
@@ -237,6 +243,7 @@ class FilePreviewErrorBoundary extends React.Component<
 			return (
 				<BrokenImagePreview
 					compact={Boolean(this.props.compact || this.props.compactPreview)}
+					square={this.props.square}
 					message="Preview unavailable"
 				/>
 			);
@@ -253,6 +260,8 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	messageId,
 	compact = false,
 	compactPreview = false,
+	square = false,
+	allowEdit = true,
 }) => {
 	const loadReferenceNumber = useLoadChatReferenceNumber();
 	const [previewContent, setPreviewContent] = useState<string>("");
@@ -275,6 +284,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	const modalImageViewportRef = useRef<HTMLDivElement>(null);
 	const thumbEnsureAttemptedRef = useRef(false);
 	const proxyFallbackAttemptedRef = useRef(false);
+	const directUrlFallbackAttemptedRef = useRef(false);
 	const imagePreviewLoadKeyRef = useRef<string | null>(null);
 	const chatImageGallery = useChatImageGalleryOptional();
 	const { mediaLoadEnabled, scrollRoot } = useChatMediaLoad();
@@ -284,6 +294,8 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	});
 	const shouldLoadMedia = mediaLoadEnabled && inView;
 	const useCompactPreview = compact || compactPreview;
+	const compactFrame = square ? "h-full w-full" : "h-24";
+	const compactMedia = square ? "h-full max-h-none" : "h-24 max-h-24";
 	const thumbOptions = useMemo(
 		() => getChatImageListThumbOptions(useCompactPreview),
 		[useCompactPreview]
@@ -298,14 +310,17 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 
 	const openImageViewer = useCallback(() => {
 		if (chatImageGallery && isImage) {
-			chatImageGallery.openImage({ fileUrl, fileName, fileSize });
+			chatImageGallery.openImage(
+				{ fileUrl, fileName, fileSize },
+				allowEdit ? undefined : { allowEdit: false }
+			);
 			return;
 		}
 		if (fileExtension === "heic" || fileExtension === "heif") {
 			setIsModalImageLoading(true);
 		}
 		setIsImageModalOpen(true);
-	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension]);
+	}, [chatImageGallery, fileUrl, fileName, fileSize, isImage, fileExtension, allowEdit]);
 
 	const handleInlineImageMount = useCallback((img: HTMLImageElement | null) => {
 		if (!img) return;
@@ -349,6 +364,14 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return;
 			}
 
+			if (!directUrlFallbackAttemptedRef.current && previewContent !== fileUrl) {
+				directUrlFallbackAttemptedRef.current = true;
+				setError("");
+				setIsLoading(true);
+				setPreviewContent(fileUrl);
+				return;
+			}
+
 			setPreviewContent("");
 			setError("Tap to view image");
 			setIsLoading(false);
@@ -359,6 +382,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	useEffect(() => {
 		thumbEnsureAttemptedRef.current = false;
 		proxyFallbackAttemptedRef.current = false;
+		directUrlFallbackAttemptedRef.current = false;
 		imagePreviewLoadKeyRef.current = null;
 		setPreviewContent("");
 		setIsLoading(false);
@@ -373,6 +397,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 		setError("");
 		thumbEnsureAttemptedRef.current = false;
 		proxyFallbackAttemptedRef.current = false;
+		directUrlFallbackAttemptedRef.current = false;
 		imagePreviewLoadKeyRef.current = null;
 	}, [shouldLoadMedia]);
 
@@ -545,12 +570,13 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	const showPreviewContent = shouldLoadMedia;
 
 	const wrapWithLazyGate = (content: React.ReactNode) => (
-		<div ref={elementRef} className="w-full min-h-0">
+		<div ref={elementRef} className={square ? "h-full w-full min-h-0" : "w-full min-h-0"}>
 			{showPreviewContent ? (
 				content
 			) : (
 				<ChatMediaPreviewPlaceholder
 					compact={useCompactPreview}
+					square={square}
 					fileExtension={fileExtension}
 				/>
 			)}
@@ -574,7 +600,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 
 			return (
 				<div
-					className={`flex items-center justify-center ${useCompactPreview ? "h-24" : "h-32"} text-red-500 px-1 text-center text-xs`}
+					className={`flex items-center justify-center ${useCompactPreview ? compactFrame : "h-32"} text-red-500 px-1 text-center text-xs`}
 				>
 					<p>{error}</p>
 				</div>
@@ -587,7 +613,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`relative w-full ${
-							useCompactPreview ? "h-24" : "h-64"
+							useCompactPreview ? compactFrame : "h-64"
 						} overflow-hidden rounded-lg`}
 					>
 						<HeicConvertingOverlay message="Converting HEIC..." />
@@ -596,7 +622,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 			}
 			return (
 				<div
-					className={`flex items-center justify-center ${useCompactPreview ? "h-24" : "h-64"}`}
+					className={`flex items-center justify-center ${useCompactPreview ? compactFrame : "h-64"}`}
 				>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
@@ -607,7 +633,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 		if (isLoading && !isRasterChatImageExtension(fileExtension)) {
 			return (
 				<div
-					className={`flex items-center justify-center ${useCompactPreview ? "h-24" : "h-64"}`}
+					className={`flex items-center justify-center ${useCompactPreview ? compactFrame : "h-64"}`}
 				>
 					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
 				</div>
@@ -619,7 +645,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-2 rounded text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-							useCompactPreview ? "max-h-24 text-[10px] leading-snug" : ""
+							useCompactPreview ? (square ? "h-full overflow-hidden text-[10px] leading-snug" : "max-h-24 text-[10px] leading-snug") : ""
 						}`}
 						onClick={e => {
 							e.stopPropagation();
@@ -636,7 +662,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`${
-							useCompactPreview ? "h-24" : "h-64"
+							useCompactPreview ? compactFrame : "h-64"
 						} ${useCompactPreview ? "" : "border rounded"} overflow-hidden relative cursor-pointer group`}
 					>
 						<iframe
@@ -661,7 +687,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`${
-							useCompactPreview ? "h-24" : "h-64"
+							useCompactPreview ? compactFrame : "h-64"
 						} ${useCompactPreview ? "" : "border rounded"} overflow-hidden relative cursor-pointer group`}
 					>
 						{previewContent ? (
@@ -694,7 +720,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`w-full ${
-							useCompactPreview ? "max-w-none h-24" : "max-w-[280px] h-64"
+							useCompactPreview ? `max-w-none ${compactFrame}` : "max-w-[280px] h-64"
 						} overflow-hidden ${useCompactPreview ? "" : "rounded-lg"} cursor-pointer hover:opacity-90 transition-opacity relative ${
 							useCompactPreview ? "min-h-0" : "min-h-64"
 						}`}
@@ -712,7 +738,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 								alt="File preview"
 								loading="lazy"
 								decoding="async"
-								className={`object-cover w-full ${useCompactPreview ? "h-24 max-h-24" : "h-64 max-h-64"} ${
+								className={`object-cover w-full ${useCompactPreview ? compactMedia : "h-64 max-h-64"} ${
 									isLoading ? "opacity-0" : ""
 								}`}
 								onLoad={() => setIsLoading(false)}
@@ -727,7 +753,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 					return (
 						<div
 							className={`flex items-center justify-center ${
-								useCompactPreview ? "h-24" : "h-32"
+								useCompactPreview ? compactFrame : "h-32"
 							} bg-gray-100 dark:bg-gray-800 rounded px-2 text-center`}
 						>
 							<p className="text-xs text-gray-500 dark:text-gray-400">
@@ -741,7 +767,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`w-full ${
-							useCompactPreview ? "max-w-none h-24" : "max-w-[400px] h-64"
+							useCompactPreview ? `max-w-none ${compactFrame}` : "max-w-[400px] h-64"
 						} overflow-hidden ${useCompactPreview ? "" : "rounded-lg"} cursor-pointer hover:opacity-90 transition-opacity ${
 							useCompactPreview ? "relative min-h-0" : "relative"
 						}`}
@@ -759,7 +785,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 								alt="File preview"
 								loading="lazy"
 								decoding="async"
-								className={`object-cover w-full ${useCompactPreview ? "h-24 max-h-24" : "h-64 max-h-64"} ${
+								className={`object-cover w-full ${useCompactPreview ? compactMedia : "h-64 max-h-64"} ${
 									isLoading ? "opacity-0" : ""
 								}`}
 								onLoad={() => {
@@ -775,7 +801,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 				return (
 					<div
 						className={`flex items-center justify-center ${
-							useCompactPreview ? "h-24" : "h-32"
+							useCompactPreview ? compactFrame : "h-32"
 						} bg-gray-50 dark:bg-gray-800 rounded px-1 text-center`}
 					>
 						<p
@@ -792,7 +818,15 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 		<>
 			{compact
 				? wrapWithLazyGate(
-						<div className="w-full min-h-0 overflow-hidden">{renderPreview()}</div>
+						<div
+							className={
+								square
+									? "h-full w-full min-h-0 overflow-hidden"
+									: "w-full min-h-0 overflow-hidden"
+							}
+						>
+							{renderPreview()}
+						</div>
 					)
 				: wrapWithLazyGate(
 						<div
@@ -1135,6 +1169,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 					fileUrl={fileUrl}
 					fileName={fileName}
 					fileSize={fileSize}
+					allowEdit={allowEdit}
 					onClose={() => setIsPdfModalOpen(false)}
 				/>
 			)}
@@ -1146,6 +1181,7 @@ const FilePreview: React.FC<FilePreviewProps> = props => (
 	<FilePreviewErrorBoundary
 		compact={props.compact}
 		compactPreview={props.compactPreview}
+		square={props.square}
 		resetKey={props.fileUrl}
 	>
 		<FilePreviewContent {...props} />

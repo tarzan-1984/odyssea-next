@@ -73,6 +73,8 @@ import MobileMessageNotificationIcon from "./mobile-message-notification.svg";
 import CopyLocationUpdateIcon from "./copy-location-update.svg";
 import LoadRestIcon from "./load-rest.svg";
 import LoadTurnOnIcon from "./load-turn-on.svg";
+import ChatFilesIcon from "./chat-files.svg";
+import AddLoadFileIcon from "./add-load-file.svg";
 import DriverListIcon from "./driver-list-icon.svg";
 import OffersIcon from "./offers.svg";
 import WorkstationIcon from "./workstation.svg";
@@ -185,6 +187,8 @@ export {
 	CopyLocationUpdateIcon,
 	LoadRestIcon,
 	LoadTurnOnIcon,
+	ChatFilesIcon,
+	AddLoadFileIcon,
 	OffersIcon,
 	WorkstationIcon,
 	CheckListIcon,

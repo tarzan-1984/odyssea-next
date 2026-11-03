@@ -21,6 +21,7 @@ import ChatBoxVirtualMessageList, {
 import MessageItem from "./MessageItem";
 import { ChatImageGalleryProvider } from "./ChatImageGalleryContext";
 import { LoadChatDownloadProvider } from "./LoadChatDownloadContext";
+import { LoadChatPhotoSelectionProvider } from "./LoadChatPhotoSelectionContext";
 import { BidChatAuctionProvider } from "./BidChatAuctionContext";
 import { ChatMediaLoadProvider } from "@/context/ChatMediaLoadContext";
 import { removeChatMessageLocally, restoreChatMessageLocally, isDeletableChatMessage } from "@/lib/chatMessageDelete";
@@ -36,7 +37,7 @@ import {
 	LOAD_DISPATCH_TERMS_ACCEPT_BUTTON_LABEL,
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
-import { canPinChatMessages, canSendChatMessages } from "@/utils/roleAccess";
+import { canPinChatMessages, canSelectLoadChatPhotos, canSendChatMessages } from "@/utils/roleAccess";
 import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
 import PinnedMessagesBar from "./PinnedMessagesBar";
@@ -302,6 +303,12 @@ export default function ChatBox({
 
 	const hasFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
+	// Modals render in a portal, but React still bubbles their drag/paste events here.
+	const isEventInsideChatBox = (event: React.SyntheticEvent) =>
+		event.currentTarget instanceof HTMLElement &&
+		event.target instanceof Node &&
+		event.currentTarget.contains(event.target);
+
 	const getClipboardFileName = (file: File, index: number) => {
 		if (file.name) return file.name;
 
@@ -340,6 +347,7 @@ export default function ChatBox({
 	};
 
 	const handleChatDragEnter = (e: React.DragEvent) => {
+		if (!isEventInsideChatBox(e)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		if (!canAttachFiles || !hasFileDrag(e)) return;
@@ -348,6 +356,7 @@ export default function ChatBox({
 	};
 
 	const handleChatDragLeave = (e: React.DragEvent) => {
+		if (!isEventInsideChatBox(e)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		if (!canAttachFiles) return;
@@ -359,6 +368,7 @@ export default function ChatBox({
 	};
 
 	const handleChatDragOver = (e: React.DragEvent) => {
+		if (!isEventInsideChatBox(e)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		if (!canAttachFiles || !hasFileDrag(e)) return;
@@ -366,6 +376,7 @@ export default function ChatBox({
 	};
 
 	const handleChatDrop = async (e: React.DragEvent) => {
+		if (!isEventInsideChatBox(e)) return;
 		e.preventDefault();
 		e.stopPropagation();
 		dragCounterRef.current = 0;
@@ -377,7 +388,7 @@ export default function ChatBox({
 	};
 
 	const handleChatPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
-		if (!canAttachFiles) return;
+		if (!isEventInsideChatBox(e) || !canAttachFiles) return;
 
 		const files = getClipboardFiles(e.clipboardData);
 		if (files.length === 0) return;
@@ -1243,6 +1254,13 @@ export default function ChatBox({
 	return (
 		<BidChatAuctionProvider chatRoomId={selectedChatRoomId} enabled={isBidChat}>
 		<LoadChatDownloadProvider referenceNumber={loadReferenceNumber}>
+		<LoadChatPhotoSelectionProvider
+			enabled={
+				selectedChatRoom.type === "LOAD" && canSelectLoadChatPhotos(currentUser?.role)
+			}
+			roomId={selectedChatRoomId ?? ""}
+			loadId={selectedChatRoom.loadId != null ? String(selectedChatRoom.loadId) : ""}
+		>
 		<ChatImageGalleryProvider messages={uniqueMessages}>
 			<div
 				data-chat-box
@@ -1526,6 +1544,7 @@ export default function ChatBox({
 				) : null}
 			</div>
 		</ChatImageGalleryProvider>
+		</LoadChatPhotoSelectionProvider>
 		</LoadChatDownloadProvider>
 		</BidChatAuctionProvider>
 	);

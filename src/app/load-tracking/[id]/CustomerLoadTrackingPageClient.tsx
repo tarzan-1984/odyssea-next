@@ -4,6 +4,7 @@ import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
 	findNextUnpassedRoutePoint,
+	storedRoadEtaMatchesStop,
 	isStoredRoadEtaFresh,
 	parseLoadRoutePoints,
 	parseStoredRoadEta,
@@ -82,6 +83,10 @@ function resolveEtaStop(view: CustomerTrackingView, hasPosition: boolean): RoadE
 	const pickup = markerFromGeocode(view.routeGeocode?.pickup, "first_pickup");
 	const delivery = markerFromGeocode(view.routeGeocode?.delivery, "delivery");
 	const route = parseLoadRoutePoints(view.loadRoute);
+	const driver =
+		hasPosition && view.position
+			? { lat: view.position.latitude, lng: view.position.longitude }
+			: null;
 
 	if (status === "waiting_on_pu_date" || status === "at_pu") {
 		return pickup;
@@ -89,11 +94,11 @@ function resolveEtaStop(view: CustomerTrackingView, hasPosition: boolean): RoadE
 
 	if (status === "loaded_enroute" || status === "at_del") {
 		return (
-			findNextUnpassedRoutePoint(route, { skipFirstPickup: true }) ?? delivery
+			findNextUnpassedRoutePoint(route, { skipFirstPickup: true, driver }) ?? delivery
 		);
 	}
 
-	return findNextUnpassedRoutePoint(route) ?? delivery ?? pickup;
+	return findNextUnpassedRoutePoint(route, { driver }) ?? delivery ?? pickup;
 }
 
 async function fetchCustomerTracking(token: string): Promise<CustomerTrackingView> {
@@ -208,7 +213,14 @@ export default function CustomerLoadTrackingPageClient({ token }: { token: strin
 		etaStop &&
 		storedRoadEta &&
 		storedRoadEta.kind === etaStop.kind &&
-		isStoredRoadEtaFresh(storedRoadEta, position?.lastLocationUpdateAt)
+		isStoredRoadEtaFresh(storedRoadEta, position?.lastLocationUpdateAt) &&
+		storedRoadEtaMatchesStop(
+			storedRoadEta,
+			hasPosition && position
+				? { lat: position.latitude, lng: position.longitude }
+				: null,
+			etaStop
+		)
 			? storedRoadEta
 			: null;
 	const etaCopy = roadEtaBannerCopy(etaStop?.kind ?? "delivery");

@@ -133,6 +133,8 @@ type ChatPdfLightboxProps = {
 	fileUrl: string;
 	fileName: string;
 	fileSize?: number;
+	/** Hide page editing. Zoom stays available. */
+	allowEdit?: boolean;
 	onClose: () => void;
 };
 
@@ -141,6 +143,7 @@ export default function ChatPdfLightbox({
 	fileUrl,
 	fileName,
 	fileSize,
+	allowEdit = true,
 	onClose,
 }: ChatPdfLightboxProps) {
 	const loadReferenceNumber = useLoadChatReferenceNumber();
@@ -706,20 +709,22 @@ export default function ChatPdfLightbox({
 					) : (
 						<>
 							{zoomControls}
-							<button
-								type="button"
-								aria-label="Edit PDF page"
-								disabled={isEditBusy || isPdfLoading || !pageCanvas}
-								onClick={e => {
-									e.stopPropagation();
-									handleStartEdit();
-								}}
-								className={`${toolTextButtonClass} min-w-[4.75rem]`}
-								title="Edit"
-							>
-								<EditIcon className="h-3.5 w-3.5 shrink-0" />
-								Edit
-							</button>
+							{allowEdit ? (
+								<button
+									type="button"
+									aria-label="Edit PDF page"
+									disabled={isEditBusy || isPdfLoading || !pageCanvas}
+									onClick={e => {
+										e.stopPropagation();
+										handleStartEdit();
+									}}
+									className={`${toolTextButtonClass} min-w-[4.75rem]`}
+									title="Edit"
+								>
+									<EditIcon className="h-3.5 w-3.5 shrink-0" />
+									Edit
+								</button>
+							) : null}
 						</>
 					)}
 				</div>

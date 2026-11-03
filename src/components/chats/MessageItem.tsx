@@ -10,9 +10,11 @@ import MessageDropdown, { getMessageDropdownActionCount } from "./MessageDropdow
 import MessageReply from "./MessageReply";
 import ChatMessageContent from "./ChatMessageContent";
 import MessageAttachmentsGrid, {
+	LoadChatSelectedPhotosUploadButton,
 	MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS,
 	MessageAttachmentCard,
 } from "./MessageAttachmentsGrid";
+import { isLoadChatSelectableFileName } from "@/utils/chatGalleryImages";
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
@@ -214,7 +216,32 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					fileSize: message.fileSize,
 				}
 			: null;
-	const legacyAttachmentKey = legacyAttachment ? `${legacyAttachment.fileUrl}-single` : "";
+	const legacyAttachmentKey = legacyAttachment
+		? `${message.id}:${legacyAttachment.fileUrl}`
+		: "";
+	const selectablePhotos = multiAttachments
+		? multiAttachments.flatMap((item, index) =>
+				isLoadChatSelectableFileName(item.fileName)
+					? [
+							{
+								key: `${message.id}:${index}:${item.fileUrl}`,
+								fileUrl: item.fileUrl,
+								fileName: item.fileName,
+								fileSize: item.fileSize,
+							},
+						]
+					: []
+			)
+		: legacyAttachment && isLoadChatSelectableFileName(legacyAttachment.fileName)
+			? [
+					{
+						key: legacyAttachmentKey,
+						fileUrl: legacyAttachment.fileUrl,
+						fileName: legacyAttachment.fileName,
+						fileSize: legacyAttachment.fileSize,
+					},
+				]
+			: [];
 	const downloadLegacyFile = (event: React.MouseEvent<HTMLAnchorElement>) => {
 		if (!legacyFileUrl) return;
 		const downloadName = loadReferenceDownloadFilename(
@@ -301,7 +328,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
 						<div className="mb-2 flex min-w-0 items-start justify-end gap-2">
 							<div className="max-w-[32rem] min-w-0 space-y-2 rounded-lg rounded-tr-sm bg-brand-500 px-3 py-2 text-white dark:bg-brand-500">
 								{message.replyData && <MessageReply replyData={message.replyData} />}
-								<MessageAttachmentsGrid items={multiAttachments} isOutgoing />
+								<MessageAttachmentsGrid
+									items={multiAttachments}
+									messageId={message.id}
+									isOutgoing
+								/>
+								<LoadChatSelectedPhotosUploadButton
+									files={selectablePhotos}
+									isOutgoing
+								/>
 								{message.content?.trim() ? (
 									<ChatMessageContent
 										content={message.content}
@@ -324,7 +359,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
 								>
 									<div className="space-y-2 rounded-lg rounded-tl-sm bg-gray-100 px-3 py-2 text-gray-800 dark:bg-white/5 dark:text-white/90">
 										{message.replyData && <MessageReply replyData={message.replyData} />}
-										<MessageAttachmentsGrid items={multiAttachments} />
+										<MessageAttachmentsGrid
+											items={multiAttachments}
+											messageId={message.id}
+										/>
+										<LoadChatSelectedPhotosUploadButton files={selectablePhotos} />
 										{message.content?.trim() ? (
 											<ChatMessageContent
 												content={message.content}
@@ -359,26 +398,31 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									currentUserId={currentUser?.id}
 									allowReactions={allowReactions}
 								>
-									<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<div className={`${MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS} space-y-2`}>
 										<MessageAttachmentCard
 											item={legacyAttachment}
 											itemKey={legacyAttachmentKey}
 											downloadingKey={singleAttachmentDownloadingKey}
 											setDownloadingKey={setSingleAttachmentDownloadingKey}
 										/>
+										<LoadChatSelectedPhotosUploadButton files={selectablePhotos} />
 									</div>
 								</IncomingMessageBubble>
 								{renderMessageMenu()}
 							</div>
 						) : (
 							<div className="flex items-start justify-end gap-2">
-								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+								<div className={`${MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS} space-y-2`}>
 									<MessageAttachmentCard
 										item={legacyAttachment}
 										itemKey={legacyAttachmentKey}
 										isOutgoing
 										downloadingKey={singleAttachmentDownloadingKey}
 										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+									<LoadChatSelectedPhotosUploadButton
+										files={selectablePhotos}
+										isOutgoing
 									/>
 								</div>
 								{renderMessageMenu()}
@@ -397,26 +441,31 @@ const MessageItem: React.FC<MessageItemProps> = ({
 									currentUserId={currentUser?.id}
 									allowReactions={allowReactions}
 								>
-									<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+									<div className={`${MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS} space-y-2`}>
 										<MessageAttachmentCard
 											item={legacyAttachment}
 											itemKey={legacyAttachmentKey}
 											downloadingKey={singleAttachmentDownloadingKey}
 											setDownloadingKey={setSingleAttachmentDownloadingKey}
 										/>
+										<LoadChatSelectedPhotosUploadButton files={selectablePhotos} />
 									</div>
 								</IncomingMessageBubble>
 								{renderMessageMenu()}
 							</div>
 						) : (
 							<div className="flex items-start justify-end gap-2">
-								<div className={MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS}>
+								<div className={`${MESSAGE_ATTACHMENT_CARD_WIDTH_CLASS} space-y-2`}>
 									<MessageAttachmentCard
 										item={legacyAttachment}
 										itemKey={legacyAttachmentKey}
 										isOutgoing
 										downloadingKey={singleAttachmentDownloadingKey}
 										setDownloadingKey={setSingleAttachmentDownloadingKey}
+									/>
+									<LoadChatSelectedPhotosUploadButton
+										files={selectablePhotos}
+										isOutgoing
 									/>
 								</div>
 								{renderMessageMenu()}

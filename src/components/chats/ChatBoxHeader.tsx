@@ -12,6 +12,7 @@ import {
 	LoadTrackingChatIcon,
 	MobileMessageNotificationIcon,
 	CopyLocationUpdateIcon,
+	ChatFilesIcon,
 } from "@/icons";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useCurrentUser } from "@/stores/userStore";
@@ -20,6 +21,7 @@ import { renderLoadChatAvatar } from "@/utils/loadChatAvatar";
 import ChatParticipantsModal from "./ChatParticipantsModal";
 import DeleteChatConfirmModal from "./DeleteChatConfirmModal";
 import FilesModal from "./FilesModal";
+import LoadChatFilesModal from "./LoadChatFilesModal";
 import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
 import SetLoadRestModal from "./SetLoadRestModal";
 import LoadChatRestStatusIcon from "./LoadChatRestStatusIcon";
@@ -79,6 +81,7 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 	const [chatAction, setChatAction] = useState<"delete" | "leave">("delete");
 	const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
+	const [isLoadFilesModalOpen, setIsLoadFilesModalOpen] = useState(false);
 	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 	const [isRestModalOpen, setIsRestModalOpen] = useState(false);
 	const [locationUpdateCopied, setLocationUpdateCopied] = useState(false);
@@ -511,6 +514,17 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 				</div>
 
 				<div className="flex items-center gap-3">
+					{chatRoom?.type === "LOAD" ? (
+						<button
+							type="button"
+							onClick={() => setIsLoadFilesModalOpen(true)}
+							className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400"
+							aria-label="Files"
+							title="Files"
+						>
+							<ChatFilesIcon className="h-[18px] w-auto" />
+						</button>
+					) : null}
 					{chatRoom?.type === "LOAD" && chatRoom.loadId?.trim() ? (
 						<Link
 							href={`/tracking/load/${encodeURIComponent(chatRoom.loadId.trim())}`}
@@ -676,6 +690,11 @@ export default function ChatBoxHeader({ chatRoom, isUserOnline }: ChatBoxHeaderP
 					chatRoom={chatRoom}
 				/>
 			)}
+			<LoadChatFilesModal
+				isOpen={isLoadFilesModalOpen}
+				onClose={() => setIsLoadFilesModalOpen(false)}
+				loadId={chatRoom?.loadId}
+			/>
 			<CheckListPushModal
 				isOpen={isPushModalOpen}
 				onClose={() => setIsPushModalOpen(false)}

@@ -5,7 +5,12 @@ import type { ChatMessageAttachment } from "@/app-api/chatApi";
 import FilePreview from "@/components/chats/FilePreview";
 import { HeicConvertingOverlay } from "@/components/chats/HeicConvertingOverlay";
 import { isHeicFileName, loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
+import { isLoadChatSelectableFileName } from "@/utils/chatGalleryImages";
 import { useLoadChatReferenceNumber } from "@/components/chats/LoadChatDownloadContext";
+import {
+	useLoadChatPhotoSelection,
+	type LoadChatSelectedPhoto,
+} from "@/components/chats/LoadChatPhotoSelectionContext";
 
 function formatKb(size?: number | null): string {
 	if (size == null || Number.isNaN(size)) return "";
@@ -28,6 +33,7 @@ async function downloadFile(
 interface MessageAttachmentsGridProps {
 	items: ChatMessageAttachment[];
 	isOutgoing?: boolean;
+	messageId?: string;
 }
 
 interface MessageAttachmentCardProps {
@@ -56,6 +62,9 @@ export function MessageAttachmentCard({
 	const safeName = item.fileName || "File";
 	const isHeic = isHeicFileName(safeName, item.fileUrl);
 	const isDownloadingThis = downloadingKey === itemKey;
+	const photoSelection = useLoadChatPhotoSelection();
+	const canSelectFile = Boolean(photoSelection) && isLoadChatSelectableFileName(safeName);
+	const isFileSelected = canSelectFile && Boolean(photoSelection?.isSelected(itemKey));
 
 	const cellFrame = isOutgoing
 		? "rounded-lg border border-white/20 bg-white/10"
@@ -77,13 +86,42 @@ export function MessageAttachmentCard({
 			{isDownloadingThis && isHeic && (
 				<HeicConvertingOverlay className="z-30 rounded-lg" message="Converting HEIC..." />
 			)}
-			<div className="shrink-0">
+			<div className="relative shrink-0">
 				<FilePreview
 					compact
 					fileUrl={item.fileUrl}
 					fileName={safeName}
 					fileSize={item.fileSize}
 				/>
+				{canSelectFile ? (
+					<button
+						type="button"
+						role="checkbox"
+						aria-checked={isFileSelected}
+						aria-label={`${isFileSelected ? "Deselect" : "Select"} ${safeName}`}
+						onMouseDown={event => event.stopPropagation()}
+						onClick={event => {
+							event.preventDefault();
+							event.stopPropagation();
+							photoSelection?.toggle(itemKey);
+						}}
+						className={`absolute right-1.5 top-1.5 z-20 flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border shadow-sm ${
+							isFileSelected
+								? "border-brand-500 bg-brand-500 text-white"
+								: "border-gray-800 bg-white/90 text-transparent"
+						}`}
+					>
+						<svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" aria-hidden>
+							<path
+								d="M3.5 8.2 6.4 11l6.1-6.2"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							/>
+						</svg>
+					</button>
+				) : null}
 			</div>
 			<div className="flex min-h-0 flex-1 flex-col px-1.5 pb-1 pt-1">
 				<div className="min-h-0">
@@ -137,6 +175,7 @@ export function MessageAttachmentCard({
 export default function MessageAttachmentsGrid({
 	items,
 	isOutgoing = false,
+	messageId,
 }: MessageAttachmentsGridProps) {
 	const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
 
@@ -152,7 +191,7 @@ export default function MessageAttachmentsGrid({
 	return (
 		<div className={gridClass}>
 			{items.map((a, idx) => {
-				const key = `${a.fileUrl}-${idx}`;
+				const key = `${messageId ?? "file"}:${idx}:${a.fileUrl}`;
 				return (
 					<MessageAttachmentCard
 						key={key}
@@ -165,5 +204,38 @@ export default function MessageAttachmentsGrid({
 				);
 			})}
 		</div>
+	);
+}
+
+export function LoadChatSelectedPhotosUploadButton({
+	files,
+	isOutgoing = false,
+}: {
+	files: LoadChatSelectedPhoto[];
+	isOutgoing?: boolean;
+}) {
+	const selection = useLoadChatPhotoSelection();
+	if (!selection || files.length === 0) return null;
+
+	const selectedFiles = files.filter(file => selection.isSelected(file.key));
+	if (selectedFiles.length === 0) return null;
+
+	return (
+		<button
+			type="button"
+			onMouseDown={event => event.stopPropagation()}
+			onClick={event => {
+				event.preventDefault();
+				event.stopPropagation();
+				selection.openUpload(selectedFiles);
+			}}
+			className={`inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+				isOutgoing
+					? "bg-white text-brand-600 hover:bg-white/90"
+					: "bg-brand-500 text-white hover:bg-brand-600"
+			}`}
+		>
+			{selectedFiles.length === 1 ? "Upload file" : "Upload files"}
+		</button>
 	);
 }
