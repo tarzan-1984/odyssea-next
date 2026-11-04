@@ -919,11 +919,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 				const addSystemToast = (window as any).addSystemToastNotification;
 				if (typeof addSystemToast === "function") {
 					const variant =
-						data.type === "offer_refused"
+						data.type === "offer_refused" ||
+						data.type === "offer_same_load_bid"
 							? "error"
-							: data.type === "offer_same_load_bid"
-								? "default"
-								: "success";
+							: "success";
 					addSystemToast({
 						id: data.id,
 						title: data.title,
