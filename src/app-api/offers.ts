@@ -25,6 +25,8 @@ export interface OfferDriver {
 	driver_eta?: string | null;
 	driver_rating?: number | null;
 	has_offer_chat?: boolean;
+	/** True after a dispatcher quick reply was sent for this bid. */
+	quick_reply_sent?: boolean;
 	/** True after this driver has opened the offer. Reset when the offer is edited or reactivated. */
 	is_read?: boolean;
 	/** Unread messages in this driver's offer chat for the current user. */
@@ -765,6 +767,49 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in selectDriverForOffer:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	/**
+	 * Send one canned quick reply into the driver's offer chat.
+	 * Creates the chat first when it does not exist.
+	 */
+	async sendDriverQuickReply(
+		offerId: number,
+		driverExternalId: string,
+		template: "checking" | "considering" | "eta" | "negotiable" | "availability"
+	): Promise<{ success: true } | { success: false; error: string; alreadySent?: boolean }> {
+		try {
+			const response = await axios.post(
+				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/quick-reply`,
+				{ template },
+				{
+					withCredentials: true,
+					validateStatus: () => true,
+				}
+			);
+			if (response.status === 409) {
+				return {
+					success: false,
+					alreadySent: true,
+					error: "Quick reply was already sent for this bid",
+				};
+			}
+			if (response.status >= 200 && response.status < 300) {
+				return { success: true };
+			}
+			const data = response.data as { error?: string; message?: string | string[] };
+			const message = Array.isArray(data?.message) ? data.message[0] : data?.message;
+			return {
+				success: false,
+				error: data?.error ?? message ?? "Failed to send message",
+			};
+		} catch (error) {
+			console.error("Error in sendDriverQuickReply:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

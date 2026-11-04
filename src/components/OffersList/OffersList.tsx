@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWebSocketConnectionCheck } from "@/hooks/useWebSocketConnectionCheck";
 import Image from "next/image";
 import CustomStaticSelect from "@/components/ui/select/CustomSelect";
@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import offersApi, { formatRoute, routeSummary } from "@/app-api/offers";
 import { abbreviateStateInLocationString } from "@/utils/formatDriverLocation";
-import type { OfferRow, OfferDriver } from "@/app-api/offers";
+import type { GetOffersResponse, OfferRow, OfferDriver } from "@/app-api/offers";
 import AddDriversModal from "@/components/tables/DataTables/DriversTable/AddDriversModal";
 import CreateOfferModal, {
 	type EditOfferData,
@@ -37,6 +37,10 @@ import DriverRatingModal from "@/components/tables/DataTables/DriversTable/Drive
 import CounterOfferModal, {
 	type CounterOfferModalState,
 } from "./CounterOfferModal";
+import OfferQuickReplyMenu, {
+	canQuickReplyDriverBid,
+	DriverBidRateButton,
+} from "./OfferQuickReplyMenu";
 import type { SystemToastData } from "@/components/notifications/SystemToastNotification";
 import { getRoleDisplayLabel } from "@/helpers";
 
@@ -468,12 +472,14 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 	driverIdx,
 	canModifyOffersByRole,
 	onPushClick,
+	onOpenQuickReply,
 }: {
 	offer: OfferRow;
 	driver: OfferDriver;
 	driverIdx: number;
 	canModifyOffersByRole: boolean;
 	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
+	onOpenQuickReply: (offer: OfferRow, driver: OfferDriver, anchor: HTMLButtonElement) => void;
 }) {
 	const driverName = [
 		driver.externalId != null ? `(${driver.externalId})` : null,
@@ -505,7 +511,10 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 		>
 			{driver.rate != null ? (
 				<span className="flex shrink-0 flex-col items-start leading-tight">
-					<span
+					<DriverBidRateButton
+						label={formatDriverBidRate(driver.rate) ?? ""}
+						enabled={canQuickReplyDriverBid(driver, canModifyOffersByRole)}
+						onOpen={(anchor) => onOpenQuickReply(offer, driver, anchor)}
 						className={`text-[10px] font-medium tabular-nums ${
 							isInactiveDriver
 								? "text-[#a20000] dark:text-red-200"
@@ -515,9 +524,7 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 										? "text-gray-500 dark:text-gray-400"
 										: "text-gray-500 dark:text-gray-400"
 						}`}
-					>
-						{formatDriverBidRate(driver.rate)}
-					</span>
+					/>
 					{driver.counter_offer != null ? (
 						<span className="text-[10px] font-medium tabular-nums text-yellow-500 dark:text-yellow-400">
 							{formatDriverBidRate(driver.counter_offer)}
@@ -816,6 +823,13 @@ const OffersList = () => {
 	} | null>(null);
 	const [counterOfferModal, setCounterOfferModal] =
 		useState<CounterOfferModalState | null>(null);
+	const quickReplyLockRef = useRef(false);
+	const [quickReplyMenu, setQuickReplyMenu] = useState<{
+		offerId: number;
+		unitId: string;
+		hasOfferChat: boolean;
+		anchor: HTMLElement;
+	} | null>(null);
 	const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
 	const [userFilterId, setUserFilterId] = useState("");
 	const [selectedOfferIds, setSelectedOfferIds] = useState<number[]>([]);
@@ -898,6 +912,98 @@ const OffersList = () => {
 	const showOfferId =
 		isAdmin && String(currentUser?.externalId ?? "").trim() === "83";
 	const canModifyOffersByRole = canModifyOffers(currentUser?.role);
+	const setQuickReplyLocked = useCallback((locked: boolean) => {
+		quickReplyLockRef.current = locked;
+	}, []);
+	const openQuickReplyMenu = useCallback(
+		(offerId: number, driver: OfferDriver, anchor: HTMLButtonElement) => {
+			if (quickReplyLockRef.current) return;
+			const unitId = (driver.externalId ?? driver.driver_id)?.trim();
+			if (!unitId || !canQuickReplyDriverBid(driver, canModifyOffersByRole)) return;
+			setQuickReplyMenu({
+				offerId,
+				unitId,
+				hasOfferChat: driver.has_offer_chat === true,
+				anchor,
+			});
+		},
+		[canModifyOffersByRole]
+	);
+	const closeQuickReplyMenu = useCallback(() => {
+		quickReplyLockRef.current = false;
+		setQuickReplyMenu(null);
+	}, []);
+	const markDriverQuickReplySent = useCallback(
+		(offerId: number, unitId: string) => {
+			queryClient.setQueriesData<GetOffersResponse>(
+				{ queryKey: ["offers-list-cards"] },
+				(current) => {
+					if (!current?.data?.results) return current;
+					return {
+						...current,
+						data: {
+							...current.data,
+							results: current.data.results.map((offer) => {
+								if (offer.id !== offerId || !offer.drivers) return offer;
+								return {
+									...offer,
+									drivers: offer.drivers.map((driver) => {
+										const key = (driver.externalId ?? driver.driver_id)?.trim();
+										if (key !== unitId) return driver;
+										return {
+											...driver,
+											quick_reply_sent: true,
+											has_offer_chat: true,
+										};
+									}),
+								};
+							}),
+						},
+					};
+				}
+			);
+		},
+		[queryClient]
+	);
+	const openOfferDriverChat = useCallback(
+		async (
+			offerId: number,
+			unitId: string,
+			hasOfferChat: boolean,
+			actionKey: string | null
+		): Promise<{ success: true } | { success: false; error: string }> => {
+			if (!canModifyOffersByRole) {
+				return { success: false, error: "Failed to create offer chat" };
+			}
+			const chatUrl = buildOfferChatUrl(String(offerId), unitId);
+			if (hasOfferChat) {
+				window.open(chatUrl, "_blank", "noopener,noreferrer");
+				return { success: true };
+			}
+			if (actionKey) setCreatingChatDriverKey(actionKey);
+			const res = await offersApi.createOfferDriverChat(offerId, unitId);
+			setCreatingChatDriverKey(null);
+			if (res.success) {
+				window.location.href = chatUrl;
+				return { success: true };
+			}
+			return {
+				success: false,
+				error:
+					typeof res.error === "string" ? res.error : "Failed to create offer chat",
+			};
+		},
+		[canModifyOffersByRole]
+	);
+	const handleQuickReplyCustom = useCallback(async () => {
+		if (!quickReplyMenu) return { success: false as const };
+		return openOfferDriverChat(
+			quickReplyMenu.offerId,
+			quickReplyMenu.unitId,
+			quickReplyMenu.hasOfferChat,
+			`${quickReplyMenu.offerId}-${quickReplyMenu.unitId}`
+		);
+	}, [openOfferDriverChat, quickReplyMenu]);
 
 	const handleConfirmDeactivateOffer = async () => {
 		if (!deactivateConfirmOffer) return;
@@ -1382,6 +1488,7 @@ const OffersList = () => {
 																	driverIdx={driverIdx}
 																	canModifyOffersByRole={canModifyOffersByRole}
 															onPushClick={handleExtendBidPush}
+															onOpenQuickReply={openQuickReplyMenu}
 																/>
 															))}
 														</div>
@@ -1396,6 +1503,7 @@ const OffersList = () => {
 																	driverIdx={driverIdx}
 																	canModifyOffersByRole={canModifyOffersByRole}
 															onPushClick={handleExtendBidPush}
+															onOpenQuickReply={openQuickReplyMenu}
 																/>
 															))}
 														</div>
@@ -1730,7 +1838,16 @@ const OffersList = () => {
 																	<TableCell className="px-3 py-2 text-center text-theme-sm text-gray-800 dark:text-gray-200 border-b border-r border-gray-200 dark:border-white/[0.08]">
 																		<div className="flex flex-col items-center gap-0.5">
 																			{driver.rate != null ? (
-																				<span>{formatDriverBidRate(driver.rate)}</span>
+																				<DriverBidRateButton
+																					label={formatDriverBidRate(driver.rate) ?? ""}
+																					enabled={canQuickReplyDriverBid(
+																						driver,
+																						canModifyOffersByRole
+																					)}
+																					onOpen={(anchor) =>
+																						openQuickReplyMenu(row.id, driver, anchor)
+																					}
+																				/>
 																			) : null}
 																			{driver.extension_rates?.map((extensionRate) => {
 																				const label = formatExtensionBidRate(extensionRate);
@@ -1783,30 +1900,16 @@ const OffersList = () => {
 																								creatingChatDriverKey === actionKey
 																							}
 																							onClick={async () => {
-																								if (!canModifyOffersByRole || !driverUnitId) return;
-																								const chatUrl = buildOfferChatUrl(
-																									String(row.id),
-																									driverUnitId
-																								);
-																if (driver.has_offer_chat) {
-																									window.open(chatUrl, "_blank", "noopener,noreferrer");
-																									return;
-																}
-																								setCreatingChatDriverKey(actionKey);
-																								const res = await offersApi.createOfferDriverChat(
+																								if (!canModifyOffersByRole || !driverUnitId || !actionKey) return;
+																								const chatResult = await openOfferDriverChat(
 																									row.id,
-																									String(driverUnitId)
+																									String(driverUnitId),
+																									driver.has_offer_chat === true,
+																									actionKey
 																								);
-																								setCreatingChatDriverKey(null);
-																								if (res.success) {
-																									window.location.href = chatUrl;
-																								} else {
-																									console.error(res.error);
-																									window.alert(
-																										typeof res.error === "string"
-																											? res.error
-																											: "Failed to create offer chat"
-																									);
+																								if (!chatResult.success) {
+																									console.error(chatResult.error);
+																									window.alert(chatResult.error);
 																								}
 																							}}
 																							className="relative inline-flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
@@ -2105,6 +2208,20 @@ const OffersList = () => {
 					await queryClient.invalidateQueries({ queryKey: ["offers-list-cards"] });
 				}}
 			/>
+
+			{quickReplyMenu ? (
+				<OfferQuickReplyMenu
+					offerId={quickReplyMenu.offerId}
+					unitId={quickReplyMenu.unitId}
+					anchor={quickReplyMenu.anchor}
+					onClose={closeQuickReplyMenu}
+					onSent={() =>
+						markDriverQuickReplySent(quickReplyMenu.offerId, quickReplyMenu.unitId)
+					}
+					onCustomReply={handleQuickReplyCustom}
+					onLockChange={setQuickReplyLocked}
+				/>
+			) : null}
 
 			<ConfirmModal
 				isOpen={deactivateConfirmOffer != null}
