@@ -65,13 +65,15 @@ export const CAPABILITIES_OPTIONS: CapabilityOption[] = [
 		text: "US Passport",
 		selected: false,
 		icon: (
-			<Image
-				src={usPassportIcon}
-				alt="US Passport"
-				width={16}
-				height={16}
-				className="h-4 w-4 object-contain"
-			/>
+			<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
+				<Image
+					src={usPassportIcon}
+					alt="US Passport"
+					width={20}
+					height={20}
+					className="h-5 w-5 object-contain"
+				/>
+			</span>
 		),
 	},
 	{

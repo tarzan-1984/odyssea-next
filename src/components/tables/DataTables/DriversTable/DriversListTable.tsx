@@ -1604,13 +1604,13 @@ export default function DriversListTable({
 																	content="US Passport"
 																	position="top"
 																>
-																	<span className="inline-flex">
+																	<span className="inline-flex h-7 w-7 items-center justify-center rounded bg-white dark:bg-white">
 																		<Image
 																			src={usPassportIcon}
 																			alt="US Passport"
-																			width={28}
-																			height={28}
-																			className="h-7 w-7 object-contain"
+																			width={20}
+																			height={20}
+																			className="h-5 w-5 object-contain"
 																		/>
 																	</span>
 																</Tooltip>
