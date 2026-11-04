@@ -25,6 +25,7 @@ import {
 } from "@/icons";
 import macroPointIcon from "@/icons/additional/macropoint.png";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
+import usPassportIcon from "@/icons/additional/us-passport.png";
 import AlaskaIcon from "@/icons/additional/usa-alaska.svg";
 import SideDoorIcon from "@/icons/additional/side_door.svg";
 
@@ -56,6 +57,22 @@ export const CAPABILITIES_OPTIONS: CapabilityOption[] = [
 		text: "Global Entry",
 		selected: false,
 		icon: <WorldMapIcon className="h-4 w-4" />,
+	},
+	{ value: "permanent-residency", text: "Permanent resident", selected: false },
+	{ value: "work-authorization", text: "Work authorization", selected: false },
+	{
+		value: "us-passport",
+		text: "US Passport",
+		selected: false,
+		icon: (
+			<Image
+				src={usPassportIcon}
+				alt="US Passport"
+				width={16}
+				height={16}
+				className="h-4 w-4 object-contain"
+			/>
+		),
 	},
 	{
 		value: "tanker-endorsement",

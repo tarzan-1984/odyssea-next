@@ -40,6 +40,7 @@ import Link from "next/link";
 import PaginationWithIcon from "./PaginationWithIcon";
 import Image from "next/image";
 import macroPointIcon from "@/icons/additional/macropoint.png";
+import usPassportIcon from "@/icons/additional/us-passport.png";
 import iceIcon from "@/icons/additional/ice.jpg";
 import tuckerTools from "@/icons/additional/tucker-tools.png";
 import AlaskaIcon from "@/icons/additional/usa-alaska.svg";
@@ -1593,6 +1594,24 @@ export default function DriversListTable({
 																>
 																	<span className="inline-flex">
 																		<TsaIcon className="h-7 w-7" />
+																	</span>
+																</Tooltip>
+															)}
+															{item?.meta_data?.legal_document_type ===
+																"us-passport" && (
+																<Tooltip
+																	theme="inverse"
+																	content="US Passport"
+																	position="top"
+																>
+																	<span className="inline-flex">
+																		<Image
+																			src={usPassportIcon}
+																			alt="US Passport"
+																			width={28}
+																			height={28}
+																			className="h-7 w-7 object-contain"
+																		/>
 																	</span>
 																</Tooltip>
 															)}
