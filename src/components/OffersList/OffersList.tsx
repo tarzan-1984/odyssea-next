@@ -479,7 +479,7 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 	driverIdx: number;
 	canModifyOffersByRole: boolean;
 	onPushClick: (offer: OfferRow, driver: OfferDriver) => void;
-	onOpenQuickReply: (offer: OfferRow, driver: OfferDriver, anchor: HTMLButtonElement) => void;
+	onOpenQuickReply: (offer: OfferRow, driver: OfferDriver, anchor: HTMLElement) => void;
 }) {
 	const driverName = [
 		driver.externalId != null ? `(${driver.externalId})` : null,
@@ -496,10 +496,39 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 		!isInactiveDriver &&
 		actionTimeUnix != null &&
 		(remainingSeconds == null || remainingSeconds <= 0);
+	const canQuickReply = canQuickReplyDriverBid(driver, canModifyOffersByRole);
+	const openQuickReplyFromBadge = (anchor: HTMLElement) => {
+		onOpenQuickReply(offer, driver, anchor);
+	};
 
 	return (
 		<div
+			role={canQuickReply ? "button" : undefined}
+			tabIndex={canQuickReply ? 0 : undefined}
+			title={canQuickReply ? "Quick reply" : undefined}
+			data-quick-reply-rate={canQuickReply ? "" : undefined}
+			onClick={
+				canQuickReply
+					? (event) => {
+							event.preventDefault();
+							event.stopPropagation();
+							openQuickReplyFromBadge(event.currentTarget);
+						}
+					: undefined
+			}
+			onKeyDown={
+				canQuickReply
+					? (event) => {
+							if (event.key !== "Enter" && event.key !== " ") return;
+							event.preventDefault();
+							event.stopPropagation();
+							openQuickReplyFromBadge(event.currentTarget);
+						}
+					: undefined
+			}
 			className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
+				canQuickReply ? "cursor-pointer " : ""
+			}${
 				isInactiveDriver
 					? "border-transparent bg-[#f5b8ab] dark:border-red-800/35 dark:bg-red-950/50"
 					: hasActiveTimer
@@ -511,10 +540,7 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 		>
 			{driver.rate != null ? (
 				<span className="flex shrink-0 flex-col items-start leading-tight">
-					<DriverBidRateButton
-						label={formatDriverBidRate(driver.rate) ?? ""}
-						enabled={canQuickReplyDriverBid(driver, canModifyOffersByRole)}
-						onOpen={(anchor) => onOpenQuickReply(offer, driver, anchor)}
+					<span
 						className={`text-[10px] font-medium tabular-nums ${
 							isInactiveDriver
 								? "text-[#a20000] dark:text-red-200"
@@ -524,7 +550,9 @@ const OfferDriverBadge = memo(function OfferDriverBadge({
 										? "text-gray-500 dark:text-gray-400"
 										: "text-gray-500 dark:text-gray-400"
 						}`}
-					/>
+					>
+						{formatDriverBidRate(driver.rate) ?? ""}
+					</span>
 					{driver.counter_offer != null ? (
 						<span className="text-[10px] font-medium tabular-nums text-yellow-500 dark:text-yellow-400">
 							{formatDriverBidRate(driver.counter_offer)}
@@ -916,7 +944,7 @@ const OffersList = () => {
 		quickReplyLockRef.current = locked;
 	}, []);
 	const openQuickReplyMenu = useCallback(
-		(offer: OfferRow, driver: OfferDriver, anchor: HTMLButtonElement) => {
+		(offer: OfferRow, driver: OfferDriver, anchor: HTMLElement) => {
 			if (quickReplyLockRef.current) return;
 			const unitId = (driver.externalId ?? driver.driver_id)?.trim();
 			if (!unitId || !canQuickReplyDriverBid(driver, canModifyOffersByRole)) return;

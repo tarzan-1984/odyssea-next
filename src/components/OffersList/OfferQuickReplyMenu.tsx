@@ -130,7 +130,17 @@ export default function OfferQuickReplyMenu({
 			if (phaseRef.current === "pending") return;
 			const target = event.target as HTMLElement | null;
 			if (!target) return;
-			if (target.closest("[data-quick-reply-rate]")) return;
+			const quickReplyTarget = target.closest("[data-quick-reply-rate]");
+			if (quickReplyTarget) {
+				const nestedAction = target.closest("button");
+				if (
+					!nestedAction ||
+					nestedAction === quickReplyTarget ||
+					nestedAction.hasAttribute("data-quick-reply-rate")
+				) {
+					return;
+				}
+			}
 			if (menuRef.current?.contains(target)) return;
 			onClose();
 		};
