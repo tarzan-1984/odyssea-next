@@ -916,12 +916,12 @@ const OffersList = () => {
 		quickReplyLockRef.current = locked;
 	}, []);
 	const openQuickReplyMenu = useCallback(
-		(offerId: number, driver: OfferDriver, anchor: HTMLButtonElement) => {
+		(offer: OfferRow, driver: OfferDriver, anchor: HTMLButtonElement) => {
 			if (quickReplyLockRef.current) return;
 			const unitId = (driver.externalId ?? driver.driver_id)?.trim();
 			if (!unitId || !canQuickReplyDriverBid(driver, canModifyOffersByRole)) return;
 			setQuickReplyMenu({
-				offerId,
+				offerId: offer.id,
 				unitId,
 				hasOfferChat: driver.has_offer_chat === true,
 				anchor,
@@ -1845,7 +1845,7 @@ const OffersList = () => {
 																						canModifyOffersByRole
 																					)}
 																					onOpen={(anchor) =>
-																						openQuickReplyMenu(row.id, driver, anchor)
+																						openQuickReplyMenu(row, driver, anchor)
 																					}
 																				/>
 																			) : null}
