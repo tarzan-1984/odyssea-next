@@ -24,7 +24,6 @@ import {
 	isOfferAsapTime,
 	isOfferDateWithoutTime,
 	OFFER_ASAP_TIME,
-	OFFER_TIME_REQUIRED_ERROR,
 	offerStopTimeOrNewYorkNow,
 } from "@/utils/offerDateTimeRange";
 import {
@@ -188,6 +187,35 @@ function locationFormatErrorsForRows(rows: RouteRow[]): Record<string, string> {
 
 function routeRowsGeocodeKey(rows: RouteRow[]): string {
 	return rows.map(row => row.id).join("|");
+}
+
+const PICKUP_DATE_TIME_REQUIRED_ERROR =
+	"Pick up date & time is necessary to proceed with the load offer";
+const DELIVERY_DATE_TIME_REQUIRED_ERROR =
+	"Delivery date & time is necessary to proceed with the load offer";
+
+function routeStopTimeIsComplete(time: string): boolean {
+	if (time === "") return false;
+	if (isOfferAsapTime(time)) return true;
+	return !isOfferDateWithoutTime(time);
+}
+
+/** Names the stop whose location is filled but date & time is missing or incomplete. */
+function dateTimeRequiredRouteError(
+	rows: Array<Pick<RouteRow, "type" | "location" | "time">>
+): string | null {
+	let pickupMissing = false;
+	let deliveryMissing = false;
+	for (const row of rows) {
+		if (row.location === "") continue;
+		if (routeStopTimeIsComplete(row.time)) continue;
+		if (row.type === "pickup") pickupMissing = true;
+		else deliveryMissing = true;
+	}
+	const messages: string[] = [];
+	if (pickupMissing) messages.push(PICKUP_DATE_TIME_REQUIRED_ERROR);
+	if (deliveryMissing) messages.push(DELIVERY_DATE_TIME_REQUIRED_ERROR);
+	return messages.length > 0 ? messages.join("\n") : null;
 }
 
 function routePointToRow(
@@ -1206,28 +1234,23 @@ export default function CreateOfferModal({
 			time: row.time.trim(),
 		}));
 
-		const pickups = trimmedRoute.filter(
-			row => row.type === "pickup" && row.location !== "" && row.time !== ""
+		const hasLocatedPickup = trimmedRoute.some(
+			row => row.type === "pickup" && row.location !== ""
 		);
-		const deliveries = trimmedRoute.filter(
-			row => row.type === "delivery" && row.location !== "" && row.time !== ""
+		const hasLocatedDelivery = trimmedRoute.some(
+			row => row.type === "delivery" && row.location !== ""
 		);
+		const dateTimeError = dateTimeRequiredRouteError(trimmedRoute);
 
 		if (trimmedRoute.length === 0) {
 			routeError = "Add at least one Pick up and one Delivery";
-		} else if (pickups.length === 0 || deliveries.length === 0) {
+		} else if (!hasLocatedPickup || !hasLocatedDelivery) {
 			routeError = "At least one Pick up and one Delivery are required";
+		} else if (dateTimeError) {
+			routeError = dateTimeError;
 		} else {
-			const missingTime = trimmedRoute.some(row => row.time === "");
-			const dateWithoutTime = trimmedRoute.some(
-				row => !isOfferAsapTime(row.time) && isOfferDateWithoutTime(row.time)
-			);
 			const missingLocation = trimmedRoute.some(row => row.location === "");
-			if (missingTime) {
-				routeError = "Each stop must have a date and time";
-			} else if (dateWithoutTime) {
-				routeError = OFFER_TIME_REQUIRED_ERROR;
-			} else if (missingLocation) {
+			if (missingLocation) {
 				routeError = "Each stop must have a location";
 			} else {
 				const first = trimmedRoute[0];
@@ -1655,7 +1678,9 @@ export default function CreateOfferModal({
 						</p>
 					)}
 					{routeError && (
-						<p className="text-sm text-red-500 dark:text-red-400">{routeError}</p>
+						<p className="whitespace-pre-line text-sm text-red-500 dark:text-red-400">
+							{routeError}
+						</p>
 					)}
 
 					{/* Row 4: Weight, Commodity */}
