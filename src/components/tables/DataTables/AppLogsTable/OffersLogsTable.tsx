@@ -8,22 +8,34 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import Input from "@/components/form/input/InputField";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "../CheckListTable/CheckListTablePagination";
+import { TMS_LOAD_PAGE_URL } from "@/utils/busyOnOtherLoad";
 import { formatAppLogCreatedAt } from "./appLogsTypes";
 import type { OfferLogsResponse } from "./offerLogsTypes";
+
+function offerLogDraftHref(draftId: string): string {
+	const params = new URLSearchParams({
+		post_id: draftId,
+		tab: "pills-documents-tab",
+	});
+	return `${TMS_LOAD_PAGE_URL}?${params.toString()}`;
+}
 
 async function fetchOfferLogsPage(
 	page: number,
 	perPage: number,
 	driverExternalId: string,
+	offerId: string,
 	dateFrom: string,
 	dateTo: string,
 ): Promise<OfferLogsResponse> {
 	const driverId = driverExternalId.trim();
+	const offer = offerId.trim();
 	const res = await axios.get<OfferLogsResponse>("/api/offers-logs", {
 		params: {
 			page,
 			limit: perPage,
 			...(driverId ? { driver_external_id: driverId } : {}),
+			...(offer ? { offer_id: offer } : {}),
 			...(dateFrom ? { date_from: dateFrom } : {}),
 			...(dateTo ? { date_to: dateTo } : {}),
 		},
@@ -94,6 +106,8 @@ export default function OffersLogsTable() {
 	const [itemsPerPage, setItemsPerPage] = useState(20);
 	const [driverInput, setDriverInput] = useState("");
 	const [debouncedDriverId, setDebouncedDriverId] = useState("");
+	const [offerIdInput, setOfferIdInput] = useState("");
+	const [debouncedOfferId, setDebouncedOfferId] = useState("");
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
 
@@ -103,8 +117,13 @@ export default function OffersLogsTable() {
 	}, [driverInput]);
 
 	useEffect(() => {
+		const t = window.setTimeout(() => setDebouncedOfferId(offerIdInput.trim()), 400);
+		return () => window.clearTimeout(t);
+	}, [offerIdInput]);
+
+	useEffect(() => {
 		setCurrentPage(1);
-	}, [debouncedDriverId, dateFrom, dateTo, itemsPerPage]);
+	}, [debouncedDriverId, debouncedOfferId, dateFrom, dateTo, itemsPerPage]);
 
 	const query = useQuery({
 		queryKey: [
@@ -112,6 +131,7 @@ export default function OffersLogsTable() {
 			currentPage,
 			itemsPerPage,
 			debouncedDriverId,
+			debouncedOfferId,
 			dateFrom,
 			dateTo,
 		],
@@ -120,6 +140,7 @@ export default function OffersLogsTable() {
 				currentPage,
 				itemsPerPage,
 				debouncedDriverId,
+				debouncedOfferId,
 				dateFrom,
 				dateTo,
 			),
@@ -136,7 +157,7 @@ export default function OffersLogsTable() {
 	const logs = query.data?.logs ?? [];
 	const totalItems = query.data?.pagination?.total_count ?? 0;
 	const totalPages = query.data?.pagination?.total_pages ?? 0;
-	const filterKey = `${debouncedDriverId}-${dateFrom}-${dateTo}`;
+	const filterKey = `${debouncedDriverId}-${debouncedOfferId}-${dateFrom}-${dateTo}`;
 
 	return (
 		<div className="relative min-w-0 bg-white dark:bg-white/[0.03] rounded-xl">
@@ -157,7 +178,7 @@ export default function OffersLogsTable() {
 					/>
 					<span className="text-gray-500 dark:text-gray-400"> entries </span>
 				</div>
-				<div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3 lg:max-w-3xl">
+				<div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 lg:max-w-5xl">
 					<label className="block min-w-0">
 						<span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
 							Driver external id
@@ -167,6 +188,19 @@ export default function OffersLogsTable() {
 							placeholder="External id"
 							value={driverInput}
 							onChange={e => setDriverInput(e.target.value)}
+							className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
+						/>
+					</label>
+					<label className="block min-w-0">
+						<span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+							Offer id
+						</span>
+						<Input
+							type="text"
+							inputMode="numeric"
+							placeholder="Offer id"
+							value={offerIdInput}
+							onChange={e => setOfferIdInput(e.target.value)}
 							className="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-600"
 						/>
 					</label>
@@ -208,7 +242,7 @@ export default function OffersLogsTable() {
 			/>
 
 			<div className="overflow-x-auto border-x border-gray-100 dark:border-white/[0.05]">
-				<div className="min-w-[960px]">
+				<div className="min-w-[1080px]">
 					<Table>
 						<TableHeader className="border-b border-gray-100 bg-gray-50 text-gray-700 dark:border-white/[0.05] dark:bg-gray-900 dark:text-gray-300">
 							<TableRow>
@@ -234,6 +268,12 @@ export default function OffersLogsTable() {
 									isHeader
 									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
 								>
+									Draft id
+								</TableCell>
+								<TableCell
+									isHeader
+									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
+								>
 									Drivers
 								</TableCell>
 								<TableCell
@@ -247,7 +287,7 @@ export default function OffersLogsTable() {
 						<TableBody className="text-sm divide-y divide-gray-100 dark:divide-white/[0.05]">
 							{query.isError && (
 								<TableRow>
-									<TableCell colSpan={5} className="px-5 py-8 text-center text-red-500">
+									<TableCell colSpan={6} className="px-5 py-8 text-center text-red-500">
 										{(query.error as Error)?.message || "Failed to load offer logs"}
 									</TableCell>
 								</TableRow>
@@ -255,7 +295,7 @@ export default function OffersLogsTable() {
 							{!query.isError && !query.isPending && logs.length === 0 && (
 								<TableRow>
 									<TableCell
-										colSpan={5}
+										colSpan={6}
 										className="px-5 py-8 text-center text-gray-500 dark:text-gray-400"
 									>
 										No logs found
@@ -279,6 +319,20 @@ export default function OffersLogsTable() {
 									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 font-mono text-xs whitespace-nowrap align-top">
 										{row.offerId}
+									</TableCell>
+									<TableCell className="px-4 py-3 text-gray-800 dark:text-gray-200 font-mono text-xs whitespace-nowrap align-top">
+										{row.draftId?.trim() ? (
+											<a
+												href={offerLogDraftHref(row.draftId.trim())}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="underline underline-offset-2 hover:text-brand-500"
+											>
+												{row.draftId.trim()}
+											</a>
+										) : (
+											"—"
+										)}
 									</TableCell>
 									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs align-top max-w-[20rem]">
 										<OfferLogDrivers

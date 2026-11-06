@@ -269,6 +269,47 @@ export interface ReturnOffersResponse {
 	returnedIds?: number[];
 }
 
+export interface OfferQuickReplyTemplate {
+	id: number;
+	title: string;
+	message: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+function readNestData(payload: unknown): unknown {
+	if (!payload || typeof payload !== "object") return payload;
+	const record = payload as { data?: unknown; timestamp?: unknown };
+	if ("timestamp" in record && "data" in record) return record.data;
+	return payload;
+}
+
+function parseQuickReplyTemplate(raw: unknown): OfferQuickReplyTemplate | null {
+	if (!raw || typeof raw !== "object") return null;
+	const row = raw as Record<string, unknown>;
+	const id = Number(row.id);
+	if (!Number.isInteger(id) || id < 1) return null;
+	if (typeof row.title !== "string" || typeof row.message !== "string") return null;
+	return {
+		id,
+		title: row.title,
+		message: row.message,
+		createdAt: typeof row.createdAt === "string" ? row.createdAt : "",
+		updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : "",
+	};
+}
+
+function apiErrorMessage(data: unknown, fallback: string): string {
+	if (!data || typeof data !== "object") return fallback;
+	const record = data as { error?: unknown; message?: unknown };
+	if (typeof record.error === "string" && record.error) return record.error;
+	if (typeof record.message === "string" && record.message) return record.message;
+	if (Array.isArray(record.message) && typeof record.message[0] === "string") {
+		return record.message[0];
+	}
+	return fallback;
+}
+
 /**
  * Offers API – create offer and rate_offers via backend.
  * Uses axios with credentials (cookies) for auth.
@@ -775,18 +816,18 @@ const offers = {
 	},
 
 	/**
-	 * Send one canned quick reply into the driver's offer chat.
+	 * Send one personal quick reply into the driver's offer chat.
 	 * Creates the chat first when it does not exist.
 	 */
 	async sendDriverQuickReply(
 		offerId: number,
 		driverExternalId: string,
-		template: "checking" | "considering" | "eta" | "negotiable" | "availability"
+		templateId: number
 	): Promise<{ success: true } | { success: false; error: string; alreadySent?: boolean }> {
 		try {
 			const response = await axios.post(
 				`/api/offers/${offerId}/drivers/${encodeURIComponent(driverExternalId)}/quick-reply`,
-				{ template },
+				{ templateId },
 				{
 					withCredentials: true,
 					validateStatus: () => true,
@@ -810,6 +851,104 @@ const offers = {
 			};
 		} catch (error) {
 			console.error("Error in sendDriverQuickReply:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async listQuickReplyTemplates(): Promise<
+		| { success: true; templates: OfferQuickReplyTemplate[] }
+		| { success: false; error: string }
+	> {
+		try {
+			const response = await axios.get("/api/offers/quick-reply-templates", {
+				withCredentials: true,
+				validateStatus: () => true,
+			});
+			if (response.status < 200 || response.status >= 300) {
+				return { success: false, error: apiErrorMessage(response.data, "Failed to load templates") };
+			}
+			const raw = readNestData(response.data);
+			const templates = Array.isArray(raw)
+				? raw.map(parseQuickReplyTemplate).filter((item): item is OfferQuickReplyTemplate => item != null)
+				: [];
+			return { success: true, templates };
+		} catch (error) {
+			console.error("Error in listQuickReplyTemplates:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async createQuickReplyTemplate(
+		title: string,
+		message: string
+	): Promise<{ success: true; template: OfferQuickReplyTemplate } | { success: false; error: string }> {
+		try {
+			const response = await axios.post(
+				"/api/offers/quick-reply-templates",
+				{ title, message },
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			if (response.status < 200 || response.status >= 300) {
+				return { success: false, error: apiErrorMessage(response.data, "Failed to save template") };
+			}
+			const template = parseQuickReplyTemplate(readNestData(response.data));
+			if (!template) return { success: false, error: "Failed to save template" };
+			return { success: true, template };
+		} catch (error) {
+			console.error("Error in createQuickReplyTemplate:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async updateQuickReplyTemplate(
+		templateId: number,
+		title: string,
+		message: string
+	): Promise<{ success: true; template: OfferQuickReplyTemplate } | { success: false; error: string }> {
+		try {
+			const response = await axios.patch(
+				`/api/offers/quick-reply-templates/${templateId}`,
+				{ title, message },
+				{ withCredentials: true, validateStatus: () => true }
+			);
+			if (response.status < 200 || response.status >= 300) {
+				return { success: false, error: apiErrorMessage(response.data, "Failed to save template") };
+			}
+			const template = parseQuickReplyTemplate(readNestData(response.data));
+			if (!template) return { success: false, error: "Failed to save template" };
+			return { success: true, template };
+		} catch (error) {
+			console.error("Error in updateQuickReplyTemplate:", error);
+			return {
+				success: false,
+				error: axios.isAxiosError(error) ? error.message : "Network error",
+			};
+		}
+	},
+
+	async deleteQuickReplyTemplate(
+		templateId: number
+	): Promise<{ success: true } | { success: false; error: string }> {
+		try {
+			const response = await axios.delete(`/api/offers/quick-reply-templates/${templateId}`, {
+				withCredentials: true,
+				validateStatus: () => true,
+			});
+			if (response.status < 200 || response.status >= 300) {
+				return { success: false, error: apiErrorMessage(response.data, "Failed to delete template") };
+			}
+			return { success: true };
+		} catch (error) {
+			console.error("Error in deleteQuickReplyTemplate:", error);
 			return {
 				success: false,
 				error: axios.isAxiosError(error) ? error.message : "Network error",

@@ -10,6 +10,8 @@ export type OfferLogRow = {
 	rates: Record<string, number>;
 	/** Driver external id chosen for the load. */
 	selectedDriverId: string | null;
+	/** TMS draft post id created when the driver was accepted. */
+	draftId: string | null;
 };
 
 export type OfferLogsResponse = {

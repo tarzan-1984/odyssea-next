@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverAuth } from "@/utils/auth";
 
-const QUICK_REPLY_TEMPLATES = new Set([
-	"checking",
-	"considering",
-	"eta",
-	"negotiable",
-	"availability",
-]);
-
 export async function POST(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string; driverExternalId: string }> }
@@ -27,10 +19,10 @@ export async function POST(
 			);
 		}
 
-		const body = await request.json().catch(() => ({}));
-		const template = typeof body?.template === "string" ? body.template.trim() : "";
-		if (!QUICK_REPLY_TEMPLATES.has(template)) {
-			return NextResponse.json({ error: "Unknown quick reply" }, { status: 400 });
+		const body = (await request.json().catch(() => ({}))) as { templateId?: unknown };
+		const templateId = Number(body.templateId);
+		if (!Number.isInteger(templateId) || templateId < 1) {
+			return NextResponse.json({ error: "Template id is required" }, { status: 400 });
 		}
 
 		const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/offers/${encodeURIComponent(id)}/drivers/${encodeURIComponent(driverExternalId)}/quick-reply`;
@@ -40,7 +32,7 @@ export async function POST(
 				Authorization: `Bearer ${accessToken}`,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ template }),
+			body: JSON.stringify({ templateId }),
 		});
 
 		const data = await response.json().catch(() => ({}));

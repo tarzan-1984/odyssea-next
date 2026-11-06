@@ -16,7 +16,7 @@ type OfferLogsApiPayload = {
 };
 
 /**
- * GET /api/offers-logs?page=&limit=&driver_external_id=&date_from=&date_to=
+ * GET /api/offers-logs?page=&limit=&driver_external_id=&offer_id=&date_from=&date_to=
  * Proxies to NestJS offers_logs list.
  */
 export async function GET(request: NextRequest) {
@@ -36,12 +36,16 @@ export async function GET(request: NextRequest) {
 		const page = searchParams.get("page");
 		const limit = searchParams.get("limit");
 		const driverExternalId = searchParams.get("driver_external_id");
+		const offerId = searchParams.get("offer_id");
 		const dateFrom = searchParams.get("date_from");
 		const dateTo = searchParams.get("date_to");
 		if (page) queryParams.set("page", page);
 		if (limit) queryParams.set("limit", limit);
 		if (driverExternalId && driverExternalId.trim() !== "") {
 			queryParams.set("driver_external_id", driverExternalId.trim());
+		}
+		if (offerId && offerId.trim() !== "") {
+			queryParams.set("offer_id", offerId.trim());
 		}
 		if (dateFrom && dateFrom.trim() !== "") {
 			queryParams.set("date_from", dateFrom.trim());
