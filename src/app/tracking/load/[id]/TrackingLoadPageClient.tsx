@@ -14,7 +14,6 @@ import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedE
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import TrackingStatusCard from "@/components/logistics/TrackingStatusCard";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
-import BusyOnOtherLoadBanner from "@/components/logistics/BusyOnOtherLoadBanner";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
@@ -1272,11 +1271,6 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 		)
 	);
 	const showDeliveredLoadBanner = Boolean(showMapAndTrackingTools && isLoadDelivered);
-	const showBusyOnOtherLoadBanner = Boolean(
-		busyOnLoad &&
-			!isLoadDelivered &&
-			(showMapAndTrackingTools || mapUiMode === "driver_not_loaded_enroute")
-	);
 
 	const driverStaleLocationBanner =
 		showStaleLocationMessage || showLoadedEnrouteStaleBanner
@@ -1348,27 +1342,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						</div>
 					)}
 					{mapUiMode === "driver_not_loaded_enroute" && (
-						<>
-							<DriverNotLoadedEnroutePanel
-								driverStatusLabel={driverStatusLabel}
-								driverExternalId={currentTrackingDriver?.externalId}
-							/>
-							{showBusyOnOtherLoadBanner && busyOnLoad ? (
-								<BusyOnOtherLoadBanner
-									busy={busyOnLoad}
-									reserveRightForHistory={false}
-								/>
-							) : null}
-						</>
+						<DriverNotLoadedEnroutePanel
+							driverStatusLabel={driverStatusLabel}
+							driverExternalId={currentTrackingDriver?.externalId}
+						/>
 					)}
 					{showMapAndTrackingTools && (
 						<>
-							{showBusyOnOtherLoadBanner && busyOnLoad ? (
-								<BusyOnOtherLoadBanner
-									busy={busyOnLoad}
-									reserveRightForHistory={reserveTopBannerRightLane}
-								/>
-							) : showPickupRoadEta ? (
+							{showPickupRoadEta ? (
 								<PickupRoadEtaBanner
 									status={pickupRoadEta.status}
 									eta={pickupRoadEta.eta}

@@ -1473,7 +1473,8 @@ const OffersList = () => {
 											</button>
 										</div>
 									</div>
-									<div className="flex flex-col gap-1 min-w-0">
+									<div className="flex items-start justify-between gap-3">
+									<div className="flex min-w-0 flex-1 flex-col gap-1">
 										{row.update_date?.trim() ? (
 											<p className="text-sm text-gray-500 dark:text-gray-400 truncate">
 												Update at {formatOfferCreateTimeEst(row.update_date)}
@@ -1539,6 +1540,12 @@ const OffersList = () => {
 												</div>
 											);
 										})()}
+									</div>
+									{row.active !== false && row.is_time_expired === true && (
+										<span className="mt-3 inline-flex h-6 shrink-0 items-center rounded-md bg-red-600 px-2 text-xs font-medium text-white">
+											Pickup time expired
+										</span>
+									)}
 									</div>
 								</div>
 									{isExpanded && (

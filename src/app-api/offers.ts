@@ -66,6 +66,7 @@ export interface OfferRow {
 	id: number;
 	active?: boolean;
 	is_driver_selected: boolean;
+	is_time_expired?: boolean;
 	external_user_id: string | null;
 	creator?: OfferCreator | null;
 	create_time: string;
