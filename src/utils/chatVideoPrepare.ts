@@ -135,3 +135,38 @@ export async function prepareChatVideoForSend(
 
 	throw new Error("Video conversion timed out. Please try again.");
 }
+
+/**
+ * Resolve the deterministic H.264 copy for playback. The backend job is
+ * idempotent; while it runs, keep the player on a lightweight preparing state
+ * instead of attempting an incompatible original and failing immediately.
+ */
+export async function resolveChatVideoForPlayback(
+	fileUrl: string,
+	fileName: string,
+	timeoutMs = 2 * 60_000,
+): Promise<string> {
+	if (fileUrl.includes("/files/playable/") && fileUrl.includes("_h264.mp4")) {
+		return fileUrl;
+	}
+
+	const expected = buildPlayableVideoUrl(fileUrl);
+	if (!expected) return fileUrl;
+	if (await remoteObjectExists(expected)) return expected;
+
+	let playableUrl = expected;
+	const startedAt = Date.now();
+	let nextEnsureAt = 0;
+	while (Date.now() - startedAt < timeoutMs) {
+		if (Date.now() >= nextEnsureAt) {
+			const result = await requestPlayable(fileUrl, fileName);
+			playableUrl = result.playableUrl || playableUrl;
+			if (result.status === "ready") return playableUrl;
+			nextEnsureAt = Date.now() + 10_000;
+		}
+		if (await remoteObjectExists(playableUrl)) return playableUrl;
+		await sleep(POLL_INTERVAL_MS);
+	}
+
+	throw new Error("Video is still being prepared. Please try again shortly.");
+}

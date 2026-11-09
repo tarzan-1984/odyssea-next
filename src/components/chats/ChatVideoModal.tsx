@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { resolveChatVideoForPlayback } from "@/utils/chatVideoPrepare";
 
 type ChatVideoModalProps = {
 	isOpen: boolean;
@@ -17,6 +18,32 @@ export default function ChatVideoModal({
 	fileName,
 	onClose,
 }: ChatVideoModalProps) {
+	const [playUrl, setPlayUrl] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!isOpen || !fileUrl) {
+			setPlayUrl(null);
+			setError(null);
+			return;
+		}
+		let cancelled = false;
+		setPlayUrl(null);
+		setError(null);
+		resolveChatVideoForPlayback(fileUrl, fileName || "video.mp4")
+			.then(url => {
+				if (!cancelled) setPlayUrl(url);
+			})
+			.catch(reason => {
+				if (!cancelled) {
+					setError(reason instanceof Error ? reason.message : "Failed to prepare video");
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [isOpen, fileUrl, fileName]);
+
 	return (
 		<Modal
 			isOpen={isOpen}
@@ -27,10 +54,10 @@ export default function ChatVideoModal({
 			closeOnBackdropClick={true}
 		>
 			<div className="flex min-h-0 flex-1 items-center justify-center p-4 pt-14 sm:p-8">
-				{isOpen && fileUrl ? (
+				{isOpen && playUrl ? (
 					<video
-						key={fileUrl}
-						src={fileUrl}
+						key={playUrl}
+						src={playUrl}
 						controls
 						autoPlay
 						playsInline
@@ -38,7 +65,14 @@ export default function ChatVideoModal({
 					>
 						{fileName || "Video"}
 					</video>
-				) : null}
+				) : error ? (
+					<p className="px-6 text-center text-sm text-red-300">{error}</p>
+				) : (
+					<div className="flex flex-col items-center gap-3 text-white">
+						<span className="h-9 w-9 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+						<p className="text-sm">Preparing video…</p>
+					</div>
+				)}
 			</div>
 			{fileName ? (
 				<div className="pointer-events-none absolute bottom-4 left-1/2 z-[100002] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg bg-black/70 px-4 py-2 text-center text-white backdrop-blur-sm">

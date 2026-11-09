@@ -565,14 +565,8 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						const uploader = new S3Uploader();
 						const { fileUrl, key, fileName, fileSize } = await uploader.upload(item.file);
 
-						// Poster in background — never delay the attach strip.
-						if (isChatVideoFile({ name: fileName })) {
-							void fetch("/api/storage/video-poster", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ fileUrl, fileName, mode: "poster" }),
-							}).catch(() => undefined);
-						}
+						// The message-create pipeline generates video poster + playable MP4 once.
+						// Until send, the attach strip keeps using its local object URL.
 						if (isChatImageThumbnailCandidate(fileName)) {
 							prefetchChatImageThumbnail(fileUrl, fileName);
 						}

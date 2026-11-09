@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useChatStore } from "@/stores/chatStore";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/lib/chatMessagesQuery";
 import { isAbortError } from "@/lib/chatMessagesSingleFlight";
 import { chatApi } from "@/app-api/chatApi";
+import { useWebSocket } from "@/context/WebSocketContext";
 
 const PAGE = 1;
 const LIMIT = 50;
@@ -32,8 +33,10 @@ const roomHasUnread = (chatRoomId: string) => {
  */
 export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 	const queryClient = useQueryClient();
+	const { socket } = useWebSocket();
 	const setLoadingMessages = useChatStore(s => s.setLoadingMessages);
 	const setError = useChatStore(s => s.setError);
+	const catchUpInFlightRef = useRef(false);
 
 	const [hydration, setHydration] = useState<HydrationState>({
 		ready: false,
@@ -101,6 +104,57 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 		throwOnError: false,
 	});
 
+	// WebSocket delivery is primary, but a browser can miss an event while the
+	// tab/socket is suspended. Reconcile the active transcript periodically and
+	// immediately when the tab becomes visible again.
+	useEffect(() => {
+		if (!chatRoomId || !hydration.ready) return;
+
+		let cancelled = false;
+		const catchUp = async () => {
+			if (
+				cancelled ||
+				catchUpInFlightRef.current ||
+				(typeof navigator !== "undefined" && !navigator.onLine)
+			) {
+				return;
+			}
+			catchUpInFlightRef.current = true;
+			try {
+				await fetchChatMessagesFromApi(chatRoomId, PAGE, LIMIT, { force: true });
+			} catch (error) {
+				if (!isAbortError(error)) {
+					console.warn("Failed to catch up active chat messages:", error);
+				}
+			} finally {
+				catchUpInFlightRef.current = false;
+			}
+		};
+
+		const onVisibilityChange = () => {
+			if (document.visibilityState === "visible") catchUp().catch(() => {});
+		};
+		const onChatUpdated = (data: { chatRoomId?: string }) => {
+			if (data?.chatRoomId === chatRoomId) catchUp().catch(() => {});
+		};
+		const intervalId = window.setInterval(() => {
+			if (document.visibilityState === "visible") catchUp().catch(() => {});
+		}, 15_000);
+
+		catchUp().catch(() => {});
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		window.addEventListener("focus", catchUp);
+		socket?.on("chatUpdated", onChatUpdated);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(intervalId);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
+			window.removeEventListener("focus", catchUp);
+			socket?.off("chatUpdated", onChatUpdated);
+		};
+	}, [chatRoomId, hydration.ready, socket]);
+
 	const isLoading =
 		Boolean(chatRoomId) &&
 		(!hydration.ready || (hydration.needsApi && query.isFetching));
@@ -115,7 +169,7 @@ export function useChatRoomMessagesQuery(chatRoomId: string | undefined) {
 		if (room?.type !== "LOAD" || String(room.loadStatus ?? "").trim()) return;
 
 		let cancelled = false;
-		void chatApi
+		chatApi
 			.getChatRoom(chatRoomId)
 			.then(fresh => {
 				if (cancelled || !String(fresh.loadStatus ?? "").trim()) return;

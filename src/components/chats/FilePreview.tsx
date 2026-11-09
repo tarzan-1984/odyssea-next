@@ -10,6 +10,7 @@ import {
 	CHAT_IMAGE_PREVIEW_LOAD_TIMEOUT_MS,
 	isChatImageThumbnailCandidate,
 	buildChatImagePreviewProxyUrl,
+	buildChatImageThumbnailUrl,
 	isLegacyChatImagePreviewProxyUrl,
 } from "@/config/chatImagePreview";
 import { ensureChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
@@ -273,6 +274,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 	const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 	const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+	const [videoPosterRetry, setVideoPosterRetry] = useState(0);
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
 	const [isDownloading, setIsDownloading] = useState(false);
 	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
@@ -311,6 +313,10 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 			fileExtension
 		);
 	const isVideo = isChatVideoFile({ name: fileName });
+
+	useEffect(() => {
+		setVideoPosterRetry(0);
+	}, [fileUrl]);
 
 	const openImageViewer = useCallback(() => {
 		if (chatImageGallery && isImage) {
@@ -600,11 +606,14 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 						setIsVideoModalOpen(true);
 					}}
 				>
-					<video
-						src={`${fileUrl}#t=0.1`}
-						muted
-						playsInline
-						preload="metadata"
+					<img
+						src={`${buildChatImageThumbnailUrl(fileUrl, 400, 50) || ""}${videoPosterRetry ? `?r=${videoPosterRetry}` : ""}`}
+						alt="Video preview"
+						onError={() => {
+							if (videoPosterRetry < 12) {
+								window.setTimeout(() => setVideoPosterRetry(current => current + 1), 2500);
+							}
+						}}
 						className={`pointer-events-none h-full w-full object-cover ${
 							useCompactPreview ? compactMedia : "max-h-64"
 						}`}
