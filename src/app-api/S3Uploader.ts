@@ -1,6 +1,7 @@
 // Lightweight client class to upload a File via presigned PUT URL.
 
 import { chatApi } from "./chatApi";
+import { chatVideoContentType } from "@/utils/chatAttachmentTypes";
 
 export type PresignResponse = {
 	uploadUrl: string;
@@ -137,8 +138,13 @@ export class S3Uploader {
 					contentType = 'application/json';
 					break;
 				default:
-					contentType = 'application/octet-stream';
+					contentType = chatVideoContentType(filename) || 'application/octet-stream';
 			}
+		}
+
+		if (!contentType || contentType === "application/octet-stream") {
+			const videoType = chatVideoContentType(filename, uploadFile.type);
+			if (videoType) contentType = videoType;
 		}
 
 		// Additional validation for SVG files
@@ -218,6 +224,10 @@ export class S3Uploader {
 			// 2) PUT upload to Wasabi
 			const putStartedAt = performance.now();
 			this.onProgress?.({ stage: "upload", sizeBytes: uploadFile.size, presignMs });
+			const putTimeoutMs = Math.max(
+				PUT_TIMEOUT_MS,
+				Math.ceil(uploadFile.size / (200 * 1024)) * 1000,
+			);
 			const putRes = await this.fetchWithTimeout(
 				uploadUrl,
 				{
@@ -225,7 +235,7 @@ export class S3Uploader {
 					headers: { "Content-Type": contentType },
 					body: uploadFile,
 				},
-				PUT_TIMEOUT_MS,
+				putTimeoutMs,
 				"Storage upload timed out",
 			);
 			const putMs = Math.round(performance.now() - putStartedAt);

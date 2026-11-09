@@ -19,6 +19,8 @@ import { loadReferenceDownloadFilename } from "@/utils/downloadChatFile";
 import { useChatMediaLoad } from "@/context/ChatMediaLoadContext";
 import { useLazyInViewport } from "@/hooks/useLazyInViewport";
 import { ChatMediaPreviewPlaceholder } from "@/components/chats/ChatMediaPreviewPlaceholder";
+import ChatVideoModal from "@/components/chats/ChatVideoModal";
+import { isChatVideoFile } from "@/utils/chatAttachmentTypes";
 
 const IMAGE_PREVIEW_EXTENSIONS = [
 	"jpg",
@@ -270,6 +272,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 	const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 	const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+	const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 	const [isModalImageLoading, setIsModalImageLoading] = useState(false);
 	const [isDownloading, setIsDownloading] = useState(false);
 	const [modalImageRotationDeg, setModalImageRotationDeg] = useState(0);
@@ -307,6 +310,7 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 		["jpg", "jpeg", "png", "gif", "webp", "svg", "heic", "heif", "bmp", "tiff", "dng"].includes(
 			fileExtension
 		);
+	const isVideo = isChatVideoFile({ name: fileName });
 
 	const openImageViewer = useCallback(() => {
 		if (chatImageGallery && isImage) {
@@ -584,6 +588,36 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 	);
 
 	const renderPreview = () => {
+		if (isVideo) {
+			return (
+				<button
+					type="button"
+					className={`relative w-full overflow-hidden bg-black ${
+						useCompactPreview ? compactFrame : "h-64 rounded-lg"
+					}`}
+					onClick={event => {
+						event.stopPropagation();
+						setIsVideoModalOpen(true);
+					}}
+				>
+					<video
+						src={`${fileUrl}#t=0.1`}
+						muted
+						playsInline
+						preload="metadata"
+						className={`pointer-events-none h-full w-full object-cover ${
+							useCompactPreview ? compactMedia : "max-h-64"
+						}`}
+					/>
+					<span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+						<span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55">
+							<span className="ml-1 h-0 w-0 border-y-[8px] border-l-[14px] border-y-transparent border-l-white" />
+						</span>
+					</span>
+				</button>
+			);
+		}
+
 		if (error) {
 			if (isImage) {
 				return (
@@ -915,6 +949,15 @@ const FilePreviewContent: React.FC<FilePreviewProps> = ({
 							</div>
 						</div>
 					)}
+
+			{isVideo && (
+				<ChatVideoModal
+					isOpen={isVideoModalOpen}
+					fileUrl={fileUrl}
+					fileName={fileName}
+					onClose={() => setIsVideoModalOpen(false)}
+				/>
+			)}
 
 			{/* Fallback image modal when gallery provider is not available (e.g. Files modal) */}
 			{isImage && !chatImageGallery && (

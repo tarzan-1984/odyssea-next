@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
 		// Existing codebase has many legacy lint warnings; fail CI via `yarn lint` instead.
 		ignoreDuringBuilds: true,
 	},
+	// Keep the real ffmpeg binary path; bundling rewrites it into .next/vendor-chunks.
+	serverExternalPackages: ["ffmpeg-static"],
 	// Parent repo has an empty package-lock.json; without this Next traces from
 	// /htdocs/odyssea2 and `next build` fails with ENOENT for some app pages.
 	outputFileTracingRoot: path.join(__dirname),

@@ -71,12 +71,13 @@ describe("URL offer time", () => {
 describe("New York default offer time", () => {
 	const instant = new Date("2026-09-30T16:23:00Z");
 
-	it("uses the current New York clock, rounded up to 10 minutes", () => {
-		expect(defaultPickupDateTime(instant)).toBe("9/30/2026 12:30 PM");
+	it("uses New York now + 30 minutes, rounded up to 10 minutes", () => {
+		// 16:23 UTC → 12:23 PM NY; +30 → 12:53 PM; round up → 1:00 PM
+		expect(defaultPickupDateTime(instant)).toBe("9/30/2026 01:00 PM");
 	});
 
-	it("keeps a GET date and fills the missing time from New York", () => {
-		expect(offerStopTimeOrNewYorkNow("8/13/2026", instant)).toBe("8/13/2026 12:30 PM");
+	it("keeps a GET date and fills the missing time from New York + 30", () => {
+		expect(offerStopTimeOrNewYorkNow("8/13/2026", instant)).toBe("8/13/2026 01:00 PM");
 	});
 
 	it("keeps a GET datetime that already has a time", () => {

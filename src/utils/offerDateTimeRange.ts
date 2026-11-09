@@ -231,14 +231,24 @@ export function newYorkWallClock(instant: Date = new Date()): Date {
 	return new Date(num("year"), num("month") - 1, num("day"), hour, num("minute"), num("second"));
 }
 
-/** Pickup default: current New York time, rounded up to 10 minutes. */
+/**
+ * Default pickup wall clock: New York now + 30 minutes, then rounded up to
+ * the next 10-minute mark.
+ */
+export function defaultPickupWallClock(instant: Date = new Date()): Date {
+	const clock = newYorkWallClock(instant);
+	clock.setMinutes(clock.getMinutes() + 30);
+	return roundUpToTenMinutes(clock);
+}
+
+/** Pickup default: New York now + 30 minutes, rounded up to 10 minutes. */
 export function defaultPickupDateTime(instant: Date = new Date()): string {
-	return formatOfferDateTime(roundUpToTenMinutes(newYorkWallClock(instant)));
+	return formatOfferDateTime(defaultPickupWallClock(instant));
 }
 
 /**
  * GET stop time. A full datetime is kept. A date without a time, or an empty
- * value, gets the current New York clock.
+ * value, gets New York now + 30 minutes (rounded up to 10 minutes).
  */
 export function offerStopTimeOrNewYorkNow(raw: string, instant: Date = new Date()): string {
 	const trimmed = raw.trim();
@@ -247,7 +257,7 @@ export function offerStopTimeOrNewYorkNow(raw: string, instant: Date = new Date(
 	if (start) return formatOfferDateTimeRange(start, end);
 	const dateOnly = parseOfferDateOnly(trimmed);
 	if (!dateOnly) return "";
-	const clock = roundUpToTenMinutes(newYorkWallClock(instant));
+	const clock = defaultPickupWallClock(instant);
 	dateOnly.setHours(clock.getHours(), clock.getMinutes(), 0, 0);
 	return formatOfferDateTime(dateOnly);
 }

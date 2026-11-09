@@ -22,7 +22,6 @@ import { runBrowserAccessTokenRefresh } from "@/utils/accessTokenRefresh";
 import { useChatStore } from "@/stores/chatStore";
 import { indexedDBChatService } from "@/services/IndexedDBChatService";
 import { getUndoSendDelaySeconds } from "@/stores/undoSendDelayStore";
-
 const SEND_ACK_TIMEOUT_MS = 15_000;
 
 export type OutboundSendFn = (
@@ -174,13 +173,15 @@ export function useChatOutboxSend({
 			inFlightRef.current.add(item.clientMessageId);
 
 			try {
-				const uploaded = item.uploadedAttachments;
+				let uploaded = item.uploadedAttachments;
 
 				if (item.kind === "media") {
 					if (!uploaded?.length) {
 						throw new Error("Missing uploaded attachments for media message");
 					}
 
+					// Send the uploaded original immediately. Nest builds H.264/poster
+					// in the background on message create — same path as mobile.
 					if (uploaded.length >= 2) {
 						await sendMessage(
 							item.content,
@@ -333,6 +334,7 @@ export function useChatOutboxSend({
 			const scheduledSendAt = isScheduled
 				? new Date(Date.now() + delaySeconds * 1000).toISOString()
 				: undefined;
+			const initialStatus = isScheduled ? "scheduled" : "sending";
 
 			const optimistic = createOptimisticMediaMessage({
 				clientMessageId,
@@ -341,7 +343,7 @@ export function useChatOutboxSend({
 				content,
 				attachments,
 				replyData,
-				status: isScheduled ? "scheduled" : "sending",
+				status: initialStatus,
 				scheduledSendAt,
 			});
 
@@ -354,7 +356,7 @@ export function useChatOutboxSend({
 				content,
 				replyData,
 				uploadedAttachments: attachmentsToOutboxUploaded(attachments),
-				status: isScheduled ? "scheduled" : "sending",
+				status: initialStatus,
 				scheduledSendAt,
 				createdAt: optimistic.createdAt,
 				retryCount: 0,

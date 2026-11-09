@@ -15,6 +15,7 @@ import MessageAttachmentsGrid, {
 	MessageAttachmentCard,
 } from "./MessageAttachmentsGrid";
 import { isLoadChatSelectableFileName } from "@/utils/chatGalleryImages";
+import { isChatVideoFile } from "@/utils/chatAttachmentTypes";
 import MessageReactions from "./MessageReactions";
 import IncomingMessageBubble from "./IncomingMessageBubble";
 import { formatNyWallClockDateTime } from "@/utils/nyWallClock";
@@ -154,6 +155,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 		const previewableExtensions = [".pdf", ".docx", ".doc", ".txt"];
 		return previewableExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 	};
+
+	const isVideoFile = (fileName?: string): boolean => isChatVideoFile({ name: fileName });
 
 	const isSystemMessage = Boolean(message.isSystemMessage);
 	const senderFirstName = String(message.sender.firstName ?? "").trim();
@@ -431,8 +434,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
 					</div>
 				)}
 
-				{/* File preview for PDF, DOCX, TXT */}
-				{showLegacySingleFile && legacyAttachment && isPreviewableFile(message.fileName) && (
+				{/* File preview for PDF, DOCX, TXT, and video */}
+				{showLegacySingleFile &&
+					legacyAttachment &&
+					(isPreviewableFile(message.fileName) || isVideoFile(message.fileName)) && (
 					<div className={isSender ? "mb-2 ml-auto" : "mb-2"}>
 						{!isSender ? (
 							<div className="flex min-w-0 items-start gap-2">
@@ -478,7 +483,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
 				{showLegacySingleFile &&
 					legacyFileUrl &&
 					!isImageFile(message.fileName) &&
-					!isPreviewableFile(message.fileName) && (
+					!isPreviewableFile(message.fileName) &&
+					!isVideoFile(message.fileName) && (
 					<div
 						className={
 							isSender ? "mb-2 ml-auto w-full max-w-[270px]" : "mb-2 w-full max-w-[270px]"
@@ -778,7 +784,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
 												d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 											/>
 										</svg>
-										<span className="chat-msg-meta">Sending...</span>
+										<span className="chat-msg-meta">
+											{pendingStatus === "uploading" &&
+											isVideoFile(message.fileName)
+												? "Preparing video..."
+												: pendingStatus === "uploading"
+													? "Uploading..."
+													: "Sending..."}
+										</span>
 									</div>
 								) : null}
 								{isPendingFailed ? (

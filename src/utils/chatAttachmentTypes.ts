@@ -39,3 +39,33 @@ export function isChatAttachmentImageFile(file: File): boolean {
 export function isChatAttachmentNonImageFile(file: File): boolean {
 	return isChatAttachmentFile(file) && !isChatAttachmentImageFile(file);
 }
+
+/** Video is allowed in chat only. News attachments keep CHAT_ATTACHMENT_TYPES. */
+export const CHAT_VIDEO_ACCEPT =
+	"video/mp4,video/quicktime,video/webm,video/3gpp,.mp4,.m4v,.mov,.webm,.3gp";
+
+export const CHAT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+
+const CHAT_VIDEO_EXTENSIONS = [".mp4", ".m4v", ".mov", ".webm", ".3gp", ".3gpp"];
+
+export function isChatVideoFile(file: { name?: string; type?: string }): boolean {
+	const type = (file.type || "").toLowerCase().split(";")[0].trim();
+	if (type.startsWith("video/")) return true;
+	const name = (file.name || "").toLowerCase();
+	return CHAT_VIDEO_EXTENSIONS.some(extension => name.endsWith(extension));
+}
+
+export function chatVideoContentType(fileName: string, type?: string): string | null {
+	const raw = (type || "").toLowerCase().split(";")[0].trim();
+	if (raw.startsWith("video/")) return raw;
+	const extension = fileName.toLowerCase().split(".").pop() || "";
+	const byExtension: Record<string, string> = {
+		mp4: "video/mp4",
+		m4v: "video/mp4",
+		mov: "video/quicktime",
+		webm: "video/webm",
+		"3gp": "video/3gpp",
+		"3gpp": "video/3gpp",
+	};
+	return byExtension[extension] ?? null;
+}

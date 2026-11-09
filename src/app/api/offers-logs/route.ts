@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { serverAuth } from "@/utils/auth";
-import { canAccessAppLogs } from "@/utils/roleAccess";
+import { canAccessAppLogs, canViewOfferLogRates } from "@/utils/roleAccess";
 
 type OfferLogsApiPayload = {
 	logs: unknown[];
@@ -77,6 +77,13 @@ export async function GET(request: NextRequest) {
 		const payload =
 			(data as { data?: OfferLogsApiPayload })?.data ?? (data as OfferLogsApiPayload);
 		const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+		if (!canViewOfferLogRates(userData?.role)) {
+			for (const log of logs) {
+				if (log && typeof log === "object") {
+					delete (log as { rates?: unknown }).rates;
+				}
+			}
+		}
 		const pagination = payload?.pagination ?? {
 			current_page: page ? Math.max(1, parseInt(page, 10)) : 1,
 			per_page: limit ? Math.max(1, parseInt(limit, 10)) : 20,

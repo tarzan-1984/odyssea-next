@@ -1,4 +1,5 @@
 import { stripMarkdown } from "@/utils/chatMarkdown";
+import { isChatVideoFile } from "@/utils/chatAttachmentTypes";
 
 type ReplyLike = {
 	content?: string;
@@ -15,6 +16,7 @@ export function replyQuoteText(replyData: ReplyLike): string {
 		.map(part => part.trim())
 		.filter(Boolean);
 	if (names.length > 1) return `${names.length} files`;
+	if (names.length === 1 && isChatVideoFile({ name: names[0] })) return "Video";
 	if (names[0]) return names[0];
 	if (replyData?.fileUrl) return "Attachment";
 	return "";

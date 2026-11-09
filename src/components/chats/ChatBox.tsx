@@ -321,6 +321,10 @@ export default function ChatBox({
 			"image/heif": "heif",
 			"application/pdf": "pdf",
 			"text/plain": "txt",
+			"video/mp4": "mp4",
+			"video/quicktime": "mov",
+			"video/webm": "webm",
+			"video/3gpp": "3gp",
 		};
 		const extension = extensionByType[file.type] || "bin";
 

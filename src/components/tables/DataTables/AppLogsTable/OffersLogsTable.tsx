@@ -8,7 +8,9 @@ import CustomStaticSelect from "@/components/ui/select/CustomSelect";
 import Input from "@/components/form/input/InputField";
 import SpinnerOne from "@/app/(admin)/(ui-elements)/spinners/SpinnerOne";
 import CheckListTablePagination from "../CheckListTable/CheckListTablePagination";
+import { useCurrentUser } from "@/stores/userStore";
 import { TMS_LOAD_PAGE_URL } from "@/utils/busyOnOtherLoad";
+import { canViewOfferLogRates } from "@/utils/roleAccess";
 import { formatAppLogCreatedAt } from "./appLogsTypes";
 import type { OfferLogsResponse } from "./offerLogsTypes";
 
@@ -102,6 +104,9 @@ function OfferLogRates({ rates }: { rates?: Record<string, number> | null }) {
 }
 
 export default function OffersLogsTable() {
+	const currentUser = useCurrentUser();
+	const showRates = canViewOfferLogRates(currentUser?.role);
+	const columnCount = showRates ? 6 : 5;
 	const [currentPage, setCurrentPage] = useState(1);
 	const [itemsPerPage, setItemsPerPage] = useState(20);
 	const [driverInput, setDriverInput] = useState("");
@@ -276,18 +281,20 @@ export default function OffersLogsTable() {
 								>
 									Drivers
 								</TableCell>
-								<TableCell
-									isHeader
-									className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
-								>
-									Rates
-								</TableCell>
+								{showRates ? (
+									<TableCell
+										isHeader
+										className="px-4 py-3 text-xs font-medium sm:px-5 sm:text-sm whitespace-nowrap"
+									>
+										Rates
+									</TableCell>
+								) : null}
 							</TableRow>
 						</TableHeader>
 						<TableBody className="text-sm divide-y divide-gray-100 dark:divide-white/[0.05]">
 							{query.isError && (
 								<TableRow>
-									<TableCell colSpan={6} className="px-5 py-8 text-center text-red-500">
+									<TableCell colSpan={columnCount} className="px-5 py-8 text-center text-red-500">
 										{(query.error as Error)?.message || "Failed to load offer logs"}
 									</TableCell>
 								</TableRow>
@@ -295,7 +302,7 @@ export default function OffersLogsTable() {
 							{!query.isError && !query.isPending && logs.length === 0 && (
 								<TableRow>
 									<TableCell
-										colSpan={6}
+										colSpan={columnCount}
 										className="px-5 py-8 text-center text-gray-500 dark:text-gray-400"
 									>
 										No logs found
@@ -341,9 +348,11 @@ export default function OffersLogsTable() {
 											selectedDriverId={row.selectedDriverId}
 										/>
 									</TableCell>
-									<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs align-top max-w-[24rem]">
-										<OfferLogRates rates={row.rates} />
-									</TableCell>
+									{showRates ? (
+										<TableCell className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs align-top max-w-[24rem]">
+											<OfferLogRates rates={row.rates} />
+										</TableCell>
+									) : null}
 								</TableRow>
 							))}
 						</TableBody>

@@ -42,7 +42,11 @@ function getS3Client(config: NonNullable<ReturnType<typeof getWasabiConfig>>) {
 }
 
 function isAllowedUploadContentType(contentType: string): boolean {
-	if (contentType.startsWith("image/") || contentType.startsWith("text/")) {
+	if (
+		contentType.startsWith("image/") ||
+		contentType.startsWith("video/") ||
+		contentType.startsWith("text/")
+	) {
 		return true;
 	}
 

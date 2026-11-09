@@ -203,6 +203,13 @@ export function canAccessAppLogs(role: string | undefined | null): boolean {
 	return (APP_LOGS_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
+/** Offer log Rates column: bid amounts, administrators and tracking team leads only. */
+export function canViewOfferLogRates(role: string | undefined | null): boolean {
+	if (!role) return false;
+	const normalized = role.trim().toUpperCase();
+	return normalized === "ADMINISTRATOR" || normalized === "TRACKING_TL";
+}
+
 /** News/Updates page: recruiters TL, tracking TL, and administrators. */
 export const NEWS_UPDATES_ALLOWED_ROLES = [
 	"RECRUITER_TL",

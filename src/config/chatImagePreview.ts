@@ -81,9 +81,14 @@ export function buildChatImageThumbnailUrl(
 			return fileUrl;
 		}
 
-		const withoutExt = afterFiles.replace(/\.[^./\\]+$/, "");
+		// Playable H.264 copies must reuse the original poster path.
+		let baseName = afterFiles;
+		if (baseName.startsWith("playable/")) {
+			baseName = baseName.slice("playable/".length);
+		}
+		baseName = baseName.replace(/\.[^./\\]+$/, "").replace(/_h264$/i, "");
 		const prefix = parsed.pathname.slice(0, filesIdx + marker.length);
-		const thumbPath = `${prefix}thumbs/${withoutExt}_w${maxWidth}_q${quality}.jpg`;
+		const thumbPath = `${prefix}thumbs/${baseName}_w${maxWidth}_q${quality}.jpg`;
 		return `${parsed.origin}${thumbPath}`;
 	} catch {
 		return null;

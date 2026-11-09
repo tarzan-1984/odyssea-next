@@ -18,8 +18,12 @@ import { Message } from "@/app-api/chatApi";
 import { S3Uploader } from "@/app-api/S3Uploader";
 import {
 	CHAT_ATTACHMENT_ACCEPT,
+	CHAT_VIDEO_ACCEPT,
+	CHAT_VIDEO_MAX_BYTES,
 	isChatAttachmentFile,
+	isChatVideoFile,
 } from "@/utils/chatAttachmentTypes";
+import ChatVideoModal from "@/components/chats/ChatVideoModal";
 import { prefetchChatImageThumbnail } from "@/utils/ensureChatImageThumbnail";
 import { isChatImageThumbnailCandidate } from "@/config/chatImagePreview";
 import { useChatImageGalleryOptional } from "@/components/chats/ChatImageGalleryContext";
@@ -59,6 +63,13 @@ export type ChatAttachmentPayload = {
 	key: string;
 	fileName: string;
 	fileSize: number;
+};
+
+type AttachedChatFile = ChatAttachmentPayload & {
+	localId: string;
+	/** Local blob preview while S3 upload is in flight. */
+	localPreviewUrl?: string;
+	uploadStatus?: "uploading" | "done" | "error";
 };
 
 interface ChatBoxSendFormProps {
@@ -145,10 +156,12 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 			() => Boolean(isBidChat && disableBidPlusOneProp),
 		);
 
-		const [attachedFiles, setAttachedFiles] = useState<
-			(ChatAttachmentPayload & { localId: string })[]
-		>([]);
+		const [attachedFiles, setAttachedFiles] = useState<AttachedChatFile[]>([]);
 		const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+		const [videoPreview, setVideoPreview] = useState<{
+			fileUrl: string;
+			fileName: string;
+		} | null>(null);
 		const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
 		const [emojiPickerMounted, setEmojiPickerMounted] = useState(false);
 		const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number } | null>(
@@ -379,13 +392,24 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 
 				if (onSendMessage) {
 					const filePayload: ChatAttachmentPayload[] = attachedFiles.map(
-						({ localId: _id, ...rest }) => rest
+						({
+							localId: _id,
+							localPreviewUrl: _preview,
+							uploadStatus: _status,
+							...rest
+						}) => rest
 					);
 					await onSendMessage({
 						content: message,
 						fileData: filePayload.length > 0 ? filePayload : undefined,
 						replyData: replyingTo,
 					});
+				}
+
+				for (const file of attachedFiles) {
+					if (file.localPreviewUrl?.startsWith("blob:")) {
+						URL.revokeObjectURL(file.localPreviewUrl);
+					}
 				}
 
 				// Stop typing indicator when message is sent
@@ -486,15 +510,20 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				const errors: string[] = [];
 
 				for (const file of picked) {
+					const video = isChatVideoFile(file);
 					if (file.size <= 0) {
 						errors.push(`${file.name || "file"}: empty file`);
 						continue;
 					}
-					if (file.size > maxSize) {
+					if (video && file.size > CHAT_VIDEO_MAX_BYTES) {
+						errors.push(`${file.name}: max 100MB`);
+						continue;
+					}
+					if (!video && file.size > maxSize) {
 						errors.push(`${file.name}: max 10MB`);
 						continue;
 					}
-					if (!isChatAttachmentFile(file)) {
+					if (!video && !isChatAttachmentFile(file)) {
 						errors.push(`${file.name}: type not allowed`);
 						continue;
 					}
@@ -508,33 +537,87 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 					return;
 				}
 
+				// Show local previews immediately — do not block the composer on S3/poster.
+				const pending: (AttachedChatFile & { file: File })[] = toUpload.map(file => {
+					const localPreviewUrl = URL.createObjectURL(file);
+					return {
+						localId: crypto.randomUUID(),
+						localPreviewUrl,
+						fileUrl: localPreviewUrl,
+						key: "",
+						fileName: file.name || "file",
+						fileSize: file.size,
+						uploadStatus: "uploading",
+						file,
+					};
+				});
+				setAttachedFiles(prev => [
+					...prev,
+					...pending.map(({ file: _file, ...rest }) => rest),
+				]);
 				setIsUploadingAttachments(true);
-				try {
-					const uploader = new S3Uploader();
-					const uploaded: (ChatAttachmentPayload & { localId: string })[] = [];
-					for (const file of toUpload) {
-						const { fileUrl, key, fileName, fileSize } = await uploader.upload(file);
-						uploaded.push({
-							localId: crypto.randomUUID(),
-							fileUrl,
-							key,
-							fileName,
-							fileSize,
-						});
+				if (fileInputRef.current) {
+					fileInputRef.current.value = "";
+				}
+
+				const results = await Promise.allSettled(
+					pending.map(async item => {
+						const uploader = new S3Uploader();
+						const { fileUrl, key, fileName, fileSize } = await uploader.upload(item.file);
+
+						// Poster in background — never delay the attach strip.
+						if (isChatVideoFile({ name: fileName })) {
+							void fetch("/api/storage/video-poster", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ fileUrl, fileName, mode: "poster" }),
+							}).catch(() => undefined);
+						}
 						if (isChatImageThumbnailCandidate(fileName)) {
 							prefetchChatImageThumbnail(fileUrl, fileName);
 						}
-					}
-					setAttachedFiles(prev => [...prev, ...uploaded]);
-				} catch (error) {
-					console.error("Upload error:", error);
-					alert(error instanceof Error ? error.message : "Upload failed");
-				} finally {
-					setIsUploadingAttachments(false);
-					if (fileInputRef.current) {
-						fileInputRef.current.value = "";
-					}
+
+						setAttachedFiles(prev =>
+							prev.map(af =>
+								af.localId === item.localId
+									? {
+											...af,
+											fileUrl,
+											key,
+											fileName,
+											fileSize,
+											uploadStatus: "done",
+										}
+									: af
+							)
+						);
+					})
+				);
+
+				const failed = results.filter(result => result.status === "rejected");
+				if (failed.length > 0) {
+					console.error("Upload error:", failed[0]);
+					setAttachedFiles(prev => {
+						const next: AttachedChatFile[] = [];
+						for (const af of prev) {
+							const pendingItem = pending.find(item => item.localId === af.localId);
+							if (pendingItem && af.uploadStatus === "uploading") {
+								if (af.localPreviewUrl?.startsWith("blob:")) {
+									URL.revokeObjectURL(af.localPreviewUrl);
+								}
+								continue;
+							}
+							next.push(af);
+						}
+						return next;
+					});
+					alert(
+						failed[0].status === "rejected" && failed[0].reason instanceof Error
+							? failed[0].reason.message
+							: "Upload failed"
+					);
 				}
+				setIsUploadingAttachments(false);
 			},
 			[disabled, isSending]
 		);
@@ -574,6 +657,10 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 				"image/heif": "heif",
 				"application/pdf": "pdf",
 				"text/plain": "txt",
+				"video/mp4": "mp4",
+				"video/quicktime": "mov",
+				"video/webm": "webm",
+				"video/3gpp": "3gp",
 			};
 			const extension = extensionByType[file.type] || "bin";
 
@@ -727,11 +814,17 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 		}, [showEmojiPicker]);
 
 		const removeAttachedFile = (localId: string) => {
-			setAttachedFiles(prev => prev.filter(f => f.localId !== localId));
+			setAttachedFiles(prev => {
+				const target = prev.find(f => f.localId === localId);
+				if (target?.localPreviewUrl?.startsWith("blob:")) {
+					URL.revokeObjectURL(target.localPreviewUrl);
+				}
+				return prev.filter(f => f.localId !== localId);
+			});
 		};
 
 		const openAttachedImagePreview = useCallback(
-			(attachment: ChatAttachmentPayload & { localId: string }) => {
+			(attachment: AttachedChatFile) => {
 				if (!chatImageGallery) return;
 
 				const imageAttachments = attachedFiles.filter(file =>
@@ -740,14 +833,14 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 
 				chatImageGallery.openImage(
 					{
-						fileUrl: attachment.fileUrl,
+						fileUrl: attachment.localPreviewUrl || attachment.fileUrl,
 						fileName: attachment.fileName,
 						fileSize: attachment.fileSize,
 					},
 					{
 						viewOnly: true,
 						images: imageAttachments.map(file => ({
-							fileUrl: file.fileUrl,
+							fileUrl: file.localPreviewUrl || file.fileUrl,
 							fileName: file.fileName,
 							fileSize: file.fileSize,
 						})),
@@ -800,41 +893,101 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 						type="file"
 						multiple
 						onChange={handleFileSelect}
-						accept={CHAT_ATTACHMENT_ACCEPT}
+						accept={`${CHAT_ATTACHMENT_ACCEPT},${CHAT_VIDEO_ACCEPT}`}
 						className="hidden"
 					/>
 				) : null}
 
+				<ChatVideoModal
+					isOpen={Boolean(videoPreview)}
+					fileUrl={videoPreview?.fileUrl ?? ""}
+					fileName={videoPreview?.fileName}
+					onClose={() => setVideoPreview(null)}
+				/>
+
 				{(attachedFiles.length > 0 || isUploadingAttachments) && (
 					<div className="mb-2 min-w-0 rounded-lg bg-gray-100 p-2 dark:bg-gray-700">
 						<div className="flex max-w-full flex-nowrap gap-2 overflow-x-auto">
-							{isUploadingAttachments && (
-								<div className="flex shrink-0 items-center gap-2 rounded-md border border-gray-200 bg-white/80 px-2 py-1.5 text-xs text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
-									<svg
-										className="h-3.5 w-3.5 animate-spin"
-										viewBox="0 0 24 24"
-										fill="none"
-										xmlns="http://www.w3.org/2000/svg"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										/>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										/>
-									</svg>
-									Uploading…
-								</div>
-							)}
 							{attachedFiles.map(af => {
 								const isImage = isChatImageThumbnailCandidate(af.fileName);
+								const isVideo = isChatVideoFile({ name: af.fileName });
+								const previewUrl = af.localPreviewUrl || af.fileUrl;
+								const isItemUploading = af.uploadStatus === "uploading";
+
+								if (isVideo) {
+									return (
+										<div key={af.localId} className="relative shrink-0">
+											<button
+												type="button"
+												onClick={() =>
+													setVideoPreview({
+														fileUrl: previewUrl,
+														fileName: af.fileName,
+													})
+												}
+												aria-label={`View ${af.fileName}`}
+												className="relative block h-16 w-16 overflow-hidden rounded-lg border border-gray-200 bg-black dark:border-gray-600"
+											>
+												<video
+													src={`${previewUrl}#t=0.1`}
+													muted
+													playsInline
+													preload="metadata"
+													className="pointer-events-none h-full w-full object-cover"
+												/>
+												<span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+													<span className="ml-0.5 h-0 w-0 border-y-[6px] border-l-[10px] border-y-transparent border-l-white" />
+												</span>
+												{isItemUploading ? (
+													<span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45">
+														<svg
+															className="h-4 w-4 animate-spin text-white"
+															viewBox="0 0 24 24"
+															fill="none"
+														>
+															<circle
+																className="opacity-25"
+																cx="12"
+																cy="12"
+																r="10"
+																stroke="currentColor"
+																strokeWidth="4"
+															/>
+															<path
+																className="opacity-75"
+																fill="currentColor"
+																d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+															/>
+														</svg>
+													</span>
+												) : null}
+											</button>
+											<button
+												type="button"
+												onClick={() => removeAttachedFile(af.localId)}
+												disabled={isItemUploading}
+												aria-label={`Remove ${af.fileName}`}
+												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800/85 text-white shadow-sm hover:bg-gray-900 disabled:opacity-40 dark:bg-gray-900/90 dark:hover:bg-black"
+											>
+												<svg
+													width="12"
+													height="12"
+													viewBox="0 0 24 24"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+												>
+													<path
+														d="M18 6L6 18M6 6L18 18"
+														stroke="currentColor"
+														strokeWidth="2"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+												</svg>
+											</button>
+										</div>
+									);
+								}
 
 								if (isImage) {
 									return (
@@ -844,18 +997,41 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 												onClick={() => openAttachedImagePreview(af)}
 												disabled={!chatImageGallery}
 												aria-label={`View ${af.fileName}`}
-												className="block overflow-hidden rounded-lg border border-gray-200 transition-opacity hover:opacity-90 disabled:cursor-default disabled:hover:opacity-100 dark:border-gray-600"
+												className="relative block overflow-hidden rounded-lg border border-gray-200 transition-opacity hover:opacity-90 disabled:cursor-default disabled:hover:opacity-100 dark:border-gray-600"
 											>
 												<img
-													src={af.fileUrl}
+													src={previewUrl}
 													alt={af.fileName}
 													className="h-16 w-16 object-cover"
 												/>
+												{isItemUploading ? (
+													<span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35">
+														<svg
+															className="h-4 w-4 animate-spin text-white"
+															viewBox="0 0 24 24"
+															fill="none"
+														>
+															<circle
+																className="opacity-25"
+																cx="12"
+																cy="12"
+																r="10"
+																stroke="currentColor"
+																strokeWidth="4"
+															/>
+															<path
+																className="opacity-75"
+																fill="currentColor"
+																d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+															/>
+														</svg>
+													</span>
+												) : null}
 											</button>
 											<button
 												type="button"
 												onClick={() => removeAttachedFile(af.localId)}
-												disabled={isUploadingAttachments}
+												disabled={isItemUploading}
 												aria-label={`Remove ${af.fileName}`}
 												className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800/85 text-white shadow-sm hover:bg-gray-900 disabled:opacity-40 dark:bg-gray-900/90 dark:hover:bg-black"
 											>
@@ -921,7 +1097,7 @@ const ChatBoxSendForm = forwardRef<ChatBoxSendFormHandle, ChatBoxSendFormProps>(
 										<button
 											type="button"
 											onClick={() => removeAttachedFile(af.localId)}
-											disabled={isUploadingAttachments}
+											disabled={isItemUploading}
 											className="shrink-0 text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
 										>
 											<svg
