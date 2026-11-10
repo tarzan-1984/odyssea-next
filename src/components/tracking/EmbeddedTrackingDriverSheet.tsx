@@ -1,18 +1,26 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { Bell } from "lucide-react";
+import CheckListPushModal from "@/components/tables/DataTables/CheckListTable/CheckListPushModal";
+import type { CheckListDriver } from "@/components/tables/DataTables/CheckListTable/checkListTypes";
+import { useResolvedDriverLastActiveApp } from "@/hooks/useResolvedDriverLastActiveApp";
 import { formatNyWallClockForDisplay } from "@/utils/nyWallClock";
 
 export type EmbeddedTrackingDriverSheetData = {
+	id?: string | null;
 	firstName?: string | null;
 	lastName?: string | null;
+	email?: string | null;
 	externalId?: string | null;
 	phone?: string | null;
 	profilePhoto?: string | null;
+	driverStatus?: string | null;
 	latitude?: number | null;
 	longitude?: number | null;
 	lastLocationUpdateAt?: string | null;
+	lastActiveApp?: string | null;
 	driverStatusLabel?: string | null;
 	loadStatusLabel?: string | null;
 	loadNumber?: string | null;
@@ -66,6 +74,30 @@ export default function EmbeddedTrackingDriverSheet({
 	driver,
 	toggleTopClassName = "top-16",
 }: EmbeddedTrackingDriverSheetProps) {
+	const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+	const { usesMobileApp } = useResolvedDriverLastActiveApp(
+		driver.externalId,
+		driver.lastActiveApp
+	);
+
+	const pushModalDriver = useMemo((): CheckListDriver | null => {
+		const id = driver.id?.trim() || driver.externalId?.trim();
+		if (!id) return null;
+		return {
+			id,
+			firstName: driver.firstName ?? "",
+			lastName: driver.lastName ?? "",
+			email: driver.email?.trim() ?? "",
+			externalId: driver.externalId ?? null,
+			phone: driver.phone ?? "",
+			driverStatus: driver.driverStatus ?? null,
+			lastActiveApp: driver.lastActiveApp ?? null,
+			lastLocationUpdateAt: driver.lastLocationUpdateAt ?? null,
+			trackingLoadId: driver.loadId?.trim() ?? null,
+		};
+	}, [driver]);
+
+	const showSendPushButton = usesMobileApp && pushModalDriver !== null;
 	const fullName =
 		`${String(driver.firstName ?? "").trim()} ${String(driver.lastName ?? "").trim()}`.trim() ||
 		"Driver";
@@ -103,7 +135,7 @@ export default function EmbeddedTrackingDriverSheet({
 					className="absolute inset-x-0 bottom-0 z-[1000] max-h-[70%] overflow-hidden rounded-t-[30px] bg-[#FBFCFF] shadow-[0_-7px_24px_rgba(20,51,89,0.12)]"
 				>
 					<div className="min-h-0 overflow-y-auto px-5 pb-5 pt-5">
-						<div className="mb-4 flex items-center gap-4 border-b border-[#DBE3F0] pb-[18px]">
+						<div className="mb-4 flex items-center gap-3 border-b border-[#DBE3F0] pb-[18px]">
 							<div className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E8F2FF]">
 								{driver.profilePhoto ? (
 									// eslint-disable-next-line @next/next/no-img-element
@@ -118,7 +150,7 @@ export default function EmbeddedTrackingDriverSheet({
 									</span>
 								)}
 							</div>
-							<div className="min-w-0">
+							<div className="min-w-0 flex-1">
 								<p className="font-[Manrope,sans-serif] text-[17px] font-semibold leading-6 text-[#09172E]">
 									{fullName}
 								</p>
@@ -126,6 +158,16 @@ export default function EmbeddedTrackingDriverSheet({
 									{unitLabel}
 								</p>
 							</div>
+							{showSendPushButton ? (
+								<button
+									type="button"
+									onClick={() => setIsPushModalOpen(true)}
+									className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#4967f2] bg-white px-3 font-[Manrope,sans-serif] text-[11px] font-medium leading-[15px] text-[#4967f2] transition hover:bg-[#f5f7ff]"
+								>
+									<Bell className="h-3.5 w-3.5" strokeWidth={1.7} />
+									Send Push
+								</button>
+							) : null}
 						</div>
 
 						<div className="grid grid-cols-2 gap-x-5 gap-y-[18px]">
@@ -175,6 +217,12 @@ export default function EmbeddedTrackingDriverSheet({
 					</div>
 				</div>
 			) : null}
+
+			<CheckListPushModal
+				isOpen={isPushModalOpen}
+				onClose={() => setIsPushModalOpen(false)}
+				drivers={isPushModalOpen && pushModalDriver ? [pushModalDriver] : null}
+			/>
 		</>
 	);
 }

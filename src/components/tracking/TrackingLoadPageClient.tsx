@@ -1761,11 +1761,14 @@ export default function TrackingLoadPageClient({
 								onToggle={() => setIsDriverInfoOpen(prev => !prev)}
 								toggleTopClassName="top-16"
 								driver={{
+									id: currentTrackingDriver.id,
 									firstName: currentTrackingDriver.firstName,
 									lastName: currentTrackingDriver.lastName,
+									email: currentTrackingDriver.email,
 									externalId: currentTrackingDriver.externalId,
 									phone: currentTrackingDriver.phone,
 									profilePhoto: currentTrackingDriver.profilePhoto,
+									driverStatus: currentTrackingDriver.driverStatus,
 									latitude: hasCurrentDriverCoordinates
 										? currentDriverLatitude
 										: null,
@@ -1774,6 +1777,7 @@ export default function TrackingLoadPageClient({
 										: null,
 									lastLocationUpdateAt:
 										currentTrackingDriver.lastLocationUpdateAt,
+									lastActiveApp: currentTrackingDriver.lastActiveApp,
 									driverStatusLabel,
 									loadStatusLabel,
 									loadNumber: loadReferenceNumber,
