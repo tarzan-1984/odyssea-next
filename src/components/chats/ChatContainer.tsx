@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import ChatList from "./ChatList";
@@ -11,6 +12,7 @@ import ContactsModal from "./ContactsModal";
 import { ChatRoom } from "@/app-api/chatApi";
 import { useWebSocketChatSync } from "@/hooks/useWebSocketChatSync";
 import { useChatModal } from "@/context/ChatModalContext";
+import { useSidebar } from "@/context/SidebarContext";
 import { useChatStore } from "@/stores/chatStore";
 import { findActiveLoadChatInList, resolveLoadChatRoom } from "@/utils/findLoadChatRoom";
 import {
@@ -35,6 +37,18 @@ import {
 	trackingTeamsQueryKey,
 } from "@/app-api/trackingTeams";
 
+const TrackingLoadPageClient = dynamic(
+	() => import("@/components/tracking/TrackingLoadPageClient"),
+	{
+		ssr: false,
+		loading: () => (
+			<div className="flex h-full items-center justify-center bg-[#eef8fb] text-sm text-gray-500">
+				Loading map...
+			</div>
+		),
+	}
+);
+
 export default function ChatContainer() {
 	const searchParams = useSearchParams();
 	const router = useRouter();
@@ -45,6 +59,9 @@ export default function ChatContainer() {
 	const unitFromUrl = searchParams.get("unit")?.trim() ?? null;
 	const tabFromUrl = parseLoadChatUrlTab(searchParams.get("tab"));
 	const currentUser = useCurrentUser();
+	const { isExpanded, setIsExpanded } = useSidebar();
+	const [isLoadMapOpen, setIsLoadMapOpen] = useState(false);
+	const sidebarExpandedBeforeMapRef = useRef<boolean | null>(null);
 
 	const showMyLoadsTab = canAccessMyLoadsChatTab(currentUser?.role);
 	const showMyTeamTab = canAccessMyTeamChatTab(currentUser?.role);
@@ -342,6 +359,45 @@ export default function ChatContainer() {
 			window.removeEventListener("odyssea:clearSelectedChat", onClearSelectedChat);
 	}, [selectedChatRoomId, setCurrentChatRoom, router, loadFromUrl, tabFromUrl]);
 
+	const selectedChatRoom = useMemo(() => {
+		if (!selectedChatRoomId) return null;
+		const fromList = chatRooms.find(room => room.id === selectedChatRoomId);
+		if (fromList) return fromList;
+		const current = useChatStore.getState().currentChatRoom;
+		return current?.id === selectedChatRoomId ? current : null;
+	}, [selectedChatRoomId, chatRooms]);
+
+	const loadMapId =
+		selectedChatRoom?.type === "LOAD" ? selectedChatRoom.loadId?.trim() || null : null;
+
+	useEffect(() => {
+		if (!loadMapId) {
+			setIsLoadMapOpen(false);
+		}
+	}, [loadMapId]);
+
+	useEffect(() => {
+		if (isLoadMapOpen) {
+			if (sidebarExpandedBeforeMapRef.current === null) {
+				sidebarExpandedBeforeMapRef.current = isExpanded;
+				setIsExpanded(false);
+			}
+			return;
+		}
+
+		if (sidebarExpandedBeforeMapRef.current !== null) {
+			setIsExpanded(sidebarExpandedBeforeMapRef.current);
+			sidebarExpandedBeforeMapRef.current = null;
+		}
+		// Snapshot sidebar only when map opens/closes; do not re-collapse on hover/toggle.
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+	}, [isLoadMapOpen, setIsExpanded]);
+
+	const handleToggleLoadMap = useCallback(() => {
+		if (!loadMapId) return;
+		setIsLoadMapOpen(prev => !prev);
+	}, [loadMapId]);
+
 	return (
 		<>
 			{noAccessLoadId ? (
@@ -366,8 +422,8 @@ export default function ChatContainer() {
 				</div>
 			) : null}
 			<div className="flex flex-col h-full gap-6 xl:flex-row xl:gap-5">
-				{/* Left Sidebar - Chat List */}
-				<div className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-[28%]">
+				{/* Left Sidebar - Chat List (width stays fixed when map opens) */}
+				<div className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-[28%] xl:shrink-0">
 					<ChatList
 						onChatSelect={handleChatSelect}
 						selectedChatId={selectedChatRoomId || undefined}
@@ -377,11 +433,35 @@ export default function ChatContainer() {
 					/>
 				</div>
 
-				{/* Right Side - Chat Box */}
-				<ChatBox
-					selectedChatRoomId={selectedChatRoomId || undefined}
-					webSocketChatSync={webSocketChatSync}
-				/>
+				{/* Remaining space: chat only, or chat 45% + map 55% */}
+				<div
+					className={
+						isLoadMapOpen && loadMapId
+							? "flex min-h-0 min-w-0 flex-1 flex-col gap-5 xl:flex-row"
+							: "flex min-h-0 min-w-0 flex-1"
+					}
+				>
+					<div
+						className={
+							isLoadMapOpen && loadMapId
+								? "min-h-0 min-w-0 xl:w-[45%]"
+								: "min-h-0 min-w-0 w-full"
+						}
+					>
+						<ChatBox
+							selectedChatRoomId={selectedChatRoomId || undefined}
+							webSocketChatSync={webSocketChatSync}
+							isLoadMapOpen={isLoadMapOpen}
+							onToggleLoadMap={loadMapId ? handleToggleLoadMap : undefined}
+							fillContainer
+						/>
+					</div>
+					{isLoadMapOpen && loadMapId ? (
+						<div className="relative min-h-[420px] min-w-0 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 xl:min-h-0 xl:w-[55%]">
+							<TrackingLoadPageClient loadId={loadMapId} embedded />
+						</div>
+					) : null}
+				</div>
 			</div>
 
 			{/* Modals */}

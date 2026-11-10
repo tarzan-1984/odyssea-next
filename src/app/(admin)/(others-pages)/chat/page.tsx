@@ -1,5 +1,4 @@
 import ChatContainer from "@/components/chats/ChatContainer";
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { ChatModalProvider } from "@/context/ChatModalContext";
 import ChatPageClient from "./ChatPageClient";
 import { Metadata } from "next";
@@ -22,8 +21,7 @@ export default function Chat() {
 	return (
 		<ChatModalProvider>
 			<div>
-				<PageBreadcrumb pageTitle="Chats" />
-				<div className="h-[calc(100vh-150px)] overflow-hidden sm:h-[calc(100vh-174px)]">
+				<div className="h-[calc(100vh-96px)] overflow-hidden sm:h-[calc(100vh-120px)]">
 					<Suspense fallback={<ChatFallback />}>
 						<ChatContainer />
 					</Suspense>

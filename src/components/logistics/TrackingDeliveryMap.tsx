@@ -30,6 +30,10 @@ const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ss
 
 const Polyline = dynamic(() => import("react-leaflet").then(mod => mod.Polyline), { ssr: false });
 
+const ZoomControl = dynamic(() => import("react-leaflet").then(mod => mod.ZoomControl), {
+	ssr: false,
+});
+
 type LoadLocation = {
 	address?: string | null;
 	short_address?: string | null;
@@ -929,6 +933,8 @@ interface TrackingDeliveryMapProps {
 	forceLightMapBasemap?: boolean;
 	/** Show Simple / Hybrid basemap toggle (MapTiler hybrid requires API key). */
 	enableBasemapModeSwitch?: boolean;
+	/** Offset Map/Hybrid below the page Back control (full tracking page). */
+	basemapSwitchBelowBack?: boolean;
 }
 
 export default function TrackingDeliveryMap({
@@ -948,6 +954,7 @@ export default function TrackingDeliveryMap({
 	pinnedHistoryPointIndices = EMPTY_PINNED_HISTORY_POINTS,
 	forceLightMapBasemap = false,
 	enableBasemapModeSwitch = false,
+	basemapSwitchBelowBack = false,
 }: TrackingDeliveryMapProps = {}) {
 	const { theme } = useTheme();
 	const [isDark, setIsDark] = useState(false);
@@ -1619,7 +1626,9 @@ export default function TrackingDeliveryMap({
 			</style>
 			{enableBasemapModeSwitch ? (
 				<div
-					className="pointer-events-none absolute left-4 top-[4.25rem] z-[1000] flex flex-col items-start gap-1"
+					className={`pointer-events-none absolute left-4 z-[1000] flex flex-col items-start gap-1 ${
+						basemapSwitchBelowBack ? "top-16" : "top-4"
+					}`}
 					role="group"
 					aria-label="Map display mode"
 				>
@@ -1672,10 +1681,12 @@ export default function TrackingDeliveryMap({
 				center={center}
 				zoom={initialZoom}
 				attributionControl={false}
+				zoomControl={false}
 				style={{ height: "100%", width: "100%" }}
 				scrollWheelZoom={true}
 				key={`map-${mapUsesDarkTiles ? "dark" : "light"}`}
 			>
+				<ZoomControl position="bottomleft" />
 				<MapRefSetter mapRef={mapRef} onZoomChange={handleZoomChange} />
 				<MapBackgroundClickListener onBackgroundClick={onMapBackgroundClick} />
 				<ResilientBasemapTileLayer

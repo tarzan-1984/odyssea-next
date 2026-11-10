@@ -1,5 +1,5 @@
 import TrackingPageWrapper from "../../[id]/TrackingPageWrapper";
-import TrackingLoadPageClient from "./TrackingLoadPageClient";
+import TrackingLoadPageClient from "@/components/tracking/TrackingLoadPageClient";
 
 export const metadata = {
 	title: "Odysseia Web",

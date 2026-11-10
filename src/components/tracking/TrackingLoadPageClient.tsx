@@ -9,11 +9,12 @@ import { io } from "socket.io-client";
 import { clientAuth } from "@/utils/auth";
 import { canEditLoadTrackingHistory } from "@/utils/roleAccess";
 import { useCurrentUser } from "@/stores/userStore";
-import DriverInfo, { getDriverInfoCardWidthClass } from "../../[id]/DriverInfo";
+import DriverInfo, { getDriverInfoCardWidthClass } from "@/app/tracking/[id]/DriverInfo";
 import DriverNotLoadedEnroutePanel from "@/components/logistics/DriverNotLoadedEnroutePanel";
 import DeliveredLoadBanner from "@/components/logistics/DeliveredLoadBanner";
 import TrackingStatusCard from "@/components/logistics/TrackingStatusCard";
 import PickupRoadEtaBanner from "@/components/logistics/PickupRoadEtaBanner";
+import EmbeddedTrackingDriverSheet from "@/components/tracking/EmbeddedTrackingDriverSheet";
 import { getStatusLabelForFilter } from "@/components/logistics/driversMapConstants";
 import { usePickupRoadEta } from "@/hooks/usePickupRoadEta";
 import {
@@ -53,6 +54,8 @@ const TrackingDeliveryMap = dynamic(() => import("@/components/logistics/Trackin
 
 interface TrackingLoadPageClientProps {
 	loadId: string;
+	/** Embedded in chat side panel: hide page Back control. */
+	embedded?: boolean;
 }
 
 type RouteGeocodeMarker = {
@@ -400,7 +403,10 @@ function getLoadRestFromDetails(details: LoadDetailsResponse | undefined): {
 	return { isRest, restDate, restStartedAt };
 }
 
-export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClientProps) {
+export default function TrackingLoadPageClient({
+	loadId,
+	embedded = false,
+}: TrackingLoadPageClientProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const currentUser = useCurrentUser();
@@ -408,6 +414,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [isAuthLoading, setIsAuthLoading] = useState(true);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+	const [isDriverInfoOpen, setIsDriverInfoOpen] = useState(false);
 	const [activeTrackingDeviceKey, setActiveTrackingDeviceKey] = useState<string | null>(null);
 	const [selectedHistoryPointIndex, setSelectedHistoryPointIndex] = useState<number | null>(null);
 	const [pinnedHistoryPointIndices, setPinnedHistoryPointIndices] = useState<number[]>([]);
@@ -1126,6 +1133,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 	/** Keep top banners centered in the same lane even when history panel is hidden. */
 	const reserveTopBannerRightLane = isAuthenticated && showMapAndTrackingTools;
 	const showBackButton =
+		!embedded &&
 		isAuthenticated &&
 		(mapUiMode === "map" || mapUiMode === "driver_not_loaded_enroute");
 
@@ -1278,7 +1286,14 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			: null;
 
 	return (
-		<section className="absolute inset-0 h-full w-full overflow-hidden bg-[#eef8fb]" data-load-id={loadId}>
+		<section
+			className={
+				embedded
+					? "relative h-full w-full overflow-hidden bg-[#eef8fb]"
+					: "absolute inset-0 h-full w-full overflow-hidden bg-[#eef8fb]"
+			}
+			data-load-id={loadId}
+		>
 			{isPageLoading && (
 				<div
 					className="absolute inset-0 z-[2000] flex items-center justify-center bg-white dark:bg-gray-950"
@@ -1330,7 +1345,11 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 			{isPageReady && (
 				<>
 					{mapUiMode === "no_app" && (
-						<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-16">
+						<div
+							className={`absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 ${
+								embedded ? "pt-6" : "pt-16"
+							}`}
+						>
 							<TrackingStatusCard
 								tone="info"
 								icon="phone"
@@ -1341,15 +1360,26 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							</TrackingStatusCard>
 						</div>
 					)}
-					{mapUiMode === "driver_not_loaded_enroute" && (
+					{mapUiMode === "driver_not_loaded_enroute" && !embedded && (
 						<DriverNotLoadedEnroutePanel
 							driverStatusLabel={driverStatusLabel}
 							driverExternalId={currentTrackingDriver?.externalId}
 						/>
 					)}
+					{mapUiMode === "driver_not_loaded_enroute" && embedded && (
+						<div className="absolute inset-0 z-[500] flex items-start justify-center bg-white px-6 pt-6">
+							<TrackingStatusCard
+								tone="info"
+								icon="load"
+								title="Driver is not loaded & enroute"
+							>
+								Map tracking will appear once the load status is Loaded & Enroute.
+							</TrackingStatusCard>
+						</div>
+					)}
 					{showMapAndTrackingTools && (
 						<>
-							{showPickupRoadEta ? (
+							{!embedded && showPickupRoadEta ? (
 								<PickupRoadEtaBanner
 									status={pickupRoadEta.status}
 									eta={pickupRoadEta.eta}
@@ -1358,7 +1388,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 									loadingLabel={roadEtaCopy.loading}
 									reserveRightForHistory={reserveTopBannerRightLane}
 								/>
-							) : showDeliveredLoadBanner ? (
+							) : !embedded && showDeliveredLoadBanner ? (
 								<DeliveredLoadBanner
 									reserveRightForHistory={reserveTopBannerRightLane}
 								/>
@@ -1368,6 +1398,7 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 								showEmptyMap
 								forceLightMapBasemap
 								enableBasemapModeSwitch
+								basemapSwitchBelowBack={!embedded}
 								initialZoom={4}
 								selectedLoadHistoryPointIndex={
 									isAuthenticated ? selectedHistoryPointIndex : null
@@ -1397,7 +1428,13 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 						</>
 					)}
 					{showLoadHistoryPanel && (
-						<div className="absolute right-4 top-4 z-[1000] flex max-h-[55vh] w-[363px] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-[14px] bg-white font-[Manrope,sans-serif] shadow-[0_8px_24px_rgba(8,20,41,0.12)]">
+						<div
+							className={`absolute right-4 top-4 z-[1000] flex max-h-[55vh] flex-col overflow-hidden rounded-[14px] bg-white font-[Manrope,sans-serif] shadow-[0_8px_24px_rgba(8,20,41,0.12)] ${
+								embedded
+									? "w-[min(320px,calc(100%-2rem))]"
+									: "w-[363px] max-w-[calc(100%-2rem)]"
+							}`}
+						>
 							<button
 								type="button"
 								className="flex w-full shrink-0 items-center justify-between gap-3 px-[18px] pb-4 pt-[14px] text-left"
@@ -1674,7 +1711,10 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							)}
 						</div>
 					)}
-					{isAuthenticated && currentTrackingDriver && !isLoadDelivered && (
+					{!embedded &&
+						isAuthenticated &&
+						currentTrackingDriver &&
+						!isLoadDelivered && (
 						<div
 							className={`absolute bottom-6 z-[1000] flex justify-center ${
 								loadRouteDetails.trim()
@@ -1711,6 +1751,41 @@ export default function TrackingLoadPageClient({ loadId }: TrackingLoadPageClien
 							/>
 						</div>
 					)}
+					{embedded &&
+						isAuthenticated &&
+						currentTrackingDriver &&
+						!isLoadDelivered &&
+						showMapAndTrackingTools && (
+							<EmbeddedTrackingDriverSheet
+								isOpen={isDriverInfoOpen}
+								onToggle={() => setIsDriverInfoOpen(prev => !prev)}
+								toggleTopClassName="top-16"
+								driver={{
+									firstName: currentTrackingDriver.firstName,
+									lastName: currentTrackingDriver.lastName,
+									externalId: currentTrackingDriver.externalId,
+									phone: currentTrackingDriver.phone,
+									profilePhoto: currentTrackingDriver.profilePhoto,
+									latitude: hasCurrentDriverCoordinates
+										? currentDriverLatitude
+										: null,
+									longitude: hasCurrentDriverCoordinates
+										? currentDriverLongitude
+										: null,
+									lastLocationUpdateAt:
+										currentTrackingDriver.lastLocationUpdateAt,
+									driverStatusLabel,
+									loadStatusLabel,
+									loadNumber: loadReferenceNumber,
+									loadId,
+									totalMiles: loadRouteTotalMiles,
+									currentLocation:
+										currentLocationPlaceLabel !== "N/A"
+											? currentLocationPlaceLabel
+											: null,
+								}}
+							/>
+						)}
 				</>
 			)}
 		</section>

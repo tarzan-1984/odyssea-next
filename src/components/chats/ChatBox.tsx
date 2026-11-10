@@ -38,6 +38,7 @@ import {
 	LOAD_DISPATCH_TERMS_ACCEPTED_CONTENT,
 } from "@/utils/loadDispatchTerms";
 import { canPinChatMessages, canSelectLoadChatPhotos, canSendChatMessages } from "@/utils/roleAccess";
+import { MapSearchIcon } from "@/icons";
 import { isSystemMessageVisibleToRole } from "@/utils/systemMessageKind";
 import ChatScrollDownIcon from "@/icons/ChatScrollDownIcon";
 import PinnedMessagesBar from "./PinnedMessagesBar";
@@ -49,6 +50,12 @@ interface ChatBoxProps {
 	/** Explicit: current user is the bid creator — +1 stays locked. */
 	disableBidPlusOne?: boolean;
 	webSocketChatSync: ReturnType<typeof useWebSocketChatSync>;
+	/** Load tracking map side panel is open. */
+	isLoadMapOpen?: boolean;
+	/** Toggle load tracking map beside the chat. */
+	onToggleLoadMap?: () => void;
+	/** Fill parent width (used when map panel is open). */
+	fillContainer?: boolean;
 }
 
 export default function ChatBox({
@@ -56,6 +63,9 @@ export default function ChatBox({
 	bidOwnerId = null,
 	disableBidPlusOne = false,
 	webSocketChatSync,
+	isLoadMapOpen = false,
+	onToggleLoadMap,
+	fillContainer = false,
 }: ChatBoxProps) {
 	const [useVirtualMessageList, setUseVirtualMessageList] = useState(true);
 	const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -1225,7 +1235,11 @@ export default function ChatBox({
 
 	if (!selectedChatRoom) {
 		return (
-			<div className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4">
+			<div
+				className={`flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${
+					fillContainer ? "w-full" : "xl:w-3/4"
+				}`}
+			>
 				<div className="flex items-center justify-center h-full">
 					<div className="text-center text-gray-500 dark:text-gray-400">
 						<svg
@@ -1268,7 +1282,9 @@ export default function ChatBox({
 		<ChatImageGalleryProvider messages={uniqueMessages}>
 			<div
 				data-chat-box
-				className="@container/size relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-3/4"
+				className={`@container/size relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${
+					fillContainer ? "w-full" : "xl:w-3/4"
+				}`}
 				onDragEnter={handleChatDragEnter}
 				onDragLeave={handleChatDragLeave}
 				onDragOver={handleChatDragOver}
@@ -1303,6 +1319,24 @@ export default function ChatBox({
 
 				{/* Messages */}
 				<div className="relative min-h-0 flex-1">
+					{selectedChatRoom?.type === "LOAD" &&
+					selectedChatRoom.loadId?.trim() &&
+					onToggleLoadMap ? (
+						<button
+							type="button"
+							onClick={onToggleLoadMap}
+							className={`absolute right-4 top-4 z-20 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 xl:right-5 xl:top-5 ${
+								isLoadMapOpen
+									? "border-brand-300 bg-brand-50 text-brand-600 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400"
+									: "border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400"
+							}`}
+							aria-label={isLoadMapOpen ? "Close map" : "Open map"}
+							aria-pressed={isLoadMapOpen}
+							title={isLoadMapOpen ? "Close map" : "Open map"}
+						>
+							<MapSearchIcon className="h-5 w-5" />
+						</button>
+					) : null}
 					<div
 						ref={attachMessagesContainer}
 						onScroll={handleScroll}
