@@ -473,10 +473,10 @@ export default function ChatBox({
 	const needsLoadDispatchTermsAcceptance = loadDispatchTermsUi.showAcceptButton;
 	const showAcceptShipmentTermsBar =
 		needsLoadDispatchTermsAcceptance && !isLoadArchivedReadOnlyChat;
+	const canSendMessages = canSendChatMessages(currentUser?.role);
+	// GAST keeps the admin-like composer chrome; send stays disabled via canSendMessages.
 	const hideComposer =
-		isLoadArchivedReadOnlyChat ||
-		loadDispatchTermsUi.hideComposer ||
-		!canSendChatMessages(currentUser?.role);
+		isLoadArchivedReadOnlyChat || loadDispatchTermsUi.hideComposer;
 
 	const chatUserNameLookup = React.useMemo(
 		() => buildChatUserNameLookup(chatParticipants, uniqueMessages),
@@ -993,7 +993,7 @@ export default function ChatBox({
 		fileData?: { fileUrl: string; key: string; fileName: string; fileSize: number }[];
 		replyData?: Message["replyData"];
 	}) => {
-		if (!selectedChatRoom || loadDispatchTermsUi.hideComposer) return;
+		if (!selectedChatRoom || loadDispatchTermsUi.hideComposer || !canSendMessages) return;
 
 		try {
 			sendTyping(false);
@@ -1544,6 +1544,7 @@ export default function ChatBox({
 						isBidChat={isBidChat}
 						bidOwnerId={bidOwnerId}
 						disableBidPlusOne={disableBidPlusOne}
+						disabled={!canSendMessages}
 					/>
 				) : null}
 			</div>

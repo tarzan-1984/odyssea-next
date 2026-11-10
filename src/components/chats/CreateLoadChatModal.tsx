@@ -19,6 +19,8 @@ import {
 	isEditorEmpty,
 	type EditorFormatCommand,
 } from "@/utils/chatRichEditor";
+import { useCurrentUser } from "@/stores/userStore";
+import { canCreateLoadChat } from "@/utils/roleAccess";
 
 interface CreateLoadChatModalProps {
 	isOpen: boolean;
@@ -140,6 +142,8 @@ function DispatchMessageEditor({
 }
 
 export default function CreateLoadChatModal({ isOpen, onClose }: CreateLoadChatModalProps) {
+	const currentUser = useCurrentUser();
+	const canSubmitCreate = canCreateLoadChat(currentUser?.role);
 	const [loadId, setLoadId] = useState("");
 	const [title, setTitle] = useState("");
 	const [company, setCompany] = useState<LoadChatCompany>("Odysseia");
@@ -264,6 +268,10 @@ export default function CreateLoadChatModal({ isOpen, onClose }: CreateLoadChatM
 
 	const handleSubmit = async (event: React.FormEvent) => {
 		event.preventDefault();
+		if (!canSubmitCreate) {
+			setError("You do not have permission to create load chats");
+			return;
+		}
 		setIsLoading(true);
 		setError("");
 
@@ -528,7 +536,11 @@ export default function CreateLoadChatModal({ isOpen, onClose }: CreateLoadChatM
 					<Button size="sm" variant="outline" onClick={onClose} disabled={isLoading}>
 						Cancel
 					</Button>
-					<Button size="sm" type="submit" disabled={isLoading || isLoadingUsers}>
+					<Button
+						size="sm"
+						type="submit"
+						disabled={!canSubmitCreate || isLoading || isLoadingUsers}
+					>
 						{isLoading ? "Creating..." : "Create Load Chat"}
 					</Button>
 				</div>

@@ -23,6 +23,7 @@ import {
 	canAccessMyLoadsChatTab,
 	canAccessMyTeamChatTab,
 	canCreateLoadChat,
+	isAdminLikeViewer,
 } from "@/utils/roleAccess";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -132,8 +133,9 @@ export default function ChatList({
 		() => canAccessMyTeamChatTab(currentUser?.role),
 		[currentUser?.role],
 	);
+	// GAST may open the create-load modal like admin; API submit stays gated by canCreateLoadChat.
 	const showCreateLoadChat = useMemo(
-		() => canCreateLoadChat(currentUser?.role),
+		() => canCreateLoadChat(currentUser?.role) || isAdminLikeViewer(currentUser?.role),
 		[currentUser?.role],
 	);
 

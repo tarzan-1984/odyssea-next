@@ -53,7 +53,10 @@ import Switch from "@/components/form/switch/Switch";
 import Button from "@/components/ui/button/Button";
 import { Tooltip } from "@/components/ui/tooltip/Tooltip";
 import { useCurrentUser } from "@/stores/userStore";
-import { canViewRestrictedDriverStatusesOnMap } from "@/utils/roleAccess";
+import {
+	canViewRestrictedDriverStatusesOnMap,
+	isAdminLikeViewer,
+} from "@/utils/roleAccess";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import CreateOfferModal, { type CreateOfferUrlPrefill } from "./CreateOfferModal";
 import LanguageFlagIcon from "./LanguageFlagIcon";
@@ -460,7 +463,7 @@ export default function DriversListTable({
 		hasAddedAny: false,
 	});
 
-	const isAdmin = currentUser?.role?.toLowerCase() === "administrator";
+	const isAdmin = isAdminLikeViewer(currentUser?.role);
 	const canViewRestrictedStatuses = canViewRestrictedDriverStatusesOnMap(currentUser?.role);
 	const hasActiveAddressSearch = Boolean(debouncedAddressFilter?.trim());
 	const hasActiveExtendedSearch =

@@ -9,6 +9,16 @@ export function isGastRole(role: string | undefined | null): boolean {
 	return role.trim().toUpperCase() === GAST_ROLE;
 }
 
+export function isAdministratorRole(role: string | undefined | null): boolean {
+	if (!role) return false;
+	return role.trim().toUpperCase() === "ADMINISTRATOR";
+}
+
+/** Page/data access that matches ADMINISTRATOR. Write actions stay separate. */
+export function isAdminLikeViewer(role: string | undefined | null): boolean {
+	return isAdministratorRole(role) || isGastRole(role);
+}
+
 export const DRIVERS_AND_OFFERS_ALLOWED_ROLES = [
 	"DISPATCHER",
 	"DISPATCHER_TL",
@@ -203,11 +213,12 @@ export function canAccessAppLogs(role: string | undefined | null): boolean {
 	return (APP_LOGS_ALLOWED_ROLES as readonly string[]).includes(normalized);
 }
 
-/** Offer log Rates column: bid amounts, administrators and tracking team leads only. */
+/** Offer log Rates column: bid amounts (admin-like viewers and tracking team leads). */
 export function canViewOfferLogRates(role: string | undefined | null): boolean {
+	if (isAdminLikeViewer(role)) return true;
 	if (!role) return false;
 	const normalized = role.trim().toUpperCase();
-	return normalized === "ADMINISTRATOR" || normalized === "TRACKING_TL";
+	return normalized === "TRACKING_TL";
 }
 
 /** News/Updates page: recruiters TL, tracking TL, and administrators. */
