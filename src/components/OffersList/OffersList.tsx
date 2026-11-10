@@ -1789,6 +1789,23 @@ const OffersList = () => {
 																]
 																	.filter(Boolean)
 																	.join(" ");
+																const hasOwnerBadge =
+																	driver.is_owner !== true && driver.owner_id != null;
+																const isOwnerBadge =
+																	driver.is_owner === true && driver.owner_id != null;
+																const ownerDisplayName = [
+																	driver.owner_first_name,
+																	driver.owner_last_name,
+																]
+																	.filter(Boolean)
+																	.join(" ")
+																	.trim();
+																const ownerLabel =
+																	hasOwnerBadge && driver.owner_id != null
+																		? `Owner: (${driver.owner_id})${
+																				ownerDisplayName ? ` ${ownerDisplayName}` : ""
+																			}`
+																		: null;
 																const tmsDriverUrl = buildTmsDriverPageUrl(driver.externalId);
 
 																return (
@@ -1817,6 +1834,15 @@ const OffersList = () => {
 																	<OfferDriverReadMarks read={Boolean(driver.is_read)} />
 																</span>
 																<div className="flex min-w-0 flex-col items-start gap-0.5">
+																	{isOwnerBadge ? (
+																		<span className="inline-flex h-[18px] shrink-0 items-center justify-center rounded px-1.5 text-[10px] font-medium leading-none text-white bg-[#2E7D32]">
+																			Owner
+																		</span>
+																	) : hasOwnerBadge ? (
+																		<span className="inline-flex h-[18px] shrink-0 items-center justify-center rounded px-1.5 text-[10px] font-medium leading-none text-black bg-[#FBC02D]">
+																			Has owner
+																		</span>
+																	) : null}
 																	<span className="inline-flex max-w-full items-center gap-1.5">
 																		{tmsDriverUrl ? (
 																			<a
@@ -1846,6 +1872,11 @@ const OffersList = () => {
 																			</span>
 																		) : null}
 																	</span>
+																	{ownerLabel ? (
+																		<span className="text-theme-xs text-brand-600 dark:text-brand-400 whitespace-nowrap">
+																			{ownerLabel}
+																		</span>
+																	) : null}
 																	{driver.phone ? (
 																		<a
 																			href={`tel:${driver.phone.replace(/\s/g, "")}`}

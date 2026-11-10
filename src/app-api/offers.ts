@@ -24,6 +24,13 @@ export interface OfferDriver {
 	total_miles: number | null;
 	driver_eta?: string | null;
 	driver_rating?: number | null;
+	/** True when this driver is the fleet owner (users.is_owner). */
+	is_owner?: boolean;
+	/** TMS owner id shared by the owner and their drivers. */
+	owner_id?: number | null;
+	/** Owner profile resolved for non-owner drivers with owner_id. */
+	owner_first_name?: string | null;
+	owner_last_name?: string | null;
 	has_offer_chat?: boolean;
 	/** True after a dispatcher quick reply was sent for this bid. */
 	quick_reply_sent?: boolean;
