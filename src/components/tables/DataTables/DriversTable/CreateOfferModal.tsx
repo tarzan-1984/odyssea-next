@@ -588,9 +588,6 @@ export default function CreateOfferModal({
 	const effectiveExternalId = editData?.externalId ?? externalId;
 	const effectiveDriverIds = editData?.selectedDriverIds ?? selectedDriverIds;
 	const effectiveDriverEmptyMiles = editData?.driverEmptyMiles ?? driverEmptyMiles;
-	const lockRouteStructureFromUrl = Boolean(
-		!editData && initialCreateOfferFromUrl?.route?.some(s => s.location.trim())
-	);
 
 	const [formValues, setFormValues] = useState(initialFormState);
 	const [routeRows, setRouteRows] = useState<RouteRow[]>([]);
@@ -1563,20 +1560,14 @@ export default function CreateOfferModal({
 									index
 								)}
 								canRemove={
-									!lockRouteStructureFromUrl &&
-									((row.type === "pickup" &&
+									(row.type === "pickup" &&
 										routeRows.filter(r => r.type === "pickup").length > 1) ||
-										(row.type === "delivery" &&
-											routeRows.filter(r => r.type === "delivery").length >
-												1))
+									(row.type === "delivery" &&
+										routeRows.filter(r => r.type === "delivery").length > 1)
 								}
 								rowCount={routeRows.length}
 								onAddRow={
-									lockRouteStructureFromUrl
-										? undefined
-										: row.type === "pickup"
-											? addPickUpRow
-											: addDeliveryRow
+									row.type === "pickup" ? addPickUpRow : addDeliveryRow
 								}
 							/>
 						))}
