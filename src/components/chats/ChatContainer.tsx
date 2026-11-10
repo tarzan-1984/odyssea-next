@@ -371,10 +371,8 @@ export default function ChatContainer() {
 		selectedChatRoom?.type === "LOAD" ? selectedChatRoom.loadId?.trim() || null : null;
 
 	useEffect(() => {
-		if (!loadMapId) {
-			setIsLoadMapOpen(false);
-		}
-	}, [loadMapId]);
+		setIsLoadMapOpen(false);
+	}, [selectedChatRoomId]);
 
 	useEffect(() => {
 		if (isLoadMapOpen) {
