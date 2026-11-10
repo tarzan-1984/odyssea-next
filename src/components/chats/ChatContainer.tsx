@@ -420,8 +420,14 @@ export default function ChatContainer() {
 				</div>
 			) : null}
 			<div className="flex flex-col h-full gap-6 xl:flex-row xl:gap-5">
-				{/* Left Sidebar - Chat List (width stays fixed when map opens) */}
-				<div className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:w-[28%] xl:shrink-0">
+				{/* Left Sidebar - Chat List (400px on 19"+ when map is open) */}
+				<div
+					className={`flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:shrink-0 ${
+						isLoadMapOpen && loadMapId
+							? "xl:w-[28%] min-[1920px]:w-[400px]"
+							: "xl:w-[28%]"
+					}`}
+				>
 					<ChatList
 						onChatSelect={handleChatSelect}
 						selectedChatId={selectedChatRoomId || undefined}
