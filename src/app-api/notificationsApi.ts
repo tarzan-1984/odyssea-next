@@ -23,7 +23,7 @@ export interface Notification {
 
 export interface NotificationsResponse {
   notifications: Notification[];
-  total: number;
+  total?: number;
   hasMore: boolean;
   unreadCount: number;
 }
@@ -46,7 +46,7 @@ class NotificationsApi {
   async getNotifications(page: number = 1, limit: number = 8): Promise<NotificationsResponse> {
     try {
       const response = await clientAuth.fetch(
-        `${this.baseUrl}?page=${page}&limit=${limit}`,
+        `${this.baseUrl}?page=${page}&limit=${limit}&includeTotal=false`,
         {
           method: 'GET',
         },

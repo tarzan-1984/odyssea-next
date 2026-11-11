@@ -10,6 +10,7 @@ interface NotificationsState {
   hasMore: boolean;
   currentPage: number;
   error: string | null;
+  lastLoadedAt: number | null;
 }
 
 interface NotificationsActions {
@@ -36,7 +37,10 @@ const initialState: NotificationsState = {
   hasMore: true,
   currentPage: 1,
   error: null,
+  lastLoadedAt: null,
 };
+
+const NOTIFICATIONS_CACHE_TTL_MS = 30_000;
 
 export const useNotificationsStore = create<NotificationsStore>()(
   devtools(
@@ -45,7 +49,16 @@ export const useNotificationsStore = create<NotificationsStore>()(
         ...initialState,
 
         loadNotifications: async (page: number = 1) => {
-          set({ isLoading: true, error: null });
+          const { notifications, lastLoadedAt } = get();
+          const hasFreshFirstPage =
+            page === 1 &&
+            notifications.length > 0 &&
+            lastLoadedAt !== null &&
+            Date.now() - lastLoadedAt < NOTIFICATIONS_CACHE_TTL_MS;
+
+          if (hasFreshFirstPage) return;
+
+          set({ isLoading: notifications.length === 0, error: null });
 
           try {
             const result = await notificationsApi.getNotifications(page, 8);
@@ -56,6 +69,7 @@ export const useNotificationsStore = create<NotificationsStore>()(
               currentPage: page,
               unreadCount: result.unreadCount, // Update unread count from notifications response
               isLoading: false,
+              lastLoadedAt: Date.now(),
             });
           } catch (error) {
             console.error('Failed to load notifications:', error);

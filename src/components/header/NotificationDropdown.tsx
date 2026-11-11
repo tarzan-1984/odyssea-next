@@ -160,7 +160,14 @@ export default function NotificationDropdown() {
 
 	// Deduplicate by id - same notification may arrive twice via WebSocket
 	const uniqueNotifications = useMemo(
-		() => notifications.filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i),
+		() => {
+			const seen = new Set<string>();
+			return notifications.filter((notification) => {
+				if (seen.has(notification.id)) return false;
+				seen.add(notification.id);
+				return true;
+			});
+		},
 		[notifications]
 	);
 
@@ -184,9 +191,6 @@ export default function NotificationDropdown() {
 		try {
 			// Load more notifications
 			await loadMoreNotifications();
-			
-			// Mark all notifications as read after loading more
-			await markAllAsRead();
 		} catch (error) {
 			console.error('Failed to load more notifications:', error);
 		} finally {
@@ -206,8 +210,11 @@ export default function NotificationDropdown() {
 
 		try {
 			await loadNotifications(1);
-			// Preserve the existing behavior: opening the dropdown marks all as read.
-			await markAllAsRead();
+			if (useNotificationsStore.getState().unreadCount > 0) {
+				markAllAsRead().catch((error) => {
+					console.error('Failed to mark notifications as read:', error);
+				});
+			}
 		} catch (error) {
 			console.error('Failed to load notifications:', error);
 		}

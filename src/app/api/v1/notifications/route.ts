@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page') || '1';
     const limit = searchParams.get('limit') || '8';
+    const includeTotal = searchParams.get('includeTotal');
 
     // Get access token from server-side authentication
     const accessToken = serverAuth.getAccessToken(request);
@@ -19,7 +20,9 @@ export async function GET(request: NextRequest) {
 
     // Proxy request to backend
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications?page=${page}&limit=${limit}`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/v1/notifications?page=${page}&limit=${limit}${
+        includeTotal === 'false' ? '&includeTotal=false' : ''
+      }`,
       {
         method: 'GET',
         headers: {
